@@ -46,9 +46,7 @@ export function drawInvestmentChart(canvas: HTMLCanvasElement | null, projection
   const baseY = padding.top + chartHeight;
   const maxValue = Math.max(
     1,
-    ...projection.points.map((point) =>
-      Math.max(point.netBalance + point.tax, point.realNetBalance, point.grossBalance + point.tax)
-    )
+    ...projection.points.map((point) => Math.max(point.netBalance, point.realNetBalance, point.grossBalance))
   );
 
   drawGrid(context, padding, chartWidth, chartHeight);
@@ -124,36 +122,7 @@ function drawSavingBar(
   baseY: number,
   maxValue: number
 ): void {
-  const radius = Math.min(6, width / 2);
-  const netBalance = Math.max(0, point.netBalance);
-  const growth = Math.min(netBalance, Math.max(0, point.growth));
-  const contribution = Math.max(0, netBalance - growth);
-  const tax = Math.max(0, point.tax);
-  const netHeight = baseY - valueToY(netBalance, padding, chartHeight, maxValue);
-  const totalHeight = baseY - valueToY(netBalance + tax, padding, chartHeight, maxValue);
-  const contributionHeight = baseY - valueToY(contribution, padding, chartHeight, maxValue);
-  const growthHeight = netHeight - contributionHeight;
-  const taxHeight = totalHeight - netHeight;
-
-  if (growthHeight <= 0 && taxHeight <= 0) {
-    roundedTopBar(context, x, baseY - contributionHeight, width, contributionHeight, radius, chartColors.grey);
-    return;
-  }
-
-  if (growthHeight <= 0) {
-    filledBarSegment(context, x, baseY - contributionHeight, width, contributionHeight, chartColors.grey);
-    roundedTopBar(context, x, baseY - totalHeight, width, taxHeight, radius, chartColors.red);
-    return;
-  }
-
-  filledBarSegment(context, x, baseY - contributionHeight, width, contributionHeight, chartColors.grey);
-  if (taxHeight <= 0) {
-    roundedTopBar(context, x, baseY - netHeight, width, growthHeight, radius, chartColors.green);
-    return;
-  }
-
-  filledBarSegment(context, x, baseY - netHeight, width, growthHeight, chartColors.green);
-  roundedTopBar(context, x, baseY - totalHeight, width, taxHeight, radius, chartColors.red);
+  drawBalanceCompositionBar(context, point, x, width, padding, chartHeight, baseY, maxValue);
 }
 
 function drawPayoutBar(
@@ -166,20 +135,55 @@ function drawPayoutBar(
   baseY: number,
   maxValue: number
 ): void {
+  drawBalanceCompositionBar(context, point, x, width, padding, chartHeight, baseY, maxValue);
+}
+
+function drawBalanceCompositionBar(
+  context: CanvasRenderingContext2D,
+  point: AssetProjectionPoint,
+  x: number,
+  width: number,
+  padding: ChartPadding,
+  chartHeight: number,
+  baseY: number,
+  maxValue: number
+): void {
   const radius = Math.min(6, width / 2);
   const netBalance = Math.max(0, point.netBalance);
-  const tax = Math.max(0, point.tax);
-  const netHeight = baseY - valueToY(netBalance, padding, chartHeight, maxValue);
-  const totalHeight = baseY - valueToY(netBalance + tax, padding, chartHeight, maxValue);
-  const taxHeight = totalHeight - netHeight;
+  const costBasis = Math.min(netBalance, Math.max(0, point.costBasis));
+  const growth = Math.max(0, netBalance - costBasis);
+  const tax = Math.min(growth, Math.max(0, point.periodTax));
+  const netGrowth = Math.max(0, growth - tax);
+  const segments = [
+    { height: valueToHeight(costBasis, padding, chartHeight, maxValue, baseY), color: chartColors.grey },
+    { height: valueToHeight(netGrowth, padding, chartHeight, maxValue, baseY), color: chartColors.green },
+    { height: valueToHeight(tax, padding, chartHeight, maxValue, baseY), color: chartColors.red }
+  ].filter((segment) => segment.height > 0);
 
-  if (taxHeight <= 0) {
-    roundedTopBar(context, x, baseY - netHeight, width, netHeight, radius, chartColors.purple);
-    return;
-  }
+  if (!segments.length) return;
 
-  filledBarSegment(context, x, baseY - netHeight, width, netHeight, chartColors.purple);
-  roundedTopBar(context, x, baseY - totalHeight, width, taxHeight, radius, chartColors.red);
+  let stackedHeight = 0;
+  segments.forEach((segment, index) => {
+    stackedHeight += segment.height;
+    const y = baseY - stackedHeight;
+    const isTopSegment = index === segments.length - 1;
+    if (isTopSegment) {
+      roundedTopBar(context, x, y, width, segment.height, radius, segment.color);
+      return;
+    }
+    filledBarSegment(context, x, y, width, segment.height, segment.color);
+  });
+}
+
+function valueToHeight(
+  value: number,
+  padding: ChartPadding,
+  chartHeight: number,
+  maxValue: number,
+  baseY: number
+): number {
+  if (value <= 0) return 0;
+  return baseY - valueToY(value, padding, chartHeight, maxValue);
 }
 
 function drawDashedLine(

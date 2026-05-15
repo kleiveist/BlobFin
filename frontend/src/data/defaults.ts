@@ -27,7 +27,7 @@ export function defaultPlanningSettings(): PlanningSettings {
     year: 2026,
     interestRatePercent: 2,
     cashbackRatePercent: 1,
-    emergencyFund: 3000
+    emergencyFund: 0
   };
 }
 
@@ -89,7 +89,7 @@ export function defaultPositions(): ReservePosition[] {
       id: "investitionsrate",
       active: true,
       name: "Investitionsrate",
-      type: "temporary",
+      type: "savings",
       amount: 150,
       startMonth: 1,
       endMonth: 12,
@@ -104,6 +104,7 @@ export function defaultPositions(): ReservePosition[] {
 export function defaultInvestmentSettings(): InvestmentSettings {
   return {
     includedIds: ["investitionsrate"],
+    includeAccountInterest: false,
     birthYear: 1993,
     chartStartAge: 32,
     payoutEndAge: 95,

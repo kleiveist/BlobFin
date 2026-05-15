@@ -58,6 +58,7 @@ export function buildAssetProjection(
   const percentageWithdrawalAnnualAtStart = percentageWithdrawalMonthlyAtStart * 12;
 
   const points: AssetProjectionPoint[] = [];
+  let previousTax = 0;
 
   for (let age = startAge; age <= endAge; age += 1) {
     const snapshot = snapshotAtAge(
@@ -70,7 +71,8 @@ export function buildAssetProjection(
       age,
       retirementSnapshot
     );
-    points.push(pointFromSnapshot(age, age > retirementAge ? "payout" : "saving", snapshot));
+    points.push(pointFromSnapshot(age, age > retirementAge ? "payout" : "saving", snapshot, previousTax));
+    previousTax = snapshot.tax;
   }
   const finalPoint = points[points.length - 1];
 
@@ -283,16 +285,19 @@ function netPercentageWithdrawalAtStart(snapshot: SavingSnapshot, settings: Inve
 function pointFromSnapshot(
   age: number,
   phase: AssetProjectionPoint["phase"],
-  snapshot: SavingSnapshot
+  snapshot: SavingSnapshot,
+  previousTax: number
 ): AssetProjectionPoint {
   return {
     age,
     phase,
     grossBalance: snapshot.grossBalance,
     contribution: snapshot.contribution,
+    costBasis: snapshot.costBasis,
     allowance: 0,
     growth: snapshot.growth,
     tax: snapshot.tax,
+    periodTax: Math.max(0, snapshot.tax - previousTax),
     netBalance: snapshot.netBalance,
     realNetBalance: snapshot.realNetBalance,
     normalDepot: snapshot.realNetBalance

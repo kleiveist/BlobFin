@@ -14,7 +14,7 @@ describe("reserve calculator", () => {
     expect(summary.maxRow.maxNeeded).toBe(2294);
     expect(summary.yearEndBalance).toBe(1040);
     expect(Math.round(summary.totalCashback * 100) / 100).toBe(38.88);
-    expect(summary.maxNeededWithEmergencyFund).toBe(5294);
+    expect(summary.maxNeededWithEmergencyFund).toBe(2294);
   });
 
   it("round-trips positions through semicolon csv", () => {
@@ -29,5 +29,6 @@ describe("reserve calculator", () => {
       type: "fixed",
       amount: 500
     });
+    expect(imported[imported.length - 1]?.type).toBe("savings");
   });
 });

@@ -8,7 +8,9 @@ export function investmentContributionForMonth(position: ReservePosition, month:
 }
 
 export function selectedMonthlyPattern(positions: ReservePosition[], settings: InvestmentSettings): number[] {
-  const selectedPositions = positions.filter((position) => settings.includedIds.includes(position.id) && position.active);
+  const selectedPositions = positions.filter(
+    (position) => position.type === "savings" && settings.includedIds.includes(position.id) && position.active
+  );
   const pattern: number[] = [];
 
   for (let month = 1; month <= 12; month += 1) {

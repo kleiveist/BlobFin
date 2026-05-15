@@ -13,7 +13,7 @@ export function calculatePositionValueAtMonthStart(position: ReservePosition, mo
   if (!isActiveInMonth(position, monthNumber)) return 0;
 
   if (position.type === "fixed") return Number(position.amount);
-  if (position.type === "temporary") return Number(position.amount);
+  if (position.type === "temporary" || position.type === "savings") return Number(position.amount);
 
   let balance = 0;
   for (let month = 1; month <= monthNumber; month += 1) {
@@ -33,7 +33,7 @@ export function calculatePositionEndOfMonthPermanent(position: ReservePosition, 
   if (position.type === "fixed") {
     return isActiveInMonth(position, monthNumber) ? Number(position.amount) : 0;
   }
-  if (position.type === "temporary") return 0;
+  if (position.type === "temporary" || position.type === "savings") return 0;
 
   let balance = 0;
   for (let month = 1; month <= monthNumber; month += 1) {
@@ -60,7 +60,7 @@ export function calculateInterestForSingleMonth(
 
   if (position.type === "fixed") return (Number(position.amount) * annualRate) / 12;
 
-  if (position.type === "temporary") {
+  if (position.type === "temporary" || position.type === "savings") {
     const payoutDay = Math.max(1, Math.min(Number(position.payoutDay || dim), dim));
     return (Number(position.amount) * annualRate * payoutDay) / 365;
   }
@@ -89,7 +89,9 @@ export function calculateCashbackForPosition(position: ReservePosition, cashback
   for (let month = 1; month <= 12; month += 1) {
     if (!isActiveInMonth(position, month)) continue;
 
-    if (position.type === "temporary" && position.payoutType === "monthly") eligibleVolume += Number(position.amount);
+    if ((position.type === "temporary" || position.type === "savings") && position.payoutType === "monthly") {
+      eligibleVolume += Number(position.amount);
+    }
     if (position.type === "reserve" && position.payoutType === "monthly") eligibleVolume += Number(position.amount);
     if (position.type === "reserve" && position.payoutType === "yearly" && Number(position.payoutMonth) === month) {
       eligibleVolume += calculatePositionValueAtMonthStart(position, month);

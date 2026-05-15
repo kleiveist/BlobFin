@@ -22,8 +22,10 @@ import { drawInvestmentChart } from "./views/investmentChart";
 import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from "./views/templates";
 
 const root = requireRootElement();
+const INTEREST_INVESTMENT_POSITION_ID = "__account-interest-investment";
 
 let state = loadInitialState();
+let draggedPositionId: string | null = null;
 normalizeInvestmentBounds();
 
 renderShell();
@@ -106,31 +108,69 @@ function bindEvents(): void {
     const action = button.dataset.action;
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
+    if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
     if (action === "export-positions") downloadText("kosten-und-ruecklagenpositionen.csv", exportPositionsCsv(state.positions));
     if (action === "export-year") downloadText("jahreskalkulator-ruecklagen.csv", exportYearTableCsv(state.settings, state.positions));
   });
 
+  root.addEventListener("dragstart", (event) => {
+    const handle = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-position-drag-id]");
+    if (!handle) return;
+
+    draggedPositionId = handle.dataset.positionDragId || null;
+    if (!draggedPositionId) return;
+
+    event.dataTransfer?.setData("text/plain", draggedPositionId);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    handle.closest("tr")?.classList.add("dragging");
+  });
+
+  root.addEventListener("dragover", (event) => {
+    const row = (event.target as HTMLElement | null)?.closest<HTMLTableRowElement>("tr[data-position-row]");
+    if (!row || !draggedPositionId) return;
+    event.preventDefault();
+    row.classList.add("drag-over");
+  });
+
+  root.addEventListener("dragleave", (event) => {
+    const row = (event.target as HTMLElement | null)?.closest<HTMLTableRowElement>("tr[data-position-row]");
+    row?.classList.remove("drag-over");
+  });
+
+  root.addEventListener("drop", (event) => {
+    const row = (event.target as HTMLElement | null)?.closest<HTMLTableRowElement>("tr[data-position-row]");
+    if (!row || !draggedPositionId) return;
+    event.preventDefault();
+
+    const targetId = row.dataset.positionRow;
+    if (targetId) {
+      const afterTarget = event.clientY > row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2;
+      reorderPosition(draggedPositionId, targetId, afterTarget);
+      renderAll();
+    }
+    clearDragState();
+  });
+
+  root.addEventListener("dragend", clearDragState);
   window.addEventListener("resize", drawCurrentInvestmentChart);
 }
 
 function renderAll(): void {
   normalizeInvestmentBounds();
+  const reserve = calculateReserveSummary(state.settings, state.positions);
   renderPositions();
-  renderInvestmentIncludeList();
-  renderCalculations();
+  renderInvestmentIncludeList(reserve);
+  renderCalculations(reserve);
   syncInvestmentInputsFromState();
   saveState(state);
 }
 
-function renderCalculations(): void {
-  const reserve = calculateReserveSummary(state.settings, state.positions);
-  const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>): void {
+  const projection = buildCurrentAssetProjection(reserve);
 
   setText("maxNeeded", money(reserve.maxRow.maxNeeded));
-  setText("maxNeededHint", `${reserve.maxRow.month}, ohne Notgroschen`);
-  setText("maxNeededWithEmergencyFund", money(reserve.maxNeededWithEmergencyFund));
-  setText("maxNeededWithEmergencyFundHint", `${money(state.settings.emergencyFund)} Notgroschen enthalten`);
+  setText("maxNeededHint", reserve.maxRow.month);
   setText("yearEndBalance", money(reserve.yearEndBalance));
   setText("totalInterest", money(reserve.totalInterest));
   setText("totalCashback", money(reserve.totalCashback));
@@ -187,7 +227,10 @@ function renderPositions(): void {
   body.innerHTML = state.positions
     .map((position) => {
       return `
-        <tr>
+        <tr data-position-row="${position.id}">
+          <td class="reorder-cell">
+            <button class="drag-handle" type="button" draggable="true" data-position-drag-id="${position.id}" aria-label="Position verschieben" title="Position verschieben">:::</button>
+          </td>
           <td><input type="checkbox" data-position-id="${position.id}" data-position-field="active" ${
             position.active ? "checked" : ""
           } /></td>
@@ -267,11 +310,24 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
   `;
 }
 
-function renderInvestmentIncludeList(): void {
+function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserveSummary>): void {
   const list = document.querySelector<HTMLDivElement>("#investmentIncludeList");
   if (!list) return;
 
-  list.innerHTML = state.positions
+  const interestButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-interest-investment']");
+  if (interestButton) {
+    interestButton.classList.toggle("active", state.investment.includeAccountInterest);
+    interestButton.setAttribute("aria-pressed", String(state.investment.includeAccountInterest));
+  }
+  setText("interestInvestmentAmount", `${money(summary.totalInterest)} jaehrlich aus Jahrestabelle`);
+
+  const savingsPositions = state.positions.filter((position) => position.type === "savings");
+  if (!savingsPositions.length) {
+    list.innerHTML = `<div class="include-empty">Keine Sparrate angelegt.</div>`;
+    return;
+  }
+
+  list.innerHTML = savingsPositions
     .map((position) => {
       const checked = state.investment.includedIds.includes(position.id) ? "checked" : "";
       const inactive = position.active ? "" : `<span class="muted">(inaktiv)</span>`;
@@ -306,7 +362,7 @@ function syncAllInputsFromState(): void {
 function syncInvestmentInputsFromState(): void {
   syncInvestmentInputBounds();
   for (const key of Object.keys(state.investment) as Array<keyof InvestmentSettings>) {
-    if (key === "includedIds") continue;
+    if (key === "includedIds" || key === "includeAccountInterest") continue;
     setInputValue(`[data-investment="${key}"]`, state.investment[key]);
   }
   setInputValue("[data-retirement-age]", calculatePayoutStartAge(state.investment));
@@ -331,7 +387,7 @@ function updatePlanningSetting(field: keyof PlanningSettings, value: string): vo
 }
 
 function updateInvestmentSetting(field: keyof InvestmentSettings, value: string): void {
-  if (field === "includedIds") return;
+  if (field === "includedIds" || field === "includeAccountInterest") return;
   if (field === "payoutEndAge") {
     const retirementAge = calculatePayoutStartAge(state.investment);
     const payoutEndAge = clamp(numberValue(value), investmentMin(field), investmentMax(field));
@@ -378,7 +434,7 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
         next[field] = numberValue(String(value));
         break;
       case "type":
-        if (value === "fixed" || value === "reserve" || value === "temporary") next.type = value;
+        if (value === "fixed" || value === "reserve" || value === "temporary" || value === "savings") next.type = value;
         break;
       case "payoutType":
         if (value === "none" || value === "monthly" || value === "yearly") next.payoutType = value;
@@ -442,6 +498,29 @@ function toggleInvestmentPosition(id: string, checked: boolean): void {
   state.investment = { ...state.investment, includedIds: Array.from(includedIds) };
 }
 
+function toggleInterestInvestment(): void {
+  state.investment = {
+    ...state.investment,
+    includeAccountInterest: !state.investment.includeAccountInterest
+  };
+  renderAll();
+}
+
+function reorderPosition(sourceId: string, targetId: string, afterTarget: boolean): void {
+  if (sourceId === targetId) return;
+
+  const moved = state.positions.find((position) => position.id === sourceId);
+  if (!moved) return;
+
+  const withoutMoved = state.positions.filter((position) => position.id !== sourceId);
+  const targetIndex = withoutMoved.findIndex((position) => position.id === targetId);
+  if (targetIndex < 0) return;
+
+  const insertIndex = afterTarget ? targetIndex + 1 : targetIndex;
+  withoutMoved.splice(insertIndex, 0, moved);
+  state.positions = withoutMoved;
+}
+
 function resetState(): void {
   state = resetStoredState();
   state.investment = defaultInvestmentSettings();
@@ -461,7 +540,9 @@ async function importPositionsFromFile(file: File | undefined): Promise<void> {
   state.positions = imported;
   state.investment = {
     ...state.investment,
-    includedIds: state.investment.includedIds.filter((id) => imported.some((position) => position.id === id))
+    includedIds: state.investment.includedIds.filter((id) =>
+      imported.some((position) => position.id === id && position.type === "savings")
+    )
   };
   renderAll();
 }
@@ -505,8 +586,52 @@ function setInputBounds(selector: string, min: number, max: number): void {
 }
 
 function drawCurrentInvestmentChart(): void {
-  const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+  const reserve = calculateReserveSummary(state.settings, state.positions);
+  const projection = buildCurrentAssetProjection(reserve);
   drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection);
+}
+
+function buildCurrentAssetProjection(summary: ReturnType<typeof calculateReserveSummary>) {
+  return buildAssetProjection(
+    state.settings.year,
+    investmentPositionsForProjection(summary.totalInterest),
+    investmentSettingsForProjection(summary.totalInterest)
+  );
+}
+
+function investmentPositionsForProjection(annualInterest: number): ReservePosition[] {
+  if (!state.investment.includeAccountInterest || annualInterest <= 0) return state.positions;
+  return [
+    ...state.positions,
+    {
+      id: INTEREST_INVESTMENT_POSITION_ID,
+      active: true,
+      name: "Zinsen aus Jahrestabelle",
+      type: "savings",
+      amount: annualInterest,
+      startMonth: 1,
+      endMonth: 12,
+      payoutType: "yearly",
+      payoutMonth: 12,
+      payoutDay: 31,
+      cashback: false
+    }
+  ];
+}
+
+function investmentSettingsForProjection(annualInterest: number): InvestmentSettings {
+  if (!state.investment.includeAccountInterest || annualInterest <= 0) return state.investment;
+  return {
+    ...state.investment,
+    includedIds: Array.from(new Set([...state.investment.includedIds, INTEREST_INVESTMENT_POSITION_ID]))
+  };
+}
+
+function clearDragState(): void {
+  draggedPositionId = null;
+  for (const row of root.querySelectorAll("tr.dragging, tr.drag-over")) {
+    row.classList.remove("dragging", "drag-over");
+  }
 }
 
 function normalizeInvestmentBounds(): void {

@@ -57,6 +57,18 @@ describe("investment calculator", () => {
     expect(projection.realWealthAtRetirement).toBeCloseTo(7609.52, 1);
   });
 
+  it("ignores selected positions that are not marked as savings rates", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate" ? { ...position, type: "temporary" } : position
+    );
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.monthlyRate).toBe(0);
+    expect(projection.annualSavingsRate).toBe(0);
+  });
+
   it("realizes tax during saving when percentage withdrawals start before retirement", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>
@@ -77,10 +89,13 @@ describe("investment calculator", () => {
 
     const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
     const firstTaxedSavingPoint = projection.points.find((point) => point.age === 52);
+    const firstPayoutPoint = projection.points.find((point) => point.age === 63);
 
     expect(projection.retirementAge).toBe(62);
     expect(projection.taxAtRetirement).toBeGreaterThan(0);
     expect(projection.taxAtEnd).toBeGreaterThan(projection.taxAtRetirement);
     expect(firstTaxedSavingPoint?.tax).toBeGreaterThan(0);
+    expect(firstTaxedSavingPoint?.periodTax).toBeGreaterThan(0);
+    expect(firstPayoutPoint?.costBasis).toBeGreaterThan(0);
   });
 });

@@ -194,6 +194,9 @@ function parseTypeValue(value: unknown): PositionType {
   if (["fixbestand", "fixed", "fix"].includes(normalized)) return "fixed";
   if (["monatlicheruecklage", "ruecklage", "reserve", "monthlyreserve"].includes(normalized)) return "reserve";
   if (["temporaermonatlich", "temporarmonatlich", "temporary", "durchlauf"].includes(normalized)) return "temporary";
+  if (["sparrate", "sparen", "saving", "savings", "investment", "investitionsrate"].includes(normalized)) {
+    return "savings";
+  }
   return "reserve";
 }
 

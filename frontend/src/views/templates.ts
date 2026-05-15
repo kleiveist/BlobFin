@@ -20,11 +20,10 @@ export function renderAppShell(): string {
           <div class="section-heading">
             <h2>Grunddaten</h2>
           </div>
-          <div class="field-grid">
+          <div class="field-grid settings-field-grid">
             ${numberField("year", "Jahr", "setting", "year", { min: 2000, max: 2100, step: 1 })}
             ${numberField("interestRatePercent", "Jahreszins Konto in %", "setting", "interestRatePercent", { min: 0, step: 0.01 })}
             ${numberField("cashbackRatePercent", "Cashback in %", "setting", "cashbackRatePercent", { min: 0, step: 0.01 })}
-            ${numberField("emergencyFund", "Notgroschen separat", "setting", "emergencyFund", { min: 0, step: 1 })}
           </div>
         </form>
 
@@ -33,8 +32,7 @@ export function renderAppShell(): string {
             <h2>Ergebnis</h2>
           </div>
           <div class="summary-grid">
-            ${metric("maxNeeded", "Max. benoetigter Kontostand", "ohne Notgroschen", true)}
-            ${metric("maxNeededWithEmergencyFund", "Kontoziel inkl. Notgroschen", "Arbeitswert fuer Liquiditaet", true)}
+            ${metric("maxNeeded", "Max. benoetigter Kontostand", "monatlicher Spitzenbedarf", true)}
             ${metric("yearEndBalance", "Dauerhafter Bestand Jahresende", "ohne temporaere Durchlaufbetraege", false)}
             ${metric("totalInterest", "Zinsen pro Jahr", "vereinfachte Tages-/Monatslogik", false)}
             ${metric("totalCashback", "Cashback pro Jahr", "nur Positionen mit Cashback", false)}
@@ -62,6 +60,7 @@ export function renderAppShell(): string {
           <table>
             <thead>
               <tr>
+                <th class="reorder-col"></th>
                 <th>Aktiv</th>
                 <th>Name</th>
                 <th>Art</th>
@@ -100,6 +99,10 @@ export function renderAppShell(): string {
         <div class="investment-grid">
           <div class="investment-selector">
             <h3>Investierbare Positionen</h3>
+            <button class="include-interest-toggle" type="button" data-action="toggle-interest-investment" aria-pressed="false">
+              <span>Zinsen in Altersvorsorge</span>
+              <strong id="interestInvestmentAmount">-</strong>
+            </button>
             <div id="investmentIncludeList" class="include-list"></div>
           </div>
 
@@ -145,7 +148,6 @@ export function renderAppShell(): string {
                 <span class="legend-item"><span class="legend-dot grey"></span> Eigenbeitrag</span>
                 <span class="legend-item"><span class="legend-dot orange"></span> Zulagen</span>
                 <span class="legend-item"><span class="legend-dot green"></span> Wertzuwachs</span>
-                <span class="legend-item"><span class="legend-dot purple"></span> Restguthaben (Auszahlung)</span>
                 <span class="legend-item"><span class="legend-dot red"></span> Kapitalertragsteuer</span>
                 <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
               </div>
@@ -188,6 +190,7 @@ export function positionTypeSelect(position: ReservePosition): string {
       <option value="fixed" ${position.type === "fixed" ? "selected" : ""}>Fixbestand</option>
       <option value="reserve" ${position.type === "reserve" ? "selected" : ""}>Monatliche Ruecklage</option>
       <option value="temporary" ${position.type === "temporary" ? "selected" : ""}>Temporaer</option>
+      <option value="savings" ${position.type === "savings" ? "selected" : ""}>Sparrate</option>
     </select>
   `;
 }

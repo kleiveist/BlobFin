@@ -49,7 +49,7 @@ function normalizeLegacyState(value: unknown): AppState {
       year: numberOrDefault(value.year, fallback.settings.year),
       interestRatePercent: numberOrDefault(value.interestRate, fallback.settings.interestRatePercent),
       cashbackRatePercent: numberOrDefault(value.cashbackRate, fallback.settings.cashbackRatePercent),
-      emergencyFund: numberOrDefault(value.emergencyFund, fallback.settings.emergencyFund)
+      emergencyFund: 0
     },
     positions: normalizePositions(value.positions, fallback.positions),
     investment: normalizeLegacyInvestmentSettings(value.investmentSettings)
@@ -63,7 +63,7 @@ function normalizePlanningSettings(value: unknown): PlanningSettings {
     year: numberOrDefault(value.year, fallback.year),
     interestRatePercent: numberOrDefault(value.interestRatePercent, fallback.interestRatePercent),
     cashbackRatePercent: numberOrDefault(value.cashbackRatePercent, fallback.cashbackRatePercent),
-    emergencyFund: numberOrDefault(value.emergencyFund, fallback.emergencyFund)
+    emergencyFund: 0
   };
 }
 
@@ -72,6 +72,7 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
   if (!isRecord(value)) return fallback;
   return {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
+    includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
@@ -95,6 +96,7 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
   if (!isRecord(value)) return fallback;
   return {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
+    includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
@@ -123,7 +125,7 @@ function normalizePositions(value: unknown, fallback: ReservePosition[]): Reserv
         id: String(item.id || createId()),
         active: Boolean(item.active),
         name: String(item.name || "Position"),
-        type: item.type === "fixed" || item.type === "temporary" ? item.type : "reserve",
+        type: normalizePositionType(item.type),
         amount: numberOrDefault(item.amount, 0),
         startMonth: numberOrDefault(item.startMonth, 1),
         endMonth: numberOrDefault(item.endMonth, 12),
@@ -132,6 +134,7 @@ function normalizePositions(value: unknown, fallback: ReservePosition[]): Reserv
         payoutDay: numberOrDefault(item.payoutDay, 31),
         cashback: Boolean(item.cashback)
       };
+      if (position.id === "investitionsrate" && position.type === "temporary") position.type = "savings";
       return position;
     })
     .filter((position): position is ReservePosition => position !== null);
@@ -149,4 +152,14 @@ function numberOrDefault(value: unknown, fallback: number): number {
 function stringArrayOrDefault(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) return fallback;
   return value.map(String);
+}
+
+function booleanOrDefault(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  return fallback;
+}
+
+function normalizePositionType(value: unknown): ReservePosition["type"] {
+  if (value === "fixed" || value === "reserve" || value === "temporary" || value === "savings") return value;
+  return "reserve";
 }

@@ -1,4 +1,4 @@
-export type PositionType = "fixed" | "reserve" | "temporary";
+export type PositionType = "fixed" | "reserve" | "temporary" | "savings";
 export type PayoutType = "none" | "monthly" | "yearly";
 
 export interface ReservePosition {
@@ -24,6 +24,7 @@ export interface PlanningSettings {
 
 export interface InvestmentSettings {
   includedIds: string[];
+  includeAccountInterest: boolean;
   birthYear: number;
   chartStartAge: number;
   payoutEndAge: number;
@@ -83,9 +84,11 @@ export interface AssetProjectionPoint {
   phase: "saving" | "payout";
   grossBalance: number;
   contribution: number;
+  costBasis: number;
   allowance: number;
   growth: number;
   tax: number;
+  periodTax: number;
   netBalance: number;
   realNetBalance: number;
   normalDepot: number;
