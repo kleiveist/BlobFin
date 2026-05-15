@@ -1,0 +1,31 @@
+{
+  "steps": [
+    {
+      "id": "personal-data",
+      "fields": [
+        { "id": "person_1_first_name", "label": "First name" },
+        { "id": "person_1_last_name", "label": "Last name" },
+        { "id": "person_1_birthdate", "label": "Birthdate" },
+        { "id": "person_1_marital_status", "label": "Marital status" },
+        { "id": "person_1_nationality", "label": "Nationality" },
+        { "id": "person_1_address_street", "label": "Street" },
+        { "id": "person_1_address_zip", "label": "ZIP" },
+        { "id": "person_1_address_city", "label": "City" },
+        { "id": "person_1_phone", "label": "Phone" },
+        { "id": "person_1_email", "label": "Email" },
+        { "id": "person_1_employment_status", "label": "Employment status" },
+        { "id": "person_2_first_name", "label": "First name" },
+        { "id": "person_2_last_name", "label": "Last name" },
+        { "id": "person_2_birthdate", "label": "Birthdate" },
+        { "id": "person_2_marital_status", "label": "Marital status" },
+        { "id": "person_2_nationality", "label": "Nationality" },
+        { "id": "person_2_address_street", "label": "Street" },
+        { "id": "person_2_address_zip", "label": "ZIP" },
+        { "id": "person_2_address_city", "label": "City" },
+        { "id": "person_2_phone", "label": "Phone" },
+        { "id": "person_2_email", "label": "Email" },
+        { "id": "person_2_employment_status", "label": "Employment status" }
+      ]
+    }
+  ]
+}

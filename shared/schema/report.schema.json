@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://imocalc.local/schema/report.schema.json",
+  "title": "ImoCalc PDF report payload",
+  "type": "object",
+  "required": ["locale", "formValues", "calculationResult", "derivedResult"],
+  "additionalProperties": true,
+  "properties": {
+    "locale": {
+      "type": "string",
+      "enum": ["en", "de"]
+    },
+    "formValues": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "calculationResult": {
+      "type": "object",
+      "required": ["costs", "rate", "risk", "scenario"],
+      "additionalProperties": true,
+      "properties": {
+        "costs": {
+          "type": "object"
+        },
+        "rate": {
+          "type": "object"
+        },
+        "risk": {
+          "type": "object"
+        },
+        "scenario": {
+          "type": "object"
+        }
+      }
+    },
+    "derivedResult": {
+      "type": "object",
+      "required": [
+        "totalProjectCost",
+        "totalEquity",
+        "financingNeeded",
+        "monthlyLoanPayment",
+        "loanBalanceAfterYears",
+        "riskAssessment"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "totalProjectCost": {
+          "type": "number"
+        },
+        "totalEquity": {
+          "type": "number"
+        },
+        "financingNeeded": {
+          "type": "number"
+        },
+        "monthlyLoanPayment": {
+          "type": "number"
+        },
+        "loanBalanceAfterYears": {
+          "type": "object"
+        },
+        "riskAssessment": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

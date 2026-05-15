@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://imocalc.local/schema/input.schema.json",
+  "title": "ImoCalc financing input",
+  "type": "object",
+  "required": ["propertyPrice", "equity"],
+  "additionalProperties": false,
+  "properties": {
+    "propertyPrice": {
+      "type": "number",
+      "minimum": 0
+    },
+    "equity": {
+      "type": "number",
+      "minimum": 0
+    },
+    "interestRate": {
+      "type": "number",
+      "minimum": 0
+    },
+    "repaymentRate": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "en": {
+    "title": "Privacy Policy",
+    "description": "This privacy policy explains how ImoCalc handles data while generating local calculations and reports.",
+    "sections": [
+      {
+        "title": "Responsible provider",
+        "paragraphs": [
+          "ImoCalc is operated for local mortgage planning workflows.",
+          "Hosting and infrastructure may be provided by Hetzner Online GmbH."
+        ]
+      },
+      {
+        "title": "Data processing",
+        "paragraphs": [
+          "Calculation data is processed to generate financing scenarios, validation responses and PDF reports.",
+          "ImoCalc does not set cookies."
+        ]
+      },
+      {
+        "title": "User rights",
+        "paragraphs": [
+          "User rights include access, rectification, deletion and restriction of processing where applicable."
+        ],
+        "items": [
+          "Request information about stored data.",
+          "Ask for corrections when data is inaccurate.",
+          "Request deletion where no retention obligation applies."
+        ]
+      }
+    ]
+  },
+  "de": {
+    "title": "Datenschutzerklaerung",
+    "description": "Diese Datenschutzerklaerung beschreibt, wie ImoCalc Daten fuer lokale Berechnungen und Reports verarbeitet.",
+    "sections": [
+      {
+        "title": "Verantwortlicher Anbieter",
+        "paragraphs": [
+          "ImoCalc wird fuer lokale Baufinanzierungs-Workflows betrieben.",
+          "Hosting und Infrastruktur koennen durch Hetzner Online GmbH bereitgestellt werden."
+        ]
+      },
+      {
+        "title": "Datenverarbeitung",
+        "paragraphs": [
+          "Berechnungsdaten werden genutzt, um Finanzierungsszenarien, Validierungen und PDF-Reports zu erzeugen.",
+          "ImoCalc setzt keine Cookies."
+        ]
+      },
+      {
+        "title": "Betroffenenrechte",
+        "paragraphs": [
+          "Betroffenenrechte umfassen Auskunft, Berichtigung, Loeschung und Einschraenkung der Verarbeitung, soweit anwendbar."
+        ],
+        "items": [
+          "Auskunft ueber gespeicherte Daten verlangen.",
+          "Korrektur unrichtiger Daten anfordern.",
+          "Loeschung verlangen, soweit keine Aufbewahrungspflicht besteht."
+        ]
+      }
+    ]
+  }
+}
