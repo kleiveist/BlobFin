@@ -104,14 +104,15 @@ export function defaultPositions(): ReservePosition[] {
 export function defaultInvestmentSettings(): InvestmentSettings {
   return {
     includedIds: ["investitionsrate"],
-    birthYear: 1980,
-    chartStartAge: 18,
+    birthYear: 1993,
+    chartStartAge: 32,
     payoutEndAge: 95,
-    payoutYears: 30,
-    investmentReturnPercent: 7,
+    payoutYears: 45,
+    percentageWithdrawalStartAge: 0,
+    percentageWithdrawalRatePercent: 4,
+    investmentReturnPercent: 14,
     capitalGainsTaxPercent: 26.375,
-    inflationRatePercent: 2,
-    withdrawalMode: "annuity"
+    inflationRatePercent: 2
   };
 }
 

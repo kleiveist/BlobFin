@@ -1,10 +1,16 @@
 import { isActiveInMonth } from "./reserveCalculator";
-import { calculateInvestmentResult } from "./investmentCalculator";
+import { annuityPayment } from "./investmentCalculator";
 import type { AssetProjection, AssetProjectionPoint, InvestmentSettings, ReservePosition } from "../types";
 
 interface SavingSnapshot {
   grossBalance: number;
   contribution: number;
+  withdrawals: number;
+  growth: number;
+  tax: number;
+  netBalance: number;
+  realNetBalance: number;
+  inflationFactor: number;
 }
 
 export function payoutStartAge(settings: InvestmentSettings): number {
@@ -31,113 +37,208 @@ export function buildAssetProjection(
   positions: ReservePosition[],
   settings: InvestmentSettings
 ): AssetProjection {
-  const investment = calculateInvestmentResult(year, positions, settings);
-  const startAge = Math.min(settings.chartStartAge, investment.payoutStartAge);
-  const endAge = Math.max(settings.payoutEndAge, investment.payoutStartAge + 1);
+  const ageToday = Math.max(0, year - settings.birthYear);
+  const retirementAge = payoutStartAge(settings);
+  const startAge = Math.min(settings.chartStartAge, retirementAge);
+  const endAge = Math.max(settings.payoutEndAge, retirementAge + 1);
   const monthlyPattern = selectedMonthlyPattern(positions, settings);
   const monthlyRate = monthlyPattern.reduce((sum, value) => sum + value, 0) / 12;
+  const annualSavingsRate = monthlyRate * 12;
   const annualReturn = settings.investmentReturnPercent / 100;
   const monthlyReturn = (1 + annualReturn) ** (1 / 12) - 1;
-  const monthlyPension =
-    settings.withdrawalMode === "fourPercent" ? (investment.netWealth * 0.04) / 12 : investment.monthlyPensionNet;
+  const retirementSnapshot = savingSnapshot(monthlyPattern, monthlyReturn, settings, ageToday, retirementAge);
+  const payoutMonths = Math.max(1, Math.round((endAge - retirementAge) * 12));
+  const monthlyPension = annuityPayment(retirementSnapshot.netBalance, monthlyReturn, payoutMonths);
+  const realMonthlyPension =
+    retirementSnapshot.inflationFactor > 0 ? monthlyPension / retirementSnapshot.inflationFactor : monthlyPension;
+  const percentageBase = snapshotAtAge(
+    monthlyPattern,
+    monthlyReturn,
+    monthlyPension,
+    settings,
+    ageToday,
+    retirementAge,
+    Math.max(settings.percentageWithdrawalStartAge, ageToday),
+    retirementSnapshot.netBalance
+  );
+  const percentageWithdrawalMonthlyAtStart =
+    percentageBase.netBalance * (settings.percentageWithdrawalRatePercent / 100) / 12;
 
   const points: AssetProjectionPoint[] = [];
 
-  for (let age = startAge; age <= investment.payoutStartAge; age += 1) {
-    const elapsedMonths = Math.max(0, Math.min(investment.savingMonths, Math.round((age - investment.ageToday) * 12)));
-    const snapshot = savingSnapshot(monthlyPattern, monthlyReturn, elapsedMonths);
-    const point = savingPoint(age, snapshot, settings, investment.ageToday);
-
-    if (age === investment.payoutStartAge) {
-      point.grossBalance = investment.grossWealth;
-      point.contribution = investment.totalContribution;
-      point.growth = investment.growth;
-      point.netBalance = investment.netWealth;
-      point.realNetBalance = investment.realWealth;
-      point.normalDepot = investment.realWealth;
-    }
-
-    points.push(point);
-  }
-
-  for (let age = investment.payoutStartAge + 1; age <= endAge; age += 1) {
-    const payoutMonths = Math.max(0, Math.round((age - investment.payoutStartAge) * 12));
-    const netBalance = payoutSnapshot(investment.netWealth, monthlyReturn, monthlyPension, payoutMonths);
-    const yearsFromNow = Math.max(0, age - investment.ageToday);
-    const inflationFactor = (1 + settings.inflationRatePercent / 100) ** yearsFromNow;
-    const realNetBalance = inflationFactor > 0 ? netBalance / inflationFactor : netBalance;
-
-    points.push({
+  for (let age = startAge; age <= endAge; age += 1) {
+    const snapshot = snapshotAtAge(
+      monthlyPattern,
+      monthlyReturn,
+      monthlyPension,
+      settings,
+      ageToday,
+      retirementAge,
       age,
-      phase: "payout",
-      grossBalance: netBalance,
-      contribution: 0,
-      allowance: 0,
-      growth: 0,
-      netBalance,
-      realNetBalance,
-      normalDepot: realNetBalance
-    });
+      retirementSnapshot.netBalance
+    );
+    points.push(pointFromSnapshot(age, age > retirementAge ? "payout" : "saving", snapshot));
   }
 
   return {
     points,
     monthlyRate,
+    annualSavingsRate,
     monthlyPension,
-    retirementAge: investment.payoutStartAge,
+    realMonthlyPension,
+    percentageWithdrawalMonthlyAtStart,
+    percentageWithdrawalAnnualAtStart: percentageWithdrawalMonthlyAtStart * 12,
+    percentageWithdrawalStartAge: settings.percentageWithdrawalStartAge,
+    percentageWithdrawalRatePercent: settings.percentageWithdrawalRatePercent,
+    retirementAge,
     endAge,
-    ageToday: investment.ageToday,
-    wealthAtRetirement: investment.netWealth,
-    realWealthAtRetirement: investment.realWealth
+    ageToday,
+    savingMonths: Math.max(0, Math.round((retirementAge - ageToday) * 12)),
+    totalContribution: retirementSnapshot.contribution,
+    grossWealthAtRetirement: retirementSnapshot.grossBalance,
+    growthAtRetirement: retirementSnapshot.growth,
+    taxAtRetirement: retirementSnapshot.tax,
+    inflationFactorAtRetirement: retirementSnapshot.inflationFactor,
+    wealthAtRetirement: retirementSnapshot.netBalance,
+    realWealthAtRetirement: retirementSnapshot.realNetBalance
   };
 }
 
-function savingSnapshot(monthlyPattern: number[], monthlyReturn: number, months: number): SavingSnapshot {
+function snapshotAtAge(
+  monthlyPattern: number[],
+  monthlyReturn: number,
+  monthlyPension: number,
+  settings: InvestmentSettings,
+  ageToday: number,
+  retirementAge: number,
+  targetAge: number,
+  retirementNetBalance: number
+): SavingSnapshot {
+  if (targetAge <= retirementAge) {
+    return savingSnapshot(monthlyPattern, monthlyReturn, settings, ageToday, targetAge);
+  }
+
+  return payoutSnapshot(
+    retirementNetBalance,
+    monthlyReturn,
+    monthlyPension,
+    settings,
+    ageToday,
+    retirementAge,
+    targetAge
+  );
+}
+
+function savingSnapshot(
+  monthlyPattern: number[],
+  monthlyReturn: number,
+  settings: InvestmentSettings,
+  ageToday: number,
+  targetAge: number
+): SavingSnapshot {
   let grossBalance = 0;
   let contribution = 0;
+  let withdrawals = 0;
+  const months = Math.max(0, Math.round((targetAge - ageToday) * 12));
 
   for (let index = 0; index < months; index += 1) {
+    const ageAtMonth = ageToday + index / 12;
     const monthlyContribution = monthlyPattern[index % 12] || 0;
     grossBalance = grossBalance * (1 + monthlyReturn) + monthlyContribution;
     contribution += monthlyContribution;
+    if (ageAtMonth >= settings.percentageWithdrawalStartAge) {
+      const withdrawal = grossBalance * (settings.percentageWithdrawalRatePercent / 100) / 12;
+      grossBalance = Math.max(0, grossBalance - withdrawal);
+      withdrawals += withdrawal;
+    }
   }
 
-  return { grossBalance, contribution };
+  return completeSnapshot(grossBalance, contribution, withdrawals, settings, ageToday, targetAge);
 }
 
-function savingPoint(
-  age: number,
-  snapshot: SavingSnapshot,
+function payoutSnapshot(
+  startBalance: number,
+  monthlyReturn: number,
+  monthlyPension: number,
   settings: InvestmentSettings,
-  ageToday: number
-): AssetProjectionPoint {
-  const growth = Math.max(0, snapshot.grossBalance - snapshot.contribution);
+  ageToday: number,
+  retirementAge: number,
+  targetAge: number
+): SavingSnapshot {
+  let grossBalance = startBalance;
+  let withdrawals = 0;
+  const months = Math.max(0, Math.round((targetAge - retirementAge) * 12));
+
+  for (let index = 0; index < months; index += 1) {
+    const ageAtMonth = retirementAge + index / 12;
+    grossBalance *= 1 + monthlyReturn;
+    if (ageAtMonth >= settings.percentageWithdrawalStartAge) {
+      const percentageWithdrawal = grossBalance * (settings.percentageWithdrawalRatePercent / 100) / 12;
+      grossBalance = Math.max(0, grossBalance - percentageWithdrawal);
+      withdrawals += percentageWithdrawal;
+    }
+    grossBalance = Math.max(0, grossBalance - monthlyPension);
+    withdrawals += monthlyPension;
+  }
+
+  return completePostTaxSnapshot(grossBalance, withdrawals, settings, ageToday, targetAge);
+}
+
+function completeSnapshot(
+  grossBalance: number,
+  contribution: number,
+  withdrawals: number,
+  settings: InvestmentSettings,
+  ageToday: number,
+  targetAge: number
+): SavingSnapshot {
+  const growth = Math.max(0, grossBalance - contribution);
   const tax = growth * (settings.capitalGainsTaxPercent / 100);
-  const netBalance = Math.max(0, snapshot.grossBalance - tax);
-  const yearsFromNow = Math.max(0, age - ageToday);
+  const netBalance = Math.max(0, grossBalance - tax);
+  const yearsFromNow = Math.max(0, targetAge - ageToday);
   const inflationFactor = (1 + settings.inflationRatePercent / 100) ** yearsFromNow;
   const realNetBalance = inflationFactor > 0 ? netBalance / inflationFactor : netBalance;
 
+  return { grossBalance, contribution, withdrawals, growth, tax, netBalance, realNetBalance, inflationFactor };
+}
+
+function completePostTaxSnapshot(
+  grossBalance: number,
+  withdrawals: number,
+  settings: InvestmentSettings,
+  ageToday: number,
+  targetAge: number
+): SavingSnapshot {
+  const yearsFromNow = Math.max(0, targetAge - ageToday);
+  const inflationFactor = (1 + settings.inflationRatePercent / 100) ** yearsFromNow;
+  const realNetBalance = inflationFactor > 0 ? grossBalance / inflationFactor : grossBalance;
+
   return {
-    age,
-    phase: "saving",
-    grossBalance: snapshot.grossBalance,
-    contribution: snapshot.contribution,
-    allowance: 0,
-    growth,
-    netBalance,
+    grossBalance,
+    contribution: 0,
+    withdrawals,
+    growth: 0,
+    tax: 0,
+    netBalance: grossBalance,
     realNetBalance,
-    normalDepot: realNetBalance
+    inflationFactor
   };
 }
 
-function payoutSnapshot(startBalance: number, monthlyReturn: number, monthlyPension: number, months: number): number {
-  let balance = startBalance;
-
-  for (let index = 0; index < months; index += 1) {
-    balance = balance * (1 + monthlyReturn) - monthlyPension;
-    if (balance < 0) return 0;
-  }
-
-  return balance;
+function pointFromSnapshot(
+  age: number,
+  phase: AssetProjectionPoint["phase"],
+  snapshot: SavingSnapshot
+): AssetProjectionPoint {
+  return {
+    age,
+    phase,
+    grossBalance: snapshot.grossBalance,
+    contribution: snapshot.contribution,
+    allowance: 0,
+    growth: snapshot.growth,
+    netBalance: snapshot.netBalance,
+    realNetBalance: snapshot.realNetBalance,
+    normalDepot: snapshot.realNetBalance
+  };
 }

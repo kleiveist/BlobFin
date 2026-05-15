@@ -328,8 +328,9 @@ tfoot th {
 
 .investment-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 430px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 0.62fr) minmax(0, 1.38fr);
   gap: 18px;
+  align-items: start;
 }
 
 .investment-selector,
@@ -343,9 +344,64 @@ tfoot th {
   grid-column: 1 / -1;
 }
 
+.investment-controls {
+  display: grid;
+  gap: 12px;
+}
+
+.investment-control-top {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.investment-control-grid {
+  display: grid;
+  grid-template-columns: minmax(400px, 1fr) minmax(410px, 0.95fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.investment-input-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(122px, 1fr));
+  gap: 12px;
+}
+
+.investment-range-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
 .include-list {
   display: grid;
   gap: 8px;
+}
+
+.savings-rate-card {
+  display: grid;
+  gap: 4px;
+  width: min(100%, 260px);
+  min-width: 0;
+  border: 1px solid #c9ddc8;
+  border-radius: 8px;
+  background: #eff8ed;
+  padding: 12px;
+}
+
+.savings-rate-card span {
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.savings-rate-card strong {
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+
+.savings-rate-card small {
+  color: var(--muted);
 }
 
 .include-item {
@@ -376,9 +432,14 @@ tfoot th {
 }
 
 .range-field {
-  grid-template-columns: minmax(150px, 220px) minmax(160px, 1fr) minmax(68px, auto);
+  grid-template-columns: minmax(150px, 220px) minmax(170px, 1fr) minmax(76px, auto);
   align-items: center;
-  margin-bottom: 10px;
+  min-width: 0;
+  margin-bottom: 0;
+  border: 1px solid #e3dbcf;
+  border-radius: 8px;
+  background: #fffaf0;
+  padding: 10px 12px;
 }
 
 .range-field strong {
@@ -564,9 +625,15 @@ tfoot th {
   border: 0;
 }
 
+@media (max-width: 1240px) {
+  .investment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 1080px) {
   .workspace-grid,
-  .investment-grid {
+  .investment-control-grid {
     grid-template-columns: 1fr;
   }
 
@@ -587,6 +654,7 @@ tfoot th {
   .summary-grid,
   .field-grid,
   .field-grid.wide,
+  .investment-input-grid,
   .details-grid {
     grid-template-columns: 1fr;
   }

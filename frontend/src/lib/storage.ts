@@ -76,10 +76,17 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
     payoutYears: numberOrDefault(value.payoutYears, fallback.payoutYears),
+    percentageWithdrawalStartAge: numberOrDefault(
+      value.percentageWithdrawalStartAge,
+      fallback.percentageWithdrawalStartAge
+    ),
+    percentageWithdrawalRatePercent: numberOrDefault(
+      value.percentageWithdrawalRatePercent,
+      fallback.percentageWithdrawalRatePercent
+    ),
     investmentReturnPercent: numberOrDefault(value.investmentReturnPercent, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTaxPercent, fallback.capitalGainsTaxPercent),
-    inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent),
-    withdrawalMode: withdrawalModeOrDefault(value.withdrawalMode, fallback.withdrawalMode)
+    inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent)
   };
 }
 
@@ -92,10 +99,17 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
     payoutYears: numberOrDefault(value.payoutYears, fallback.payoutYears),
+    percentageWithdrawalStartAge: numberOrDefault(
+      value.percentageWithdrawalStartAge,
+      fallback.percentageWithdrawalStartAge
+    ),
+    percentageWithdrawalRatePercent: numberOrDefault(
+      value.percentageWithdrawalRatePercent,
+      fallback.percentageWithdrawalRatePercent
+    ),
     investmentReturnPercent: numberOrDefault(value.investmentReturn, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTax, fallback.capitalGainsTaxPercent),
-    inflationRatePercent: numberOrDefault(value.inflationRate, fallback.inflationRatePercent),
-    withdrawalMode: withdrawalModeOrDefault(value.withdrawalMode, fallback.withdrawalMode)
+    inflationRatePercent: numberOrDefault(value.inflationRate, fallback.inflationRatePercent)
   };
 }
 
@@ -135,8 +149,4 @@ function numberOrDefault(value: unknown, fallback: number): number {
 function stringArrayOrDefault(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) return fallback;
   return value.map(String);
-}
-
-function withdrawalModeOrDefault(value: unknown, fallback: "annuity" | "fourPercent"): "annuity" | "fourPercent" {
-  return value === "fourPercent" || value === "annuity" ? value : fallback;
 }

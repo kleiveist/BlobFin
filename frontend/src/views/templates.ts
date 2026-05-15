@@ -104,16 +104,28 @@ export function renderAppShell(): string {
           </div>
 
           <div class="investment-controls">
-            <div class="field-grid wide">
-              ${numberField("birthYear", "Geburtsjahr", "investment", "birthYear", { min: 1962, max: 2009, step: 1 })}
-              ${numberField("chartStartAge", "Startalter Grafik", "investment", "chartStartAge", { min: 0, max: 80, step: 1 })}
-              ${retirementAgeField()}
-              ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1 })}
-              ${withdrawalModeField()}
+            <div class="investment-control-top">
+              <aside class="savings-rate-card" aria-label="Sparrate">
+                <span>Jaehrliche Sparrate</span>
+                <strong id="annualSavingsRateMetric">-</strong>
+                <small id="monthlySavingsRateMetric">-</small>
+              </aside>
             </div>
-            ${rangeField("investmentReturnPercent", "Jaehrliche Rendite", 0, 30, 0.1)}
-            ${rangeField("capitalGainsTaxPercent", "Kapitalertragsteuer auf Wertzuwachs", 0, 50, 0.1)}
-            ${rangeField("inflationRatePercent", "Inflation pro Jahr", 1, 10, 0.1)}
+            <div class="investment-control-grid">
+              <div class="investment-input-grid">
+                ${numberField("birthYear", "Geburtsjahr", "investment", "birthYear", { min: 1962, max: 2009, step: 1 })}
+                ${numberField("chartStartAge", "Startalter Grafik", "investment", "chartStartAge", { min: 0, max: 80, step: 1 })}
+                ${retirementAgeField()}
+                ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1 })}
+                ${numberField("percentageWithdrawalStartAge", "Prozent-Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1 })}
+                ${numberField("percentageWithdrawalRatePercent", "Prozent-Entnahme p. a.", "investment", "percentageWithdrawalRatePercent", { min: 0, max: 20, step: 0.1 })}
+              </div>
+              <div class="investment-range-panel">
+                ${rangeField("investmentReturnPercent", "Jaehrliche Rendite", 0, 30, 0.1)}
+                ${rangeField("capitalGainsTaxPercent", "Kapitalertragsteuer auf Wertzuwachs", 0, 50, 0.1)}
+                ${rangeField("inflationRatePercent", "Inflation pro Jahr", 1, 10, 0.1)}
+              </div>
+            </div>
           </div>
 
           <div class="investment-visual">
@@ -146,11 +158,16 @@ export function renderAppShell(): string {
                 ${detailLine("Reales Vermoegen", "detailRealWealth")}
                 </div>
                 <div class="detail-list" aria-label="Auszahlung">
+                ${detailLine("Jaehrliche Sparrate", "detailAnnualSavingsRate")}
                 ${detailLine("Alter heute", "detailAgeToday")}
-                ${detailLine("Start Auszahlung", "detailPayoutStartAge")}
+                ${detailLine("Gleichmaessige Entnahme ab Alter", "detailPayoutStartAge")}
+                ${detailLine("Prozent-Entnahme ab Alter", "detailPercentageWithdrawalStartAge")}
+                ${detailLine("Prozent-Entnahme p. a.", "detailPercentageWithdrawalRate")}
+                ${detailLine("Monatliche Prozent-Entnahme", "detailPercentageWithdrawalMonthly")}
+                ${detailLine("Jaehrliche Prozent-Entnahme", "detailPercentageWithdrawalAnnual")}
                 ${detailLine("Ansparzeit", "detailSavingMonths")}
-                ${detailLine("Monatliche Rente netto", "detailMonthlyPension")}
-                ${detailLine("Monatliche Rente real", "detailRealMonthlyPension")}
+                ${detailLine("Monatliche gleichmaessige Entnahme netto", "detailMonthlyPension")}
+                ${detailLine("Monatliche gleichmaessige Entnahme real", "detailRealMonthlyPension")}
                 ${detailLine("Gewaehlte Monatsrate", "detailSelectedMonthlyRate")}
                 </div>
               </div>
@@ -226,18 +243,6 @@ function retirementAgeField(): string {
     <label class="field" for="retirementAge">
       <span>Rentenalter</span>
       <input id="retirementAge" type="number" min="50" max="85" step="1" data-retirement-age="true" />
-    </label>
-  `;
-}
-
-function withdrawalModeField(): string {
-  return `
-    <label class="field" for="withdrawalMode">
-      <span>Auszahlung</span>
-      <select id="withdrawalMode" data-investment="withdrawalMode">
-        <option value="annuity">gleichmaessige Entnahme bis Endalter</option>
-        <option value="fourPercent">4-%-Regel pro Jahr</option>
-      </select>
     </label>
   `;
 }

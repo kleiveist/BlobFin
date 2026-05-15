@@ -2,7 +2,6 @@ import "./styles.css";
 
 import { createId, defaultAppState, defaultInvestmentSettings } from "./data/defaults";
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
-import { calculateInvestmentResult } from "./domain/investmentCalculator";
 import { calculateReserveSummary } from "./domain/reserveCalculator";
 import { exportPositionsCsv, exportYearTableCsv, parseCsv, positionsFromCsvRows } from "./lib/csv";
 import {
@@ -121,11 +120,7 @@ function renderAll(): void {
 
 function renderCalculations(): void {
   const reserve = calculateReserveSummary(state.settings, state.positions);
-  const investment = calculateInvestmentResult(state.settings.year, state.positions, state.investment);
   const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
-  const displayedMonthlyPension = projection.monthlyPension;
-  const displayedRealMonthlyPension =
-    investment.inflationFactor > 0 ? displayedMonthlyPension / investment.inflationFactor : displayedMonthlyPension;
 
   setText("maxNeeded", money(reserve.maxRow.maxNeeded));
   setText("maxNeededHint", `${reserve.maxRow.month}, ohne Notgroschen`);
@@ -135,12 +130,14 @@ function renderCalculations(): void {
   setText("totalInterest", money(reserve.totalInterest));
   setText("totalCashback", money(reserve.totalCashback));
 
-  setText("investmentNetWealthTop", money(investment.netWealth));
-  setText("investmentMonthlyPensionTop", money(displayedMonthlyPension));
-  setText("investmentRealWealthTop", money(investment.realWealth));
+  setText("investmentNetWealthTop", money(projection.wealthAtRetirement));
+  setText("investmentMonthlyPensionTop", money(projection.monthlyPension));
+  setText("investmentRealWealthTop", money(projection.realWealthAtRetirement));
   setText("monthlyRateMetric", money(projection.monthlyRate));
+  setText("monthlySavingsRateMetric", `${money(projection.monthlyRate)} monatlich`);
+  setText("annualSavingsRateMetric", money(projection.annualSavingsRate));
   setText("wealthAtRetirementMetric", money(projection.wealthAtRetirement));
-  setText("monthlyPensionMetric", money(displayedMonthlyPension));
+  setText("monthlyPensionMetric", money(projection.monthlyPension));
   setText("realWealthMetric", money(projection.realWealthAtRetirement));
 
   setRangeLabel("investmentReturnPercent", percent(state.investment.investmentReturnPercent));
@@ -150,22 +147,27 @@ function renderCalculations(): void {
 
   setText(
     "detailContribution",
-    `${money(investment.totalContribution)} (${money(investment.averageMonthlyContribution)} x ${intNumber(
-      investment.savingMonths
+    `${money(projection.totalContribution)} (${money(projection.monthlyRate)} x ${intNumber(
+      projection.savingMonths
     )} Monate)`
   );
-  setText("detailGrowth", money(investment.growth));
-  setText("detailGrossWealth", money(investment.grossWealth));
-  setText("detailTax", `-${money(investment.tax)}`);
-  setText("detailNetWealth", money(investment.netWealth));
-  setText("detailInflationFactor", `${investment.inflationFactor.toFixed(2).replace(".", ",")}x`);
-  setText("detailRealWealth", money(investment.realWealth));
-  setText("detailAgeToday", `${intNumber(investment.ageToday)} Jahre`);
-  setText("detailPayoutStartAge", `${intNumber(investment.payoutStartAge)} Jahre`);
-  setText("detailSavingMonths", `${intNumber(investment.savingMonths)} Monate`);
-  setText("detailMonthlyPension", money(displayedMonthlyPension));
-  setText("detailRealMonthlyPension", money(displayedRealMonthlyPension));
-  setText("detailSelectedMonthlyRate", money(investment.averageMonthlyContribution));
+  setText("detailGrowth", money(projection.growthAtRetirement));
+  setText("detailGrossWealth", money(projection.grossWealthAtRetirement));
+  setText("detailTax", `-${money(projection.taxAtRetirement)}`);
+  setText("detailNetWealth", money(projection.wealthAtRetirement));
+  setText("detailInflationFactor", `${projection.inflationFactorAtRetirement.toFixed(2).replace(".", ",")}x`);
+  setText("detailRealWealth", money(projection.realWealthAtRetirement));
+  setText("detailAnnualSavingsRate", money(projection.annualSavingsRate));
+  setText("detailAgeToday", `${intNumber(projection.ageToday)} Jahre`);
+  setText("detailPayoutStartAge", `${intNumber(projection.retirementAge)} Jahre`);
+  setText("detailPercentageWithdrawalStartAge", `${intNumber(projection.percentageWithdrawalStartAge)} Jahre`);
+  setText("detailPercentageWithdrawalRate", percent(projection.percentageWithdrawalRatePercent));
+  setText("detailPercentageWithdrawalMonthly", money(projection.percentageWithdrawalMonthlyAtStart));
+  setText("detailPercentageWithdrawalAnnual", money(projection.percentageWithdrawalAnnualAtStart));
+  setText("detailSavingMonths", `${intNumber(projection.savingMonths)} Monate`);
+  setText("detailMonthlyPension", money(projection.monthlyPension));
+  setText("detailRealMonthlyPension", money(projection.realMonthlyPension));
+  setText("detailSelectedMonthlyRate", money(projection.monthlyRate));
 
   renderResultTable(reserve);
   drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection);
@@ -301,13 +303,6 @@ function updatePlanningSetting(field: keyof PlanningSettings, value: string): vo
 
 function updateInvestmentSetting(field: keyof InvestmentSettings, value: string): void {
   if (field === "includedIds") return;
-  if (field === "withdrawalMode") {
-    if (value === "annuity" || value === "fourPercent") {
-      state.investment = { ...state.investment, withdrawalMode: value };
-    }
-    return;
-  }
-
   if (field === "payoutEndAge") {
     const retirementAge = calculatePayoutStartAge(state.investment);
     const payoutEndAge = clamp(numberValue(value), investmentMin(field), investmentMax(field));
@@ -489,6 +484,7 @@ function investmentMin(field: keyof InvestmentSettings): number {
   if (field === "chartStartAge") return 0;
   if (field === "birthYear") return 1962;
   if (field === "payoutEndAge") return 70;
+  if (field === "percentageWithdrawalStartAge") return 0;
   if (field === "payoutYears") return 1;
   if (field === "inflationRatePercent") return 1;
   return 0;
@@ -498,6 +494,8 @@ function investmentMax(field: keyof InvestmentSettings): number {
   if (field === "chartStartAge") return 80;
   if (field === "birthYear") return 2009;
   if (field === "payoutEndAge") return 110;
+  if (field === "percentageWithdrawalStartAge") return 110;
+  if (field === "percentageWithdrawalRatePercent") return 20;
   if (field === "payoutYears") return 50;
   if (field === "investmentReturnPercent") return 30;
   if (field === "capitalGainsTaxPercent") return 50;
