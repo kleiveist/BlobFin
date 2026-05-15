@@ -1,0 +1,14 @@
+     Running BeforeDevCommand (`npm run dev -- --host 127.0.0.1 --port 5173`)
+
+> imocalc-frontend@0.1.0 dev
+> vite --host 127.0.0.1 --port 5173
+
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 120 ms
+
+  ➜  Local:   http://127.0.0.1:5173/
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+        Info Watching /home/kleif/Projects/ImoCalc/src-tauri for changes...
+[1m[92m    Finished[0m ]8;;https://doc.rust-lang.org/cargo/reference/profiles.html#default-profiles\`dev` profile [unoptimized + debuginfo]]8;;\ target(s) in 0.19s
+[1m[92m     Running[0m `target/debug/imocalc`

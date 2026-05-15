@@ -1,0 +1,581 @@
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import signal
+import subprocess
+from pathlib import Path
+
+from tools import control
+from tools.tauri import common, doctor, paths, run
+from tools.tauri.build import appimage, installappimage
+from tools.tauri.linux import install as linux_install
+
+
+def test_tauri_parser_recognizes_subcommands() -> None:
+    parser = control._build_parser()
+
+    cases = [
+        ["tauri", "doctor", "--json"],
+        ["tauri", "install", "--dry-run"],
+        ["tauri", "install-appimage", "--dry-run"],
+        ["tauri", "run", "--foreground", "--no-follow", "--frontend-port", "5174"],
+        ["tauri", "build", "--target", "windows-portable", "--dry-run", "--bundles", "deb,rpm"],
+        ["tauri", "build", "--appimage", "--dry-run", "--skip-appimage-preflight"],
+        ["tauri", "test", "--all"],
+        ["tauri", "copy", "--dry-run", "--target-dir", ".dist/desktop"],
+    ]
+
+    for argv in cases:
+        args = parser.parse_args(argv)
+        assert args.command == "tauri"
+        assert args.tauri_command == argv[1]
+
+
+def test_bare_tauri_command_prints_help(capsys) -> None:
+    code = control.main(["tauri"])
+
+    assert code == 0
+    output = capsys.readouterr().out
+    assert "Manage Tauri desktop tooling" in output
+    assert "--doctor" in output
+    assert "--install" in output
+
+
+def test_tauri_command_aliases_are_normalized() -> None:
+    assert control._normalize_argv(["tauri", "--doctor"]) == ["tauri", "doctor"]
+    assert control._normalize_argv(["tauri", "--install", "--dry-run"]) == [
+        "tauri",
+        "install",
+        "--dry-run",
+    ]
+    assert control._normalize_argv(["tauri", "--run", "--frontend-port", "5174"]) == [
+        "tauri",
+        "run",
+        "--frontend-port",
+        "5174",
+    ]
+    assert control._normalize_argv(["tauri", "--build", "--dry-run"]) == [
+        "tauri",
+        "build",
+        "--dry-run",
+    ]
+    assert control._normalize_argv(["tauri", "--install-appimage", "--dry-run"]) == [
+        "tauri",
+        "install-appimage",
+        "--dry-run",
+    ]
+
+
+def test_existing_aliases_do_not_collide_with_tauri() -> None:
+    assert control._normalize_argv(["--doctor"]) == ["doctor"]
+    assert control._normalize_argv(["--install"]) == ["install"]
+    assert control._normalize_argv(["--run"]) == ["run"]
+    assert control._normalize_argv(["--stop"]) == ["stop"]
+    assert control._normalize_argv(["--test", "--suite", "frontend"]) == ["test", "--suite", "frontend"]
+
+
+def test_tauri_doctor_json_is_parseable(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        doctor,
+        "collect_checks",
+        lambda: ([common.CheckResult("fixture", "OK", "ready")], "OK"),
+    )
+
+    code = control.main(["tauri", "doctor", "--json"])
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["overall"] == "OK"
+    assert payload["checks"][0]["name"] == "fixture"
+
+
+def test_tauri_install_dry_run_skips_mutating_commands(monkeypatch) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
+        commands.append(command)
+        assert kwargs.get("dry_run") is True
+        return common.CommandResult(command=command, cwd=paths.ROOT, returncode=0, dry_run=True)
+
+    monkeypatch.setattr(common, "run_command", fake_run_command)
+    monkeypatch.setattr("tools.tauri.install._ensure_rust", lambda dry_run: 0)
+    monkeypatch.setattr("tools.tauri.install._ensure_node", lambda dry_run: 0)
+
+    code = control.main(["tauri", "install", "--dry-run"])
+
+    assert code == 0
+    assert commands
+
+
+def test_tauri_build_dry_run_does_not_run_real_build(monkeypatch) -> None:
+    calls: list[tuple[list[str], bool]] = []
+
+    def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
+        calls.append((command, bool(kwargs.get("dry_run"))))
+        return common.CommandResult(command=command, cwd=paths.ROOT, returncode=0, dry_run=True)
+
+    monkeypatch.setattr(common, "run_command", fake_run_command)
+
+    code = control.main(["tauri", "build", "--target", "linux", "--dry-run"])
+
+    assert code == 0
+    assert calls
+    assert calls[0][1] is True
+    assert calls[0][0][-3:] == ["build", "--bundles", "deb,rpm,appimage"]
+
+
+def test_tauri_build_plan_prints_target_command_and_bundles(monkeypatch) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr(common.logger, "info", messages.append)
+
+    common.print_build_plan(
+        "linux",
+        ["tauri", "build", "--bundles", "deb,rpm"],
+        dry_run=True,
+        bundles="deb,rpm",
+    )
+
+    assert "🧱 Build target: linux (dry-run)" in messages
+    assert "📦 Bundles: deb,rpm" in messages
+    assert "🛠️ Command: tauri build --bundles deb,rpm" in messages
+
+
+def test_tauri_build_artifacts_print_with_icons(monkeypatch, tmp_path) -> None:
+    messages: list[str] = []
+    monkeypatch.setattr(common.logger, "info", messages.append)
+
+    root = tmp_path / "repo"
+    bundle_dir = root / "src-tauri" / "target" / "release" / "bundle"
+    dist_dir = root / ".dist" / "desktop"
+    bundle_dir.mkdir(parents=True)
+    dist_dir.mkdir(parents=True)
+    (bundle_dir / "ImoCalc_0.1.0_amd64.deb").write_bytes(b"deb")
+    (bundle_dir / "ImoCalc-0.1.0-1.x86_64.rpm").write_bytes(b"rpm")
+    (dist_dir / "ImoCalc-windows-portable.zip").write_bytes(b"zip")
+
+    monkeypatch.setattr(paths, "ROOT", root)
+    monkeypatch.setattr(paths, "DIST_DIR", dist_dir)
+    monkeypatch.setattr(paths, "bundle_roots", lambda: [bundle_dir])
+
+    common.print_build_artifacts()
+
+    output = "\n".join(messages)
+    assert "📁 Build artifacts:" in messages
+    assert "📦 src-tauri/target/release/bundle/ImoCalc_0.1.0_amd64.deb" in output
+    assert "📦 src-tauri/target/release/bundle/ImoCalc-0.1.0-1.x86_64.rpm" in output
+    assert "🗜️ .dist/desktop/ImoCalc-windows-portable.zip" in output
+
+
+def test_tauri_linux_build_accepts_explicit_bundle_selection(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(common, "run_command", lambda command, **kwargs: calls.append(command) or common.CommandResult(command, paths.ROOT, 0))
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+
+    code = control.main(["tauri", "build", "--target", "linux", "--bundles", "appimage"])
+
+    assert code == 0
+    assert calls[0][-3:] == ["build", "--bundles", "appimage"]
+
+
+def test_tauri_linux_build_default_includes_appimage_preflight(monkeypatch) -> None:
+    calls: list[list[str]] = []
+    preflight: list[bool] = []
+
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda *args, **kwargs: preflight.append(True) or True)
+    monkeypatch.setattr(common, "run_command", lambda command, **kwargs: calls.append(command) or common.CommandResult(command, paths.ROOT, 0))
+
+    code = control.main(["tauri", "build", "--target", "linux"])
+
+    assert code == 0
+    assert preflight == [True]
+    assert calls[0][-3:] == ["build", "--bundles", "deb,rpm,appimage"]
+
+
+def test_tauri_linux_build_uses_appimage_fallback_when_linuxdeploy_fails(monkeypatch) -> None:
+    calls: list[list[str]] = []
+    fallback: list[bool] = []
+
+    def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
+        calls.append(command)
+        return common.CommandResult(command=command, cwd=paths.ROOT, returncode=1, stderr="failed to run linuxdeploy")
+
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(common, "run_command", fake_run_command)
+    monkeypatch.setattr(appimage, "package_existing_appdir", lambda dry_run=False: fallback.append(dry_run) or 0)
+    monkeypatch.setattr(common, "print_build_artifacts", lambda: None)
+
+    code = control.main(["tauri", "build", "--target", "linux"])
+
+    assert code == 0
+    assert calls[0][-3:] == ["build", "--bundles", "deb,rpm,appimage"]
+    assert fallback == [False]
+
+
+def test_tauri_build_appimage_shortcut_builds_and_installs(monkeypatch) -> None:
+    calls: list[tuple[list[str], bool]] = []
+    installed: list[bool] = []
+
+    def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
+        calls.append((command, bool(kwargs.get("dry_run"))))
+        return common.CommandResult(command=command, cwd=paths.ROOT, returncode=0)
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda: True)
+    monkeypatch.setattr(common, "run_command", fake_run_command)
+    monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: installed.append(dry_run) or 0)
+    monkeypatch.setattr(common, "print_build_artifacts", lambda: None)
+
+    code = control.main(["tauri", "build", "--appimage"])
+
+    assert code == 0
+    assert calls[0][0][-3:] == ["build", "--bundles", "appimage"]
+    assert calls[0][1] is False
+    assert installed == [False]
+
+
+def test_tauri_build_appimage_shortcut_packages_appdir_on_linuxdeploy_failure(monkeypatch) -> None:
+    fallback: list[bool] = []
+    installed: list[bool] = []
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda: True)
+    monkeypatch.setattr(
+        common,
+        "run_command",
+        lambda command, **kwargs: common.CommandResult(command=command, cwd=paths.ROOT, returncode=1),
+    )
+    monkeypatch.setattr(appimage, "package_existing_appdir", lambda dry_run=False: fallback.append(dry_run) or 0)
+    monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: installed.append(dry_run) or 0)
+    monkeypatch.setattr(common, "print_build_artifacts", lambda: None)
+
+    code = control.main(["tauri", "build", "--appimage"])
+
+    assert code == 0
+    assert fallback == [False]
+    assert installed == [False]
+
+
+def test_tauri_install_appimage_command_only_installs(monkeypatch) -> None:
+    installed: list[bool] = []
+
+    monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: installed.append(dry_run) or 0)
+
+    code = control.main(["tauri", "install-appimage", "--dry-run"])
+
+    assert code == 0
+    assert installed == [True]
+
+
+def test_tauri_installappimage_module_delegates_to_appimage_installer(monkeypatch) -> None:
+    installed: list[bool] = []
+
+    monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: installed.append(dry_run) or 0)
+
+    code = installappimage.main(argparse.Namespace(dry_run=False))
+
+    assert code == 0
+    assert installed == [False]
+
+
+def test_tauri_install_appimage_packages_existing_appdir_when_final_file_is_missing(monkeypatch, tmp_path) -> None:
+    root = tmp_path / "repo"
+    home = tmp_path / "home"
+    tauri_dir = root / "src-tauri"
+    appimage_dir = tauri_dir / "target" / "release" / "bundle" / "appimage"
+    appdir = appimage_dir / "ImoCalc.AppDir"
+    icon_dir = tauri_dir / "icons"
+    appdir.mkdir(parents=True)
+    icon_dir.mkdir(parents=True)
+    (icon_dir / "icon.png").write_bytes(b"png")
+    packaged: list[bool] = []
+
+    def fake_package_existing_appdir(dry_run: bool = False) -> int:
+        packaged.append(dry_run)
+        (appimage_dir / "ImoCalc_0.1.0_amd64.AppImage").write_bytes(b"appimage")
+        return 0
+
+    monkeypatch.setattr(paths, "ROOT", root)
+    monkeypatch.setattr(paths, "TAURI_DIR", tauri_dir)
+    monkeypatch.setattr(appimage, "_home", lambda: home)
+    monkeypatch.setattr(appimage, "package_existing_appdir", fake_package_existing_appdir)
+
+    code = appimage.install_latest()
+
+    assert code == 0
+    assert packaged == [False]
+    assert (home / "Applications" / "ImoCalc.AppImage").read_bytes() == b"appimage"
+
+
+def test_tauri_build_appimage_dry_run_does_not_install(monkeypatch) -> None:
+    calls: list[tuple[list[str], bool]] = []
+
+    def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
+        calls.append((command, bool(kwargs.get("dry_run"))))
+        return common.CommandResult(command=command, cwd=paths.ROOT, returncode=0, dry_run=True)
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr(common, "run_command", fake_run_command)
+    monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: (_ for _ in ()).throw(AssertionError("should not install")))
+
+    code = control.main(["tauri", "build", "--appimage", "--dry-run"])
+
+    assert code == 0
+    assert calls[0][0][-3:] == ["build", "--bundles", "appimage"]
+    assert calls[0][1] is True
+
+
+def test_tauri_build_appimage_fails_when_preflight_is_missing(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda: False)
+    monkeypatch.setattr(common, "run_command", lambda command, **kwargs: calls.append(command) or common.CommandResult(command, paths.ROOT, 0))
+
+    code = control.main(["tauri", "build", "--appimage"])
+
+    assert code == 1
+    assert calls == []
+
+
+def test_tauri_build_appimage_can_skip_preflight(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda: (_ for _ in ()).throw(AssertionError("should skip preflight")))
+    monkeypatch.setattr(common, "run_command", lambda command, **kwargs: calls.append(command) or common.CommandResult(command, paths.ROOT, 0))
+    monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: 0)
+    monkeypatch.setattr(common, "print_build_artifacts", lambda: None)
+
+    code = control.main(["tauri", "build", "--appimage", "--skip-appimage-preflight"])
+
+    assert code == 0
+    assert calls[0][-3:] == ["build", "--bundles", "appimage"]
+
+
+def test_tauri_appimage_command_detection_checks_host_paths(monkeypatch) -> None:
+    monkeypatch.setattr(appimage.shutil, "which", lambda binary: None)
+    monkeypatch.setattr(appimage, "_host_file_exists", lambda relative_path: relative_path == "usr/bin/patchelf")
+    monkeypatch.setattr(common, "command_output", lambda command: (_ for _ in ()).throw(AssertionError("should not shell out")))
+
+    assert appimage._command_available("patchelf") is True
+
+
+def test_tauri_appimage_libfuse_detection_checks_host_paths(monkeypatch) -> None:
+    monkeypatch.setattr(common, "command_output", lambda command: (True, ""))
+    monkeypatch.setattr(appimage, "_library_file_exists", lambda pattern: pattern == "libfuse.so.2*")
+
+    assert appimage._libfuse2_available() is True
+
+
+def test_tauri_appimage_libfuse_detection_accepts_versioned_library(monkeypatch, tmp_path) -> None:
+    lib_dir = tmp_path / "usr" / "lib"
+    lib_dir.mkdir(parents=True)
+    (lib_dir / "libfuse.so.2.9.9").write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(
+        appimage,
+        "Path",
+        lambda value: lib_dir if value == "/usr/lib" else Path(value),
+    )
+
+    assert appimage._library_file_exists("libfuse.so.2*") is True
+
+
+def test_tauri_detects_arch_like_host_from_os_release(tmp_path) -> None:
+    os_release = tmp_path / "os-release"
+    os_release.write_text('ID=cachyos\nID_LIKE=arch\n', encoding="utf-8")
+
+    assert linux_install._distro_from_os_release(os_release) == "arch"
+
+
+def test_tauri_build_appimage_rejects_non_linux_target(monkeypatch) -> None:
+    monkeypatch.setattr(appimage, "main", lambda args: (_ for _ in ()).throw(AssertionError("should not run")))
+
+    code = control.main(["tauri", "build", "--target", "windows", "--appimage"])
+
+    assert code == 1
+
+
+def test_tauri_appimage_install_copies_artifact_icon_and_desktop_entry(monkeypatch, tmp_path) -> None:
+    root = tmp_path / "repo"
+    home = tmp_path / "home"
+    tauri_dir = root / "src-tauri"
+    appimage_dir = tauri_dir / "target" / "release" / "bundle" / "appimage"
+    icon_dir = tauri_dir / "icons"
+    appimage_dir.mkdir(parents=True)
+    icon_dir.mkdir(parents=True)
+    source_appimage = appimage_dir / "ImoCalc_0.1.0_amd64.AppImage"
+    source_icon = icon_dir / "icon.png"
+    source_appimage.write_bytes(b"appimage")
+    source_icon.write_bytes(b"png")
+
+    monkeypatch.setattr(paths, "ROOT", root)
+    monkeypatch.setattr(paths, "TAURI_DIR", tauri_dir)
+    monkeypatch.setattr(appimage, "_home", lambda: home)
+
+    code = appimage.install_latest()
+
+    installed_appimage = home / "Applications" / "ImoCalc.AppImage"
+    installed_icon = home / ".local" / "share" / "icons" / "imocalc.png"
+    desktop_entry = home / ".local" / "share" / "applications" / "imocalc.desktop"
+    assert code == 0
+    assert installed_appimage.read_bytes() == b"appimage"
+    assert installed_appimage.stat().st_mode & 0o111
+    assert installed_icon.read_bytes() == b"png"
+    assert "Name=ImoCalc" in desktop_entry.read_text(encoding="utf-8")
+
+
+def test_tauri_appimage_repair_icon_matches_desktop_icon_name(tmp_path, monkeypatch) -> None:
+    appdir = tmp_path / "ImoCalc.AppDir"
+    appdir.mkdir()
+    (appdir / "ImoCalc.desktop").write_text("Name=ImoCalc\nIcon=imocalc\n", encoding="utf-8")
+    (appdir / "ImoCalc.png").write_bytes(b"png")
+
+    monkeypatch.setattr(paths, "APP_NAME", "ImoCalc")
+
+    appimage._repair_appdir_icon(appdir)
+
+    assert (appdir / "imocalc.png").read_bytes() == b"png"
+
+
+def test_tauri_build_fails_when_frontend_dependencies_are_missing(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: False)
+    monkeypatch.setattr(
+        common,
+        "missing_frontend_dependency_paths",
+        lambda: [paths.FRONTEND_DIR / "node_modules" / "@types" / "node"],
+    )
+    monkeypatch.setattr(common, "run_command", lambda command, **kwargs: calls.append(command) or common.CommandResult(command, paths.ROOT, 0))
+
+    code = control.main(["tauri", "build", "--target", "linux"])
+
+    assert code == 1
+    assert calls == []
+
+
+def test_tauri_cli_fallback_uses_tauri_apps_cli_package(monkeypatch) -> None:
+    monkeypatch.setattr(paths, "local_tauri_binary", lambda: paths.FRONTEND_DIR / "missing-tauri")
+    monkeypatch.setattr(common, "package_manager", lambda: "npm")
+
+    command = common.tauri_cli_command("dev")
+
+    assert command[:5] == ["npm", "exec", "--yes", "--package", "@tauri-apps/cli@2.10.1"]
+    assert command[-2:] == ["tauri", "dev"]
+
+
+def test_tauri_run_override_uses_frontend_cwd_command() -> None:
+    payload = json.loads(run._dev_config_override(5174))
+
+    assert payload["build"]["beforeDevCommand"] == "npm run dev -- --host 127.0.0.1 --port 5174"
+    assert payload["build"]["devUrl"] == "http://127.0.0.1:5174"
+
+
+def test_tauri_run_defaults_to_detached(monkeypatch, capsys) -> None:
+    started: list[list[str]] = []
+
+    monkeypatch.setattr(common, "tauri_cli_command", lambda *args: ["tauri", *args])
+    monkeypatch.setattr(run, "_run_detached", lambda command, follow=True: started.append([*command, f"follow={follow}"]) or 0)
+
+    code = control.main(["tauri", "run"])
+
+    assert code == 0
+    assert started == [["tauri", "dev", "--config", run._dev_config_override(5173), "follow=True"]]
+    assert capsys.readouterr().err == ""
+
+
+def test_tauri_run_no_follow_returns_after_background_start(monkeypatch) -> None:
+    started: list[list[str]] = []
+
+    monkeypatch.setattr(common, "tauri_cli_command", lambda *args: ["tauri", *args])
+    monkeypatch.setattr(run, "_run_detached", lambda command, follow=True: started.append([*command, f"follow={follow}"]) or 0)
+
+    code = control.main(["tauri", "run", "--no-follow"])
+
+    assert code == 0
+    assert started == [["tauri", "dev", "--config", run._dev_config_override(5173), "follow=False"]]
+
+
+def test_tauri_run_foreground_uses_current_terminal(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(common, "tauri_cli_command", lambda *args: ["tauri", *args])
+    monkeypatch.setattr(run, "_run_detached", lambda command: (_ for _ in ()).throw(AssertionError("should not detach")))
+
+    def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
+        calls.append(command)
+        return common.CommandResult(command=command, cwd=paths.ROOT, returncode=0)
+
+    monkeypatch.setattr(common, "run_command", fake_run_command)
+
+    code = control.main(["tauri", "run", "--foreground"])
+
+    assert code == 0
+    assert calls == [["tauri", "dev", "--config", run._dev_config_override(5173)]]
+
+
+def test_tauri_follow_ctrl_c_stops_process_group(monkeypatch, tmp_path) -> None:
+    log_path = tmp_path / "tauri.log"
+    log_path.write_text("ready\n", encoding="utf-8")
+    killed: list[tuple[int, int]] = []
+
+    class FakeProcess:
+        pid = 4321
+
+        def __init__(self) -> None:
+            self.poll_count = 0
+            self.terminated = False
+
+        def poll(self) -> int | None:
+            self.poll_count += 1
+            if self.poll_count == 1:
+                raise KeyboardInterrupt
+            if self.terminated:
+                return 0
+            return None
+
+    monkeypatch.setattr(run, "_clear_state", lambda: None)
+    fake_process = FakeProcess()
+
+    def fake_killpg(pid: int, sig: int) -> None:
+        killed.append((pid, sig))
+        fake_process.terminated = True
+
+    monkeypatch.setattr(run.os, "killpg", fake_killpg)
+
+    code = run._follow_log(log_path, fake_process)  # type: ignore[arg-type]
+
+    assert code == 0
+    assert killed == [(4321, signal.SIGTERM)]
+
+
+def test_tauri_package_has_no_bare_imports_or_legacy_tokens() -> None:
+    legacy_pattern = re.compile(
+        r"FMDFlashcard|fmdflashcard|fmd-desktop|apps/fmd-desktop|com\.fmd\.flashcard|AppInsall"
+    )
+    bare_import_pattern = re.compile(r"from\s+(doctor|console|installuix|installuixubu)\s+import")
+
+    scanned = list((paths.ROOT / "tools" / "tauri").rglob("*.py"))
+    scanned.extend((paths.ROOT / "src-tauri").rglob("*"))
+
+    offenders: list[str] = []
+    for path in scanned:
+        if any(part in {"target", "gen"} for part in path.relative_to(paths.ROOT).parts):
+            continue
+        if not path.is_file() or path.suffix in {".png", ".ico", ".icns"}:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if legacy_pattern.search(text) or bare_import_pattern.search(text):
+            offenders.append(str(path.relative_to(paths.ROOT)))
+
+    assert offenders == []
