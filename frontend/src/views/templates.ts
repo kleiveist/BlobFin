@@ -38,7 +38,7 @@ export function renderAppShell(): string {
             ${metric("yearEndBalance", "Dauerhafter Bestand Jahresende", "ohne temporaere Durchlaufbetraege", false)}
             ${metric("totalInterest", "Zinsen pro Jahr", "vereinfachte Tages-/Monatslogik", false)}
             ${metric("totalCashback", "Cashback pro Jahr", "nur Positionen mit Cashback", false)}
-            ${metric("investmentNetWealthTop", "Vermoegen fuer Auszahlung", "nach Kapitalertragsteuer", true)}
+            ${metric("investmentNetWealthTop", "Vermoegen fuer Auszahlung", "Steuer erst bei Entnahme", true)}
             ${metric("investmentMonthlyPensionTop", "Monatliche Rente netto", "vereinfachte Entnahme", true)}
             ${metric("investmentRealWealthTop", "Reales Vermoegen", "inflationsbereinigt", false)}
           </div>
@@ -146,6 +146,7 @@ export function renderAppShell(): string {
                 <span class="legend-item"><span class="legend-dot orange"></span> Zulagen</span>
                 <span class="legend-item"><span class="legend-dot green"></span> Wertzuwachs</span>
                 <span class="legend-item"><span class="legend-dot purple"></span> Restguthaben (Auszahlung)</span>
+                <span class="legend-item"><span class="legend-dot red"></span> Kapitalertragsteuer</span>
                 <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
               </div>
               <div class="investment-statistics">
@@ -153,8 +154,8 @@ export function renderAppShell(): string {
                 ${detailLine("Eigenbeitrag", "detailContribution")}
                 ${detailLine("Wertzuwachs", "detailGrowth")}
                 ${detailLine("Bruttovermoegen", "detailGrossWealth")}
-                ${detailLine("Steuern", "detailTax")}
-                ${detailLine("Vermoegen fuer Auszahlung", "detailNetWealth")}
+                ${detailLine("Realisierte Steuern bis Rente", "detailTax")}
+                ${detailLine("Depotwert fuer Auszahlung", "detailNetWealth")}
                 ${detailLine("Inflationsfaktor", "detailInflationFactor")}
                 ${detailLine("Reales Vermoegen", "detailRealWealth")}
                 </div>
@@ -166,6 +167,7 @@ export function renderAppShell(): string {
                 ${detailLine("Prozent-Entnahme p. a.", "detailPercentageWithdrawalRate")}
                 ${detailLine("Monatliche Prozent-Entnahme", "detailPercentageWithdrawalMonthly")}
                 ${detailLine("Jaehrliche Prozent-Entnahme", "detailPercentageWithdrawalAnnual")}
+                ${detailLine("Realisierte Steuern bis Endalter", "detailTaxAtEnd")}
                 ${detailLine("Ansparzeit", "detailSavingMonths")}
                 ${detailLine("Monatliche gleichmaessige Entnahme netto", "detailMonthlyPension")}
                 ${detailLine("Monatliche gleichmaessige Entnahme real", "detailRealMonthlyPension")}

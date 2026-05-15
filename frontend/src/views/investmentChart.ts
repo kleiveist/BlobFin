@@ -4,6 +4,7 @@ const chartColors = {
   background: "#17191c",
   muted: "#9ca3af",
   grid: "#2a2d31",
+  grey: "#777b82",
   green: "#43b20a",
   purple: "#9b94ff",
   red: "#ff5b63"
@@ -45,7 +46,9 @@ export function drawInvestmentChart(canvas: HTMLCanvasElement | null, projection
   const baseY = padding.top + chartHeight;
   const maxValue = Math.max(
     1,
-    ...projection.points.map((point) => Math.max(point.netBalance, point.realNetBalance, point.grossBalance))
+    ...projection.points.map((point) =>
+      Math.max(point.netBalance + point.tax, point.realNetBalance, point.grossBalance + point.tax)
+    )
   );
 
   drawGrid(context, padding, chartWidth, chartHeight);
@@ -101,12 +104,82 @@ function drawBars(
 
   points.forEach((point, index) => {
     const x = xForIndex(index, padding, scale);
-    const y = valueToY(point.netBalance, padding, chartHeight, maxValue);
-    const height = baseY - y;
-    const radius = Math.min(6, scale.barWidth / 2);
-    const color = point.phase === "saving" ? chartColors.green : chartColors.purple;
-    roundedBar(context, x - scale.barWidth / 2, baseY - height, scale.barWidth, height, radius, color);
+    const barX = x - scale.barWidth / 2;
+    if (point.phase === "saving") {
+      drawSavingBar(context, point, barX, scale.barWidth, padding, chartHeight, baseY, maxValue);
+      return;
+    }
+
+    drawPayoutBar(context, point, barX, scale.barWidth, padding, chartHeight, baseY, maxValue);
   });
+}
+
+function drawSavingBar(
+  context: CanvasRenderingContext2D,
+  point: AssetProjectionPoint,
+  x: number,
+  width: number,
+  padding: ChartPadding,
+  chartHeight: number,
+  baseY: number,
+  maxValue: number
+): void {
+  const radius = Math.min(6, width / 2);
+  const netBalance = Math.max(0, point.netBalance);
+  const growth = Math.min(netBalance, Math.max(0, point.growth));
+  const contribution = Math.max(0, netBalance - growth);
+  const tax = Math.max(0, point.tax);
+  const netHeight = baseY - valueToY(netBalance, padding, chartHeight, maxValue);
+  const totalHeight = baseY - valueToY(netBalance + tax, padding, chartHeight, maxValue);
+  const contributionHeight = baseY - valueToY(contribution, padding, chartHeight, maxValue);
+  const growthHeight = netHeight - contributionHeight;
+  const taxHeight = totalHeight - netHeight;
+
+  if (growthHeight <= 0 && taxHeight <= 0) {
+    roundedTopBar(context, x, baseY - contributionHeight, width, contributionHeight, radius, chartColors.grey);
+    return;
+  }
+
+  if (growthHeight <= 0) {
+    filledBarSegment(context, x, baseY - contributionHeight, width, contributionHeight, chartColors.grey);
+    roundedTopBar(context, x, baseY - totalHeight, width, taxHeight, radius, chartColors.red);
+    return;
+  }
+
+  filledBarSegment(context, x, baseY - contributionHeight, width, contributionHeight, chartColors.grey);
+  if (taxHeight <= 0) {
+    roundedTopBar(context, x, baseY - netHeight, width, growthHeight, radius, chartColors.green);
+    return;
+  }
+
+  filledBarSegment(context, x, baseY - netHeight, width, growthHeight, chartColors.green);
+  roundedTopBar(context, x, baseY - totalHeight, width, taxHeight, radius, chartColors.red);
+}
+
+function drawPayoutBar(
+  context: CanvasRenderingContext2D,
+  point: AssetProjectionPoint,
+  x: number,
+  width: number,
+  padding: ChartPadding,
+  chartHeight: number,
+  baseY: number,
+  maxValue: number
+): void {
+  const radius = Math.min(6, width / 2);
+  const netBalance = Math.max(0, point.netBalance);
+  const tax = Math.max(0, point.tax);
+  const netHeight = baseY - valueToY(netBalance, padding, chartHeight, maxValue);
+  const totalHeight = baseY - valueToY(netBalance + tax, padding, chartHeight, maxValue);
+  const taxHeight = totalHeight - netHeight;
+
+  if (taxHeight <= 0) {
+    roundedTopBar(context, x, baseY - netHeight, width, netHeight, radius, chartColors.purple);
+    return;
+  }
+
+  filledBarSegment(context, x, baseY - netHeight, width, netHeight, chartColors.purple);
+  roundedTopBar(context, x, baseY - totalHeight, width, taxHeight, radius, chartColors.red);
 }
 
 function drawDashedLine(
@@ -182,7 +255,23 @@ function drawAxisLabels(
   context.restore();
 }
 
-function roundedBar(
+function filledBarSegment(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string
+): void {
+  if (height <= 0) return;
+
+  context.save();
+  context.fillStyle = color;
+  context.fillRect(x, y, width, height);
+  context.restore();
+}
+
+function roundedTopBar(
   context: CanvasRenderingContext2D,
   x: number,
   y: number,

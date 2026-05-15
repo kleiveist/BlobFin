@@ -582,6 +582,10 @@ tfoot th {
   background: var(--chart-purple);
 }
 
+.legend-dot.red {
+  background: var(--chart-red);
+}
+
 .legend-dash {
   display: inline-block;
   width: 28px;

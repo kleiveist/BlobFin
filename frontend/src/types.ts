@@ -85,6 +85,7 @@ export interface AssetProjectionPoint {
   contribution: number;
   allowance: number;
   growth: number;
+  tax: number;
   netBalance: number;
   realNetBalance: number;
   normalDepot: number;
@@ -109,6 +110,7 @@ export interface AssetProjection {
   grossWealthAtRetirement: number;
   growthAtRetirement: number;
   taxAtRetirement: number;
+  taxAtEnd: number;
   inflationFactorAtRetirement: number;
   wealthAtRetirement: number;
   realWealthAtRetirement: number;

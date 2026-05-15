@@ -51,8 +51,36 @@ describe("investment calculator", () => {
     expect(projection.monthlyRate).toBe(3);
     expect(projection.annualSavingsRate).toBe(36);
     expect(projection.totalContribution).toBe(1152);
-    expect(projection.wealthAtRetirement).toBeCloseTo(12650.4, 1);
-    expect(projection.monthlyPension).toBeCloseTo(141.67, 1);
-    expect(projection.realWealthAtRetirement).toBeCloseTo(5740.38, 1);
+    expect(projection.taxAtRetirement).toBe(0);
+    expect(projection.wealthAtRetirement).toBeCloseTo(16769.53, 1);
+    expect(projection.monthlyPension).toBeCloseTo(139.98, 1);
+    expect(projection.realWealthAtRetirement).toBeCloseTo(7609.52, 1);
+  });
+
+  it("realizes tax during saving when percentage withdrawals start before retirement", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate" ? { ...position, amount: 250 } : position
+    );
+    state.investment = {
+      ...state.investment,
+      birthYear: 1993,
+      chartStartAge: 32,
+      payoutEndAge: 82,
+      payoutYears: 20,
+      percentageWithdrawalStartAge: 51,
+      percentageWithdrawalRatePercent: 3.7,
+      investmentReturnPercent: 7,
+      capitalGainsTaxPercent: 27.9,
+      inflationRatePercent: 2.9
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+    const firstTaxedSavingPoint = projection.points.find((point) => point.age === 52);
+
+    expect(projection.retirementAge).toBe(62);
+    expect(projection.taxAtRetirement).toBeGreaterThan(0);
+    expect(projection.taxAtEnd).toBeGreaterThan(projection.taxAtRetirement);
+    expect(firstTaxedSavingPoint?.tax).toBeGreaterThan(0);
   });
 });

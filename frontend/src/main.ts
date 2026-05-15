@@ -159,7 +159,7 @@ function renderCalculations(): void {
   );
   setText("detailGrowth", money(projection.growthAtRetirement));
   setText("detailGrossWealth", money(projection.grossWealthAtRetirement));
-  setText("detailTax", `-${money(projection.taxAtRetirement)}`);
+  setText("detailTax", projection.taxAtRetirement > 0 ? `-${money(projection.taxAtRetirement)}` : money(0));
   setText("detailNetWealth", money(projection.wealthAtRetirement));
   setText("detailInflationFactor", `${projection.inflationFactorAtRetirement.toFixed(2).replace(".", ",")}x`);
   setText("detailRealWealth", money(projection.realWealthAtRetirement));
@@ -170,6 +170,7 @@ function renderCalculations(): void {
   setText("detailPercentageWithdrawalRate", percent(projection.percentageWithdrawalRatePercent));
   setText("detailPercentageWithdrawalMonthly", money(projection.percentageWithdrawalMonthlyAtStart));
   setText("detailPercentageWithdrawalAnnual", money(projection.percentageWithdrawalAnnualAtStart));
+  setText("detailTaxAtEnd", projection.taxAtEnd > 0 ? `-${money(projection.taxAtEnd)}` : money(0));
   setText("detailSavingMonths", `${intNumber(projection.savingMonths)} Monate`);
   setText("detailMonthlyPension", money(projection.monthlyPension));
   setText("detailRealMonthlyPension", money(projection.realMonthlyPension));
