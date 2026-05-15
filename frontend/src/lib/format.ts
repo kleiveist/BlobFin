@@ -66,7 +66,7 @@ export function cleanText(value: unknown): string {
 export function labelForType(type: PositionType): string {
   if (type === "fixed") return "Fixbestand";
   if (type === "reserve") return "Monatliche Ruecklage";
-  return "Temporaer monatlich";
+  return "Temporaer";
 }
 
 export function labelForPayout(type: PayoutType): string {

@@ -117,7 +117,7 @@ export function renderAppShell(): string {
                 ${numberField("chartStartAge", "Startalter Grafik", "investment", "chartStartAge", { min: 0, max: 80, step: 1 })}
                 ${retirementAgeField()}
                 ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1 })}
-                ${numberField("percentageWithdrawalStartAge", "Prozent-Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1 })}
+                ${numberField("percentageWithdrawalStartAge", "Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1 })}
                 ${numberField("percentageWithdrawalRatePercent", "Prozent-Entnahme p. a.", "investment", "percentageWithdrawalRatePercent", { min: 0, max: 20, step: 0.1 })}
               </div>
               <div class="investment-range-panel">
@@ -135,6 +135,7 @@ export function renderAppShell(): string {
                 <div class="investment-chart-metrics">
                   ${chartMetric("monthlyRateMetric", "Monatliche Investmentrate")}
                   ${chartMetric("wealthAtRetirementMetric", "Vermoegen zur Rente")}
+                  ${chartMetric("withdrawalGainMetric", "Monatlicher Zugewinn durch Entnahme")}
                   ${chartMetric("monthlyPensionMetric", "Monatliche Rente netto")}
                   ${chartMetric("realWealthMetric", "Reales Vermoegen zur Rente")}
                 </div>
@@ -161,7 +162,7 @@ export function renderAppShell(): string {
                 ${detailLine("Jaehrliche Sparrate", "detailAnnualSavingsRate")}
                 ${detailLine("Alter heute", "detailAgeToday")}
                 ${detailLine("Gleichmaessige Entnahme ab Alter", "detailPayoutStartAge")}
-                ${detailLine("Prozent-Entnahme ab Alter", "detailPercentageWithdrawalStartAge")}
+                ${detailLine("Entnahme ab Alter", "detailPercentageWithdrawalStartAge")}
                 ${detailLine("Prozent-Entnahme p. a.", "detailPercentageWithdrawalRate")}
                 ${detailLine("Monatliche Prozent-Entnahme", "detailPercentageWithdrawalMonthly")}
                 ${detailLine("Jaehrliche Prozent-Entnahme", "detailPercentageWithdrawalAnnual")}
@@ -184,7 +185,7 @@ export function positionTypeSelect(position: ReservePosition): string {
     <select data-position-id="${position.id}" data-position-field="type">
       <option value="fixed" ${position.type === "fixed" ? "selected" : ""}>Fixbestand</option>
       <option value="reserve" ${position.type === "reserve" ? "selected" : ""}>Monatliche Ruecklage</option>
-      <option value="temporary" ${position.type === "temporary" ? "selected" : ""}>Temporaer monatlich</option>
+      <option value="temporary" ${position.type === "temporary" ? "selected" : ""}>Temporaer</option>
     </select>
   `;
 }

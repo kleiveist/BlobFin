@@ -16,6 +16,11 @@ interface ChartPadding {
   left: number;
 }
 
+interface ChartScale {
+  slotWidth: number;
+  barWidth: number;
+}
+
 export function drawInvestmentChart(canvas: HTMLCanvasElement | null, projection: AssetProjection): void {
   if (!canvas) return;
 
@@ -49,6 +54,18 @@ export function drawInvestmentChart(canvas: HTMLCanvasElement | null, projection
   drawAxisLabels(context, projection, padding, chartWidth, chartHeight, baseY);
 }
 
+function makeChartScale(pointsLength: number, chartWidth: number): ChartScale {
+  const slotWidth = chartWidth / Math.max(1, pointsLength);
+  return {
+    slotWidth,
+    barWidth: Math.max(3, Math.min(16, slotWidth * 0.72))
+  };
+}
+
+function xForIndex(index: number, padding: ChartPadding, scale: ChartScale): number {
+  return padding.left + scale.slotWidth * (index + 0.5);
+}
+
 function drawGrid(
   context: CanvasRenderingContext2D,
   padding: ChartPadding,
@@ -80,16 +97,15 @@ function drawBars(
   baseY: number,
   maxValue: number
 ): void {
-  const xStep = chartWidth / Math.max(1, points.length - 1);
-  const barWidth = Math.max(3, Math.min(16, xStep * 0.72));
+  const scale = makeChartScale(points.length, chartWidth);
 
   points.forEach((point, index) => {
-    const x = padding.left + index * xStep;
+    const x = xForIndex(index, padding, scale);
     const y = valueToY(point.netBalance, padding, chartHeight, maxValue);
     const height = baseY - y;
-    const radius = Math.min(6, barWidth / 2);
+    const radius = Math.min(6, scale.barWidth / 2);
     const color = point.phase === "saving" ? chartColors.green : chartColors.purple;
-    roundedBar(context, x - barWidth / 2, baseY - height, barWidth, height, radius, color);
+    roundedBar(context, x - scale.barWidth / 2, baseY - height, scale.barWidth, height, radius, color);
   });
 }
 
@@ -101,7 +117,7 @@ function drawDashedLine(
   chartHeight: number,
   maxValue: number
 ): void {
-  const xStep = chartWidth / Math.max(1, points.length - 1);
+  const scale = makeChartScale(points.length, chartWidth);
 
   context.save();
   context.strokeStyle = chartColors.red;
@@ -110,7 +126,7 @@ function drawDashedLine(
   context.beginPath();
 
   points.forEach((point, index) => {
-    const x = padding.left + index * xStep;
+    const x = xForIndex(index, padding, scale);
     const y = valueToY(point.normalDepot, padding, chartHeight, maxValue);
     if (index === 0) context.moveTo(x, y);
     else context.lineTo(x, y);
@@ -130,19 +146,20 @@ function drawAxisLabels(
   baseY: number
 ): void {
   const points = projection.points;
-  const xStep = chartWidth / Math.max(1, points.length - 1);
+  const scale = makeChartScale(points.length, chartWidth);
   const startAge = points[0]?.age ?? projection.ageToday;
   const endAge = points[points.length - 1]?.age ?? projection.endAge;
   const retirementIndex = points.findIndex((point) => point.age === projection.retirementAge);
-  const retirementX = padding.left + Math.max(0, retirementIndex) * xStep;
+  const retirementX = xForIndex(Math.max(0, retirementIndex), padding, scale);
+  const startX = xForIndex(0, padding, scale);
+  const endX = xForIndex(Math.max(0, points.length - 1), padding, scale);
 
   context.save();
   context.fillStyle = chartColors.muted;
   context.font = "16px system-ui, sans-serif";
-  context.textAlign = "left";
-  context.fillText(String(startAge), padding.left - 4, baseY + 28);
-  context.textAlign = "right";
-  context.fillText(String(endAge), padding.left + chartWidth + 4, baseY + 28);
+  context.textAlign = "center";
+  context.fillText(String(startAge), startX, baseY + 28);
+  context.fillText(String(endAge), endX, baseY + 28);
   context.textAlign = "center";
   context.font = "18px system-ui, sans-serif";
   context.fillText("Alter", padding.left + chartWidth / 2, baseY + 52);

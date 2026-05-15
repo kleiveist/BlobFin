@@ -108,7 +108,7 @@ export function defaultInvestmentSettings(): InvestmentSettings {
     chartStartAge: 32,
     payoutEndAge: 95,
     payoutYears: 45,
-    percentageWithdrawalStartAge: 0,
+    percentageWithdrawalStartAge: 32,
     percentageWithdrawalRatePercent: 4,
     investmentReturnPercent: 14,
     capitalGainsTaxPercent: 26.375,

@@ -1,4 +1,4 @@
-import { isActiveInMonth } from "./reserveCalculator";
+import { selectedMonthlyPattern } from "./investmentContributions";
 import type { InvestmentResult, InvestmentSettings, ReservePosition } from "../types";
 
 export function annuityPayment(presentValue: number, monthlyRate: number, monthsCount: number): number {
@@ -19,18 +19,7 @@ export function calculateInvestmentResult(
   const savingMonths = Math.max(0, Math.round(yearsUntilPayout * 12));
   const payoutMonths = Math.max(1, Math.round(payoutYears * 12));
 
-  const selectedPositions = positions.filter(
-    (position) => settings.includedIds.includes(position.id) && position.active
-  );
-  const monthlyPattern: number[] = [];
-  for (let month = 1; month <= 12; month += 1) {
-    monthlyPattern.push(
-      selectedPositions.reduce((sum, position) => {
-        return isActiveInMonth(position, month) ? sum + Number(position.amount) : sum;
-      }, 0)
-    );
-  }
-
+  const monthlyPattern = selectedMonthlyPattern(positions, settings);
   const averageMonthlyContribution = monthlyPattern.reduce((sum, value) => sum + value, 0) / 12;
   const annualReturn = settings.investmentReturnPercent / 100;
   const monthlyReturn = (1 + annualReturn) ** (1 / 12) - 1;

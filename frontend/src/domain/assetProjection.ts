@@ -1,5 +1,5 @@
-import { isActiveInMonth } from "./reserveCalculator";
 import { annuityPayment } from "./investmentCalculator";
+import { selectedMonthlyPattern } from "./investmentContributions";
 import type { AssetProjection, AssetProjectionPoint, InvestmentSettings, ReservePosition } from "../types";
 
 interface SavingSnapshot {
@@ -15,21 +15,6 @@ interface SavingSnapshot {
 
 export function payoutStartAge(settings: InvestmentSettings): number {
   return Math.max(0, settings.payoutEndAge - settings.payoutYears);
-}
-
-export function selectedMonthlyPattern(positions: ReservePosition[], settings: InvestmentSettings): number[] {
-  const selectedPositions = positions.filter((position) => settings.includedIds.includes(position.id) && position.active);
-  const pattern: number[] = [];
-
-  for (let month = 1; month <= 12; month += 1) {
-    pattern.push(
-      selectedPositions.reduce((sum, position) => {
-        return isActiveInMonth(position, month) ? sum + Number(position.amount) : sum;
-      }, 0)
-    );
-  }
-
-  return pattern;
 }
 
 export function buildAssetProjection(
@@ -63,6 +48,7 @@ export function buildAssetProjection(
   );
   const percentageWithdrawalMonthlyAtStart =
     percentageBase.netBalance * (settings.percentageWithdrawalRatePercent / 100) / 12;
+  const percentageWithdrawalAnnualAtStart = percentageWithdrawalMonthlyAtStart * 12;
 
   const points: AssetProjectionPoint[] = [];
 
@@ -87,7 +73,8 @@ export function buildAssetProjection(
     monthlyPension,
     realMonthlyPension,
     percentageWithdrawalMonthlyAtStart,
-    percentageWithdrawalAnnualAtStart: percentageWithdrawalMonthlyAtStart * 12,
+    percentageWithdrawalAnnualAtStart,
+    withdrawalGainMonthlyAtStart: percentageWithdrawalMonthlyAtStart,
     percentageWithdrawalStartAge: settings.percentageWithdrawalStartAge,
     percentageWithdrawalRatePercent: settings.percentageWithdrawalRatePercent,
     retirementAge,

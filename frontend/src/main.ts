@@ -8,8 +8,10 @@ import {
   clamp,
   escapeHtml,
   intNumber,
+  labelForPayout,
   labelForType,
   makeHeaderLabel,
+  monthName,
   money,
   numberValue,
   percent
@@ -22,6 +24,7 @@ import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from ".
 const root = requireRootElement();
 
 let state = loadInitialState();
+normalizeInvestmentBounds();
 
 renderShell();
 bindEvents();
@@ -112,9 +115,11 @@ function bindEvents(): void {
 }
 
 function renderAll(): void {
+  normalizeInvestmentBounds();
   renderPositions();
   renderInvestmentIncludeList();
   renderCalculations();
+  syncInvestmentInputsFromState();
   saveState(state);
 }
 
@@ -137,6 +142,7 @@ function renderCalculations(): void {
   setText("monthlySavingsRateMetric", `${money(projection.monthlyRate)} monatlich`);
   setText("annualSavingsRateMetric", money(projection.annualSavingsRate));
   setText("wealthAtRetirementMetric", money(projection.wealthAtRetirement));
+  setText("withdrawalGainMetric", money(projection.withdrawalGainMonthlyAtStart));
   setText("monthlyPensionMetric", money(projection.monthlyPension));
   setText("realWealthMetric", money(projection.realWealthAtRetirement));
 
@@ -273,9 +279,7 @@ function renderInvestmentIncludeList(): void {
           <input type="checkbox" data-include-position="${position.id}" ${checked} />
           <span>
             <span class="include-name">${escapeHtml(position.name)} ${inactive}</span>
-            <span class="include-amount">${money(position.amount)} pro aktivem Monat | ${escapeHtml(
-              labelForType(position.type)
-            )}</span>
+            <span class="include-amount">${escapeHtml(investmentPositionSubtitle(position))}</span>
           </span>
         </label>
       `;
@@ -283,15 +287,39 @@ function renderInvestmentIncludeList(): void {
     .join("");
 }
 
+function investmentPositionSubtitle(position: ReservePosition): string {
+  const amount =
+    position.payoutType === "yearly"
+      ? `${money(position.amount)} jaehrlich (${monthName(position.payoutMonth)})`
+      : `${money(position.amount)} monatlich`;
+  return `${amount} | ${labelForType(position.type)} | Abgang ${labelForPayout(position.payoutType)}`;
+}
+
 function syncAllInputsFromState(): void {
   for (const key of Object.keys(state.settings) as Array<keyof PlanningSettings>) {
     setInputValue(`[data-setting="${key}"]`, state.settings[key]);
   }
+  syncInvestmentInputsFromState();
+}
+
+function syncInvestmentInputsFromState(): void {
+  syncInvestmentInputBounds();
   for (const key of Object.keys(state.investment) as Array<keyof InvestmentSettings>) {
     if (key === "includedIds") continue;
     setInputValue(`[data-investment="${key}"]`, state.investment[key]);
   }
   setInputValue("[data-retirement-age]", calculatePayoutStartAge(state.investment));
+}
+
+function syncInvestmentInputBounds(): void {
+  const retirementAge = calculatePayoutStartAge(state.investment);
+  const chartStartAge = state.investment.chartStartAge;
+  setInputBounds(
+    '[data-investment="chartStartAge"]',
+    investmentMin("chartStartAge"),
+    Math.min(investmentMax("chartStartAge"), retirementAge)
+  );
+  setInputBounds('[data-investment="percentageWithdrawalStartAge"]', chartStartAge, retirementAge);
 }
 
 function updatePlanningSetting(field: keyof PlanningSettings, value: string): void {
@@ -311,6 +339,7 @@ function updateInvestmentSetting(field: keyof InvestmentSettings, value: string)
       payoutEndAge,
       payoutYears: clamp(payoutEndAge - retirementAge, 1, 50)
     };
+    normalizeInvestmentBounds();
     return;
   }
 
@@ -318,6 +347,7 @@ function updateInvestmentSetting(field: keyof InvestmentSettings, value: string)
     ...state.investment,
     [field]: clamp(numberValue(value), investmentMin(field), investmentMax(field))
   };
+  normalizeInvestmentBounds();
 }
 
 function updateRetirementAge(value: string): void {
@@ -326,6 +356,7 @@ function updateRetirementAge(value: string): void {
     ...state.investment,
     payoutYears: clamp(state.investment.payoutEndAge - retirementAge, 1, 50)
   };
+  normalizeInvestmentBounds();
 }
 
 function updatePosition(id: string, field: keyof ReservePosition, value: string | boolean): void {
@@ -465,9 +496,30 @@ function setInputValue(selector: string, value: number | string | string[]): voi
   if (input) input.value = String(value);
 }
 
+function setInputBounds(selector: string, min: number, max: number): void {
+  const input = document.querySelector<HTMLInputElement>(selector);
+  if (!input) return;
+  input.min = String(min);
+  input.max = String(max);
+}
+
 function drawCurrentInvestmentChart(): void {
   const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
   drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection);
+}
+
+function normalizeInvestmentBounds(): void {
+  const retirementAge = calculatePayoutStartAge(state.investment);
+  const chartStartAge = clamp(
+    state.investment.chartStartAge,
+    investmentMin("chartStartAge"),
+    Math.min(investmentMax("chartStartAge"), retirementAge)
+  );
+  state.investment = {
+    ...state.investment,
+    chartStartAge,
+    percentageWithdrawalStartAge: clamp(state.investment.percentageWithdrawalStartAge, chartStartAge, retirementAge)
+  };
 }
 
 function settingMin(field: keyof PlanningSettings): number {
