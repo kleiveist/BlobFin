@@ -1,5 +1,6 @@
 export type PositionType = "fixed" | "reserve" | "temporary";
 export type PayoutType = "none" | "monthly" | "yearly";
+export type WithdrawalMode = "annuity" | "fourPercent";
 
 export interface ReservePosition {
   id: string;
@@ -25,11 +26,13 @@ export interface PlanningSettings {
 export interface InvestmentSettings {
   includedIds: string[];
   birthYear: number;
+  chartStartAge: number;
   payoutEndAge: number;
   payoutYears: number;
   investmentReturnPercent: number;
   capitalGainsTaxPercent: number;
   inflationRatePercent: number;
+  withdrawalMode: WithdrawalMode;
 }
 
 export interface AppState {
@@ -73,4 +76,27 @@ export interface InvestmentResult {
   realWealth: number;
   monthlyPensionNet: number;
   realMonthlyPension: number;
+}
+
+export interface AssetProjectionPoint {
+  age: number;
+  phase: "saving" | "payout";
+  grossBalance: number;
+  contribution: number;
+  allowance: number;
+  growth: number;
+  netBalance: number;
+  realNetBalance: number;
+  normalDepot: number;
+}
+
+export interface AssetProjection {
+  points: AssetProjectionPoint[];
+  monthlyRate: number;
+  monthlyPension: number;
+  retirementAge: number;
+  endAge: number;
+  ageToday: number;
+  wealthAtRetirement: number;
+  realWealthAtRetirement: number;
 }

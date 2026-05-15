@@ -106,15 +106,37 @@ export function renderAppShell(): string {
           <div class="investment-controls">
             <div class="field-grid wide">
               ${numberField("birthYear", "Geburtsjahr", "investment", "birthYear", { min: 1962, max: 2009, step: 1 })}
-              ${numberField("payoutEndAge", "Alter am Ende", "investment", "payoutEndAge", { min: 85, max: 105, step: 1 })}
-              ${numberField("payoutYears", "Auszahlungsjahre", "investment", "payoutYears", { min: 1, max: 50, step: 1 })}
+              ${numberField("chartStartAge", "Startalter Grafik", "investment", "chartStartAge", { min: 0, max: 80, step: 1 })}
+              ${retirementAgeField()}
+              ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1 })}
+              ${withdrawalModeField()}
             </div>
             ${rangeField("investmentReturnPercent", "Jaehrliche Rendite", 0, 30, 0.1)}
             ${rangeField("capitalGainsTaxPercent", "Kapitalertragsteuer auf Wertzuwachs", 0, 50, 0.1)}
             ${rangeField("inflationRatePercent", "Inflation pro Jahr", 1, 10, 0.1)}
+          </div>
 
-            <div class="details-grid">
-              <div class="detail-list" aria-label="Berechnungsdetails">
+          <div class="investment-visual">
+            <section class="investment-chart-card" aria-label="Anlageentwicklung Grafik">
+              <div class="investment-chart-header">
+                <div class="investment-chart-title">Anlageentwicklung</div>
+                <div class="investment-chart-metrics">
+                  ${chartMetric("monthlyRateMetric", "Monatliche Investmentrate")}
+                  ${chartMetric("wealthAtRetirementMetric", "Vermoegen zur Rente")}
+                  ${chartMetric("monthlyPensionMetric", "Monatliche Rente netto")}
+                  ${chartMetric("realWealthMetric", "Reales Vermoegen zur Rente")}
+                </div>
+              </div>
+              <canvas id="investmentChart"></canvas>
+              <div class="investment-legend">
+                <span class="legend-item"><span class="legend-dot grey"></span> Eigenbeitrag</span>
+                <span class="legend-item"><span class="legend-dot orange"></span> Zulagen</span>
+                <span class="legend-item"><span class="legend-dot green"></span> Wertzuwachs</span>
+                <span class="legend-item"><span class="legend-dot purple"></span> Restguthaben (Auszahlung)</span>
+                <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
+              </div>
+              <div class="investment-statistics">
+                <div class="detail-list" aria-label="Berechnungsdetails">
                 ${detailLine("Eigenbeitrag", "detailContribution")}
                 ${detailLine("Wertzuwachs", "detailGrowth")}
                 ${detailLine("Bruttovermoegen", "detailGrossWealth")}
@@ -122,16 +144,17 @@ export function renderAppShell(): string {
                 ${detailLine("Vermoegen fuer Auszahlung", "detailNetWealth")}
                 ${detailLine("Inflationsfaktor", "detailInflationFactor")}
                 ${detailLine("Reales Vermoegen", "detailRealWealth")}
-              </div>
-              <div class="detail-list" aria-label="Auszahlung">
+                </div>
+                <div class="detail-list" aria-label="Auszahlung">
                 ${detailLine("Alter heute", "detailAgeToday")}
                 ${detailLine("Start Auszahlung", "detailPayoutStartAge")}
                 ${detailLine("Ansparzeit", "detailSavingMonths")}
                 ${detailLine("Monatliche Rente netto", "detailMonthlyPension")}
                 ${detailLine("Monatliche Rente real", "detailRealMonthlyPension")}
                 ${detailLine("Gewaehlte Monatsrate", "detailSelectedMonthlyRate")}
+                </div>
               </div>
-            </div>
+            </section>
           </div>
         </div>
       </section>
@@ -195,6 +218,36 @@ function rangeField(key: keyof InvestmentSettings, label: string, min: number, m
       <input type="range" min="${min}" max="${max}" step="${step}" data-investment="${key}" />
       <strong id="${key}Value">-</strong>
     </label>
+  `;
+}
+
+function retirementAgeField(): string {
+  return `
+    <label class="field" for="retirementAge">
+      <span>Rentenalter</span>
+      <input id="retirementAge" type="number" min="50" max="85" step="1" data-retirement-age="true" />
+    </label>
+  `;
+}
+
+function withdrawalModeField(): string {
+  return `
+    <label class="field" for="withdrawalMode">
+      <span>Auszahlung</span>
+      <select id="withdrawalMode" data-investment="withdrawalMode">
+        <option value="annuity">gleichmaessige Entnahme bis Endalter</option>
+        <option value="fourPercent">4-%-Regel pro Jahr</option>
+      </select>
+    </label>
+  `;
+}
+
+function chartMetric(id: string, label: string): string {
+  return `
+    <div class="chart-metric">
+      <div class="chart-label">${label}</div>
+      <div class="chart-value" id="${id}">-</div>
+    </div>
   `;
 }
 

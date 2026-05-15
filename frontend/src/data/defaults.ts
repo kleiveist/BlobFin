@@ -105,11 +105,13 @@ export function defaultInvestmentSettings(): InvestmentSettings {
   return {
     includedIds: ["investitionsrate"],
     birthYear: 1980,
+    chartStartAge: 18,
     payoutEndAge: 95,
     payoutYears: 30,
     investmentReturnPercent: 7,
     capitalGainsTaxPercent: 26.375,
-    inflationRatePercent: 2
+    inflationRatePercent: 2,
+    withdrawalMode: "annuity"
   };
 }
 

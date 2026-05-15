@@ -1,6 +1,7 @@
 import "./styles.css";
 
 import { createId, defaultAppState, defaultInvestmentSettings } from "./data/defaults";
+import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
 import { calculateInvestmentResult } from "./domain/investmentCalculator";
 import { calculateReserveSummary } from "./domain/reserveCalculator";
 import { exportPositionsCsv, exportYearTableCsv, parseCsv, positionsFromCsvRows } from "./lib/csv";
@@ -16,13 +17,10 @@ import {
 } from "./lib/format";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
 import type { AppState, InvestmentSettings, PlanningSettings, ReservePosition } from "./types";
+import { drawInvestmentChart } from "./views/investmentChart";
 import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from "./views/templates";
 
-const root = document.querySelector<HTMLDivElement>("#app");
-
-if (!root) {
-  throw new Error("Application root #app is missing.");
-}
+const root = requireRootElement();
 
 let state = loadInitialState();
 
@@ -38,6 +36,14 @@ function loadInitialState(): AppState {
     console.warn("Stored state could not be loaded; falling back to defaults.", error);
     return defaultAppState();
   }
+}
+
+function requireRootElement(): HTMLDivElement {
+  const element = document.querySelector<HTMLDivElement>("#app");
+  if (!element) {
+    throw new Error("Application root #app is missing.");
+  }
+  return element;
 }
 
 function renderShell(): void {
@@ -57,6 +63,12 @@ function bindEvents(): void {
 
     if (target.dataset.investment) {
       updateInvestmentSetting(target.dataset.investment as keyof InvestmentSettings, target.value);
+      renderAll();
+      return;
+    }
+
+    if (target.dataset.retirementAge) {
+      updateRetirementAge(target.value);
       renderAll();
     }
   });
@@ -96,6 +108,8 @@ function bindEvents(): void {
     if (action === "export-positions") downloadText("kosten-und-ruecklagenpositionen.csv", exportPositionsCsv(state.positions));
     if (action === "export-year") downloadText("jahreskalkulator-ruecklagen.csv", exportYearTableCsv(state.settings, state.positions));
   });
+
+  window.addEventListener("resize", drawCurrentInvestmentChart);
 }
 
 function renderAll(): void {
@@ -108,6 +122,10 @@ function renderAll(): void {
 function renderCalculations(): void {
   const reserve = calculateReserveSummary(state.settings, state.positions);
   const investment = calculateInvestmentResult(state.settings.year, state.positions, state.investment);
+  const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+  const displayedMonthlyPension = projection.monthlyPension;
+  const displayedRealMonthlyPension =
+    investment.inflationFactor > 0 ? displayedMonthlyPension / investment.inflationFactor : displayedMonthlyPension;
 
   setText("maxNeeded", money(reserve.maxRow.maxNeeded));
   setText("maxNeededHint", `${reserve.maxRow.month}, ohne Notgroschen`);
@@ -118,12 +136,17 @@ function renderCalculations(): void {
   setText("totalCashback", money(reserve.totalCashback));
 
   setText("investmentNetWealthTop", money(investment.netWealth));
-  setText("investmentMonthlyPensionTop", money(investment.monthlyPensionNet));
+  setText("investmentMonthlyPensionTop", money(displayedMonthlyPension));
   setText("investmentRealWealthTop", money(investment.realWealth));
+  setText("monthlyRateMetric", money(projection.monthlyRate));
+  setText("wealthAtRetirementMetric", money(projection.wealthAtRetirement));
+  setText("monthlyPensionMetric", money(displayedMonthlyPension));
+  setText("realWealthMetric", money(projection.realWealthAtRetirement));
 
   setRangeLabel("investmentReturnPercent", percent(state.investment.investmentReturnPercent));
   setRangeLabel("capitalGainsTaxPercent", percent(state.investment.capitalGainsTaxPercent));
   setRangeLabel("inflationRatePercent", percent(state.investment.inflationRatePercent));
+  setInputValue("[data-retirement-age]", projection.retirementAge);
 
   setText(
     "detailContribution",
@@ -140,11 +163,12 @@ function renderCalculations(): void {
   setText("detailAgeToday", `${intNumber(investment.ageToday)} Jahre`);
   setText("detailPayoutStartAge", `${intNumber(investment.payoutStartAge)} Jahre`);
   setText("detailSavingMonths", `${intNumber(investment.savingMonths)} Monate`);
-  setText("detailMonthlyPension", money(investment.monthlyPensionNet));
-  setText("detailRealMonthlyPension", money(investment.realMonthlyPension));
+  setText("detailMonthlyPension", money(displayedMonthlyPension));
+  setText("detailRealMonthlyPension", money(displayedRealMonthlyPension));
   setText("detailSelectedMonthlyRate", money(investment.averageMonthlyContribution));
 
   renderResultTable(reserve);
+  drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection);
 }
 
 function renderPositions(): void {
@@ -247,7 +271,7 @@ function renderInvestmentIncludeList(): void {
           <input type="checkbox" data-include-position="${position.id}" ${checked} />
           <span>
             <span class="include-name">${escapeHtml(position.name)} ${inactive}</span>
-            <span class="include-amount">${money(position.amount)} pro aktivem Monat · ${escapeHtml(
+            <span class="include-amount">${money(position.amount)} pro aktivem Monat | ${escapeHtml(
               labelForType(position.type)
             )}</span>
           </span>
@@ -265,6 +289,7 @@ function syncAllInputsFromState(): void {
     if (key === "includedIds") continue;
     setInputValue(`[data-investment="${key}"]`, state.investment[key]);
   }
+  setInputValue("[data-retirement-age]", calculatePayoutStartAge(state.investment));
 }
 
 function updatePlanningSetting(field: keyof PlanningSettings, value: string): void {
@@ -276,9 +301,35 @@ function updatePlanningSetting(field: keyof PlanningSettings, value: string): vo
 
 function updateInvestmentSetting(field: keyof InvestmentSettings, value: string): void {
   if (field === "includedIds") return;
+  if (field === "withdrawalMode") {
+    if (value === "annuity" || value === "fourPercent") {
+      state.investment = { ...state.investment, withdrawalMode: value };
+    }
+    return;
+  }
+
+  if (field === "payoutEndAge") {
+    const retirementAge = calculatePayoutStartAge(state.investment);
+    const payoutEndAge = clamp(numberValue(value), investmentMin(field), investmentMax(field));
+    state.investment = {
+      ...state.investment,
+      payoutEndAge,
+      payoutYears: clamp(payoutEndAge - retirementAge, 1, 50)
+    };
+    return;
+  }
+
   state.investment = {
     ...state.investment,
     [field]: clamp(numberValue(value), investmentMin(field), investmentMax(field))
+  };
+}
+
+function updateRetirementAge(value: string): void {
+  const retirementAge = clamp(numberValue(value), 50, 85);
+  state.investment = {
+    ...state.investment,
+    payoutYears: clamp(state.investment.payoutEndAge - retirementAge, 1, 50)
   };
 }
 
@@ -415,8 +466,13 @@ function setRangeLabel(key: keyof InvestmentSettings, value: string): void {
 }
 
 function setInputValue(selector: string, value: number | string | string[]): void {
-  const input = document.querySelector<HTMLInputElement>(selector);
+  const input = document.querySelector<HTMLInputElement | HTMLSelectElement>(selector);
   if (input) input.value = String(value);
+}
+
+function drawCurrentInvestmentChart(): void {
+  const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+  drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection);
 }
 
 function settingMin(field: keyof PlanningSettings): number {
@@ -430,16 +486,18 @@ function settingMax(field: keyof PlanningSettings): number {
 }
 
 function investmentMin(field: keyof InvestmentSettings): number {
+  if (field === "chartStartAge") return 0;
   if (field === "birthYear") return 1962;
-  if (field === "payoutEndAge") return 85;
+  if (field === "payoutEndAge") return 70;
   if (field === "payoutYears") return 1;
   if (field === "inflationRatePercent") return 1;
   return 0;
 }
 
 function investmentMax(field: keyof InvestmentSettings): number {
+  if (field === "chartStartAge") return 80;
   if (field === "birthYear") return 2009;
-  if (field === "payoutEndAge") return 105;
+  if (field === "payoutEndAge") return 110;
   if (field === "payoutYears") return 50;
   if (field === "investmentReturnPercent") return 30;
   if (field === "capitalGainsTaxPercent") return 50;

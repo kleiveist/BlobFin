@@ -73,11 +73,13 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
   return {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
+    chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
     payoutYears: numberOrDefault(value.payoutYears, fallback.payoutYears),
     investmentReturnPercent: numberOrDefault(value.investmentReturnPercent, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTaxPercent, fallback.capitalGainsTaxPercent),
-    inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent)
+    inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent),
+    withdrawalMode: withdrawalModeOrDefault(value.withdrawalMode, fallback.withdrawalMode)
   };
 }
 
@@ -87,11 +89,13 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
   return {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
+    chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
     payoutYears: numberOrDefault(value.payoutYears, fallback.payoutYears),
     investmentReturnPercent: numberOrDefault(value.investmentReturn, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTax, fallback.capitalGainsTaxPercent),
-    inflationRatePercent: numberOrDefault(value.inflationRate, fallback.inflationRatePercent)
+    inflationRatePercent: numberOrDefault(value.inflationRate, fallback.inflationRatePercent),
+    withdrawalMode: withdrawalModeOrDefault(value.withdrawalMode, fallback.withdrawalMode)
   };
 }
 
@@ -131,4 +135,8 @@ function numberOrDefault(value: unknown, fallback: number): number {
 function stringArrayOrDefault(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) return fallback;
   return value.map(String);
+}
+
+function withdrawalModeOrDefault(value: unknown, fallback: "annuity" | "fourPercent"): "annuity" | "fourPercent" {
+  return value === "fourPercent" || value === "annuity" ? value : fallback;
 }
