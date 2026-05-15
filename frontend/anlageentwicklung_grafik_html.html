@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anlageentwicklung Grafik</title>
+  <style>
+    :root {
+      --bg: #111315;
+      --panel: #17191c;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --grid: #2a2d31;
+      --green: #43b20a;
+      --purple: #9b94ff;
+      --grey: #777b82;
+      --orange: #ff7a00;
+      --red: #ff5b63;
+      --border: #2f3338;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.25);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.5rem, 2.4vw, 2.4rem);
+      letter-spacing: -0.03em;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      max-width: 1050px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    label {
+      display: block;
+      font-size: .8rem;
+      color: var(--muted);
+      margin-bottom: 5px;
+      font-weight: 700;
+    }
+
+    input, select, button {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #0f1113;
+      color: var(--text);
+      padding: 10px 11px;
+      font: inherit;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      border: 0;
+      accent-color: var(--green);
+    }
+
+    button {
+      cursor: pointer;
+      background: #243b1b;
+      border-color: #3b6b22;
+      color: #c9f7b0;
+      font-weight: 800;
+    }
+
+    .chart-card {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 22px 24px 0;
+      flex-wrap: wrap;
+    }
+
+    .chart-title {
+      font-size: clamp(1.35rem, 2vw, 2.05rem);
+      font-weight: 850;
+      letter-spacing: -0.03em;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--border);
+      background: #111315;
+      border-radius: 16px;
+      padding: 12px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 750;
+      margin-bottom: 4px;
+    }
+
+    .metric .value {
+      font-size: clamp(1rem, 1.6vw, 1.35rem);
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    canvas {
+      width: 100%;
+      height: min(62vh, 640px);
+      display: block;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding: 0 24px 22px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .dash {
+      width: 28px;
+      height: 0;
+      border-top: 2px dashed var(--red);
+      display: inline-block;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: .88rem;
+      margin-top: 10px;
+    }
+
+    .warn {
+      color: #fecaca;
+      background: rgba(127, 29, 29, .25);
+      border: 1px solid rgba(248, 113, 113, .25);
+      padding: 10px 12px;
+      border-radius: 14px;
+      display: none;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 720px) {
+      main { padding: 12px; }
+      .chart-header { padding: 16px 16px 0; }
+      canvas { height: 460px; }
+      .legend { justify-content: flex-start; padding: 0 16px 16px; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card">
+      <h1>Anlageentwicklung</h1>
+      <p class="sub">
+        Diese separate Grafikseite liest automatisch die gespeicherten Daten aus dem ersten Jahreskalkulator. Verwendet werden die dort ausgewählten Investment-Positionen, z. B. „Investitionsrate“ oder zusätzliche Förderungen.
+      </p>
+      <div id="dataWarning" class="warn">
+        Keine Daten aus dem ersten Rechner gefunden. Es werden Demo-Werte genutzt. Öffne zuerst den Jahreskalkulator, speichere/ändere dort eine Position und lade diese Grafikseite danach neu.
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <div>
+          <label for="birthYear">Geburtsjahr</label>
+          <input id="birthYear" type="number" min="1962" max="2009" value="1980" />
+        </div>
+        <div>
+          <label for="startAge">Startalter Grafik</label>
+          <input id="startAge" type="number" min="0" max="80" value="18" />
+        </div>
+        <div>
+          <label for="retirementAge">Rentenalter</label>
+          <input id="retirementAge" type="number" min="50" max="85" value="67" />
+        </div>
+        <div>
+          <label for="endAge">Endalter</label>
+          <input id="endAge" type="number" min="70" max="110" value="85" />
+        </div>
+        <div>
+          <label for="annualReturn">Rendite p. a. <span id="annualReturnLabel">7,0 %</span></label>
+          <input id="annualReturn" type="range" min="0" max="30" step="0.1" value="7" />
+        </div>
+        <div>
+          <label for="taxRate">Kapitalertragsteuer <span id="taxRateLabel">26,4 %</span></label>
+          <input id="taxRate" type="range" min="0" max="50" step="0.1" value="26.375" />
+        </div>
+        <div>
+          <label for="inflationRate">Inflation <span id="inflationRateLabel">2,0 %</span></label>
+          <input id="inflationRate" type="range" min="1" max="10" step="0.1" value="2" />
+        </div>
+        <div>
+          <label for="withdrawalMode">Auszahlung</label>
+          <select id="withdrawalMode">
+            <option value="annuity">gleichmäßige Entnahme bis Endalter</option>
+            <option value="fourPercent">4-%-Regel pro Jahr</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint">
+        Die rote gestrichelte Linie zeigt ein normales Depot nach Steuer- und Inflationsabzug als reale Vergleichslinie. Die grünen Balken zeigen den Vermögensaufbau, die violetten Balken das Restguthaben in der Auszahlungsphase.
+      </p>
+    </section>
+
+    <section class="card chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Anlageentwicklung</div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="label">Monatliche Investmentrate</div>
+            <div class="value" id="monthlyRateMetric">–</div>
+          </div>
+          <div class="metric">
+            <div class="label">Vermögen zur Rente</div>
+            <div class="value" id="wealthAtRetirementMetric">–</div>
+          </div>
+          <div class="metric">
+            <div class="label">Monatliche Rente netto</div>
+            <div class="value" id="monthlyPensionMetric">–</div>
+          </div>
+          <div class="metric">
+            <div class="label">Reales Vermögen zur Rente</div>
+            <div class="value" id="realWealthMetric">–</div>
+          </div>
+        </div>
+      </div>
+      <canvas id="chart"></canvas>
+      <div class="legend">
+        <span class="legend-item"><span class="dot" style="background: var(--grey)"></span> Eigenbeitrag</span>
+        <span class="legend-item"><span class="dot" style="background: var(--orange)"></span> Zulagen</span>
+        <span class="legend-item"><span class="dot" style="background: var(--green)"></span> Wertzuwachs</span>
+        <span class="legend-item"><span class="dot" style="background: var(--purple)"></span> Restguthaben (Auszahlung)</span>
+        <span class="legend-item"><span class="dash"></span> Normales Depot</span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "jahreskalkulatorState";
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+
+    const colors = {
+      bg: "#17191c",
+      text: "#e5e7eb",
+      muted: "#9ca3af",
+      grid: "#2a2d31",
+      green: "#43b20a",
+      purple: "#9b94ff",
+      grey: "#777b82",
+      orange: "#ff7a00",
+      red: "#ff5b63"
+    };
+
+    function defaultState() {
+      return {
+        year: new Date().getFullYear(),
+        positions: [
+          { id: "investitionsrate", active: true, name: "Investitionsrate", type: "temporary", amount: 550, startMonth: 1, endMonth: 12 }
+        ],
+        investmentSettings: {
+          includedIds: ["investitionsrate"],
+          birthYear: 1980,
+          payoutEndAge: 85,
+          payoutYears: 18,
+          investmentReturn: 7,
+          capitalGainsTax: 26.375,
+          inflationRate: 2
+        }
+      };
+    }
+
+    function loadFirstCalculatorState() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        document.getElementById("dataWarning").style.display = "block";
+        return defaultState();
+      }
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed.positions)) throw new Error("positions fehlt");
+        document.getElementById("dataWarning").style.display = "none";
+        return parsed;
+      } catch {
+        document.getElementById("dataWarning").style.display = "block";
+        return defaultState();
+      }
+    }
+
+    let state = loadFirstCalculatorState();
+
+    function initControlsFromState() {
+      const settings = state.investmentSettings || {};
+      const currentYear = Number(state.year || new Date().getFullYear());
+      const birthYear = Number(settings.birthYear || 1980);
+      const payoutEndAge = Number(settings.payoutEndAge || 85);
+      const payoutYears = Number(settings.payoutYears || 18);
+      const retirementAge = Math.max(50, Math.min(85, payoutEndAge - payoutYears));
+
+      document.getElementById("birthYear").value = birthYear;
+      document.getElementById("startAge").value = 18;
+      document.getElementById("retirementAge").value = retirementAge || 67;
+      document.getElementById("endAge").value = payoutEndAge || 85;
+      document.getElementById("annualReturn").value = Number(settings.investmentReturn ?? 7);
+      document.getElementById("taxRate").value = Number(settings.capitalGainsTax ?? 26.375);
+      document.getElementById("inflationRate").value = Number(settings.inflationRate ?? 2);
+    }
+
+    function activeMonthlyRateFromState() {
+      const settings = state.investmentSettings || {};
+      const included = Array.isArray(settings.includedIds) ? settings.includedIds : ["investitionsrate"];
+      const positions = Array.isArray(state.positions) ? state.positions : [];
+      const selected = positions.filter(p => p.active !== false && included.includes(p.id));
+
+      if (!selected.length) {
+        const fallback = positions.find(p => String(p.name || "").toLowerCase().includes("invest"));
+        if (fallback) selected.push(fallback);
+      }
+
+      let yearlyTotal = 0;
+      for (let month = 1; month <= 12; month++) {
+        for (const p of selected) {
+          const start = Number(p.startMonth || 1);
+          const end = Number(p.endMonth || 12);
+          if (month >= start && month <= end) yearlyTotal += Number(p.amount || 0);
+        }
+      }
+      return yearlyTotal / 12;
+    }
+
+    function simulate() {
+      const currentYear = Number(state.year || new Date().getFullYear());
+      const birthYear = Number(document.getElementById("birthYear").value || 1980);
+      const ageNow = Math.max(0, currentYear - birthYear);
+      const startAge = Number(document.getElementById("startAge").value || 18);
+      const retirementAge = Number(document.getElementById("retirementAge").value || 67);
+      const endAge = Number(document.getElementById("endAge").value || 85);
+      const annualReturn = Number(document.getElementById("annualReturn").value || 0) / 100;
+      const taxRate = Number(document.getElementById("taxRate").value || 0) / 100;
+      const inflationRate = Number(document.getElementById("inflationRate").value || 0) / 100;
+      const withdrawalMode = document.getElementById("withdrawalMode").value;
+      const monthlyRate = activeMonthlyRateFromState();
+      const monthlyReturn = Math.pow(1 + annualReturn, 1 / 12) - 1;
+
+      let balance = 0;
+      let contribution = 0;
+      const yearly = [];
+
+      for (let age = startAge; age <= retirementAge; age++) {
+        if (age >= ageNow) {
+          for (let m = 0; m < 12; m++) {
+            balance = balance * (1 + monthlyReturn) + monthlyRate;
+            contribution += monthlyRate;
+          }
+        }
+
+        const growth = Math.max(0, balance - contribution);
+        const tax = growth * taxRate;
+        const netBalance = Math.max(0, balance - tax);
+        const yearsFromNow = Math.max(0, age - ageNow);
+        const inflationFactor = Math.pow(1 + inflationRate, yearsFromNow);
+        const realNetBalance = netBalance / inflationFactor;
+
+        yearly.push({
+          age,
+          phase: "saving",
+          grossBalance: balance,
+          contribution,
+          allowance: 0,
+          growth,
+          netBalance,
+          realNetBalance,
+          normalDepot: realNetBalance
+        });
+      }
+
+      let payoutBalance = yearly.length ? yearly[yearly.length - 1].netBalance : 0;
+      const payoutYears = Math.max(1, endAge - retirementAge);
+      const payoutMonths = payoutYears * 12;
+      let monthlyPension = 0;
+
+      if (withdrawalMode === "fourPercent") {
+        monthlyPension = payoutBalance * 0.04 / 12;
+      } else if (monthlyReturn <= 0) {
+        monthlyPension = payoutBalance / payoutMonths;
+      } else {
+        monthlyPension = payoutBalance * monthlyReturn / (1 - Math.pow(1 + monthlyReturn, -payoutMonths));
+      }
+
+      for (let age = retirementAge + 1; age <= endAge; age++) {
+        for (let m = 0; m < 12; m++) {
+          payoutBalance = payoutBalance * (1 + monthlyReturn) - monthlyPension;
+          if (payoutBalance < 0) payoutBalance = 0;
+        }
+        const yearsFromNow = Math.max(0, age - ageNow);
+        const inflationFactor = Math.pow(1 + inflationRate, yearsFromNow);
+        yearly.push({
+          age,
+          phase: "payout",
+          grossBalance: payoutBalance,
+          contribution: 0,
+          allowance: 0,
+          growth: 0,
+          netBalance: payoutBalance,
+          realNetBalance: payoutBalance / inflationFactor,
+          normalDepot: payoutBalance / inflationFactor
+        });
+      }
+
+      return { yearly, monthlyRate, monthlyPension, retirementAge, endAge, ageNow };
+    }
+
+    function drawChart() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const { yearly, monthlyRate, monthlyPension, retirementAge } = simulate();
+      const width = rect.width;
+      const height = rect.height;
+      const pad = { top: 34, right: 30, bottom: 56, left: 30 };
+      const chartW = width - pad.left - pad.right;
+      const chartH = height - pad.top - pad.bottom;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = colors.bg;
+      ctx.fillRect(0, 0, width, height);
+
+      const maxValue = Math.max(1, ...yearly.map(d => Math.max(d.netBalance, d.realNetBalance, d.grossBalance)));
+      const yScale = value => pad.top + chartH - (value / maxValue) * chartH * 0.94;
+      const xStep = chartW / Math.max(1, yearly.length - 1);
+      const barW = Math.max(3, Math.min(16, xStep * 0.72));
+      const baseY = pad.top + chartH;
+
+      drawGrid(width, height, pad, chartW, chartH);
+
+      yearly.forEach((d, i) => {
+        const x = pad.left + i * xStep;
+        const barH = baseY - yScale(d.netBalance);
+        const radius = Math.min(6, barW / 2);
+        const color = d.phase === "saving" ? colors.green : colors.purple;
+        roundedBar(x - barW / 2, baseY - barH, barW, barH, radius, color);
+      });
+
+      drawDashedLine(yearly, pad, chartW, chartH, maxValue);
+      drawAxisLabels(yearly, pad, chartW, chartH, retirementAge);
+      updateMetrics(yearly, monthlyRate, monthlyPension, retirementAge);
+    }
+
+    function drawGrid(width, height, pad, chartW, chartH) {
+      ctx.save();
+      ctx.strokeStyle = colors.grid;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.45;
+      const lines = 4;
+      for (let i = 0; i <= lines; i++) {
+        const y = pad.top + (chartH / lines) * i;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + chartW, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawDashedLine(yearly, pad, chartW, chartH, maxValue) {
+      const baseY = pad.top + chartH;
+      const xStep = chartW / Math.max(1, yearly.length - 1);
+      const yScale = value => pad.top + chartH - (value / maxValue) * chartH * 0.94;
+
+      ctx.save();
+      ctx.strokeStyle = colors.red;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      yearly.forEach((d, i) => {
+        const x = pad.left + i * xStep;
+        const y = yScale(d.normalDepot);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function drawAxisLabels(yearly, pad, chartW, chartH, retirementAge) {
+      const baseY = pad.top + chartH;
+      const xStep = chartW / Math.max(1, yearly.length - 1);
+      const start = yearly[0]?.age || 18;
+      const end = yearly[yearly.length - 1]?.age || 85;
+      const retirementIndex = yearly.findIndex(d => d.age === retirementAge);
+      const retirementX = pad.left + Math.max(0, retirementIndex) * xStep;
+
+      ctx.save();
+      ctx.fillStyle = colors.muted;
+      ctx.font = "16px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(String(start), pad.left - 4, baseY + 28);
+      ctx.textAlign = "right";
+      ctx.fillText(String(end), pad.left + chartW + 4, baseY + 28);
+      ctx.textAlign = "center";
+      ctx.font = "18px system-ui, sans-serif";
+      ctx.fillText("Alter", pad.left + chartW / 2, baseY + 52);
+
+      if (retirementIndex >= 0) {
+        ctx.strokeStyle = "#0c0d0e";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(retirementX, pad.top);
+        ctx.lineTo(retirementX, baseY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = colors.purple;
+        ctx.font = "20px system-ui, sans-serif";
+        ctx.fillText(`${retirementAge} (Rente)`, retirementX + 10, baseY + 28);
+      }
+
+      ctx.restore();
+    }
+
+    function roundedBar(x, y, w, h, r, color) {
+      if (h <= 0) return;
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h);
+      ctx.lineTo(x, y + h);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function updateMetrics(yearly, monthlyRate, monthlyPension, retirementAge) {
+      const retirementRow = yearly.find(d => d.age === retirementAge) || yearly[yearly.length - 1] || {};
+      document.getElementById("monthlyRateMetric").textContent = money(monthlyRate);
+      document.getElementById("wealthAtRetirementMetric").textContent = money(retirementRow.netBalance || 0);
+      document.getElementById("monthlyPensionMetric").textContent = money(monthlyPension || 0);
+      document.getElementById("realWealthMetric").textContent = money(retirementRow.realNetBalance || 0);
+    }
+
+    function money(value) {
+      return new Intl.NumberFormat("de-DE", {
+        style: "currency",
+        currency: "EUR",
+        maximumFractionDigits: 0
+      }).format(Number(value || 0));
+    }
+
+    function percent(value) {
+      return new Intl.NumberFormat("de-DE", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+      }).format(Number(value || 0)) + " %";
+    }
+
+    function updateRangeLabels() {
+      document.getElementById("annualReturnLabel").textContent = percent(document.getElementById("annualReturn").value);
+      document.getElementById("taxRateLabel").textContent = percent(document.getElementById("taxRate").value);
+      document.getElementById("inflationRateLabel").textContent = percent(document.getElementById("inflationRate").value);
+    }
+
+    ["birthYear", "startAge", "retirementAge", "endAge", "annualReturn", "taxRate", "inflationRate", "withdrawalMode"].forEach(id => {
+      document.getElementById(id).addEventListener("input", () => {
+        updateRangeLabels();
+        drawChart();
+      });
+      document.getElementById(id).addEventListener("change", () => {
+        updateRangeLabels();
+        drawChart();
+      });
+    });
+
+    window.addEventListener("resize", drawChart);
+
+    initControlsFromState();
+    updateRangeLabels();
+    drawChart();
+  </script>
+</body>
+</html>
