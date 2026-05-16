@@ -160,19 +160,65 @@ def test_tauri_build_plan_prints_target_command_and_bundles(monkeypatch) -> None
     assert "🛠️ Command: tauri build --bundles deb,rpm" in messages
 
 
-def test_tauri_windows_portable_dry_run_requires_windows_host(monkeypatch) -> None:
+def test_tauri_windows_portable_dry_run_uses_cargo_xwin_on_linux(monkeypatch) -> None:
+    calls: list[tuple[list[str], bool]] = []
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr("tools.tauri.build.windows_portable.shutil.which", lambda name: "cargo" if name == "cargo" else None)
+    monkeypatch.setattr(
+        common,
+        "run_command",
+        lambda command, **kwargs: calls.append((command, bool(kwargs.get("dry_run"))))
+        or common.CommandResult(command, paths.ROOT, 0, dry_run=bool(kwargs.get("dry_run"))),
+    )
+
+    code = control.main(["tauri", "build", "--target", "windows-portable", "--dry-run"])
+
+    assert code == 0
+    assert len(calls) == 2
+    assert calls[0][1] is True
+    assert calls[0][0][-3:] == ["cargo", "install", "cargo-xwin"]
+    assert calls[1][1] is True
+    assert "--runner" in calls[1][0]
+    assert "cargo-xwin" in calls[1][0]
+    assert calls[1][0][-2:] == ["--bundles", "none"]
+
+
+def test_tauri_windows_portable_installs_cargo_xwin_for_real_linux_build(monkeypatch) -> None:
+    calls: list[tuple[list[str], bool]] = []
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr("tools.tauri.build.windows_portable.shutil.which", lambda name: "/usr/bin/cargo" if name == "cargo" else None)
+    monkeypatch.setattr(
+        common,
+        "run_command",
+        lambda command, **kwargs: calls.append((command, bool(kwargs.get("dry_run"))))
+        or common.CommandResult(command, paths.ROOT, 0, dry_run=bool(kwargs.get("dry_run"))),
+    )
+    monkeypatch.setattr("tools.tauri.build.windows_portable._zip_portable_binary", lambda dry_run=False: 0)
+
+    code = control.main(["tauri", "build", "--target", "windows-portable"])
+
+    assert code == 0
+    assert calls[0] == (["/usr/bin/cargo", "install", "cargo-xwin"], False)
+    assert "--runner" in calls[1][0]
+    assert "cargo-xwin" in calls[1][0]
+
+
+def test_tauri_windows_portable_fails_without_cargo_on_linux(monkeypatch) -> None:
     calls: list[list[str]] = []
     messages: list[str] = []
 
     monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr("tools.tauri.build.windows_portable.shutil.which", lambda name: None)
     monkeypatch.setattr(common, "run_command", lambda command, **kwargs: calls.append(command) or common.CommandResult(command, paths.ROOT, 0))
     monkeypatch.setattr("tools.tauri.build.windows_portable.logger.fail", messages.append)
 
-    code = control.main(["tauri", "build", "--target", "windows-portable", "--dry-run"])
+    code = control.main(["tauri", "build", "--target", "windows-portable"])
 
     assert code == 1
     assert calls == []
-    assert any("Windows portable build requires a Windows host" in message for message in messages)
+    assert any("cargo not found" in message for message in messages)
 
 
 def test_tauri_windows_cross_dry_run_requires_linux_host(monkeypatch) -> None:

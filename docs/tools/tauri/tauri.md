@@ -56,7 +56,6 @@ python tools/control.py tauri build --appimage
 python tools/control.py tauri install-appimage
 python tools/control.py tauri build --target windows
 python tools/control.py tauri build --target windows-portable
-python tools/control.py tauri build --target windows-cross-linux
 python tools/control.py tauri build --target macos
 python tools/control.py tauri test
 python tools/control.py tauri copy
@@ -194,15 +193,14 @@ python tools/control.py tauri build --target linux
 python tools/control.py tauri build --appimage
 python tools/control.py tauri build --target windows
 python tools/control.py tauri build --target windows-portable
-python tools/control.py tauri build --target windows-cross-linux
 python tools/control.py tauri build --target macos
 ```
 
 Targets:
 - `linux`: default Linux bundle build with `deb,rpm,appimage`
 - `windows`: Windows installer build on Windows hosts
-- `windows-portable`: Windows portable executable ZIP flow
-- `windows-cross-linux`: optional Windows cross-build from Linux with `cargo-xwin`
+- `windows-portable`: Windows portable executable ZIP flow; on Linux it prepares `cargo-xwin` and builds the ZIP automatically
+- `windows-cross-linux`: lower-level Windows cross-build from Linux
 - `macos`: macOS app or DMG build on macOS hosts
 
 Linux bundle selection:
@@ -405,6 +403,10 @@ Create a Windows portable build:
 python tools/control.py tauri build --target windows-portable
 python tools/control.py tauri copy
 ```
+
+On Linux, this target prepares `cargo-xwin` when needed, runs Tauri with
+`--runner cargo-xwin --target x86_64-pc-windows-msvc --bundles none`, and writes
+the portable ZIP to `.dist/desktop/BlobFin-windows-portable.zip`.
 
 Check tooling without modifying the system:
 ```bash
