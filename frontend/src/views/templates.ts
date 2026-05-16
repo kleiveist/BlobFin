@@ -32,11 +32,11 @@ export function renderAppShell(): string {
             <div class="theme-options" role="radiogroup" aria-label="Farbmodus">
               <button class="theme-option" type="button" data-action="set-theme-light" aria-pressed="false">
                 <span class="theme-swatch light"></span>
-                <span>Hellmodus</span>
+                <span>Hell</span>
               </button>
               <button class="theme-option" type="button" data-action="set-theme-dark" aria-pressed="false">
                 <span class="theme-swatch dark"></span>
-                <span>Dunkelmodus</span>
+                <span>Dunkel</span>
               </button>
             </div>
             <div class="settings-danger-zone">
@@ -106,9 +106,9 @@ export function renderAppShell(): string {
                 <th>Ende</th>
                 <th>Abgang</th>
                 <th>Abgangsmonat</th>
-                <th>Tag</th>
-                <th>Zinsen</th>
-                <th>Cashback</th>
+                <th class="day-col">Tag</th>
+                <th class="interest-toggle-col">Zinsen</th>
+                <th class="cashback-toggle-col">Cashback</th>
                 <th></th>
               </tr>
             </thead>

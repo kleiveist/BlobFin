@@ -278,13 +278,13 @@ function renderPositions(): void {
           ${positionDateCells(position)}
           <td>${payoutSelect(position)}</td>
           <td>${monthSelect(position.id, "payoutMonth", position.payoutMonth)}</td>
-          <td><input class="small-input" type="number" min="1" max="31" step="1" value="${
+          <td class="day-cell"><input class="small-input day-input" type="number" min="1" max="31" step="1" value="${
             position.payoutDay
           }" data-position-id="${position.id}" data-position-field="payoutDay" /></td>
-          <td class="check-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="interestBearing" ${
+          <td class="check-cell interest-toggle-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="interestBearing" ${
             position.payoutType !== "once" && position.interestBearing ? "checked" : ""
           } ${position.payoutType !== "once" ? "" : "disabled"} /></td>
-          <td class="check-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="cashback" ${
+          <td class="check-cell cashback-toggle-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="cashback" ${
             position.type === "temporary" && position.cashback ? "checked" : ""
           } ${position.type === "temporary" ? "" : "disabled"} /></td>
           <td><button class="icon-button danger" type="button" data-action="remove-${position.id}" aria-label="Position entfernen">x</button></td>
