@@ -35,6 +35,7 @@ const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
 
 let state = loadInitialState();
 let draggedPositionId: string | null = null;
+let exportStatusTimeoutId: number | undefined;
 normalizeInvestmentBounds();
 applyTheme();
 
@@ -127,8 +128,20 @@ function bindEvents(): void {
     if (action === "set-theme-light") setThemeMode("light");
     if (action === "set-theme-dark") setThemeMode("dark");
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
-    if (action === "export-positions") downloadText("kosten-und-ruecklagenpositionen.csv", exportPositionsCsv(state.positions));
-    if (action === "export-year") downloadText("jahreskalkulator-ruecklagen.csv", exportYearTableCsv(state.settings, state.positions));
+    if (action === "export-positions") {
+      void exportCsvFile(
+        "kosten-und-ruecklagenpositionen.csv",
+        exportPositionsCsv(state.positions),
+        "Positionen-Export"
+      );
+    }
+    if (action === "export-year") {
+      void exportCsvFile(
+        "jahreskalkulator-ruecklagen.csv",
+        exportYearTableCsv(state.settings, state.positions),
+        "Jahrestabellen-Export"
+      );
+    }
   });
 
   root.addEventListener("dragstart", (event) => {
@@ -704,16 +717,85 @@ async function importPositionsFromFile(file: File | undefined): Promise<void> {
   renderAll();
 }
 
-function downloadText(filename: string, text: string): void {
-  const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+async function exportCsvFile(filename: string, text: string, label: string): Promise<void> {
+  const contents = csvFileContents(text);
+  const nativeResult = await saveCsvWithNativeDialog(filename, contents);
+
+  if (nativeResult === "saved") {
+    showExportStatus(`${label} wurde gespeichert.`);
+    return;
+  }
+
+  if (nativeResult === "cancelled") {
+    showExportStatus(`${label} wurde abgebrochen.`);
+    return;
+  }
+
+  downloadText(filename, contents);
+  showExportStatus(
+    nativeResult === "failed" ? `${label} wurde als Download gestartet.` : `${label} wurde gestartet.`
+  );
+}
+
+async function saveCsvWithNativeDialog(filename: string, contents: string): Promise<"saved" | "cancelled" | "unavailable" | "failed"> {
+  if (!isTauriRuntime()) return "unavailable";
+
+  showExportStatus("Speichern-Dialog wird geoeffnet...");
+  try {
+    const [{ save }, { invoke }] = await Promise.all([import("@tauri-apps/plugin-dialog"), import("@tauri-apps/api/core")]);
+    const selectedPath = await save({
+      title: "CSV exportieren",
+      defaultPath: filename,
+      filters: [{ name: "CSV", extensions: ["csv"] }]
+    });
+
+    if (!selectedPath) return "cancelled";
+    await invoke("write_csv_file", { path: ensureCsvExtension(selectedPath), contents });
+    return "saved";
+  } catch (error) {
+    console.error("Native CSV export failed; falling back to browser download.", error);
+    return "failed";
+  }
+}
+
+function isTauriRuntime(): boolean {
+  return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+}
+
+function csvFileContents(text: string): string {
+  const content = text.endsWith("\n") ? text : `${text}\n`;
+  return `\uFEFF${content}`;
+}
+
+function ensureCsvExtension(path: string): string {
+  return path.toLowerCase().endsWith(".csv") ? path : `${path}.csv`;
+}
+
+function downloadText(filename: string, contents: string): void {
+  const blob = new Blob([contents], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
   document.body.appendChild(anchor);
   anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => {
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+function showExportStatus(message: string): void {
+  const status = document.querySelector<HTMLSpanElement>("#exportStatus");
+  if (!status) return;
+  status.textContent = message;
+  if (exportStatusTimeoutId) window.clearTimeout(exportStatusTimeoutId);
+  exportStatusTimeoutId = window.setTimeout(() => {
+    status.textContent = "";
+    exportStatusTimeoutId = undefined;
+  }, 3500);
 }
 
 function formControl(target: EventTarget | null): HTMLInputElement | HTMLSelectElement | null {

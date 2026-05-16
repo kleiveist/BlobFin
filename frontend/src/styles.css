@@ -342,6 +342,15 @@ button:focus-visible {
   color: var(--danger);
 }
 
+.export-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
 .button:hover,
 .icon-button:hover {
   filter: brightness(0.98);

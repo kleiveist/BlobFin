@@ -90,6 +90,7 @@ export function renderAppShell(): string {
             <button class="button secondary" type="button" data-action="export-positions">Positionen exportieren</button>
             <button class="button secondary" type="button" data-action="export-year">Jahrestabelle exportieren</button>
             <input class="visually-hidden" id="positionsCsvImport" type="file" accept=".csv,text/csv" />
+            <span id="exportStatus" class="export-status" aria-live="polite"></span>
           </div>
         </div>
         <div class="table-wrap position-table-wrap">
