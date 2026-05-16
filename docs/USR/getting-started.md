@@ -36,7 +36,7 @@ npm run dev
 ## Basic Inputs
 
 - `Jahr`: calendar year used for month lengths and one-time payout matching.
-- Income is maintained in the `Einnahmen` table inside `Kosten- und Ruecklagenpositionen`.
+- Income, expenses, and savings rates are maintained in the `Einnahmen`, `Ausgaben`, and `Sparen` tables inside `Kosten- und Ruecklagenpositionen`.
 - `Jahreszins Konto in %`: account interest rate for positions with the `Zinsen` checkbox enabled.
 - `Cashback in %`: cashback rate for temporary positions with the `Cashback` checkbox enabled.
 

@@ -7,12 +7,12 @@ This page documents the calculation rules implemented in the frontend domain mod
 
 ## Core Types
 
-`ReservePosition` represents one row in the income or cost/reserve table.
+`ReservePosition` represents one row in the income, expense, or savings table.
 
 Important fields:
 
 - `flow`: `income` or `expense`.
-- `type`: expense rows use `fixed`, `reserve`, `temporary`, or `savings`; income rows use `incomeMonthly`, `incomeYearly`, or `incomeTemporary`.
+- `type`: expense rows use `fixed`, `reserve`, or `temporary`; savings rows use `savings`; income rows use `incomeMonthly`, `incomeYearly`, or `incomeTemporary`.
 - `payoutType`: `none`, `monthly`, `yearly`, or `once`.
 - `active`: whether the row participates in calculations.
 - `visible`: whether the row appears in the yearly table.

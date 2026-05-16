@@ -392,6 +392,12 @@ button:focus-visible {
   margin-bottom: 12px;
 }
 
+.position-toolbar-heading {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));

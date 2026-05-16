@@ -81,14 +81,15 @@ export function renderAppShell(): string {
 
       <section class="panel">
         <div class="toolbar">
-          <div class="section-heading">
+          <div class="section-heading position-toolbar-heading">
             <h2>Kosten- und Ruecklagenpositionen</h2>
-          </div>
-          <div class="button-row">
             <div class="position-mode-switch" role="tablist" aria-label="Positionstabelle">
               <button class="position-mode-button" type="button" data-action="show-income-positions" aria-pressed="false">Einnahmen</button>
               <button class="position-mode-button" type="button" data-action="show-expense-positions" aria-pressed="true">Ausgaben</button>
+              <button class="position-mode-button" type="button" data-action="show-savings-positions" aria-pressed="false">Sparen</button>
             </div>
+          </div>
+          <div class="button-row">
             <button class="button" id="addPositionButton" type="button" data-action="add-position">Ausgabe hinzufuegen</button>
             <button class="button secondary" type="button" data-action="import-positions">Positionen importieren</button>
             <button class="button secondary" type="button" data-action="export-positions">Positionen exportieren</button>
@@ -232,12 +233,19 @@ export function positionTypeSelect(position: ReservePosition): string {
     `;
   }
 
+  if (position.type === "savings") {
+    return `
+      <select data-position-id="${position.id}" data-position-field="type">
+        <option value="savings" selected>Sparrate</option>
+      </select>
+    `;
+  }
+
   return `
     <select data-position-id="${position.id}" data-position-field="type">
       <option value="fixed" ${position.type === "fixed" ? "selected" : ""}>Fixbestand</option>
       <option value="reserve" ${position.type === "reserve" ? "selected" : ""}>Monatliche Ruecklage</option>
       <option value="temporary" ${position.type === "temporary" ? "selected" : ""}>Temporaer</option>
-      <option value="savings" ${position.type === "savings" ? "selected" : ""}>Sparrate</option>
     </select>
   `;
 }

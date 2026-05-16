@@ -3,7 +3,7 @@
 <!-- AUTO-GENERATED:backlink END -->
 # Reserve Planning
 
-The `Kosten- und Ruecklagenpositionen` table is the base for the yearly planning view and for investable contributions. It can be switched between `Einnahmen` and `Ausgaben`.
+The `Kosten- und Ruecklagenpositionen` table is the base for the yearly planning view and for investable contributions. It can be switched between `Einnahmen`, `Ausgaben`, and `Sparen`.
 
 ## Position Fields
 
@@ -14,8 +14,8 @@ The `Kosten- und Ruecklagenpositionen` table is the base for the yearly planning
 - `Betrag`: amount for the position.
 - `Start` / `Ende`: active month range for recurring positions.
 - `Jahr`: start or matching year for income rows.
-- `Abgang` / `Eingang`: payout or income cadence.
-- `Abgangsmonat` / `Eingangsmonat`: month for yearly or one-time rows.
+- `Abgang` / `Eingang` / `Transfer`: payout, income, or savings cadence.
+- `Abgangsmonat` / `Eingangsmonat` / `Transfermonat`: month for yearly or one-time rows.
 - `Tag`: day used for simplified interest timing.
 - `Zinsen`: enables account interest for expense positions.
 - `Cashback`: enables cashback where allowed for expense positions.
@@ -35,6 +35,9 @@ Expense rows:
 - `Fixbestand`: a fixed balance or baseline amount. It is not treated as a planned outflow.
 - `Ruecklage`: money built up for future costs.
 - `Temporar`: active expense or temporary cost position.
+
+Savings rows:
+
 - `Sparrate`: savings position. Only this type can be selected for the investment projection.
 
 ## Payout Cadence

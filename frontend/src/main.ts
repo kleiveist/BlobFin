@@ -16,14 +16,20 @@ import {
   numberValue,
   percent
 } from "./lib/format";
-import { flowForType, isIncomePosition, isPositionType, positionFlow } from "./lib/positionKinds";
+import {
+  flowForType,
+  isIncomePosition,
+  isPositionType,
+  positionFlow,
+  positionTableMode,
+  type PositionTableMode
+} from "./lib/positionKinds";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
 import type {
   AppState,
   AssetProjection,
   AssetProjectionPoint,
   InvestmentSettings,
-  PositionFlow,
   PlanningSettings,
   ReservePosition,
   ThemeMode
@@ -38,7 +44,7 @@ const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
 let state = loadInitialState();
 let draggedPositionId: string | null = null;
 let exportStatusTimeoutId: number | undefined;
-let selectedPositionFlow: PositionFlow = "expense";
+let selectedPositionMode: PositionTableMode = "expense";
 normalizeInvestmentBounds();
 applyTheme();
 
@@ -123,8 +129,9 @@ function bindEvents(): void {
     const action = button.dataset.action;
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
-    if (action === "show-income-positions") setSelectedPositionFlow("income");
-    if (action === "show-expense-positions") setSelectedPositionFlow("expense");
+    if (action === "show-income-positions") setSelectedPositionMode("income");
+    if (action === "show-expense-positions") setSelectedPositionMode("expense");
+    if (action === "show-savings-positions") setSelectedPositionMode("savings");
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
@@ -275,12 +282,12 @@ function renderPositions(): void {
   const body = document.querySelector<HTMLTableSectionElement>("#positionsBody");
   if (!body) return;
 
-  const positions = state.positions.filter((position) => positionFlow(position) === selectedPositionFlow);
+  const positions = state.positions.filter((position) => positionTableMode(position) === selectedPositionMode);
   if (!positions.length) {
     body.innerHTML = `
       <tr>
-        <td class="position-empty" colspan="${selectedPositionFlow === "income" ? 13 : 14}">
-          Noch keine ${selectedPositionFlow === "income" ? "Einnahmen" : "Ausgaben"} angelegt.
+        <td class="position-empty" colspan="${selectedPositionMode === "income" ? 13 : 14}">
+          Noch keine ${positionModeEmptyLabel(selectedPositionMode)} angelegt.
         </td>
       </tr>
     `;
@@ -343,24 +350,30 @@ function renderPositions(): void {
 }
 
 function renderPositionModeControls(): void {
-  for (const flow of ["income", "expense"] as PositionFlow[]) {
-    const button = document.querySelector<HTMLButtonElement>(`[data-action='show-${flow}-positions']`);
+  for (const mode of ["income", "expense", "savings"] as PositionTableMode[]) {
+    const button = document.querySelector<HTMLButtonElement>(`[data-action='show-${mode}-positions']`);
     if (!button) continue;
-    const active = selectedPositionFlow === flow;
+    const active = selectedPositionMode === mode;
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   }
   const addButton = document.querySelector<HTMLButtonElement>("#addPositionButton");
   if (addButton) {
-    addButton.textContent = selectedPositionFlow === "income" ? "Einnahme hinzufuegen" : "Ausgabe hinzufuegen";
+    addButton.textContent = addPositionButtonLabel(selectedPositionMode);
   }
 }
 
 function renderPositionTableHead(): void {
   const head = document.querySelector<HTMLTableSectionElement>("#positionsHead");
   if (!head) return;
-  const timingLabel = selectedPositionFlow === "income" ? "Eingang" : "Abgang";
-  const monthLabel = selectedPositionFlow === "income" ? "Eingangsmonat" : "Abgangsmonat";
+  const timingLabel =
+    selectedPositionMode === "income" ? "Eingang" : selectedPositionMode === "savings" ? "Transfer" : "Abgang";
+  const monthLabel =
+    selectedPositionMode === "income"
+      ? "Eingangsmonat"
+      : selectedPositionMode === "savings"
+        ? "Transfermonat"
+        : "Abgangsmonat";
   head.innerHTML = `
     <tr>
       <th class="reorder-col"></th>
@@ -371,18 +384,30 @@ function renderPositionTableHead(): void {
       <th class="amount-col">Betrag</th>
       <th>Start</th>
       <th>Ende</th>
-      ${selectedPositionFlow === "income" ? "<th>Jahr</th>" : ""}
+      ${selectedPositionMode === "income" ? "<th>Jahr</th>" : ""}
       <th>${timingLabel}</th>
       <th>${monthLabel}</th>
       <th class="day-col">Tag</th>
       ${
-        selectedPositionFlow === "expense"
+        selectedPositionMode !== "income"
           ? '<th class="interest-toggle-col">Zinsen</th><th class="cashback-toggle-col">Cashback</th>'
           : ""
       }
       <th></th>
     </tr>
   `;
+}
+
+function positionModeEmptyLabel(mode: PositionTableMode): string {
+  if (mode === "income") return "Einnahmen";
+  if (mode === "savings") return "Sparraten";
+  return "Ausgaben";
+}
+
+function addPositionButtonLabel(mode: PositionTableMode): string {
+  if (mode === "income") return "Einnahme hinzufuegen";
+  if (mode === "savings") return "Sparrate hinzufuegen";
+  return "Ausgabe hinzufuegen";
 }
 
 function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>): void {
@@ -686,16 +711,17 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
 }
 
 function addPosition(): void {
-  const isIncome = selectedPositionFlow === "income";
+  const isIncome = selectedPositionMode === "income";
+  const isSavings = selectedPositionMode === "savings";
   state.positions = [
     ...state.positions,
     {
       id: createId(),
-      flow: selectedPositionFlow,
+      flow: isIncome ? "income" : "expense",
       active: true,
       visible: true,
-      name: isIncome ? "Neue Einnahme" : "Neue Ausgabe",
-      type: isIncome ? "incomeMonthly" : "temporary",
+      name: isIncome ? "Neue Einnahme" : isSavings ? "Neue Sparrate" : "Neue Ausgabe",
+      type: isIncome ? "incomeMonthly" : isSavings ? "savings" : "temporary",
       amount: 0,
       startMonth: 1,
       endMonth: 12,
@@ -748,8 +774,8 @@ function toggleCashbackInvestment(): void {
   renderAll();
 }
 
-function setSelectedPositionFlow(flow: PositionFlow): void {
-  selectedPositionFlow = flow;
+function setSelectedPositionMode(mode: PositionTableMode): void {
+  selectedPositionMode = mode;
   renderPositions();
 }
 

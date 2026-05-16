@@ -2,6 +2,7 @@ import type { ExpensePositionType, IncomePositionType, PositionFlow, PositionTyp
 
 export const INCOME_POSITION_TYPES: IncomePositionType[] = ["incomeMonthly", "incomeYearly", "incomeTemporary"];
 export const EXPENSE_POSITION_TYPES: ExpensePositionType[] = ["fixed", "reserve", "temporary", "savings"];
+export type PositionTableMode = PositionFlow | "savings";
 
 export function isIncomeType(type: PositionType): type is IncomePositionType {
   return INCOME_POSITION_TYPES.includes(type as IncomePositionType);
@@ -25,6 +26,12 @@ export function isIncomePosition(position: Pick<ReservePosition, "flow" | "type"
 
 export function isExpensePosition(position: Pick<ReservePosition, "flow" | "type">): boolean {
   return positionFlow(position) === "expense";
+}
+
+export function positionTableMode(position: Pick<ReservePosition, "flow" | "type">): PositionTableMode {
+  if (isIncomePosition(position)) return "income";
+  if (position.type === "savings") return "savings";
+  return "expense";
 }
 
 export function typeForFlow(type: PositionType, flow: PositionFlow): PositionType {
