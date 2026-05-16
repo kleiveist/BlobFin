@@ -85,7 +85,13 @@ export function drawInvestmentChart(
   const baseY = padding.top + chartHeight;
   const maxValue = Math.max(
     1,
-    ...projection.points.map((point) => Math.max(point.netBalance, point.realNetBalance, point.grossBalance))
+    ...projection.points.map((point) =>
+      Math.max(
+        finiteChartValue(point.netBalance),
+        finiteChartValue(point.realNetBalance),
+        finiteChartValue(point.grossBalance)
+      )
+    )
   );
 
   drawGrid(context, padding, chartWidth, chartHeight);
@@ -304,7 +310,7 @@ function valueToHeight(
   maxValue: number,
   baseY: number
 ): number {
-  if (value <= 0) return 0;
+  if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(maxValue) || maxValue <= 0) return 0;
   return baseY - valueToY(value, padding, chartHeight, maxValue);
 }
 
@@ -424,7 +430,12 @@ function roundedTopBar(
 }
 
 function valueToY(value: number, padding: ChartPadding, chartHeight: number, maxValue: number): number {
+  if (!Number.isFinite(value) || !Number.isFinite(maxValue) || maxValue <= 0) return padding.top + chartHeight;
   return padding.top + chartHeight - (value / maxValue) * chartHeight * 0.94;
+}
+
+function finiteChartValue(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function resolveChartColors(canvas: HTMLCanvasElement): typeof defaultChartColors {

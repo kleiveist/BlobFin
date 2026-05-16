@@ -22,6 +22,7 @@ import {
   isPositionType,
   positionFlow,
   positionTableMode,
+  typeForFlow,
   type PositionTableMode
 } from "./lib/positionKinds";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
@@ -56,11 +57,18 @@ renderAll();
 
 function loadInitialState(): AppState {
   try {
-    return loadState();
+    return sanitizeAppState(loadState());
   } catch (error) {
     console.warn("Stored state could not be loaded; falling back to defaults.", error);
-    return defaultAppState();
+    return sanitizeAppState(defaultAppState());
   }
+}
+
+function sanitizeAppState(appState: AppState): AppState {
+  return {
+    ...appState,
+    positions: appState.positions.map((position) => sanitizePosition(position, appState.settings.year))
+  };
 }
 
 function requireRootElement(): HTMLDivElement {
@@ -706,8 +714,69 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
       if (next.payoutType === "none") next.payoutType = "monthly";
     }
 
-    return next;
+    return sanitizePosition(next, state.settings.year);
   });
+}
+
+function sanitizePosition(position: ReservePosition, fallbackYear: number): ReservePosition {
+  const requestedFlow = positionFlow(position);
+  const type = typeForFlow(position.type, requestedFlow);
+  const flow = flowForType(type);
+  const payoutType = normalizePayoutType(position.payoutType, flow, type);
+  const payoutMonth = finiteIntegerInRange(position.payoutMonth, 1, 12, 12);
+  let startMonth = finiteIntegerInRange(position.startMonth, 1, 12, 1);
+  let endMonth = finiteIntegerInRange(position.endMonth, 1, 12, 12);
+
+  if (startMonth > endMonth) {
+    const previousStart = startMonth;
+    startMonth = endMonth;
+    endMonth = previousStart;
+  }
+
+  if (payoutType === "once") {
+    startMonth = payoutMonth;
+    endMonth = payoutMonth;
+  }
+
+  const isIncome = flow === "income";
+  return {
+    ...position,
+    id: String(position.id || createId()),
+    flow,
+    active: Boolean(position.active),
+    visible: Boolean(position.visible),
+    name: String(position.name || "Position"),
+    type,
+    amount: Math.max(0, finiteNumber(position.amount, 0)),
+    startMonth,
+    endMonth,
+    payoutType,
+    payoutYear: finiteIntegerInRange(position.payoutYear, 2000, 2200, fallbackYear),
+    payoutMonth,
+    payoutDay: finiteIntegerInRange(position.payoutDay, 1, 31, 31),
+    interestBearing: !isIncome && payoutType !== "once" && Boolean(position.interestBearing),
+    cashback: !isIncome && type === "temporary" && Boolean(position.cashback)
+  };
+}
+
+function normalizePayoutType(
+  value: ReservePosition["payoutType"],
+  flow: ReservePosition["flow"],
+  type: ReservePosition["type"]
+): ReservePosition["payoutType"] {
+  if (value === "monthly" || value === "yearly" || value === "once") return value;
+  if (value === "none" && flow === "expense") return value;
+  if (flow === "income" && type === "incomeYearly") return "yearly";
+  return "monthly";
+}
+
+function finiteIntegerInRange(value: unknown, min: number, max: number, fallback: number): number {
+  return Math.round(clamp(finiteNumber(value, fallback), min, max));
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function addPosition(): void {
