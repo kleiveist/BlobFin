@@ -22,6 +22,12 @@ interface ChartScale {
   barWidth: number;
 }
 
+interface BarSegment {
+  height: number;
+  color: string;
+  overlay?: boolean;
+}
+
 export function drawInvestmentChart(canvas: HTMLCanvasElement | null, projection: AssetProjection): void {
   if (!canvas) return;
 
@@ -135,7 +141,7 @@ function drawPayoutBar(
   baseY: number,
   maxValue: number
 ): void {
-  drawBalanceCompositionBar(context, point, x, width, padding, chartHeight, baseY, maxValue);
+  drawBalanceCompositionBar(context, point, x, width, padding, chartHeight, baseY, maxValue, true);
 }
 
 function drawBalanceCompositionBar(
@@ -146,7 +152,8 @@ function drawBalanceCompositionBar(
   padding: ChartPadding,
   chartHeight: number,
   baseY: number,
-  maxValue: number
+  maxValue: number,
+  showPayoutBalance = false
 ): void {
   const radius = Math.min(6, width / 2);
   const netBalance = Math.max(0, point.netBalance);
@@ -154,16 +161,27 @@ function drawBalanceCompositionBar(
   const growth = Math.max(0, netBalance - costBasis);
   const tax = Math.min(growth, Math.max(0, point.periodTax));
   const netGrowth = Math.max(0, growth - tax);
-  const segments = [
-    { height: valueToHeight(costBasis, padding, chartHeight, maxValue, baseY), color: chartColors.grey },
-    { height: valueToHeight(netGrowth, padding, chartHeight, maxValue, baseY), color: chartColors.green },
-    { height: valueToHeight(tax, padding, chartHeight, maxValue, baseY), color: chartColors.red }
-  ].filter((segment) => segment.height > 0);
+  const segments: BarSegment[] = showPayoutBalance
+    ? [
+        { height: valueToHeight(costBasis, padding, chartHeight, maxValue, baseY), color: chartColors.purple },
+        { height: valueToHeight(costBasis, padding, chartHeight, maxValue, baseY), color: chartColors.grey, overlay: true },
+        { height: valueToHeight(netGrowth, padding, chartHeight, maxValue, baseY), color: chartColors.green },
+        { height: valueToHeight(tax, padding, chartHeight, maxValue, baseY), color: chartColors.red }
+      ].filter((segment) => segment.height > 0)
+    : [
+        { height: valueToHeight(costBasis, padding, chartHeight, maxValue, baseY), color: chartColors.grey },
+        { height: valueToHeight(netGrowth, padding, chartHeight, maxValue, baseY), color: chartColors.green },
+        { height: valueToHeight(tax, padding, chartHeight, maxValue, baseY), color: chartColors.red }
+      ].filter((segment) => segment.height > 0);
 
   if (!segments.length) return;
 
   let stackedHeight = 0;
   segments.forEach((segment, index) => {
+    if (segment.overlay) {
+      drawOverlaySegment(context, x, baseY - segment.height, width, segment.height, segment.color);
+      return;
+    }
     stackedHeight += segment.height;
     const y = baseY - stackedHeight;
     const isTopSegment = index === segments.length - 1;
@@ -173,6 +191,23 @@ function drawBalanceCompositionBar(
     }
     filledBarSegment(context, x, y, width, segment.height, segment.color);
   });
+}
+
+function drawOverlaySegment(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string
+): void {
+  if (height <= 0) return;
+
+  context.save();
+  context.fillStyle = color;
+  context.globalAlpha = 0.55;
+  context.fillRect(x + width * 0.18, y, width * 0.64, height);
+  context.restore();
 }
 
 function valueToHeight(

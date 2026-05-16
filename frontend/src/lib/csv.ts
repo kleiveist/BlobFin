@@ -109,6 +109,11 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
         payoutDay: clamp(parseMoneyValue(get(row, ["abgangstag", "payoutday"], 8)) || 31, 1, 31),
         cashback: parseBooleanValue(get(row, ["cashback", "cashbackfrage"], 9), false)
       };
+      if (position.type !== "temporary") position.cashback = false;
+      if (position.payoutType === "once") {
+        position.startMonth = position.payoutMonth;
+        position.endMonth = position.payoutMonth;
+      }
 
       if (position.startMonth > position.endMonth) {
         const startMonth = position.startMonth;
@@ -146,14 +151,15 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
 
 export function exportYearTableCsv(settings: PlanningSettings, positions: ReservePosition[]): string {
   const rows = calculateMonthlyRows(settings, positions);
-  const activePositions = positions.filter((position) => position.active);
+  const activePositions = positions.filter((position) => position.active && position.payoutType !== "once");
   const csvRows = [
     [
       "Monat",
       ...activePositions.map((position) => position.name),
       "Max. benoetigter Kontostand am Monatsanfang",
       "Dauerhafter Bestand nach Abgaengen",
-      "ca. Monatszins"
+      "ca. Monatszins",
+      "Cashback"
     ]
   ];
 
@@ -163,7 +169,8 @@ export function exportYearTableCsv(settings: PlanningSettings, positions: Reserv
       ...activePositions.map((position) => formatCsvNumber(row.values[position.id] || 0)),
       formatCsvNumber(row.maxNeeded),
       formatCsvNumber(row.permanentAfterMonthlyOutflows),
-      formatCsvNumber(row.monthlyInterest)
+      formatCsvNumber(row.monthlyInterest),
+      formatCsvNumber(row.monthlyCashback)
     ]);
   }
 
@@ -205,6 +212,7 @@ function parsePayoutValue(value: unknown): PayoutType {
   if (["keinabgang", "keiner", "none", "nein", ""].includes(normalized)) return "none";
   if (["monatlich", "monthly"].includes(normalized)) return "monthly";
   if (["jaehrlich", "jahrlich", "yearly", "annual"].includes(normalized)) return "yearly";
+  if (["einmalig", "einmal", "once", "single", "onetime"].includes(normalized)) return "once";
   return "none";
 }
 

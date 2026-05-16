@@ -1,5 +1,5 @@
 export type PositionType = "fixed" | "reserve" | "temporary" | "savings";
-export type PayoutType = "none" | "monthly" | "yearly";
+export type PayoutType = "none" | "monthly" | "yearly" | "once";
 
 export interface ReservePosition {
   id: string;
@@ -25,6 +25,7 @@ export interface PlanningSettings {
 export interface InvestmentSettings {
   includedIds: string[];
   includeAccountInterest: boolean;
+  includeAccountCashback: boolean;
   birthYear: number;
   chartStartAge: number;
   payoutEndAge: number;
@@ -49,6 +50,7 @@ export interface MonthlyReserveRow {
   maxNeeded: number;
   permanentAfterMonthlyOutflows: number;
   monthlyInterest: number;
+  monthlyCashback: number;
 }
 
 export interface ReserveSummary {

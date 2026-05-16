@@ -73,6 +73,7 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
   return {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
     includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
+    includeAccountCashback: booleanOrDefault(value.includeAccountCashback, fallback.includeAccountCashback),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
@@ -97,6 +98,7 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
   return {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
     includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
+    includeAccountCashback: booleanOrDefault(value.includeAccountCashback, fallback.includeAccountCashback),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
@@ -121,20 +123,31 @@ function normalizePositions(value: unknown, fallback: ReservePosition[]): Reserv
   return value
     .map((item) => {
       if (!isRecord(item)) return null;
+      const type = normalizePositionType(item.type);
       const position: ReservePosition = {
         id: String(item.id || createId()),
         active: Boolean(item.active),
         name: String(item.name || "Position"),
-        type: normalizePositionType(item.type),
+        type,
         amount: numberOrDefault(item.amount, 0),
         startMonth: numberOrDefault(item.startMonth, 1),
         endMonth: numberOrDefault(item.endMonth, 12),
-        payoutType: item.payoutType === "monthly" || item.payoutType === "yearly" ? item.payoutType : "none",
+        payoutType:
+          item.payoutType === "monthly" || item.payoutType === "yearly" || item.payoutType === "once"
+            ? item.payoutType
+            : "none",
         payoutMonth: numberOrDefault(item.payoutMonth, 12),
         payoutDay: numberOrDefault(item.payoutDay, 31),
-        cashback: Boolean(item.cashback)
+        cashback: Boolean(item.cashback) && type === "temporary"
       };
-      if (position.id === "investitionsrate" && position.type === "temporary") position.type = "savings";
+      if (position.id === "investitionsrate" && position.type === "temporary") {
+        position.type = "savings";
+        position.cashback = false;
+      }
+      if (position.payoutType === "once") {
+        position.startMonth = position.payoutMonth;
+        position.endMonth = position.payoutMonth;
+      }
       return position;
     })
     .filter((position): position is ReservePosition => position !== null);

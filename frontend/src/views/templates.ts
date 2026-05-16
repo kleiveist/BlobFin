@@ -99,10 +99,16 @@ export function renderAppShell(): string {
         <div class="investment-grid">
           <div class="investment-selector">
             <h3>Investierbare Positionen</h3>
-            <button class="include-interest-toggle" type="button" data-action="toggle-interest-investment" aria-pressed="false">
-              <span>Zinsen in Altersvorsorge</span>
-              <strong id="interestInvestmentAmount">-</strong>
-            </button>
+            <div class="include-special-toggles">
+              <button class="include-transfer-toggle" type="button" data-action="toggle-interest-investment" aria-pressed="false">
+                <span>Zinsen in Altersvorsorge</span>
+                <strong id="interestInvestmentAmount">-</strong>
+              </button>
+              <button class="include-transfer-toggle" type="button" data-action="toggle-cashback-investment" aria-pressed="false">
+                <span>Cashback in Altersvorsorge</span>
+                <strong id="cashbackInvestmentAmount">-</strong>
+              </button>
+            </div>
             <div id="investmentIncludeList" class="include-list"></div>
           </div>
 
@@ -148,6 +154,7 @@ export function renderAppShell(): string {
                 <span class="legend-item"><span class="legend-dot grey"></span> Eigenbeitrag</span>
                 <span class="legend-item"><span class="legend-dot orange"></span> Zulagen</span>
                 <span class="legend-item"><span class="legend-dot green"></span> Wertzuwachs</span>
+                <span class="legend-item"><span class="legend-dot purple"></span> Restguthaben (Auszahlung)</span>
                 <span class="legend-item"><span class="legend-dot red"></span> Kapitalertragsteuer</span>
                 <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
               </div>
@@ -201,13 +208,14 @@ export function payoutSelect(position: ReservePosition): string {
       <option value="none" ${position.payoutType === "none" ? "selected" : ""}>${labelForPayout("none")}</option>
       <option value="monthly" ${position.payoutType === "monthly" ? "selected" : ""}>${labelForPayout("monthly")}</option>
       <option value="yearly" ${position.payoutType === "yearly" ? "selected" : ""}>${labelForPayout("yearly")}</option>
+      <option value="once" ${position.payoutType === "once" ? "selected" : ""}>${labelForPayout("once")}</option>
     </select>
   `;
 }
 
-export function monthSelect(id: string, field: keyof ReservePosition, value: number): string {
+export function monthSelect(id: string, field: keyof ReservePosition, value: number, disabled = false): string {
   return `
-    <select data-position-id="${id}" data-position-field="${field}">
+    <select data-position-id="${id}" data-position-field="${field}" ${disabled ? "disabled" : ""}>
       ${MONTHS.map((name, index) => {
         const month = index + 1;
         return `<option value="${month}" ${Number(value) === month ? "selected" : ""}>${name}</option>`;

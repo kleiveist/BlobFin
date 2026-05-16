@@ -3,7 +3,9 @@ import type { InvestmentSettings, ReservePosition } from "../types";
 
 export function investmentContributionForMonth(position: ReservePosition, month: number): number {
   if (!isActiveInMonth(position, month)) return 0;
-  if (position.payoutType === "yearly") return Number(position.payoutMonth) === month ? Number(position.amount) : 0;
+  if (position.payoutType === "yearly" || position.payoutType === "once") {
+    return Number(position.payoutMonth) === month ? Number(position.amount) : 0;
+  }
   return Number(position.amount);
 }
 

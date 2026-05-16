@@ -23,6 +23,7 @@ import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from ".
 
 const root = requireRootElement();
 const INTEREST_INVESTMENT_POSITION_ID = "__account-interest-investment";
+const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
 
 let state = loadInitialState();
 let draggedPositionId: string | null = null;
@@ -109,6 +110,7 @@ function bindEvents(): void {
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
     if (action === "toggle-interest-investment") toggleInterestInvestment();
+    if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
     if (action === "export-positions") downloadText("kosten-und-ruecklagenpositionen.csv", exportPositionsCsv(state.positions));
     if (action === "export-year") downloadText("jahreskalkulator-ruecklagen.csv", exportYearTableCsv(state.settings, state.positions));
@@ -241,16 +243,16 @@ function renderPositions(): void {
           <td><input class="small-input" type="number" min="0" step="0.01" value="${position.amount}" data-position-id="${
             position.id
           }" data-position-field="amount" /></td>
-          <td>${monthSelect(position.id, "startMonth", position.startMonth)}</td>
-          <td>${monthSelect(position.id, "endMonth", position.endMonth)}</td>
+          <td>${monthSelect(position.id, "startMonth", position.startMonth, position.payoutType === "once")}</td>
+          <td>${monthSelect(position.id, "endMonth", position.endMonth, position.payoutType === "once")}</td>
           <td>${payoutSelect(position)}</td>
           <td>${monthSelect(position.id, "payoutMonth", position.payoutMonth)}</td>
           <td><input class="small-input" type="number" min="1" max="31" step="1" value="${
             position.payoutDay
           }" data-position-id="${position.id}" data-position-field="payoutDay" /></td>
           <td><input type="checkbox" data-position-id="${position.id}" data-position-field="cashback" ${
-            position.cashback ? "checked" : ""
-          } /></td>
+            position.type === "temporary" && position.cashback ? "checked" : ""
+          } ${position.type === "temporary" ? "" : "disabled"} /></td>
           <td><button class="icon-button danger" type="button" data-action="remove-${position.id}" aria-label="Position entfernen">x</button></td>
         </tr>
       `;
@@ -280,6 +282,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       <th class="highlight-col">Max. Bedarf Monatsanfang</th>
       <th>Dauerhafter Bestand</th>
       <th>ca. Monatszins</th>
+      <th>Cashback</th>
     </tr>
   `;
 
@@ -292,6 +295,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
           <td class="highlight-col">${money(row.maxNeeded)}</td>
           <td>${money(row.permanentAfterMonthlyOutflows)}</td>
           <td class="positive">${money(row.monthlyInterest)}</td>
+          <td class="positive">${money(row.monthlyCashback)}</td>
         </tr>
       `;
     })
@@ -306,6 +310,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       <th class="highlight-col">${money(summary.maxRow.maxNeeded)}</th>
       <th>${money(summary.yearEndBalance)}</th>
       <th class="positive">${money(summary.totalInterest)}</th>
+      <th class="positive">${money(summary.totalCashback)}</th>
     </tr>
   `;
 }
@@ -319,7 +324,13 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
     interestButton.classList.toggle("active", state.investment.includeAccountInterest);
     interestButton.setAttribute("aria-pressed", String(state.investment.includeAccountInterest));
   }
+  const cashbackButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-cashback-investment']");
+  if (cashbackButton) {
+    cashbackButton.classList.toggle("active", state.investment.includeAccountCashback);
+    cashbackButton.setAttribute("aria-pressed", String(state.investment.includeAccountCashback));
+  }
   setText("interestInvestmentAmount", `${money(summary.totalInterest)} jaehrlich aus Jahrestabelle`);
+  setText("cashbackInvestmentAmount", `${money(summary.totalCashback)} jaehrlich aus Jahrestabelle`);
 
   const savingsPositions = state.positions.filter((position) => position.type === "savings");
   if (!savingsPositions.length) {
@@ -362,7 +373,7 @@ function syncAllInputsFromState(): void {
 function syncInvestmentInputsFromState(): void {
   syncInvestmentInputBounds();
   for (const key of Object.keys(state.investment) as Array<keyof InvestmentSettings>) {
-    if (key === "includedIds" || key === "includeAccountInterest") continue;
+    if (key === "includedIds" || key === "includeAccountInterest" || key === "includeAccountCashback") continue;
     setInputValue(`[data-investment="${key}"]`, state.investment[key]);
   }
   setInputValue("[data-retirement-age]", calculatePayoutStartAge(state.investment));
@@ -387,7 +398,7 @@ function updatePlanningSetting(field: keyof PlanningSettings, value: string): vo
 }
 
 function updateInvestmentSetting(field: keyof InvestmentSettings, value: string): void {
-  if (field === "includedIds" || field === "includeAccountInterest") return;
+  if (field === "includedIds" || field === "includeAccountInterest" || field === "includeAccountCashback") return;
   if (field === "payoutEndAge") {
     const retirementAge = calculatePayoutStartAge(state.investment);
     const payoutEndAge = clamp(numberValue(value), investmentMin(field), investmentMax(field));
@@ -424,7 +435,7 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
     switch (field) {
       case "active":
       case "cashback":
-        next[field] = Boolean(value);
+        next[field] = next.type === "temporary" && Boolean(value);
         break;
       case "amount":
       case "startMonth":
@@ -434,10 +445,19 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
         next[field] = numberValue(String(value));
         break;
       case "type":
-        if (value === "fixed" || value === "reserve" || value === "temporary" || value === "savings") next.type = value;
+        if (value === "fixed" || value === "reserve" || value === "temporary" || value === "savings") {
+          next.type = value;
+          if (next.type !== "temporary") next.cashback = false;
+        }
         break;
       case "payoutType":
-        if (value === "none" || value === "monthly" || value === "yearly") next.payoutType = value;
+        if (value === "none" || value === "monthly" || value === "yearly" || value === "once") {
+          next.payoutType = value;
+          if (next.payoutType === "once") {
+            next.startMonth = next.payoutMonth;
+            next.endMonth = next.payoutMonth;
+          }
+        }
         break;
       case "name":
         next.name = String(value);
@@ -450,6 +470,11 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
       const startMonth = next.startMonth;
       next.startMonth = next.endMonth;
       next.endMonth = startMonth;
+    }
+
+    if (next.payoutType === "once") {
+      next.startMonth = next.payoutMonth;
+      next.endMonth = next.payoutMonth;
     }
 
     return next;
@@ -502,6 +527,14 @@ function toggleInterestInvestment(): void {
   state.investment = {
     ...state.investment,
     includeAccountInterest: !state.investment.includeAccountInterest
+  };
+  renderAll();
+}
+
+function toggleCashbackInvestment(): void {
+  state.investment = {
+    ...state.investment,
+    includeAccountCashback: !state.investment.includeAccountCashback
   };
   renderAll();
 }
@@ -594,36 +627,47 @@ function drawCurrentInvestmentChart(): void {
 function buildCurrentAssetProjection(summary: ReturnType<typeof calculateReserveSummary>) {
   return buildAssetProjection(
     state.settings.year,
-    investmentPositionsForProjection(summary.totalInterest),
-    investmentSettingsForProjection(summary.totalInterest)
+    investmentPositionsForProjection(summary),
+    investmentSettingsForProjection(summary)
   );
 }
 
-function investmentPositionsForProjection(annualInterest: number): ReservePosition[] {
-  if (!state.investment.includeAccountInterest || annualInterest <= 0) return state.positions;
-  return [
-    ...state.positions,
-    {
-      id: INTEREST_INVESTMENT_POSITION_ID,
-      active: true,
-      name: "Zinsen aus Jahrestabelle",
-      type: "savings",
-      amount: annualInterest,
-      startMonth: 1,
-      endMonth: 12,
-      payoutType: "yearly",
-      payoutMonth: 12,
-      payoutDay: 31,
-      cashback: false
-    }
-  ];
+function investmentPositionsForProjection(summary: ReturnType<typeof calculateReserveSummary>): ReservePosition[] {
+  const virtualPositions: ReservePosition[] = [];
+  if (state.investment.includeAccountInterest && summary.totalInterest > 0) {
+    virtualPositions.push(virtualInvestmentPosition(INTEREST_INVESTMENT_POSITION_ID, "Zinsen aus Jahrestabelle", summary.totalInterest));
+  }
+  if (state.investment.includeAccountCashback && summary.totalCashback > 0) {
+    virtualPositions.push(
+      virtualInvestmentPosition(CASHBACK_INVESTMENT_POSITION_ID, "Cashback aus Jahrestabelle", summary.totalCashback)
+    );
+  }
+  return [...state.positions, ...virtualPositions];
 }
 
-function investmentSettingsForProjection(annualInterest: number): InvestmentSettings {
-  if (!state.investment.includeAccountInterest || annualInterest <= 0) return state.investment;
+function investmentSettingsForProjection(summary: ReturnType<typeof calculateReserveSummary>): InvestmentSettings {
+  const includedIds = new Set(state.investment.includedIds);
+  if (state.investment.includeAccountInterest && summary.totalInterest > 0) includedIds.add(INTEREST_INVESTMENT_POSITION_ID);
+  if (state.investment.includeAccountCashback && summary.totalCashback > 0) includedIds.add(CASHBACK_INVESTMENT_POSITION_ID);
   return {
     ...state.investment,
-    includedIds: Array.from(new Set([...state.investment.includedIds, INTEREST_INVESTMENT_POSITION_ID]))
+    includedIds: Array.from(includedIds)
+  };
+}
+
+function virtualInvestmentPosition(id: string, name: string, amount: number): ReservePosition {
+  return {
+    id,
+    active: true,
+    name,
+    type: "savings",
+    amount,
+    startMonth: 1,
+    endMonth: 12,
+    payoutType: "yearly",
+    payoutMonth: 12,
+    payoutDay: 31,
+    cashback: false
   };
 }
 

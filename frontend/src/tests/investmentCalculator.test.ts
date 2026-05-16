@@ -57,6 +57,20 @@ describe("investment calculator", () => {
     expect(projection.realWealthAtRetirement).toBeCloseTo(7609.52, 1);
   });
 
+  it("counts one-time savings positions in their payout month", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate"
+        ? { ...position, amount: 1200, payoutType: "once", payoutMonth: 6 }
+        : position
+    );
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.monthlyRate).toBe(100);
+    expect(projection.annualSavingsRate).toBe(1200);
+  });
+
   it("ignores selected positions that are not marked as savings rates", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>

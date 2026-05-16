@@ -12,6 +12,7 @@ export function isActiveInMonth(position: ReservePosition, monthNumber: number):
 export function calculatePositionValueAtMonthStart(position: ReservePosition, monthNumber: number): number {
   if (!isActiveInMonth(position, monthNumber)) return 0;
 
+  if (position.payoutType === "once") return 0;
   if (position.type === "fixed") return Number(position.amount);
   if (position.type === "temporary" || position.type === "savings") return Number(position.amount);
 
@@ -19,7 +20,7 @@ export function calculatePositionValueAtMonthStart(position: ReservePosition, mo
   for (let month = 1; month <= monthNumber; month += 1) {
     if (isActiveInMonth(position, month)) balance += Number(position.amount);
     if (position.payoutType === "monthly" && isActiveInMonth(position, month)) balance = 0;
-    if (position.payoutType === "yearly" && month < monthNumber && Number(position.payoutMonth) === month) {
+    if (isSingleMonthPayout(position) && month < monthNumber && isPayoutMonth(position, month)) {
       balance = 0;
     }
   }
@@ -29,6 +30,7 @@ export function calculatePositionValueAtMonthStart(position: ReservePosition, mo
 
 export function calculatePositionEndOfMonthPermanent(position: ReservePosition, monthNumber: number): number {
   if (!position.active) return 0;
+  if (position.payoutType === "once") return 0;
 
   if (position.type === "fixed") {
     return isActiveInMonth(position, monthNumber) ? Number(position.amount) : 0;
@@ -39,7 +41,7 @@ export function calculatePositionEndOfMonthPermanent(position: ReservePosition, 
   for (let month = 1; month <= monthNumber; month += 1) {
     if (isActiveInMonth(position, month)) balance += Number(position.amount);
     if (position.payoutType === "monthly" && isActiveInMonth(position, month)) balance = 0;
-    if (position.payoutType === "yearly" && Number(position.payoutMonth) === month && month <= monthNumber) {
+    if (isSingleMonthPayout(position) && isPayoutMonth(position, month) && month <= monthNumber) {
       balance = 0;
     }
   }
@@ -54,6 +56,7 @@ export function calculateInterestForSingleMonth(
   annualRate: number
 ): number {
   if (!position.active || !isActiveInMonth(position, monthNumber)) return 0;
+  if (position.payoutType === "once") return 0;
 
   const monthIndex = monthNumber - 1;
   const dim = daysInMonth(year, monthIndex);
@@ -68,7 +71,7 @@ export function calculateInterestForSingleMonth(
   const balance = calculatePositionValueAtMonthStart(position, monthNumber);
   let daysHeld = dim;
   if (position.payoutType === "monthly") daysHeld = Math.max(1, Math.min(Number(position.payoutDay || dim), dim));
-  if (position.payoutType === "yearly" && Number(position.payoutMonth) === monthNumber) {
+  if (isSingleMonthPayout(position) && isPayoutMonth(position, monthNumber)) {
     daysHeld = Math.max(1, Math.min(Number(position.payoutDay || dim), dim));
   }
   return (balance * annualRate * daysHeld) / 365;
@@ -83,33 +86,50 @@ export function calculateInterestForPosition(position: ReservePosition, year: nu
 }
 
 export function calculateCashbackForPosition(position: ReservePosition, cashbackRate: number): number {
-  if (!position.active || !position.cashback) return 0;
-
-  let eligibleVolume = 0;
+  let cashback = 0;
   for (let month = 1; month <= 12; month += 1) {
-    if (!isActiveInMonth(position, month)) continue;
+    cashback += calculateCashbackForSingleMonth(position, month, cashbackRate);
+  }
+  return cashback;
+}
 
-    if ((position.type === "temporary" || position.type === "savings") && position.payoutType === "monthly") {
-      eligibleVolume += Number(position.amount);
-    }
-    if (position.type === "reserve" && position.payoutType === "monthly") eligibleVolume += Number(position.amount);
-    if (position.type === "reserve" && position.payoutType === "yearly" && Number(position.payoutMonth) === month) {
-      eligibleVolume += calculatePositionValueAtMonthStart(position, month);
-    }
+export function calculateCashbackForSingleMonth(
+  position: ReservePosition,
+  monthNumber: number,
+  cashbackRate: number
+): number {
+  if (!position.active || !position.cashback || position.type !== "temporary") return 0;
+  if (position.payoutType === "once") {
+    return isPayoutMonth(position, monthNumber) ? Number(position.amount) * cashbackRate : 0;
+  }
+  if (!isActiveInMonth(position, monthNumber)) return 0;
+  if (position.payoutType === "monthly") return Number(position.amount) * cashbackRate;
+  if (position.payoutType === "yearly" && isPayoutMonth(position, monthNumber)) {
+    return Number(position.amount) * cashbackRate;
   }
 
-  return eligibleVolume * cashbackRate;
+  return 0;
+}
+
+function isSingleMonthPayout(position: ReservePosition): boolean {
+  return position.payoutType === "yearly" || position.payoutType === "once";
+}
+
+function isPayoutMonth(position: ReservePosition, monthNumber: number): boolean {
+  return Number(position.payoutMonth) === monthNumber;
 }
 
 export function calculateMonthlyRows(settings: PlanningSettings, positions: ReservePosition[]): MonthlyReserveRow[] {
   const rows: MonthlyReserveRow[] = [];
   const annualRate = settings.interestRatePercent / 100;
+  const cashbackRate = settings.cashbackRatePercent / 100;
 
   for (let month = 1; month <= 12; month += 1) {
     const values: Record<string, number> = {};
     let maxNeeded = 0;
     let permanentAfterMonthlyOutflows = 0;
     let monthlyInterest = 0;
+    let monthlyCashback = 0;
 
     for (const position of positions) {
       if (!position.active) {
@@ -122,6 +142,7 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
       maxNeeded += value;
       permanentAfterMonthlyOutflows += calculatePositionEndOfMonthPermanent(position, month);
       monthlyInterest += calculateInterestForSingleMonth(position, settings.year, month, annualRate);
+      monthlyCashback += calculateCashbackForSingleMonth(position, month, cashbackRate);
     }
 
     rows.push({
@@ -130,7 +151,8 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
       values,
       maxNeeded,
       permanentAfterMonthlyOutflows,
-      monthlyInterest
+      monthlyInterest,
+      monthlyCashback
     });
   }
 
@@ -139,18 +161,14 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
 
 export function calculateReserveSummary(settings: PlanningSettings, positions: ReservePosition[]): ReserveSummary {
   const rows = calculateMonthlyRows(settings, positions);
-  const activePositions = positions.filter((position) => position.active);
+  const activePositions = positions.filter((position) => position.active && position.payoutType !== "once");
   const maxRow = rows.reduce((best, row) => (row.maxNeeded > best.maxNeeded ? row : best), rows[0]);
   const annualRate = settings.interestRatePercent / 100;
-  const cashbackRate = settings.cashbackRatePercent / 100;
   const totalInterest = positions.reduce(
     (sum, position) => sum + calculateInterestForPosition(position, settings.year, annualRate),
     0
   );
-  const totalCashback = positions.reduce(
-    (sum, position) => sum + calculateCashbackForPosition(position, cashbackRate),
-    0
-  );
+  const totalCashback = rows.reduce((sum, row) => sum + row.monthlyCashback, 0);
   const yearEndBalance = rows[11]?.permanentAfterMonthlyOutflows || 0;
 
   return {

@@ -105,6 +105,7 @@ export function defaultInvestmentSettings(): InvestmentSettings {
   return {
     includedIds: ["investitionsrate"],
     includeAccountInterest: false,
+    includeAccountCashback: false,
     birthYear: 1993,
     chartStartAge: 32,
     payoutEndAge: 95,

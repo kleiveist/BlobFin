@@ -414,11 +414,18 @@ tfoot th {
   gap: 8px;
 }
 
-.include-interest-toggle {
+.include-special-toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.include-transfer-toggle {
   display: grid;
   gap: 4px;
   width: 100%;
-  margin-bottom: 10px;
+  min-height: 74px;
   border: 1px solid #c9ddc8;
   border-radius: 8px;
   background: #eff8ed;
@@ -428,23 +435,23 @@ tfoot th {
   cursor: pointer;
 }
 
-.include-interest-toggle span {
+.include-transfer-toggle span {
   font-size: 0.84rem;
   font-weight: 900;
 }
 
-.include-interest-toggle strong {
+.include-transfer-toggle strong {
   color: var(--muted);
   font-size: 0.82rem;
 }
 
-.include-interest-toggle.active {
+.include-transfer-toggle.active {
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
 }
 
-.include-interest-toggle.active strong {
+.include-transfer-toggle.active strong {
   color: rgba(255, 255, 255, 0.86);
 }
 

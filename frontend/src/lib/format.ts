@@ -73,6 +73,7 @@ export function labelForType(type: PositionType): string {
 export function labelForPayout(type: PayoutType): string {
   if (type === "monthly") return "monatlich";
   if (type === "yearly") return "jaehrlich";
+  if (type === "once") return "einmalig";
   return "kein Abgang";
 }
 

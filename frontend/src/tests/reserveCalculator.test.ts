@@ -13,8 +13,77 @@ describe("reserve calculator", () => {
     expect(summary.maxRow.month).toBe("Dezember");
     expect(summary.maxRow.maxNeeded).toBe(2294);
     expect(summary.yearEndBalance).toBe(1040);
+    expect(summary.rows[0].monthlyCashback).toBeCloseTo(3.24, 2);
     expect(Math.round(summary.totalCashback * 100) / 100).toBe(38.88);
     expect(summary.maxNeededWithEmergencyFund).toBe(2294);
+  });
+
+  it("only grants cashback for temporary positions with matching payout cadence", () => {
+    const state = defaultAppState();
+    state.positions = [
+      {
+        id: "annual-temp",
+        active: true,
+        name: "Annual Temp",
+        type: "temporary",
+        amount: 1200,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "yearly",
+        payoutMonth: 12,
+        payoutDay: 31,
+        cashback: true
+      },
+      {
+        id: "reserve-no-cashback",
+        active: true,
+        name: "Reserve",
+        type: "reserve",
+        amount: 1200,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "yearly",
+        payoutMonth: 12,
+        payoutDay: 31,
+        cashback: true
+      }
+    ];
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+
+    expect(summary.rows[0].monthlyCashback).toBe(0);
+    expect(summary.rows[11].monthlyCashback).toBe(12);
+    expect(summary.totalCashback).toBe(12);
+  });
+
+  it("keeps one-time temporary payouts out of balances while counting cashback", () => {
+    const state = defaultAppState();
+    state.positions = [
+      {
+        id: "one-time-temp",
+        active: true,
+        name: "One Time Temp",
+        type: "temporary",
+        amount: 500,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "once",
+        payoutMonth: 6,
+        payoutDay: 20,
+        cashback: true
+      }
+    ];
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+
+    expect(summary.activePositions).toHaveLength(0);
+    expect(summary.rows[0].values["one-time-temp"]).toBe(0);
+    expect(summary.rows[5].values["one-time-temp"]).toBe(0);
+    expect(summary.rows[6].values["one-time-temp"]).toBe(0);
+    expect(summary.maxRow.maxNeeded).toBe(0);
+    expect(summary.totalInterest).toBe(0);
+    expect(summary.rows[5].monthlyCashback).toBe(5);
+    expect(summary.totalCashback).toBe(5);
   });
 
   it("round-trips positions through semicolon csv", () => {
