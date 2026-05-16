@@ -57,6 +57,10 @@ describe("investment calculator", () => {
     state.positions = state.positions.map((position) =>
       position.id === "investitionsrate" ? { ...position, amount: 50 } : position
     );
+    state.investment = {
+      ...state.investment,
+      percentageWithdrawalStartAge: state.investment.payoutEndAge - state.investment.payoutYears
+    };
 
     const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
 

@@ -118,6 +118,7 @@ export function renderAppShell(): string {
             <button class="button secondary" type="button" data-action="show-reserve-chart">Grafik anzeigen</button>
           </div>
         </div>
+        <div id="reserveChartPopup" class="reserve-chart-popup" role="dialog" aria-label="Einnahmen Ausgaben Sparrate Grafik" hidden></div>
         <div class="table-wrap result-table-wrap">
           <table>
             <thead id="resultHead"></thead>
@@ -125,7 +126,6 @@ export function renderAppShell(): string {
             <tfoot id="resultFoot"></tfoot>
           </table>
         </div>
-        <div id="reserveChartPopup" class="reserve-chart-popup" role="dialog" aria-label="Einnahmen Ausgaben Sparrate Grafik" hidden></div>
       </section>
 
       <section class="panel investment-panel">

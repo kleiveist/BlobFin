@@ -447,6 +447,7 @@ button:focus-visible {
   box-shadow: 0 22px 56px rgba(54, 44, 28, 0.18);
   padding: 16px;
   margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 .reserve-chart-popup[hidden] {
