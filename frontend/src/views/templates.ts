@@ -176,7 +176,7 @@ export function renderAppShell(): string {
                 <div class="investment-chart-metrics">
                   ${chartMetric("monthlyRateMetric", "Monatliche Investmentrate")}
                   ${chartMetric("wealthAtRetirementMetric", "Vermoegen zur Rente")}
-                  ${chartMetric("withdrawalGainMetric", "Monatlicher Zugewinn durch Entnahme")}
+                  ${withdrawalGainMetric()}
                   ${chartMetric("monthlyPensionMetric", "Monatliche Rente netto")}
                   ${chartMetric("realWealthMetric", "Reales Vermoegen zur Rente")}
                 </div>
@@ -330,6 +330,24 @@ function chartMetric(id: string, label: string): string {
     <div class="chart-metric">
       <div class="chart-label">${label}</div>
       <div class="chart-value" id="${id}">-</div>
+    </div>
+  `;
+}
+
+function withdrawalGainMetric(): string {
+  return `
+    <div class="chart-metric chart-metric-split">
+      <div class="chart-label">Monatlicher Zugewinn durch Entnahme</div>
+      <div class="chart-split-values">
+        <div class="chart-split-item">
+          <span>Kumulierte Sparrate</span>
+          <strong id="withdrawalOffsetMetric">-</strong>
+        </div>
+        <div class="chart-split-item">
+          <span>Netto</span>
+          <strong id="withdrawalGainMetric">-</strong>
+        </div>
+      </div>
     </div>
   `;
 }

@@ -967,6 +967,34 @@ tfoot th {
   overflow-wrap: anywhere;
 }
 
+.chart-metric-split {
+  min-width: min(100%, 260px);
+}
+
+.chart-split-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.chart-split-item {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.chart-split-item span {
+  color: var(--chart-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.chart-split-item strong {
+  font-size: clamp(0.92rem, 1.25vw, 1.16rem);
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
 #investmentChart {
   display: block;
   width: 100%;

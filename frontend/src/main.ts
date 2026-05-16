@@ -244,6 +244,7 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("monthlySavingsRateMetric", `${money(projection.monthlyRate)} monatlich`);
   setText("annualSavingsRateMetric", money(projection.annualSavingsRate));
   setText("wealthAtRetirementMetric", money(projection.wealthAtRetirement));
+  setText("withdrawalOffsetMetric", money(projection.withdrawalRemainingSavingsMonthlyAtStart));
   setText("withdrawalGainMetric", money(projection.withdrawalGainMonthlyAtStart));
   setText("monthlyPensionMetric", money(projection.monthlyPension));
   setText("realWealthMetric", money(projection.realWealthAtRetirement));

@@ -64,6 +64,7 @@ export function buildAssetProjection(
   );
   const percentageWithdrawalMonthlyAtStart = netPercentageWithdrawalAtStart(percentageBase, settings);
   const percentageWithdrawalAnnualAtStart = percentageWithdrawalMonthlyAtStart * 12;
+  const withdrawalRemainingSavingsMonthlyAtStart = Math.max(0, monthlyRate - percentageWithdrawalMonthlyAtStart);
   const withdrawalGainMonthlyAtStart = Math.max(0, percentageWithdrawalMonthlyAtStart - monthlyRate);
 
   const points: AssetProjectionPoint[] = [];
@@ -95,6 +96,7 @@ export function buildAssetProjection(
     realMonthlyPension,
     percentageWithdrawalMonthlyAtStart,
     percentageWithdrawalAnnualAtStart,
+    withdrawalRemainingSavingsMonthlyAtStart,
     withdrawalGainMonthlyAtStart,
     percentageWithdrawalStartAge: settings.percentageWithdrawalStartAge,
     percentageWithdrawalRatePercent: settings.percentageWithdrawalRatePercent,

@@ -27,6 +27,9 @@ describe("investment calculator", () => {
     expect(projection.annualSavingsRate).toBe(1800);
     expect(projection.percentageWithdrawalStartAge).toBe(32);
     expect(projection.percentageWithdrawalRatePercent).toBe(4);
+    expect(projection.withdrawalRemainingSavingsMonthlyAtStart).toBeCloseTo(
+      Math.max(0, projection.monthlyRate - projection.percentageWithdrawalMonthlyAtStart)
+    );
     expect(projection.withdrawalGainMonthlyAtStart).toBeCloseTo(
       Math.max(0, projection.percentageWithdrawalMonthlyAtStart - projection.monthlyRate)
     );
@@ -43,7 +46,25 @@ describe("investment calculator", () => {
     const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
 
     expect(projection.percentageWithdrawalMonthlyAtStart - projection.monthlyRate).toBeLessThan(0);
+    expect(projection.withdrawalRemainingSavingsMonthlyAtStart).toBeCloseTo(
+      projection.monthlyRate - projection.percentageWithdrawalMonthlyAtStart
+    );
     expect(projection.withdrawalGainMonthlyAtStart).toBe(0);
+  });
+
+  it("uses net withdrawals only after the selected monthly rate is fully offset", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate" ? { ...position, amount: 50 } : position
+    );
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.percentageWithdrawalMonthlyAtStart).toBeGreaterThan(projection.monthlyRate);
+    expect(projection.withdrawalRemainingSavingsMonthlyAtStart).toBe(0);
+    expect(projection.withdrawalGainMonthlyAtStart).toBeCloseTo(
+      projection.percentageWithdrawalMonthlyAtStart - projection.monthlyRate
+    );
   });
 
   it("counts yearly investment positions once per year", () => {

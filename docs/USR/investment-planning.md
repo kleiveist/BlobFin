@@ -61,7 +61,7 @@ Click a bar to open a popup for that year. The popup shows:
 
 - `Monatliche Investmentrate`: average recurring monthly investment.
 - `Vermoegen zur Rente`: projected depot value at retirement.
-- `Monatlicher Zugewinn durch Entnahme`: monthly net percentage withdrawal at the selected withdrawal start age minus the recurring monthly investment rate, floored at zero.
+- `Monatlicher Zugewinn durch Entnahme`: monthly percentage withdrawal split into the remaining recurring monthly investment rate after offset and the remaining net withdrawal, floored at zero.
 - `Monatliche Rente netto`: simulated net monthly payout over the payout period.
 - `Reales Vermoegen zur Rente`: retirement wealth adjusted for inflation.
 - `Realisierte Steuern bis Rente`: taxes realized before retirement through percentage withdrawals.

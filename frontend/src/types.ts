@@ -122,6 +122,7 @@ export interface AssetProjection {
   realMonthlyPension: number;
   percentageWithdrawalMonthlyAtStart: number;
   percentageWithdrawalAnnualAtStart: number;
+  withdrawalRemainingSavingsMonthlyAtStart: number;
   withdrawalGainMonthlyAtStart: number;
   percentageWithdrawalStartAge: number;
   percentageWithdrawalRatePercent: number;
