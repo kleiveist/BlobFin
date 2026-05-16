@@ -160,6 +160,36 @@ def test_tauri_build_plan_prints_target_command_and_bundles(monkeypatch) -> None
     assert "🛠️ Command: tauri build --bundles deb,rpm" in messages
 
 
+def test_tauri_windows_portable_dry_run_requires_windows_host(monkeypatch) -> None:
+    calls: list[list[str]] = []
+    messages: list[str] = []
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr(common, "run_command", lambda command, **kwargs: calls.append(command) or common.CommandResult(command, paths.ROOT, 0))
+    monkeypatch.setattr("tools.tauri.build.windows_portable.logger.fail", messages.append)
+
+    code = control.main(["tauri", "build", "--target", "windows-portable", "--dry-run"])
+
+    assert code == 1
+    assert calls == []
+    assert any("Windows portable build requires a Windows host" in message for message in messages)
+
+
+def test_tauri_windows_cross_dry_run_requires_linux_host(monkeypatch) -> None:
+    calls: list[list[str]] = []
+    messages: list[str] = []
+
+    monkeypatch.setattr(common, "host_os", lambda: "windows")
+    monkeypatch.setattr(common, "run_command", lambda command, **kwargs: calls.append(command) or common.CommandResult(command, paths.ROOT, 0))
+    monkeypatch.setattr("tools.tauri.build.windows_cross_linux.logger.fail", messages.append)
+
+    code = control.main(["tauri", "build", "--target", "windows-cross-linux", "--dry-run"])
+
+    assert code == 1
+    assert calls == []
+    assert any("Windows cross-build is supported from Linux hosts only" in message for message in messages)
+
+
 def test_tauri_build_artifacts_print_with_icons(monkeypatch, tmp_path) -> None:
     messages: list[str] = []
     monkeypatch.setattr(common.logger, "info", messages.append)

@@ -8,7 +8,7 @@ from tools.tauri import common, paths
 
 def main(args: argparse.Namespace) -> int:
     dry_run = bool(getattr(args, "dry_run", False))
-    if common.host_os() != "windows" and not dry_run:
+    if common.host_os() != "windows":
         logger.fail("Windows build requires a Windows host. Use windows-cross-linux on Linux.")
         return 1
     command = common.tauri_cli_command("build", "--target", "x86_64-pc-windows-msvc")

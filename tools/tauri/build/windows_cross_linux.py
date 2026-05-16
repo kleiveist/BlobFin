@@ -9,7 +9,7 @@ from tools.tauri import common, paths
 
 def main(args: argparse.Namespace) -> int:
     dry_run = bool(getattr(args, "dry_run", False))
-    if common.host_os() != "linux" and not dry_run:
+    if common.host_os() != "linux":
         logger.fail("Windows cross-build is supported from Linux hosts only.")
         return 1
     if shutil.which("cargo-xwin") is None and not dry_run:
