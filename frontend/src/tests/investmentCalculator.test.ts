@@ -28,10 +28,22 @@ describe("investment calculator", () => {
     expect(projection.percentageWithdrawalStartAge).toBe(32);
     expect(projection.percentageWithdrawalRatePercent).toBe(4);
     expect(projection.withdrawalGainMonthlyAtStart).toBeCloseTo(
-      projection.percentageWithdrawalMonthlyAtStart - projection.monthlyRate
+      Math.max(0, projection.percentageWithdrawalMonthlyAtStart - projection.monthlyRate)
     );
     expect(projection.wealthAtRetirement).toBeGreaterThan(40000);
     expect(projection.points.some((point) => point.phase === "payout")).toBe(true);
+  });
+
+  it("does not show negative withdrawal gain values", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate" ? { ...position, amount: 2000 } : position
+    );
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.percentageWithdrawalMonthlyAtStart - projection.monthlyRate).toBeLessThan(0);
+    expect(projection.withdrawalGainMonthlyAtStart).toBe(0);
   });
 
   it("counts yearly investment positions once per year", () => {

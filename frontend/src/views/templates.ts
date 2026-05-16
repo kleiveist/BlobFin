@@ -83,7 +83,7 @@ export function renderAppShell(): string {
         <div class="toolbar">
           <div class="section-heading position-toolbar-heading">
             <h2>Kosten- und Ruecklagenpositionen</h2>
-            <div class="position-mode-switch" role="tablist" aria-label="Positionstabelle">
+            <div class="position-mode-switch position-table-switch" role="tablist" aria-label="Positionstabelle">
               <button class="position-mode-button" type="button" data-action="show-income-positions" aria-pressed="false">Einnahmen</button>
               <button class="position-mode-button" type="button" data-action="show-expense-positions" aria-pressed="true">Ausgaben</button>
               <button class="position-mode-button" type="button" data-action="show-savings-positions" aria-pressed="false">Sparen</button>
