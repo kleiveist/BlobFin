@@ -11,7 +11,7 @@
 <!-- AUTO-GENERATED:docs-index END -->
 
 ## Purpose
-The Tauri tooling adds a desktop shell around the existing ImoCalc React/Vite frontend.
+The Tauri tooling adds a desktop shell around the existing BlobFin Vite/TypeScript frontend.
 It does not create a second frontend. All desktop commands are routed through the existing control CLI.
 
 ## Important Syntax
@@ -252,18 +252,18 @@ If you know the host has a non-standard AppImage setup, bypass only the prefligh
 python tools/control.py tauri build --appimage --skip-appimage-preflight
 ```
 
-If Tauri creates `ImoCalc.AppDir` but `linuxdeploy` fails before writing the final `.AppImage`, the tooling repairs the AppDir icon name and packages the existing AppDir with the cached AppImage plugin. This handles the common mismatch where the desktop file expects `Icon=imocalc` but the generated file is named `ImoCalc.png`.
+If Tauri creates `BlobFin.AppDir` but `linuxdeploy` fails before writing the final `.AppImage`, the tooling repairs the AppDir icon name and packages the existing AppDir with the cached AppImage plugin. This handles the common mismatch where the desktop file expects `Icon=blobfin` but the generated file is named `BlobFin.png`.
 
 The AppImage install step copies the newest generated AppImage to:
 
 ```text
-~/Applications/ImoCalc.AppImage
+~/Applications/BlobFin.AppImage
 ```
 
 It also copies the best available icon to the local icon directory and writes:
 
 ```text
-~/.local/share/applications/imocalc.desktop
+~/.local/share/applications/blobfin.desktop
 ```
 
 ## Tauri Install AppImage
@@ -277,7 +277,7 @@ python tools/control.py tauri --install-appimage --dry-run
 Purpose:
 - installs an already-built AppImage without rebuilding
 - creates or updates the local desktop entry
-- copies the best available ImoCalc icon into the local icon directory
+- copies the best available BlobFin icon into the local icon directory
 - marks the installed AppImage executable
 
 Prerequisite:
@@ -298,9 +298,9 @@ python tools/control.py tauri build --appimage
 Install target paths:
 
 ```text
-~/Applications/ImoCalc.AppImage
-~/.local/share/icons/imocalc.png
-~/.local/share/applications/imocalc.desktop
+~/Applications/BlobFin.AppImage
+~/.local/share/icons/blobfin.png
+~/.local/share/applications/blobfin.desktop
 ```
 
 What it does not do:
@@ -309,7 +309,7 @@ What it does not do:
 - it does not install system packages
 - it does not copy `.deb` or `.rpm` artifacts
 
-If the final `.AppImage` is missing but `ImoCalc.AppDir` exists, the command packages that existing AppDir first and then installs the resulting AppImage. It still does not rebuild the app.
+If the final `.AppImage` is missing but `BlobFin.AppDir` exists, the command packages that existing AppDir first and then installs the resulting AppImage. It still does not rebuild the app.
 
 Use `--dry-run` to inspect the install actions:
 
@@ -416,7 +416,7 @@ python tools/control.py tauri test --build-dry-run
 
 ## Files and Directories
 - `src-tauri/`: Tauri Rust shell and desktop configuration
-- `frontend/`: existing React/Vite app used by both web and desktop
+- `frontend/`: existing Vite/TypeScript app used by both web and desktop
 - `tools/tauri/`: Python tooling for Tauri
 - `.dist/desktop/`: default copied desktop artifact output
 - `tools/.runtime/logs/tauri.log`: detached Tauri run log

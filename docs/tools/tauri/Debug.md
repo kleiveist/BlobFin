@@ -116,7 +116,7 @@ This means the Tauri dev command is running from the wrong working directory or 
 The expected command inside Tauri config is:
 
 ```bash
-npm run dev -- --host 127.0.0.1 --port 5173
+cd frontend && npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
 ### npm could not determine executable to run
@@ -214,13 +214,13 @@ If your host uses a custom AppImage setup and you want to try the build anyway:
 python tools/control.py tauri build --appimage --skip-appimage-preflight
 ```
 
-If Tauri leaves an `ImoCalc.AppDir` behind but no final `.AppImage`, the tooling can repair the AppDir icon name and package the existing AppDir with the cached AppImage plugin.
+If Tauri leaves a `BlobFin.AppDir` behind but no final `.AppImage`, the tooling can repair the AppDir icon name and package the existing AppDir with the cached AppImage plugin.
 
 This installs:
 
 ```text
-~/Applications/ImoCalc.AppImage
-~/.local/share/applications/imocalc.desktop
+~/Applications/BlobFin.AppImage
+~/.local/share/applications/blobfin.desktop
 ```
 
 Install an already-built AppImage without rebuilding:
@@ -231,7 +231,7 @@ python tools/control.py tauri install-appimage --dry-run
 ```
 
 This command only installs the latest AppImage from `src-tauri/target/release/bundle/appimage/`.
-It does not rebuild the app. If only `ImoCalc.AppDir` exists, it packages that existing AppDir first and then installs the resulting AppImage.
+It does not rebuild the app. If only `BlobFin.AppDir` exists, it packages that existing AppDir first and then installs the resulting AppImage.
 
 If AppImage fails but deb/rpm were already created, collect available artifacts with:
 

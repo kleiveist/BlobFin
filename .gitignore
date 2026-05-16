@@ -7,6 +7,10 @@ frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
 
+src-tauri/target/
+src-tauri/gen/schemas/*
+!src-tauri/gen/schemas/.gitkeep
+
 __pycache__/
 *.py[cod]
 .pytest_cache/

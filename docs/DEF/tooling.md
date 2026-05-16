@@ -68,7 +68,15 @@ The control tooling tracks started services under `tools/.runtime`. Reports are 
 
 ## Tauri
 
-Tauri tooling exists under `tools/tauri` and `docs/tools/tauri`. It is not the primary path for the current web frontend task, but it remains available for desktop packaging workflows.
+Tauri tooling exists under `tools/tauri` and `docs/tools/tauri`. The committed desktop scaffold lives in `src-tauri`.
+
+The desktop app uses:
+
+- product name: `BlobFin`,
+- app identifier: `de.kleiveist.blobfin`,
+- frontend dev URL: `http://127.0.0.1:5173`,
+- production frontend assets: `frontend/dist`,
+- icons from `src-tauri/icons`.
 
 Use:
 
@@ -77,3 +85,12 @@ python tools/control.py tauri --help
 ```
 
 for the current subcommands.
+
+Useful desktop commands:
+
+```sh
+python tools/control.py tauri doctor
+python tools/control.py tauri run
+python tools/control.py tauri build --target linux
+python tools/control.py tauri build --appimage
+```

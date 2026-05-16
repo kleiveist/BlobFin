@@ -13,10 +13,10 @@ from tools import logger
 from tools.tauri import common, paths
 from tools.tauri.linux import install as linux_install
 
-DESKTOP_FILE_NAME = "imocalc.desktop"
+DESKTOP_FILE_NAME = "blobfin.desktop"
 STABLE_APPIMAGE_NAME = f"{paths.APP_NAME}.AppImage"
-STABLE_ICON_BASENAME = "imocalc"
-NAME_PREFERENCE_TOKEN = "imocalc"
+STABLE_ICON_BASENAME = "blobfin"
+NAME_PREFERENCE_TOKEN = "blobfin"
 
 APPIMAGE_PATTERNS = ("*.AppImage", "*.appimage")
 PNG_PATTERNS = ("*.png", "*.PNG")
@@ -225,7 +225,7 @@ def install_latest(*, dry_run: bool = False) -> int:
             dry_run=dry_run,
         )
 
-        logger.ok("ImoCalc AppImage installed locally")
+        logger.ok("BlobFin AppImage installed locally")
         logger.info(f"🧩 Installed AppImage: {_target_appimage_path()}")
         logger.info(f"🎨 Installed icon: {target_icon}")
         logger.info(f"🧾 Desktop entry: {_target_desktop_path()}")
@@ -383,7 +383,7 @@ def _select_appimage(appimage_dir: Path) -> Path:
     preferred = [path for path in candidates if NAME_PREFERENCE_TOKEN in _normalize_name(path.name)]
     pool = preferred if preferred else candidates
     if len(candidates) > 1:
-        detail = f"preferred ImoCalc candidates: {len(preferred)}" if preferred else "using newest by modification time"
+        detail = f"preferred BlobFin candidates: {len(preferred)}" if preferred else "using newest by modification time"
         logger.warn(f"Multiple AppImages found ({len(candidates)}); {detail}.")
 
     newest_mtime = max(path.stat().st_mtime_ns for path in pool)

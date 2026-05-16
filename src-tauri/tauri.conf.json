@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "BlobFin",
+  "version": "0.1.0",
+  "identifier": "de.kleiveist.blobfin",
+  "mainBinaryName": "BlobFin",
+  "build": {
+    "beforeDevCommand": "cd frontend && npm run dev -- --host 127.0.0.1 --port 5173",
+    "beforeBuildCommand": "cd frontend && npm run build",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "BlobFin",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Finance",
+    "shortDescription": "Reserve and investment planning",
+    "longDescription": "BlobFin is a local finance planning app for yearly reserves, cashflow, investment growth, withdrawals, and payout planning.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ]
+  }
+}

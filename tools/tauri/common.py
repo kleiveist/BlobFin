@@ -149,7 +149,8 @@ def package_manager_install_command() -> list[str]:
 
 def missing_frontend_dependency_paths() -> list[Path]:
     required = [
-        paths.FRONTEND_DIR / "node_modules" / "@types" / "node",
+        paths.FRONTEND_DIR / "node_modules" / "typescript",
+        paths.FRONTEND_DIR / "node_modules" / "vite",
     ]
     return [path for path in required if not path.exists()]
 

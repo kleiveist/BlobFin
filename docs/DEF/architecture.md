@@ -8,6 +8,7 @@ BlobFin is organized as a small monorepo with frontend, backend, shared data, an
 frontend/   Vite + TypeScript single page app
 backend/    FastAPI service with validation, calculation, PDF, and privacy endpoints
 shared/     JSON schemas, examples, legal data, and shared assets
+src-tauri/  Tauri desktop shell for packaging the frontend as a desktop app
 tools/      Python control CLI for install, run, stop, build, test, and Tauri workflows
 docs/       User, developer, and tooling documentation
 ```
@@ -25,6 +26,8 @@ The main planning application is the frontend:
 7. State is saved through `frontend/src/lib/storage.ts`.
 
 The backend is available as a separate FastAPI process. It currently exposes legacy financing validation/calculation and PDF endpoints. The Vite frontend is allowed by CORS from `127.0.0.1:5173` and `localhost:5173`.
+
+The desktop app is a Tauri shell under `src-tauri`. In development it opens the Vite dev server. In production builds it embeds the generated `frontend/dist` assets.
 
 ## Data Flow
 
@@ -47,6 +50,7 @@ Browser input
 - Keep HTML structure in `frontend/src/views/templates.ts`.
 - Keep chart drawing and chart hit detection in `frontend/src/views/investmentChart.ts`.
 - Keep backend API contracts under `backend/app/api` and `shared/schema`.
+- Keep desktop packaging metadata in `src-tauri` and Tauri command wrappers in `tools/tauri`.
 
 ## Current Legacy Boundary
 

@@ -10,6 +10,7 @@ BlobFin is a local finance planning application for yearly reserve planning, cas
 - Selects savings positions, account interest, and cashback as investment inputs.
 - Projects asset growth, percentage withdrawals, retirement payouts, inflation, and capital gains tax on realized gains.
 - Shows an interactive investment chart where each yearly bar can be opened for a value breakdown.
+- Provides a prepared Tauri desktop shell for building the web frontend as a desktop app.
 
 ## Documentation Map
 
@@ -76,6 +77,7 @@ backend/          FastAPI service, validation, calculation, PDF endpoints
 docs/             User, developer, and tooling documentation
 frontend/         Vite + TypeScript single page application
 shared/           JSON schemas, examples, legal data, shared assets
+src-tauri/        Tauri desktop shell, configuration, capabilities, and icons
 tools/            Python project control CLI and test/build/run helpers
 ```
 

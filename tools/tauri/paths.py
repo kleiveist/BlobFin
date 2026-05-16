@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-APP_NAME = "ImoCalc"
-APP_ID = "de.kleiveist.imocalc"
+APP_NAME = "BlobFin"
+APP_ID = "de.kleiveist.blobfin"
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT / "frontend"

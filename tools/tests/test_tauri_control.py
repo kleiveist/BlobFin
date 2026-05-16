@@ -151,9 +151,9 @@ def test_tauri_build_artifacts_print_with_icons(monkeypatch, tmp_path) -> None:
     dist_dir = root / ".dist" / "desktop"
     bundle_dir.mkdir(parents=True)
     dist_dir.mkdir(parents=True)
-    (bundle_dir / "ImoCalc_0.1.0_amd64.deb").write_bytes(b"deb")
-    (bundle_dir / "ImoCalc-0.1.0-1.x86_64.rpm").write_bytes(b"rpm")
-    (dist_dir / "ImoCalc-windows-portable.zip").write_bytes(b"zip")
+    (bundle_dir / "BlobFin_0.1.0_amd64.deb").write_bytes(b"deb")
+    (bundle_dir / "BlobFin-0.1.0-1.x86_64.rpm").write_bytes(b"rpm")
+    (dist_dir / "BlobFin-windows-portable.zip").write_bytes(b"zip")
 
     monkeypatch.setattr(paths, "ROOT", root)
     monkeypatch.setattr(paths, "DIST_DIR", dist_dir)
@@ -163,9 +163,9 @@ def test_tauri_build_artifacts_print_with_icons(monkeypatch, tmp_path) -> None:
 
     output = "\n".join(messages)
     assert "📁 Build artifacts:" in messages
-    assert "📦 src-tauri/target/release/bundle/ImoCalc_0.1.0_amd64.deb" in output
-    assert "📦 src-tauri/target/release/bundle/ImoCalc-0.1.0-1.x86_64.rpm" in output
-    assert "🗜️ .dist/desktop/ImoCalc-windows-portable.zip" in output
+    assert "📦 src-tauri/target/release/bundle/BlobFin_0.1.0_amd64.deb" in output
+    assert "📦 src-tauri/target/release/bundle/BlobFin-0.1.0-1.x86_64.rpm" in output
+    assert "🗜️ .dist/desktop/BlobFin-windows-portable.zip" in output
 
 
 def test_tauri_linux_build_accepts_explicit_bundle_selection(monkeypatch) -> None:
@@ -289,7 +289,7 @@ def test_tauri_install_appimage_packages_existing_appdir_when_final_file_is_miss
     home = tmp_path / "home"
     tauri_dir = root / "src-tauri"
     appimage_dir = tauri_dir / "target" / "release" / "bundle" / "appimage"
-    appdir = appimage_dir / "ImoCalc.AppDir"
+    appdir = appimage_dir / "BlobFin.AppDir"
     icon_dir = tauri_dir / "icons"
     appdir.mkdir(parents=True)
     icon_dir.mkdir(parents=True)
@@ -298,7 +298,7 @@ def test_tauri_install_appimage_packages_existing_appdir_when_final_file_is_miss
 
     def fake_package_existing_appdir(dry_run: bool = False) -> int:
         packaged.append(dry_run)
-        (appimage_dir / "ImoCalc_0.1.0_amd64.AppImage").write_bytes(b"appimage")
+        (appimage_dir / "BlobFin_0.1.0_amd64.AppImage").write_bytes(b"appimage")
         return 0
 
     monkeypatch.setattr(paths, "ROOT", root)
@@ -310,7 +310,7 @@ def test_tauri_install_appimage_packages_existing_appdir_when_final_file_is_miss
 
     assert code == 0
     assert packaged == [False]
-    assert (home / "Applications" / "ImoCalc.AppImage").read_bytes() == b"appimage"
+    assert (home / "Applications" / "BlobFin.AppImage").read_bytes() == b"appimage"
 
 
 def test_tauri_build_appimage_dry_run_does_not_install(monkeypatch) -> None:
@@ -413,7 +413,7 @@ def test_tauri_appimage_install_copies_artifact_icon_and_desktop_entry(monkeypat
     icon_dir = tauri_dir / "icons"
     appimage_dir.mkdir(parents=True)
     icon_dir.mkdir(parents=True)
-    source_appimage = appimage_dir / "ImoCalc_0.1.0_amd64.AppImage"
+    source_appimage = appimage_dir / "BlobFin_0.1.0_amd64.AppImage"
     source_icon = icon_dir / "icon.png"
     source_appimage.write_bytes(b"appimage")
     source_icon.write_bytes(b"png")
@@ -424,27 +424,27 @@ def test_tauri_appimage_install_copies_artifact_icon_and_desktop_entry(monkeypat
 
     code = appimage.install_latest()
 
-    installed_appimage = home / "Applications" / "ImoCalc.AppImage"
-    installed_icon = home / ".local" / "share" / "icons" / "imocalc.png"
-    desktop_entry = home / ".local" / "share" / "applications" / "imocalc.desktop"
+    installed_appimage = home / "Applications" / "BlobFin.AppImage"
+    installed_icon = home / ".local" / "share" / "icons" / "blobfin.png"
+    desktop_entry = home / ".local" / "share" / "applications" / "blobfin.desktop"
     assert code == 0
     assert installed_appimage.read_bytes() == b"appimage"
     assert installed_appimage.stat().st_mode & 0o111
     assert installed_icon.read_bytes() == b"png"
-    assert "Name=ImoCalc" in desktop_entry.read_text(encoding="utf-8")
+    assert "Name=BlobFin" in desktop_entry.read_text(encoding="utf-8")
 
 
 def test_tauri_appimage_repair_icon_matches_desktop_icon_name(tmp_path, monkeypatch) -> None:
-    appdir = tmp_path / "ImoCalc.AppDir"
+    appdir = tmp_path / "BlobFin.AppDir"
     appdir.mkdir()
-    (appdir / "ImoCalc.desktop").write_text("Name=ImoCalc\nIcon=imocalc\n", encoding="utf-8")
-    (appdir / "ImoCalc.png").write_bytes(b"png")
+    (appdir / "BlobFin.desktop").write_text("Name=BlobFin\nIcon=blobfin\n", encoding="utf-8")
+    (appdir / "BlobFin.png").write_bytes(b"png")
 
-    monkeypatch.setattr(paths, "APP_NAME", "ImoCalc")
+    monkeypatch.setattr(paths, "APP_NAME", "BlobFin")
 
     appimage._repair_appdir_icon(appdir)
 
-    assert (appdir / "imocalc.png").read_bytes() == b"png"
+    assert (appdir / "blobfin.png").read_bytes() == b"png"
 
 
 def test_tauri_build_fails_when_frontend_dependencies_are_missing(monkeypatch) -> None:
@@ -477,7 +477,7 @@ def test_tauri_cli_fallback_uses_tauri_apps_cli_package(monkeypatch) -> None:
 def test_tauri_run_override_uses_frontend_cwd_command() -> None:
     payload = json.loads(run._dev_config_override(5174))
 
-    assert payload["build"]["beforeDevCommand"] == "npm run dev -- --host 127.0.0.1 --port 5174"
+    assert payload["build"]["beforeDevCommand"] == "cd frontend && npm run dev -- --host 127.0.0.1 --port 5174"
     assert payload["build"]["devUrl"] == "http://127.0.0.1:5174"
 
 
