@@ -1,5 +1,6 @@
 export type PositionType = "fixed" | "reserve" | "temporary" | "savings";
 export type PayoutType = "none" | "monthly" | "yearly" | "once";
+export type ThemeMode = "light" | "dark";
 
 export interface ReservePosition {
   id: string;
@@ -42,6 +43,7 @@ export interface InvestmentSettings {
 }
 
 export interface AppState {
+  theme: ThemeMode;
   settings: PlanningSettings;
   positions: ReservePosition[];
   investment: InvestmentSettings;

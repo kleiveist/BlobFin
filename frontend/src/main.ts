@@ -17,7 +17,15 @@ import {
   percent
 } from "./lib/format";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
-import type { AppState, AssetProjection, AssetProjectionPoint, InvestmentSettings, PlanningSettings, ReservePosition } from "./types";
+import type {
+  AppState,
+  AssetProjection,
+  AssetProjectionPoint,
+  InvestmentSettings,
+  PlanningSettings,
+  ReservePosition,
+  ThemeMode
+} from "./types";
 import { drawInvestmentChart } from "./views/investmentChart";
 import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from "./views/templates";
 
@@ -28,10 +36,12 @@ const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
 let state = loadInitialState();
 let draggedPositionId: string | null = null;
 normalizeInvestmentBounds();
+applyTheme();
 
 renderShell();
 bindEvents();
 syncAllInputsFromState();
+syncThemeControls();
 renderAll();
 
 function loadInitialState(): AppState {
@@ -112,6 +122,10 @@ function bindEvents(): void {
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
+    if (action === "toggle-theme-settings") toggleThemeSettings();
+    if (action === "close-theme-settings") hideThemeSettings();
+    if (action === "set-theme-light") setThemeMode("light");
+    if (action === "set-theme-dark") setThemeMode("dark");
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
     if (action === "export-positions") downloadText("kosten-und-ruecklagenpositionen.csv", exportPositionsCsv(state.positions));
     if (action === "export-year") downloadText("jahreskalkulator-ruecklagen.csv", exportYearTableCsv(state.settings, state.positions));
@@ -156,6 +170,12 @@ function bindEvents(): void {
   });
 
   root.addEventListener("dragend", clearDragState);
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      hideThemeSettings();
+      hideInvestmentChartPopup();
+    }
+  });
   window.addEventListener("resize", drawCurrentInvestmentChart);
 }
 
@@ -391,13 +411,11 @@ function investmentPositionAmountText(position: ReservePosition): string {
 function positionDateCells(position: ReservePosition): string {
   if (position.payoutType === "once") {
     return `
-      <td colspan="2">
-        <label class="inline-cell-field">
-          <span>Abgangsjahr</span>
-          <input class="small-input payout-year-input" type="number" min="2000" max="2200" step="1" value="${
-            position.payoutYear
-          }" data-position-id="${position.id}" data-position-field="payoutYear" />
-        </label>
+      <td class="once-year-label">Abgangsjahr</td>
+      <td>
+        <input class="small-input payout-year-input" type="number" min="2000" max="2200" step="1" value="${
+          position.payoutYear
+        }" data-position-id="${position.id}" data-position-field="payoutYear" />
       </td>
     `;
   }
@@ -412,6 +430,7 @@ function syncAllInputsFromState(): void {
     setInputValue(`[data-setting="${key}"]`, state.settings[key]);
   }
   syncInvestmentInputsFromState();
+  syncThemeControls();
 }
 
 function syncInvestmentInputsFromState(): void {
@@ -614,10 +633,56 @@ function reorderPosition(sourceId: string, targetId: string, afterTarget: boolea
 }
 
 function resetState(): void {
+  const confirmed = window.confirm("Moechtest du wirklich alle Grunddaten, Positionen und Investment-Einstellungen zuruecksetzen?");
+  if (!confirmed) return;
   state = resetStoredState();
   state.investment = defaultInvestmentSettings();
+  applyTheme();
   syncAllInputsFromState();
+  hideThemeSettings();
   renderAll();
+}
+
+function setThemeMode(theme: ThemeMode): void {
+  state = { ...state, theme };
+  applyTheme();
+  syncThemeControls();
+  saveState(state);
+  drawCurrentInvestmentChart();
+}
+
+function applyTheme(): void {
+  document.documentElement.dataset.theme = state.theme;
+  const metaThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (metaThemeColor) {
+    metaThemeColor.content = state.theme === "dark" ? "#101412" : "#f7f4ed";
+  }
+}
+
+function toggleThemeSettings(): void {
+  const panel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
+  syncThemeControls();
+}
+
+function hideThemeSettings(): void {
+  const panel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
+  if (panel) panel.hidden = true;
+  syncThemeControls();
+}
+
+function syncThemeControls(): void {
+  const panel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
+  const button = document.querySelector<HTMLButtonElement>("[data-action='toggle-theme-settings']");
+  if (button) button.setAttribute("aria-expanded", String(Boolean(panel && !panel.hidden)));
+  for (const option of document.querySelectorAll<HTMLButtonElement>(".theme-option[data-action]")) {
+    const isActive =
+      (option.dataset.action === "set-theme-light" && state.theme === "light") ||
+      (option.dataset.action === "set-theme-dark" && state.theme === "dark");
+    option.classList.toggle("active", isActive);
+    option.setAttribute("aria-pressed", String(isActive));
+  }
 }
 
 async function importPositionsFromFile(file: File | undefined): Promise<void> {

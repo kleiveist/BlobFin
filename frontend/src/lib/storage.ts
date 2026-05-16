@@ -1,5 +1,5 @@
 import { createId, defaultAppState, defaultInvestmentSettings, defaultPlanningSettings } from "../data/defaults";
-import type { AppState, InvestmentSettings, PlanningSettings, ReservePosition } from "../types";
+import type { AppState, InvestmentSettings, PlanningSettings, ReservePosition, ThemeMode } from "../types";
 
 const STORAGE_KEY = "blobfin.reserveCalculator.v1";
 const LEGACY_STORAGE_KEY = "jahreskalkulatorState";
@@ -34,6 +34,7 @@ function normalizeState(value: unknown): AppState {
   const settings = normalizePlanningSettings(value.settings);
 
   return {
+    theme: normalizeThemeMode(value.theme, fallback.theme),
     settings,
     positions: normalizePositions(value.positions, fallback.positions, settings.year),
     investment: normalizeInvestmentSettings(value.investment)
@@ -53,10 +54,15 @@ function normalizeLegacyState(value: unknown): AppState {
   };
 
   return {
+    theme: normalizeThemeMode(value.theme, fallback.theme),
     settings,
     positions: normalizePositions(value.positions, fallback.positions, settings.year),
     investment: normalizeLegacyInvestmentSettings(value.investmentSettings)
   };
+}
+
+function normalizeThemeMode(value: unknown, fallback: ThemeMode): ThemeMode {
+  return value === "dark" || value === "light" ? value : fallback;
 }
 
 function normalizePlanningSettings(value: unknown): PlanningSettings {

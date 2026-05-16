@@ -52,28 +52,6 @@ BlobFin is a local finance planning application for yearly reserve planning, cas
 - Shows an interactive investment chart where each yearly bar can be opened for a value breakdown.
 - Provides a prepared Tauri desktop shell for building the web frontend as a desktop app.
 
-## Documentation Map
-
-User-focused documentation lives in `docs/USR`:
-
-- [User Guide](docs/USR/README.md)
-- [Getting Started](docs/USR/getting-started.md)
-- [Reserve Planning](docs/USR/reserve-planning.md)
-- [Investment Planning](docs/USR/investment-planning.md)
-- [Data, Export, And Reset](docs/USR/data-export-reset.md)
-
-Developer-focused documentation lives in `docs/DEF`:
-
-- [Developer Guide](docs/DEF/README.md)
-- [Architecture](docs/DEF/architecture.md)
-- [Frontend](docs/DEF/frontend.md)
-- [Domain Model](docs/DEF/domain-model.md)
-- [Backend](docs/DEF/backend.md)
-- [Tooling](docs/DEF/tooling.md)
-- [Testing](docs/DEF/testing.md)
-
-Operational tooling details also exist under `docs/tools`.
-
 ## Quick Start
 
 Install dependencies:

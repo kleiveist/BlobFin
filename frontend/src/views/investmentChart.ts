@@ -1,14 +1,18 @@
 import type { AssetProjection, AssetProjectionPoint } from "../types";
 
-const chartColors = {
+const defaultChartColors = {
   background: "#17191c",
   muted: "#9ca3af",
   grid: "#2a2d31",
   grey: "#777b82",
+  orange: "#ff7a00",
   green: "#43b20a",
   purple: "#9b94ff",
-  red: "#ff5b63"
+  red: "#ff5b63",
+  retirement: "#0c0d0e"
 };
+
+let chartColors = defaultChartColors;
 
 interface ChartPadding {
   top: number;
@@ -62,6 +66,7 @@ export function drawInvestmentChart(
   const context = canvas.getContext("2d");
   if (!context) return;
 
+  chartColors = resolveChartColors(canvas);
   const rect = canvas.getBoundingClientRect();
   const width = Math.max(320, rect.width || canvas.clientWidth || 320);
   const height = Math.max(360, rect.height || canvas.clientHeight || 480);
@@ -359,7 +364,7 @@ function drawAxisLabels(
   context.fillText("Alter", padding.left + chartWidth / 2, baseY + 52);
 
   if (retirementIndex >= 0) {
-    context.strokeStyle = "#0c0d0e";
+    context.strokeStyle = chartColors.retirement;
     context.lineWidth = 2;
     context.setLineDash([3, 3]);
     context.beginPath();
@@ -420,4 +425,26 @@ function roundedTopBar(
 
 function valueToY(value: number, padding: ChartPadding, chartHeight: number, maxValue: number): number {
   return padding.top + chartHeight - (value / maxValue) * chartHeight * 0.94;
+}
+
+function resolveChartColors(canvas: HTMLCanvasElement): typeof defaultChartColors {
+  const card = canvas.closest<HTMLElement>(".investment-chart-card");
+  if (!card) return defaultChartColors;
+  const styles = getComputedStyle(card);
+  return {
+    background: cssVar(styles, "--chart-bg", defaultChartColors.background),
+    muted: cssVar(styles, "--chart-muted", defaultChartColors.muted),
+    grid: cssVar(styles, "--chart-grid", defaultChartColors.grid),
+    grey: cssVar(styles, "--chart-grey", defaultChartColors.grey),
+    orange: cssVar(styles, "--chart-orange", defaultChartColors.orange),
+    green: cssVar(styles, "--chart-green", defaultChartColors.green),
+    purple: cssVar(styles, "--chart-purple", defaultChartColors.purple),
+    red: cssVar(styles, "--chart-red", defaultChartColors.red),
+    retirement: cssVar(styles, "--chart-retirement", defaultChartColors.retirement)
+  };
+}
+
+function cssVar(styles: CSSStyleDeclaration, name: string, fallback: string): string {
+  const value = styles.getPropertyValue(name).trim();
+  return value || fallback;
 }

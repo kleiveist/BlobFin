@@ -136,6 +136,7 @@ export function defaultInvestmentSettings(): InvestmentSettings {
 
 export function defaultAppState(): AppState {
   return {
+    theme: "light",
     settings: defaultPlanningSettings(),
     positions: defaultPositions(),
     investment: defaultInvestmentSettings()

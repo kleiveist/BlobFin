@@ -10,7 +10,40 @@ export function renderAppShell(): string {
         <h1>Jahreskalkulator fuer Ruecklagen und Investment</h1>
       </div>
       <div class="header-actions">
-        <button class="button secondary" type="button" data-action="reset">Grunddaten zuruecksetzen</button>
+        <div class="app-settings">
+          <button
+            class="settings-button"
+            type="button"
+            data-action="toggle-theme-settings"
+            aria-label="Einstellungen"
+            aria-controls="themeSettingsPanel"
+            aria-expanded="false"
+            title="Einstellungen"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.3 4.8c.1-.4.1-.7.1-1s0-.6-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1L16 3.4h-4l-.4 2.6a7 7 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7.7 7.7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.5-2.2-1.5Z" />
+            </svg>
+          </button>
+          <div id="themeSettingsPanel" class="settings-popover" role="dialog" aria-label="Darstellung" hidden>
+            <div class="settings-popover-head">
+              <strong>Darstellung</strong>
+              <button class="chart-popup-close" type="button" data-action="close-theme-settings" aria-label="Einstellungen schliessen">x</button>
+            </div>
+            <div class="theme-options" role="radiogroup" aria-label="Farbmodus">
+              <button class="theme-option" type="button" data-action="set-theme-light" aria-pressed="false">
+                <span class="theme-swatch light"></span>
+                <span>Hellmodus</span>
+              </button>
+              <button class="theme-option" type="button" data-action="set-theme-dark" aria-pressed="false">
+                <span class="theme-swatch dark"></span>
+                <span>Dunkelmodus</span>
+              </button>
+            </div>
+            <div class="settings-danger-zone">
+              <button class="button danger" type="button" data-action="reset">Grunddaten zuruecksetzen</button>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
