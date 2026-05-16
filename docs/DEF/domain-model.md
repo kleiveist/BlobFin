@@ -12,7 +12,7 @@ This page documents the calculation rules implemented in the frontend domain mod
 Important fields:
 
 - `flow`: `income` or `expense`.
-- `type`: expense rows use `fixed`, `reserve`, or `temporary`; savings rows use `savings`; income rows use `incomeMonthly`, `incomeYearly`, or `incomeTemporary`.
+- `type`: expense rows use `reserve` or `temporary`; savings rows use `fixed` or `savings`; income rows use `incomeMonthly`, `incomeYearly`, or `incomeTemporary`.
 - `payoutType`: `none`, `monthly`, `yearly`, or `once`.
 - `active`: whether the row participates in calculations.
 - `visible`: whether the row appears in the yearly table.
@@ -32,7 +32,7 @@ Rules:
 
 - Inactive positions return zero.
 - Income positions create monthly planned income.
-- Fixed expense positions are not treated as planned outflows.
+- Fixed positions are not treated as planned outflows.
 - Reserve positions can accumulate and optionally reset on monthly or yearly payout.
 - Temporary and savings positions are outflows while active.
 - One-time payout positions are only counted in their matching `payoutYear` and `payoutMonth`.

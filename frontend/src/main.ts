@@ -400,13 +400,13 @@ function renderPositionTableHead(): void {
 
 function positionModeEmptyLabel(mode: PositionTableMode): string {
   if (mode === "income") return "Einnahmen";
-  if (mode === "savings") return "Sparraten";
+  if (mode === "savings") return "Sparpositionen";
   return "Ausgaben";
 }
 
 function addPositionButtonLabel(mode: PositionTableMode): string {
   if (mode === "income") return "Einnahme hinzufuegen";
-  if (mode === "savings") return "Sparrate hinzufuegen";
+  if (mode === "savings") return "Sparposition hinzufuegen";
   return "Ausgabe hinzufuegen";
 }
 

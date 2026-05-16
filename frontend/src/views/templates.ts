@@ -233,17 +233,17 @@ export function positionTypeSelect(position: ReservePosition): string {
     `;
   }
 
-  if (position.type === "savings") {
+  if (position.type === "fixed" || position.type === "savings") {
     return `
       <select data-position-id="${position.id}" data-position-field="type">
-        <option value="savings" selected>Sparrate</option>
+        <option value="fixed" ${position.type === "fixed" ? "selected" : ""}>Fixbestand</option>
+        <option value="savings" ${position.type === "savings" ? "selected" : ""}>Sparrate</option>
       </select>
     `;
   }
 
   return `
     <select data-position-id="${position.id}" data-position-field="type">
-      <option value="fixed" ${position.type === "fixed" ? "selected" : ""}>Fixbestand</option>
       <option value="reserve" ${position.type === "reserve" ? "selected" : ""}>Monatliche Ruecklage</option>
       <option value="temporary" ${position.type === "temporary" ? "selected" : ""}>Temporaer</option>
     </select>

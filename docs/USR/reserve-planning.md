@@ -32,12 +32,12 @@ Income rows:
 
 Expense rows:
 
-- `Fixbestand`: a fixed balance or baseline amount. It is not treated as a planned outflow.
 - `Ruecklage`: money built up for future costs.
 - `Temporar`: active expense or temporary cost position.
 
 Savings rows:
 
+- `Fixbestand`: a fixed balance or baseline amount. It is not treated as a planned outflow.
 - `Sparrate`: savings position. Only this type can be selected for the investment projection.
 
 ## Payout Cadence

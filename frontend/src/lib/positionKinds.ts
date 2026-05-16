@@ -30,7 +30,7 @@ export function isExpensePosition(position: Pick<ReservePosition, "flow" | "type
 
 export function positionTableMode(position: Pick<ReservePosition, "flow" | "type">): PositionTableMode {
   if (isIncomePosition(position)) return "income";
-  if (position.type === "savings") return "savings";
+  if (position.type === "fixed" || position.type === "savings") return "savings";
   return "expense";
 }
 
