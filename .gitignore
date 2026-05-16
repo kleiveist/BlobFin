@@ -1,18 +1,88 @@
-.env
+# Project/backup archives
+/.archive/
+**/.archive/
+docs/*.zip
 .dist/
 .report/
 
+# Local/editor clutter
+..gitignore.kate-swp
+*.kate-swp
+*.swp
+*.swo
+*~
+*.tmp
+.DS_Store
+Thumbs.db
+
+# IDEs (optional)
+.vscode/
+.idea/
+.obsidian/
+.tempFix/
+
+# Python / virtualenv
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+backend/.venv/
+
+# Node / Vite / React
 node_modules/
+dist/
+out/
+.vite/
+.eslintcache
+*.tsbuildinfo
 frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
 
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Rust / Tauri build output
+# Ignores any Rust target/ directory, including src-tauri/target.
+target/
+**/src-tauri/target/
 src-tauri/target/
-src-tauri/gen/schemas/*
+src-tauri/gen/schemas/**
+!src-tauri/gen/schemas/
 !src-tauri/gen/schemas/.gitkeep
 
-__pycache__/
-*.py[cod]
-.pytest_cache/
-backend/.venv/
+# Tauri bundler outputs outside target/
+*.AppImage
+*.deb
+*.rpm
+*.dmg
+*.msi
+*.exe
+*.app
+
+# Local env files
+.env
+.env.*
+!.env.example
 tools/.runtime/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+*.fdb_latexmk
+*.fls
+*.synctex.gz
