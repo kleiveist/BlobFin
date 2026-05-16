@@ -109,10 +109,13 @@ export function renderAppShell(): string {
       <section class="panel result-panel">
         <div class="section-heading result-table-heading">
           <h2>Jahrestabelle</h2>
-          <div class="position-mode-switch result-column-switch" role="group" aria-label="Jahrestabellen-Spalten">
-            <button class="position-mode-button" type="button" data-action="toggle-result-max-needed" aria-pressed="false">
-              Max. Bedarf Monatsanfang
-            </button>
+          <div class="result-header-actions">
+            <div class="position-mode-switch result-column-switch" role="group" aria-label="Jahrestabellen-Spalten">
+              <button class="position-mode-button" type="button" data-action="toggle-result-max-needed" aria-pressed="false">
+                Max. Bedarf Monatsanfang
+              </button>
+            </div>
+            <button class="button secondary" type="button" data-action="show-reserve-chart">Grafik anzeigen</button>
           </div>
         </div>
         <div class="table-wrap result-table-wrap">
@@ -121,9 +124,6 @@ export function renderAppShell(): string {
             <tbody id="resultBody"></tbody>
             <tfoot id="resultFoot"></tfoot>
           </table>
-        </div>
-        <div class="year-chart-actions">
-          <button class="button secondary" type="button" data-action="show-reserve-chart">Grafik anzeigen</button>
         </div>
         <div id="reserveChartPopup" class="reserve-chart-popup" role="dialog" aria-label="Einnahmen Ausgaben Sparrate Grafik" hidden></div>
       </section>
