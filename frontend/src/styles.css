@@ -277,9 +277,12 @@ th {
 }
 
 td:first-child,
-th:first-child,
-td:nth-child(3),
-th:nth-child(3) {
+th:first-child {
+  text-align: left;
+}
+
+.position-table td:nth-child(4),
+.position-table th:nth-child(4) {
   text-align: left;
 }
 
@@ -287,6 +290,10 @@ th:nth-child(3) {
 .reorder-cell {
   width: 48px;
   min-width: 48px;
+  text-align: center;
+}
+
+.check-cell {
   text-align: center;
 }
 
@@ -347,6 +354,15 @@ tfoot th {
 
 .small-input {
   min-width: 86px;
+}
+
+.amount-col {
+  width: 78px;
+}
+
+.amount-input {
+  width: 74px;
+  min-width: 74px;
 }
 
 .month-col {

@@ -128,7 +128,8 @@ function normalizePositions(value: unknown, fallback: ReservePosition[]): Reserv
       const type = normalizePositionType(item.type);
       const position: ReservePosition = {
         id: String(item.id || createId()),
-        active: Boolean(item.active),
+        active: booleanOrDefault(item.active, true),
+        visible: booleanOrDefault(item.visible ?? item.view, true),
         name: String(item.name || "Position"),
         type,
         amount: numberOrDefault(item.amount, 0),
@@ -140,6 +141,7 @@ function normalizePositions(value: unknown, fallback: ReservePosition[]): Reserv
             : "none",
         payoutMonth: numberOrDefault(item.payoutMonth, 12),
         payoutDay: numberOrDefault(item.payoutDay, 31),
+        interestBearing: booleanOrDefault(item.interestBearing ?? item.interest, false),
         cashback: Boolean(item.cashback) && type === "temporary"
       };
       if (position.id === "investitionsrate" && position.type === "temporary") {
@@ -149,6 +151,7 @@ function normalizePositions(value: unknown, fallback: ReservePosition[]): Reserv
       if (position.payoutType === "once") {
         position.startMonth = position.payoutMonth;
         position.endMonth = position.payoutMonth;
+        position.interestBearing = false;
       }
       return position;
     })

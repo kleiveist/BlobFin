@@ -99,6 +99,7 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
       const position: ReservePosition = {
         id: createId(),
         active: parseBooleanValue(get(row, ["aktiv", "active"], 0), true),
+        visible: parseBooleanValue(get(row, ["view", "visible", "sichtbar", "anzeigen"], -1), true),
         name,
         type: parseTypeValue(get(row, ["art", "type"], 2)),
         amount,
@@ -107,12 +108,14 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
         payoutType: parsePayoutValue(get(row, ["abgang", "payout", "abgangsart"], 6)),
         payoutMonth: parseMonthValue(get(row, ["abgangsmonat", "payoutmonth"], 7), 12),
         payoutDay: clamp(parseMoneyValue(get(row, ["abgangstag", "payoutday"], 8)) || 31, 1, 31),
+        interestBearing: parseBooleanValue(get(row, ["zinsen", "zins", "interest", "verzinsung"], -1), false),
         cashback: parseBooleanValue(get(row, ["cashback", "cashbackfrage"], 9), false)
       };
       if (position.type !== "temporary") position.cashback = false;
       if (position.payoutType === "once") {
         position.startMonth = position.payoutMonth;
         position.endMonth = position.payoutMonth;
+        position.interestBearing = false;
       }
 
       if (position.startMonth > position.endMonth) {
@@ -128,12 +131,26 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
 
 export function exportPositionsCsv(positions: ReservePosition[]): string {
   const rows = [
-    ["Aktiv", "Name", "Art", "Betrag", "Startmonat", "Endmonat", "Abgang", "Abgangsmonat", "Abgangstag", "Cashback"]
+    [
+      "Aktiv",
+      "View",
+      "Name",
+      "Art",
+      "Betrag",
+      "Startmonat",
+      "Endmonat",
+      "Abgang",
+      "Abgangsmonat",
+      "Abgangstag",
+      "Zinsen",
+      "Cashback"
+    ]
   ];
 
   for (const position of positions) {
     rows.push([
       position.active ? "Ja" : "Nein",
+      position.visible ? "Ja" : "Nein",
       position.name,
       labelForType(position.type),
       formatCsvNumber(position.amount),
@@ -142,6 +159,7 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
       labelForPayout(position.payoutType),
       monthName(position.payoutMonth),
       String(position.payoutDay),
+      position.interestBearing ? "Ja" : "Nein",
       position.cashback ? "Ja" : "Nein"
     ]);
   }
@@ -151,11 +169,13 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
 
 export function exportYearTableCsv(settings: PlanningSettings, positions: ReservePosition[]): string {
   const rows = calculateMonthlyRows(settings, positions);
-  const activePositions = positions.filter((position) => position.active && position.payoutType !== "once");
+  const visiblePositions = positions.filter(
+    (position) => position.active && position.visible && position.payoutType !== "once"
+  );
   const csvRows = [
     [
       "Monat",
-      ...activePositions.map((position) => position.name),
+      ...visiblePositions.map((position) => position.name),
       "Verplant ohne Fixbestand",
       "Netto uebrig",
       "Max. benoetigter Kontostand am Monatsanfang",
@@ -168,7 +188,7 @@ export function exportYearTableCsv(settings: PlanningSettings, positions: Reserv
   for (const row of rows) {
     csvRows.push([
       row.month,
-      ...activePositions.map((position) => formatCsvNumber(row.values[position.id] || 0)),
+      ...visiblePositions.map((position) => formatCsvNumber(row.values[position.id] || 0)),
       formatCsvNumber(row.plannedOutflow),
       formatCsvNumber(row.monthlyRemaining),
       formatCsvNumber(row.maxNeeded),
@@ -195,8 +215,9 @@ export function parseMoneyValue(value: unknown): number {
 
 function parseBooleanValue(value: unknown, fallback: boolean): boolean {
   const normalized = cleanText(value).toLowerCase();
+  if (normalized === "") return fallback;
   if (["ja", "yes", "true", "1", "x", "aktiv"].includes(normalized)) return true;
-  if (["nein", "no", "false", "0", "inaktiv", ""].includes(normalized)) return false;
+  if (["nein", "no", "false", "0", "inaktiv"].includes(normalized)) return false;
   return fallback;
 }
 

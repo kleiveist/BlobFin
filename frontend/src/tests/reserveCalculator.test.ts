@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
 import { calculateReserveSummary } from "../domain/reserveCalculator";
-import { exportPositionsCsv, parseCsv, positionsFromCsvRows } from "../lib/csv";
+import { exportPositionsCsv, exportYearTableCsv, parseCsv, positionsFromCsvRows } from "../lib/csv";
 
 describe("reserve calculator", () => {
   it("keeps the imported default yearly values deterministic", () => {
@@ -28,6 +28,7 @@ describe("reserve calculator", () => {
       {
         id: "annual-temp",
         active: true,
+        visible: true,
         name: "Annual Temp",
         type: "temporary",
         amount: 1200,
@@ -36,11 +37,13 @@ describe("reserve calculator", () => {
         payoutType: "yearly",
         payoutMonth: 12,
         payoutDay: 31,
+        interestBearing: false,
         cashback: true
       },
       {
         id: "reserve-no-cashback",
         active: true,
+        visible: true,
         name: "Reserve",
         type: "reserve",
         amount: 1200,
@@ -49,6 +52,7 @@ describe("reserve calculator", () => {
         payoutType: "yearly",
         payoutMonth: 12,
         payoutDay: 31,
+        interestBearing: false,
         cashback: true
       }
     ];
@@ -66,6 +70,7 @@ describe("reserve calculator", () => {
       {
         id: "one-time-temp",
         active: true,
+        visible: true,
         name: "One Time Temp",
         type: "temporary",
         amount: 500,
@@ -74,6 +79,7 @@ describe("reserve calculator", () => {
         payoutType: "once",
         payoutMonth: 6,
         payoutDay: 20,
+        interestBearing: false,
         cashback: true
       }
     ];
@@ -94,6 +100,64 @@ describe("reserve calculator", () => {
     expect(summary.totalCashback).toBe(5);
   });
 
+  it("calculates hidden positions without showing them in year table columns", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "kfz-ruecklage" ? { ...position, visible: false } : position
+    );
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+    const csv = exportYearTableCsv(state.settings, state.positions);
+
+    expect(summary.activePositions.some((position) => position.id === "kfz-ruecklage")).toBe(true);
+    expect(summary.visiblePositions.some((position) => position.id === "kfz-ruecklage")).toBe(false);
+    expect(summary.rows[0].values["kfz-ruecklage"]).toBe(65);
+    expect(summary.rows[0].plannedOutflow).toBe(584);
+    expect(csv).not.toContain("Kfz-Versicherung Ruecklage");
+  });
+
+  it("calculates account interest only for checked interest positions", () => {
+    const state = defaultAppState();
+    state.settings.interestRatePercent = 12;
+    state.positions = [
+      {
+        id: "interest-bearing",
+        active: true,
+        visible: true,
+        name: "Interest Bearing",
+        type: "fixed",
+        amount: 1200,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "none",
+        payoutMonth: 12,
+        payoutDay: 31,
+        interestBearing: true,
+        cashback: false
+      },
+      {
+        id: "no-interest",
+        active: true,
+        visible: true,
+        name: "No Interest",
+        type: "fixed",
+        amount: 1200,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "none",
+        payoutMonth: 12,
+        payoutDay: 31,
+        interestBearing: false,
+        cashback: false
+      }
+    ];
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+
+    expect(summary.rows[0].monthlyInterest).toBe(12);
+    expect(summary.totalInterest).toBe(144);
+  });
+
   it("round-trips positions through semicolon csv", () => {
     const state = defaultAppState();
     const csv = exportPositionsCsv(state.positions);
@@ -102,9 +166,11 @@ describe("reserve calculator", () => {
     expect(imported).toHaveLength(state.positions.length);
     expect(imported[0]).toMatchObject({
       active: true,
+      visible: true,
       name: "Dispo-Reserve",
       type: "fixed",
-      amount: 500
+      amount: 500,
+      interestBearing: false
     });
     expect(imported[imported.length - 1]?.type).toBe("savings");
   });

@@ -55,7 +55,7 @@ export function calculateInterestForSingleMonth(
   monthNumber: number,
   annualRate: number
 ): number {
-  if (!position.active || !isActiveInMonth(position, monthNumber)) return 0;
+  if (!position.active || !position.interestBearing || !isActiveInMonth(position, monthNumber)) return 0;
   if (position.payoutType === "once") return 0;
 
   const monthIndex = monthNumber - 1;
@@ -175,6 +175,7 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
 export function calculateReserveSummary(settings: PlanningSettings, positions: ReservePosition[]): ReserveSummary {
   const rows = calculateMonthlyRows(settings, positions);
   const activePositions = positions.filter((position) => position.active && position.payoutType !== "once");
+  const visiblePositions = activePositions.filter((position) => position.visible);
   const maxRow = rows.reduce((best, row) => (row.maxNeeded > best.maxNeeded ? row : best), rows[0]);
   const minRemainingRow = rows.reduce(
     (lowest, row) => (row.monthlyRemaining < lowest.monthlyRemaining ? row : lowest),
@@ -193,6 +194,7 @@ export function calculateReserveSummary(settings: PlanningSettings, positions: R
   return {
     rows,
     activePositions,
+    visiblePositions,
     maxRow,
     minRemainingRow,
     totalPlannedOutflow,

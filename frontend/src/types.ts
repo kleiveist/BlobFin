@@ -4,6 +4,7 @@ export type PayoutType = "none" | "monthly" | "yearly" | "once";
 export interface ReservePosition {
   id: string;
   active: boolean;
+  visible: boolean;
   name: string;
   type: PositionType;
   amount: number;
@@ -12,6 +13,7 @@ export interface ReservePosition {
   payoutType: PayoutType;
   payoutMonth: number;
   payoutDay: number;
+  interestBearing: boolean;
   cashback: boolean;
 }
 
@@ -59,6 +61,7 @@ export interface MonthlyReserveRow {
 export interface ReserveSummary {
   rows: MonthlyReserveRow[];
   activePositions: ReservePosition[];
+  visiblePositions: ReservePosition[];
   maxRow: MonthlyReserveRow;
   minRemainingRow: MonthlyReserveRow;
   totalPlannedOutflow: number;

@@ -60,19 +60,21 @@ export function renderAppShell(): string {
           </div>
         </div>
         <div class="table-wrap position-table-wrap">
-          <table>
+          <table class="position-table">
             <thead>
               <tr>
                 <th class="reorder-col"></th>
                 <th>Aktiv</th>
+                <th>View</th>
                 <th>Name</th>
                 <th>Art</th>
-                <th>Betrag</th>
+                <th class="amount-col">Betrag</th>
                 <th>Start</th>
                 <th>Ende</th>
                 <th>Abgang</th>
                 <th>Abgangsmonat</th>
                 <th>Tag</th>
+                <th>Zinsen</th>
                 <th>Cashback</th>
                 <th></th>
               </tr>

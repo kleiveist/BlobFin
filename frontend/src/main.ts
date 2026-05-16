@@ -243,14 +243,17 @@ function renderPositions(): void {
           <td class="reorder-cell">
             <button class="drag-handle" type="button" draggable="true" data-position-drag-id="${position.id}" aria-label="Position verschieben" title="Position verschieben">:::</button>
           </td>
-          <td><input type="checkbox" data-position-id="${position.id}" data-position-field="active" ${
+          <td class="check-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="active" ${
             position.active ? "checked" : ""
+          } /></td>
+          <td class="check-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="visible" ${
+            position.visible ? "checked" : ""
           } /></td>
           <td><input class="name-input" value="${escapeHtml(position.name)}" data-position-id="${
             position.id
           }" data-position-field="name" /></td>
           <td>${positionTypeSelect(position)}</td>
-          <td><input class="small-input" type="number" min="0" step="0.01" value="${position.amount}" data-position-id="${
+          <td><input class="small-input amount-input" type="number" min="0" step="0.01" value="${position.amount}" data-position-id="${
             position.id
           }" data-position-field="amount" /></td>
           <td>${monthSelect(position.id, "startMonth", position.startMonth, position.payoutType === "once")}</td>
@@ -260,7 +263,10 @@ function renderPositions(): void {
           <td><input class="small-input" type="number" min="1" max="31" step="1" value="${
             position.payoutDay
           }" data-position-id="${position.id}" data-position-field="payoutDay" /></td>
-          <td><input type="checkbox" data-position-id="${position.id}" data-position-field="cashback" ${
+          <td class="check-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="interestBearing" ${
+            position.payoutType !== "once" && position.interestBearing ? "checked" : ""
+          } ${position.payoutType !== "once" ? "" : "disabled"} /></td>
+          <td class="check-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="cashback" ${
             position.type === "temporary" && position.cashback ? "checked" : ""
           } ${position.type === "temporary" ? "" : "disabled"} /></td>
           <td><button class="icon-button danger" type="button" data-action="remove-${position.id}" aria-label="Position entfernen">x</button></td>
@@ -288,7 +294,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
   head.innerHTML = `
     <tr>
       <th class="month-col">Monat</th>
-      ${summary.activePositions.map((position) => `<th>${makeHeaderLabel(position.name)}</th>`).join("")}
+      ${summary.visiblePositions.map((position) => `<th>${makeHeaderLabel(position.name)}</th>`).join("")}
       <th>Verplant ohne Fixbestand</th>
       <th>Netto uebrig</th>
       <th class="highlight-col">Max. Bedarf Monatsanfang</th>
@@ -303,7 +309,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       return `
         <tr>
           <td>${row.month}</td>
-          ${summary.activePositions.map((position) => `<td>${money(row.values[position.id] || 0)}</td>`).join("")}
+          ${summary.visiblePositions.map((position) => `<td>${money(row.values[position.id] || 0)}</td>`).join("")}
           <td>${money(row.plannedOutflow)}</td>
           <td class="${amountClass(row.monthlyRemaining)}">${money(row.monthlyRemaining)}</td>
           <td class="highlight-col">${money(row.maxNeeded)}</td>
@@ -318,7 +324,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
   foot.innerHTML = `
     <tr>
       <th>Summe / Maximum</th>
-      ${summary.activePositions
+      ${summary.visiblePositions
         .map((position) => `<th>${money(summary.rows[11]?.values[position.id] || 0)}</th>`)
         .join("")}
       <th>${money(summary.totalPlannedOutflow)}</th>
@@ -450,8 +456,16 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
 
     switch (field) {
       case "active":
+        next.active = Boolean(value);
+        break;
+      case "visible":
+        next.visible = Boolean(value);
+        break;
+      case "interestBearing":
+        next.interestBearing = next.payoutType !== "once" && Boolean(value);
+        break;
       case "cashback":
-        next[field] = next.type === "temporary" && Boolean(value);
+        next.cashback = next.type === "temporary" && Boolean(value);
         break;
       case "amount":
       case "startMonth":
@@ -472,6 +486,7 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
           if (next.payoutType === "once") {
             next.startMonth = next.payoutMonth;
             next.endMonth = next.payoutMonth;
+            next.interestBearing = false;
           }
         }
         break;
@@ -491,6 +506,7 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
     if (next.payoutType === "once") {
       next.startMonth = next.payoutMonth;
       next.endMonth = next.payoutMonth;
+      next.interestBearing = false;
     }
 
     return next;
@@ -503,6 +519,7 @@ function addPosition(): void {
     {
       id: createId(),
       active: true,
+      visible: true,
       name: "Neue Position",
       type: "temporary",
       amount: 0,
@@ -511,6 +528,7 @@ function addPosition(): void {
       payoutType: "monthly",
       payoutMonth: 12,
       payoutDay: 14,
+      interestBearing: false,
       cashback: false
     }
   ];
@@ -689,6 +707,8 @@ function virtualInvestmentPosition(id: string, name: string, amount: number): Re
     payoutType: "yearly",
     payoutMonth: 12,
     payoutDay: 31,
+    visible: false,
+    interestBearing: false,
     cashback: false
   };
 }

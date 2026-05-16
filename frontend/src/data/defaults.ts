@@ -37,6 +37,7 @@ export function defaultPositions(): ReservePosition[] {
     {
       id: "dispo-reserve",
       active: true,
+      visible: true,
       name: "Dispo-Reserve",
       type: "fixed",
       amount: 500,
@@ -45,11 +46,13 @@ export function defaultPositions(): ReservePosition[] {
       payoutType: "none",
       payoutMonth: 12,
       payoutDay: 31,
+      interestBearing: false,
       cashback: false
     },
     {
       id: "kfz-ruecklage",
       active: true,
+      visible: true,
       name: "Kfz-Versicherung Ruecklage",
       type: "reserve",
       amount: 65,
@@ -58,11 +61,13 @@ export function defaultPositions(): ReservePosition[] {
       payoutType: "yearly",
       payoutMonth: 12,
       payoutDay: 31,
+      interestBearing: false,
       cashback: false
     },
     {
       id: "katzen-ruecklage",
       active: true,
+      visible: true,
       name: "Katzenversicherung Ruecklage",
       type: "reserve",
       amount: 45,
@@ -71,11 +76,13 @@ export function defaultPositions(): ReservePosition[] {
       payoutType: "none",
       payoutMonth: 12,
       payoutDay: 31,
+      interestBearing: false,
       cashback: false
     },
     {
       id: "uni-gebuehr",
       active: true,
+      visible: true,
       name: "Uni-Gebuehr",
       type: "temporary",
       amount: 324,
@@ -84,11 +91,13 @@ export function defaultPositions(): ReservePosition[] {
       payoutType: "monthly",
       payoutMonth: 12,
       payoutDay: 29,
+      interestBearing: false,
       cashback: true
     },
     {
       id: "investitionsrate",
       active: true,
+      visible: true,
       name: "Investitionsrate",
       type: "savings",
       amount: 150,
@@ -97,6 +106,7 @@ export function defaultPositions(): ReservePosition[] {
       payoutType: "monthly",
       payoutMonth: 12,
       payoutDay: 14,
+      interestBearing: false,
       cashback: false
     }
   ];
