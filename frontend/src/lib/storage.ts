@@ -31,10 +31,11 @@ export function resetStoredState(storage: Storage = localStorage): AppState {
 function normalizeState(value: unknown): AppState {
   const fallback = defaultAppState();
   if (!isRecord(value)) return fallback;
+  const settings = normalizePlanningSettings(value.settings);
 
   return {
-    settings: normalizePlanningSettings(value.settings),
-    positions: normalizePositions(value.positions, fallback.positions),
+    settings,
+    positions: normalizePositions(value.positions, fallback.positions, settings.year),
     investment: normalizeInvestmentSettings(value.investment)
   };
 }
@@ -42,17 +43,18 @@ function normalizeState(value: unknown): AppState {
 function normalizeLegacyState(value: unknown): AppState {
   const fallback = defaultAppState();
   if (!isRecord(value)) return fallback;
+  const settings = {
+    ...defaultPlanningSettings(),
+    year: numberOrDefault(value.year, fallback.settings.year),
+    monthlyNetIncome: numberOrDefault(value.monthlyNetIncome, fallback.settings.monthlyNetIncome),
+    interestRatePercent: numberOrDefault(value.interestRate, fallback.settings.interestRatePercent),
+    cashbackRatePercent: numberOrDefault(value.cashbackRate, fallback.settings.cashbackRatePercent),
+    emergencyFund: 0
+  };
 
   return {
-    settings: {
-      ...defaultPlanningSettings(),
-      year: numberOrDefault(value.year, fallback.settings.year),
-      monthlyNetIncome: numberOrDefault(value.monthlyNetIncome, fallback.settings.monthlyNetIncome),
-      interestRatePercent: numberOrDefault(value.interestRate, fallback.settings.interestRatePercent),
-      cashbackRatePercent: numberOrDefault(value.cashbackRate, fallback.settings.cashbackRatePercent),
-      emergencyFund: 0
-    },
-    positions: normalizePositions(value.positions, fallback.positions),
+    settings,
+    positions: normalizePositions(value.positions, fallback.positions, settings.year),
     investment: normalizeLegacyInvestmentSettings(value.investmentSettings)
   };
 }
@@ -119,7 +121,11 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
   };
 }
 
-function normalizePositions(value: unknown, fallback: ReservePosition[]): ReservePosition[] {
+function normalizePositions(
+  value: unknown,
+  fallback: ReservePosition[],
+  fallbackPayoutYear = defaultPlanningSettings().year
+): ReservePosition[] {
   if (!Array.isArray(value) || value.length === 0) return fallback;
 
   return value
@@ -139,6 +145,7 @@ function normalizePositions(value: unknown, fallback: ReservePosition[]): Reserv
           item.payoutType === "monthly" || item.payoutType === "yearly" || item.payoutType === "once"
             ? item.payoutType
             : "none",
+        payoutYear: numberOrDefault(item.payoutYear ?? item.year, fallbackPayoutYear),
         payoutMonth: numberOrDefault(item.payoutMonth, 12),
         payoutDay: numberOrDefault(item.payoutDay, 31),
         interestBearing: booleanOrDefault(item.interestBearing ?? item.interest, false),

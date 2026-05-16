@@ -60,18 +60,24 @@ describe("investment calculator", () => {
     expect(projection.realWealthAtRetirement).toBeCloseTo(7609.52, 1);
   });
 
-  it("counts one-time savings positions in their payout month", () => {
+  it("adds one-time savings positions once without raising the annual savings rate", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>
       position.id === "investitionsrate"
-        ? { ...position, amount: 1200, payoutType: "once", payoutMonth: 6 }
+        ? { ...position, amount: 1200, payoutType: "once", payoutYear: state.settings.year + 2, payoutMonth: 6 }
         : position
     );
+    state.investment = {
+      ...state.investment,
+      percentageWithdrawalRatePercent: 0
+    };
 
     const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
 
-    expect(projection.monthlyRate).toBe(100);
-    expect(projection.annualSavingsRate).toBe(1200);
+    expect(projection.monthlyRate).toBe(0);
+    expect(projection.annualSavingsRate).toBe(0);
+    expect(projection.totalContribution).toBe(1200);
+    expect(projection.wealthAtRetirement).toBeGreaterThan(1200);
   });
 
   it("ignores selected positions that are not marked as savings rates", () => {

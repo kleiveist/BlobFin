@@ -11,6 +11,7 @@ export interface ReservePosition {
   startMonth: number;
   endMonth: number;
   payoutType: PayoutType;
+  payoutYear: number;
   payoutMonth: number;
   payoutDay: number;
   interestBearing: boolean;

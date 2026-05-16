@@ -200,9 +200,7 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
 
   setText(
     "detailContribution",
-    `${money(projection.totalContribution)} (${money(projection.monthlyRate)} x ${intNumber(
-      projection.savingMonths
-    )} Monate)`
+    contributionDetailText(projection)
   );
   setText("detailCostBasis", money(projection.costBasisAtRetirement));
   setText("detailGrowth", money(projection.growthAtRetirement));
@@ -257,8 +255,7 @@ function renderPositions(): void {
           <td><input class="small-input amount-input" type="number" min="0" step="0.01" value="${position.amount}" data-position-id="${
             position.id
           }" data-position-field="amount" /></td>
-          <td>${monthSelect(position.id, "startMonth", position.startMonth, position.payoutType === "once")}</td>
-          <td>${monthSelect(position.id, "endMonth", position.endMonth, position.payoutType === "once")}</td>
+          ${positionDateCells(position)}
           <td>${payoutSelect(position)}</td>
           <td>${monthSelect(position.id, "payoutMonth", position.payoutMonth)}</td>
           <td><input class="small-input" type="number" min="1" max="31" step="1" value="${
@@ -379,11 +376,35 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
 }
 
 function investmentPositionSubtitle(position: ReservePosition): string {
-  const amount =
-    position.payoutType === "yearly"
-      ? `${money(position.amount)} jaehrlich (${monthName(position.payoutMonth)})`
-      : `${money(position.amount)} monatlich`;
+  const amount = investmentPositionAmountText(position);
   return `${amount} | ${labelForType(position.type)} | Abgang ${labelForPayout(position.payoutType)}`;
+}
+
+function investmentPositionAmountText(position: ReservePosition): string {
+  if (position.payoutType === "once") {
+    return `${money(position.amount)} einmalig (${monthName(position.payoutMonth)} ${intNumber(position.payoutYear)})`;
+  }
+  if (position.payoutType === "yearly") return `${money(position.amount)} jaehrlich (${monthName(position.payoutMonth)})`;
+  return `${money(position.amount)} monatlich`;
+}
+
+function positionDateCells(position: ReservePosition): string {
+  if (position.payoutType === "once") {
+    return `
+      <td colspan="2">
+        <label class="inline-cell-field">
+          <span>Abgangsjahr</span>
+          <input class="small-input payout-year-input" type="number" min="2000" max="2200" step="1" value="${
+            position.payoutYear
+          }" data-position-id="${position.id}" data-position-field="payoutYear" />
+        </label>
+      </td>
+    `;
+  }
+  return `
+    <td>${monthSelect(position.id, "startMonth", position.startMonth)}</td>
+    <td>${monthSelect(position.id, "endMonth", position.endMonth)}</td>
+  `;
 }
 
 function syncAllInputsFromState(): void {
@@ -471,6 +492,7 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
       case "amount":
       case "startMonth":
       case "endMonth":
+      case "payoutYear":
       case "payoutMonth":
       case "payoutDay":
         next[field] = numberValue(String(value));
@@ -485,6 +507,7 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
         if (value === "none" || value === "monthly" || value === "yearly" || value === "once") {
           next.payoutType = value;
           if (next.payoutType === "once") {
+            next.payoutYear = Number(next.payoutYear || state.settings.year);
             next.startMonth = next.payoutMonth;
             next.endMonth = next.payoutMonth;
             next.interestBearing = false;
@@ -527,6 +550,7 @@ function addPosition(): void {
       startMonth: 1,
       endMonth: 12,
       payoutType: "monthly",
+      payoutYear: state.settings.year,
       payoutMonth: 12,
       payoutDay: 14,
       interestBearing: false,
@@ -666,6 +690,19 @@ function drawCurrentInvestmentChart(): void {
   drawInvestmentChartWithPopup(projection);
 }
 
+function contributionDetailText(projection: AssetProjection): string {
+  const recurringContribution = projection.monthlyRate * projection.savingMonths;
+  const oneTimeContribution = Math.max(0, projection.totalContribution - recurringContribution);
+  if (oneTimeContribution > 0.01) {
+    return `${money(projection.totalContribution)} (${money(recurringContribution)} regelmaessig + ${money(
+      oneTimeContribution
+    )} einmalig)`;
+  }
+  return `${money(projection.totalContribution)} (${money(projection.monthlyRate)} x ${intNumber(
+    projection.savingMonths
+  )} Monate)`;
+}
+
 function drawInvestmentChartWithPopup(projection: AssetProjection): void {
   drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection, (selection) => {
     showInvestmentChartPopup(projection, selection.point, selection.clientX, selection.clientY);
@@ -773,6 +810,7 @@ function virtualInvestmentPosition(id: string, name: string, amount: number): Re
     startMonth: 1,
     endMonth: 12,
     payoutType: "yearly",
+    payoutYear: state.settings.year,
     payoutMonth: 12,
     payoutDay: 31,
     visible: false,

@@ -1,4 +1,4 @@
-import { createId, MONTHS } from "../data/defaults";
+import { createId, defaultPlanningSettings, MONTHS } from "../data/defaults";
 import { calculateMonthlyRows } from "../domain/reserveCalculator";
 import {
   cleanText,
@@ -106,6 +106,7 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
         startMonth: parseMonthValue(get(row, ["startmonat", "start"], 4), 1),
         endMonth: parseMonthValue(get(row, ["endmonat", "ende", "end"], 5), 12),
         payoutType: parsePayoutValue(get(row, ["abgang", "payout", "abgangsart"], 6)),
+        payoutYear: parseYearValue(get(row, ["abgangsjahr", "payoutyear", "year"], -1), defaultPlanningSettings().year),
         payoutMonth: parseMonthValue(get(row, ["abgangsmonat", "payoutmonth"], 7), 12),
         payoutDay: clamp(parseMoneyValue(get(row, ["abgangstag", "payoutday"], 8)) || 31, 1, 31),
         interestBearing: parseBooleanValue(get(row, ["zinsen", "zins", "interest", "verzinsung"], -1), false),
@@ -140,6 +141,7 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
       "Startmonat",
       "Endmonat",
       "Abgang",
+      "Abgangsjahr",
       "Abgangsmonat",
       "Abgangstag",
       "Zinsen",
@@ -157,6 +159,7 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
       monthName(position.startMonth),
       monthName(position.endMonth),
       labelForPayout(position.payoutType),
+      String(position.payoutYear),
       monthName(position.payoutMonth),
       String(position.payoutDay),
       position.interestBearing ? "Ja" : "Nein",
@@ -211,6 +214,11 @@ export function parseMoneyValue(value: unknown): number {
   cleaned = cleaned.replaceAll(".", "").replaceAll(",", ".");
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseYearValue(value: unknown, fallback: number): number {
+  const parsed = Math.round(parseMoneyValue(value));
+  return parsed > 0 ? parsed : fallback;
 }
 
 function parseBooleanValue(value: unknown, fallback: boolean): boolean {

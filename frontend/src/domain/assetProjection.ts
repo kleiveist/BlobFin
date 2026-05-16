@@ -1,5 +1,9 @@
 import { annuityPayment } from "./investmentCalculator";
-import { selectedMonthlyPattern } from "./investmentContributions";
+import {
+  selectedInvestmentContributionForProjectionMonth,
+  selectedMonthlyPattern,
+  selectedOneTimeInvestmentContributionForProjectionMonth
+} from "./investmentContributions";
 import type { AssetProjection, AssetProjectionPoint, InvestmentSettings, ReservePosition } from "../types";
 
 interface SavingSnapshot {
@@ -32,12 +36,15 @@ export function buildAssetProjection(
   const annualSavingsRate = monthlyRate * 12;
   const annualReturn = settings.investmentReturnPercent / 100;
   const monthlyReturn = (1 + annualReturn) ** (1 / 12) - 1;
-  const retirementSnapshot = savingSnapshot(monthlyPattern, monthlyReturn, settings, ageToday, retirementAge);
+  const retirementSnapshot = savingSnapshot(positions, monthlyReturn, settings, year, ageToday, retirementAge);
   const payoutMonths = Math.max(1, Math.round((endAge - retirementAge) * 12));
   const monthlyPension = solveNetMonthlyPension(
     retirementSnapshot,
+    positions,
+    year,
     monthlyReturn,
     settings,
+    ageToday,
     retirementAge,
     endAge,
     payoutMonths
@@ -45,7 +52,8 @@ export function buildAssetProjection(
   const realMonthlyPension =
     retirementSnapshot.inflationFactor > 0 ? monthlyPension / retirementSnapshot.inflationFactor : monthlyPension;
   const percentageBase = snapshotAtAge(
-    monthlyPattern,
+    positions,
+    year,
     monthlyReturn,
     monthlyPension,
     settings,
@@ -62,7 +70,8 @@ export function buildAssetProjection(
 
   for (let age = startAge; age <= endAge; age += 1) {
     const snapshot = snapshotAtAge(
-      monthlyPattern,
+      positions,
+      year,
       monthlyReturn,
       monthlyPension,
       settings,
@@ -107,7 +116,8 @@ export function buildAssetProjection(
 }
 
 function snapshotAtAge(
-  monthlyPattern: number[],
+  positions: ReservePosition[],
+  baseYear: number,
   monthlyReturn: number,
   monthlyPension: number,
   settings: InvestmentSettings,
@@ -117,11 +127,13 @@ function snapshotAtAge(
   retirementSnapshot: SavingSnapshot
 ): SavingSnapshot {
   if (targetAge <= retirementAge) {
-    return savingSnapshot(monthlyPattern, monthlyReturn, settings, ageToday, targetAge);
+    return savingSnapshot(positions, monthlyReturn, settings, baseYear, ageToday, targetAge);
   }
 
   return payoutSnapshot(
     retirementSnapshot,
+    positions,
+    baseYear,
     monthlyReturn,
     monthlyPension,
     settings,
@@ -132,9 +144,10 @@ function snapshotAtAge(
 }
 
 function savingSnapshot(
-  monthlyPattern: number[],
+  positions: ReservePosition[],
   monthlyReturn: number,
   settings: InvestmentSettings,
+  baseYear: number,
   ageToday: number,
   targetAge: number
 ): SavingSnapshot {
@@ -147,7 +160,7 @@ function savingSnapshot(
 
   for (let index = 0; index < months; index += 1) {
     const ageAtMonth = ageToday + index / 12;
-    const monthlyContribution = monthlyPattern[index % 12] || 0;
+    const monthlyContribution = selectedInvestmentContributionForProjectionMonth(positions, settings, baseYear, index);
     grossBalance = grossBalance * (1 + monthlyReturn) + monthlyContribution;
     costBasis += monthlyContribution;
     contribution += monthlyContribution;
@@ -166,6 +179,8 @@ function savingSnapshot(
 
 function payoutSnapshot(
   startSnapshot: SavingSnapshot,
+  positions: ReservePosition[],
+  baseYear: number,
   monthlyReturn: number,
   monthlyPension: number,
   settings: InvestmentSettings,
@@ -175,13 +190,24 @@ function payoutSnapshot(
 ): SavingSnapshot {
   let grossBalance = startSnapshot.grossBalance;
   let costBasis = startSnapshot.costBasis;
+  let contribution = startSnapshot.contribution;
   let withdrawals = 0;
   let tax = startSnapshot.tax;
   const months = Math.max(0, Math.round((targetAge - retirementAge) * 12));
+  const retirementMonthIndex = Math.max(0, Math.round((retirementAge - ageToday) * 12));
 
   for (let index = 0; index < months; index += 1) {
     const ageAtMonth = retirementAge + index / 12;
+    const oneTimeContribution = selectedOneTimeInvestmentContributionForProjectionMonth(
+      positions,
+      settings,
+      baseYear,
+      retirementMonthIndex + index
+    );
     grossBalance *= 1 + monthlyReturn;
+    grossBalance += oneTimeContribution;
+    costBasis += oneTimeContribution;
+    contribution += oneTimeContribution;
     if (ageAtMonth >= settings.percentageWithdrawalStartAge) {
       const percentageWithdrawal = grossBalance * (settings.percentageWithdrawalRatePercent / 100) / 12;
       const result = applyGrossWithdrawal(grossBalance, costBasis, percentageWithdrawal, settings);
@@ -197,7 +223,7 @@ function payoutSnapshot(
     tax += result.tax;
   }
 
-  return completeSnapshot(grossBalance, costBasis, startSnapshot.contribution, withdrawals, tax, settings, ageToday, targetAge);
+  return completeSnapshot(grossBalance, costBasis, contribution, withdrawals, tax, settings, ageToday, targetAge);
 }
 
 function completeSnapshot(
@@ -261,19 +287,46 @@ function applyNetWithdrawal(
 
 function solveNetMonthlyPension(
   startSnapshot: SavingSnapshot,
+  positions: ReservePosition[],
+  baseYear: number,
   monthlyReturn: number,
   settings: InvestmentSettings,
+  ageToday: number,
   retirementAge: number,
   endAge: number,
   payoutMonths: number
 ): number {
-  const grossMonthlyPension = annuityPayment(startSnapshot.grossBalance, monthlyReturn, payoutMonths);
+  const retirementMonthIndex = Math.max(0, Math.round((retirementAge - ageToday) * 12));
+  let futureOneTimeContributions = 0;
+  for (let index = 0; index < payoutMonths; index += 1) {
+    futureOneTimeContributions += selectedOneTimeInvestmentContributionForProjectionMonth(
+      positions,
+      settings,
+      baseYear,
+      retirementMonthIndex + index
+    );
+  }
+  const grossMonthlyPension = annuityPayment(
+    startSnapshot.grossBalance + futureOneTimeContributions,
+    monthlyReturn,
+    payoutMonths
+  );
   let low = 0;
   let high = grossMonthlyPension;
 
   for (let index = 0; index < 48; index += 1) {
     const candidate = (low + high) / 2;
-    const snapshot = payoutSnapshot(startSnapshot, monthlyReturn, candidate, settings, retirementAge, retirementAge, endAge);
+    const snapshot = payoutSnapshot(
+      startSnapshot,
+      positions,
+      baseYear,
+      monthlyReturn,
+      candidate,
+      settings,
+      ageToday,
+      retirementAge,
+      endAge
+    );
     if (snapshot.grossBalance > 1) low = candidate;
     else high = candidate;
   }

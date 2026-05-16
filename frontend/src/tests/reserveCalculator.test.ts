@@ -35,6 +35,7 @@ describe("reserve calculator", () => {
         startMonth: 1,
         endMonth: 12,
         payoutType: "yearly",
+        payoutYear: state.settings.year,
         payoutMonth: 12,
         payoutDay: 31,
         interestBearing: false,
@@ -50,6 +51,7 @@ describe("reserve calculator", () => {
         startMonth: 1,
         endMonth: 12,
         payoutType: "yearly",
+        payoutYear: state.settings.year,
         payoutMonth: 12,
         payoutDay: 31,
         interestBearing: false,
@@ -77,6 +79,7 @@ describe("reserve calculator", () => {
         startMonth: 1,
         endMonth: 12,
         payoutType: "once",
+        payoutYear: state.settings.year,
         payoutMonth: 6,
         payoutDay: 20,
         interestBearing: false,
@@ -98,6 +101,36 @@ describe("reserve calculator", () => {
     expect(summary.totalInterest).toBe(0);
     expect(summary.rows[5].monthlyCashback).toBe(5);
     expect(summary.totalCashback).toBe(5);
+  });
+
+  it("counts one-time payouts only in their payout year", () => {
+    const state = defaultAppState();
+    state.positions = [
+      {
+        id: "future-one-time",
+        active: true,
+        visible: true,
+        name: "Future One Time",
+        type: "temporary",
+        amount: 500,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "once",
+        payoutYear: state.settings.year + 1,
+        payoutMonth: 6,
+        payoutDay: 20,
+        interestBearing: false,
+        cashback: true
+      }
+    ];
+
+    const currentYear = calculateReserveSummary(state.settings, state.positions);
+    const payoutYear = calculateReserveSummary({ ...state.settings, year: state.settings.year + 1 }, state.positions);
+
+    expect(currentYear.totalPlannedOutflow).toBe(0);
+    expect(currentYear.totalCashback).toBe(0);
+    expect(payoutYear.rows[5].plannedOutflow).toBe(500);
+    expect(payoutYear.totalCashback).toBe(5);
   });
 
   it("calculates hidden positions without showing them in year table columns", () => {
@@ -130,6 +163,7 @@ describe("reserve calculator", () => {
         startMonth: 1,
         endMonth: 12,
         payoutType: "none",
+        payoutYear: state.settings.year,
         payoutMonth: 12,
         payoutDay: 31,
         interestBearing: true,
@@ -145,6 +179,7 @@ describe("reserve calculator", () => {
         startMonth: 1,
         endMonth: 12,
         payoutType: "none",
+        payoutYear: state.settings.year,
         payoutMonth: 12,
         payoutDay: 31,
         interestBearing: false,

@@ -1,11 +1,21 @@
-import { isActiveInMonth } from "./reserveCalculator";
+import { isActiveInMonth, isOneTimePayoutInMonth } from "./reserveCalculator";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
 export function investmentContributionForMonth(position: ReservePosition, month: number): number {
   if (!isActiveInMonth(position, month)) return 0;
-  if (position.payoutType === "yearly" || position.payoutType === "once") {
+  if (position.payoutType === "once") return 0;
+  if (position.payoutType === "yearly") {
     return Number(position.payoutMonth) === month ? Number(position.amount) : 0;
   }
+  return Number(position.amount);
+}
+
+export function oneTimeInvestmentContributionForMonth(
+  position: ReservePosition,
+  year: number,
+  month: number
+): number {
+  if (!isOneTimePayoutInMonth(position, year, month)) return 0;
   return Number(position.amount);
 }
 
@@ -24,4 +34,39 @@ export function selectedMonthlyPattern(positions: ReservePosition[], settings: I
   }
 
   return pattern;
+}
+
+export function selectedInvestmentContributionForProjectionMonth(
+  positions: ReservePosition[],
+  settings: InvestmentSettings,
+  baseYear: number,
+  projectionMonthIndex: number
+): number {
+  const calendarYear = baseYear + Math.floor(projectionMonthIndex / 12);
+  const month = (projectionMonthIndex % 12) + 1;
+  return selectedInvestmentPositions(positions, settings).reduce((sum, position) => {
+    if (position.payoutType === "once") {
+      return sum + oneTimeInvestmentContributionForMonth(position, calendarYear, month);
+    }
+    return sum + investmentContributionForMonth(position, month);
+  }, 0);
+}
+
+export function selectedOneTimeInvestmentContributionForProjectionMonth(
+  positions: ReservePosition[],
+  settings: InvestmentSettings,
+  baseYear: number,
+  projectionMonthIndex: number
+): number {
+  const calendarYear = baseYear + Math.floor(projectionMonthIndex / 12);
+  const month = (projectionMonthIndex % 12) + 1;
+  return selectedInvestmentPositions(positions, settings).reduce((sum, position) => {
+    return sum + oneTimeInvestmentContributionForMonth(position, calendarYear, month);
+  }, 0);
+}
+
+function selectedInvestmentPositions(positions: ReservePosition[], settings: InvestmentSettings): ReservePosition[] {
+  return positions.filter(
+    (position) => position.type === "savings" && settings.includedIds.includes(position.id) && position.active
+  );
 }

@@ -365,6 +365,25 @@ tfoot th {
   min-width: 74px;
 }
 
+.payout-year-input {
+  width: 132px;
+  min-width: 132px;
+}
+
+.inline-cell-field {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  text-align: left;
+}
+
+.inline-cell-field span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .month-col {
   width: 112px;
   min-width: 112px;

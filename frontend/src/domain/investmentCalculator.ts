@@ -1,4 +1,4 @@
-import { selectedMonthlyPattern } from "./investmentContributions";
+import { selectedInvestmentContributionForProjectionMonth, selectedMonthlyPattern } from "./investmentContributions";
 import type { InvestmentResult, InvestmentSettings, ReservePosition } from "../types";
 
 export function annuityPayment(presentValue: number, monthlyRate: number, monthsCount: number): number {
@@ -27,7 +27,7 @@ export function calculateInvestmentResult(
   let totalContribution = 0;
 
   for (let index = 0; index < savingMonths; index += 1) {
-    const contribution = monthlyPattern[index % 12];
+    const contribution = selectedInvestmentContributionForProjectionMonth(positions, settings, year, index);
     grossWealth = grossWealth * (1 + monthlyReturn) + contribution;
     totalContribution += contribution;
   }
