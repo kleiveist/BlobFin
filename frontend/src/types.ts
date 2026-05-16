@@ -1,9 +1,13 @@
-export type PositionType = "fixed" | "reserve" | "temporary" | "savings";
+export type PositionFlow = "income" | "expense";
+export type ExpensePositionType = "fixed" | "reserve" | "temporary" | "savings";
+export type IncomePositionType = "incomeMonthly" | "incomeYearly" | "incomeTemporary";
+export type PositionType = ExpensePositionType | IncomePositionType;
 export type PayoutType = "none" | "monthly" | "yearly" | "once";
 export type ThemeMode = "light" | "dark";
 
 export interface ReservePosition {
   id: string;
+  flow: PositionFlow;
   active: boolean;
   visible: boolean;
   name: string;
@@ -53,6 +57,7 @@ export interface MonthlyReserveRow {
   monthNumber: number;
   month: string;
   values: Record<string, number>;
+  plannedIncome: number;
   maxNeeded: number;
   plannedOutflow: number;
   monthlyRemaining: number;
@@ -67,6 +72,7 @@ export interface ReserveSummary {
   visiblePositions: ReservePosition[];
   maxRow: MonthlyReserveRow;
   minRemainingRow: MonthlyReserveRow;
+  totalPlannedIncome: number;
   totalPlannedOutflow: number;
   yearlyRemaining: number;
   totalInterest: number;

@@ -16,12 +16,14 @@ import {
   numberValue,
   percent
 } from "./lib/format";
+import { flowForType, isIncomePosition, isPositionType, positionFlow } from "./lib/positionKinds";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
 import type {
   AppState,
   AssetProjection,
   AssetProjectionPoint,
   InvestmentSettings,
+  PositionFlow,
   PlanningSettings,
   ReservePosition,
   ThemeMode
@@ -36,6 +38,7 @@ const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
 let state = loadInitialState();
 let draggedPositionId: string | null = null;
 let exportStatusTimeoutId: number | undefined;
+let selectedPositionFlow: PositionFlow = "expense";
 normalizeInvestmentBounds();
 applyTheme();
 
@@ -120,6 +123,8 @@ function bindEvents(): void {
     const action = button.dataset.action;
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
+    if (action === "show-income-positions") setSelectedPositionFlow("income");
+    if (action === "show-expense-positions") setSelectedPositionFlow("expense");
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
@@ -211,9 +216,9 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("totalInterest", money(reserve.totalInterest));
   setText("totalCashback", money(reserve.totalCashback));
   setText("minMonthlyRemaining", money(reserve.minRemainingRow.monthlyRemaining));
-  setText("minMonthlyRemainingHint", `${reserve.minRemainingRow.month}, ohne Fixbestand`);
+  setText("minMonthlyRemainingHint", `${reserve.minRemainingRow.month}, Einnahmen minus Ausgaben`);
   setText("yearlyRemaining", money(reserve.yearlyRemaining));
-  setText("yearlyRemainingHint", `${money(reserve.totalPlannedOutflow)} verplant`);
+  setText("yearlyRemainingHint", `${money(reserve.totalPlannedIncome)} Einnahmen | ${money(reserve.totalPlannedOutflow)} Ausgaben`);
 
   setText("investmentNetWealthTop", money(projection.wealthAtRetirement));
   setText("investmentMonthlyPensionTop", money(projection.monthlyPension));
@@ -265,11 +270,26 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
 }
 
 function renderPositions(): void {
+  renderPositionModeControls();
+  renderPositionTableHead();
   const body = document.querySelector<HTMLTableSectionElement>("#positionsBody");
   if (!body) return;
 
-  body.innerHTML = state.positions
+  const positions = state.positions.filter((position) => positionFlow(position) === selectedPositionFlow);
+  if (!positions.length) {
+    body.innerHTML = `
+      <tr>
+        <td class="position-empty" colspan="${selectedPositionFlow === "income" ? 13 : 14}">
+          Noch keine ${selectedPositionFlow === "income" ? "Einnahmen" : "Ausgaben"} angelegt.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  body.innerHTML = positions
     .map((position) => {
+      const isIncome = isIncomePosition(position);
       return `
         <tr data-position-row="${position.id}">
           <td class="reorder-cell">
@@ -288,18 +308,24 @@ function renderPositions(): void {
           <td><input class="small-input amount-input" type="number" min="0" step="0.01" value="${position.amount}" data-position-id="${
             position.id
           }" data-position-field="amount" /></td>
-          ${positionDateCells(position)}
+          ${isIncome ? incomeDateCells(position) : expenseDateCells(position)}
           <td>${payoutSelect(position)}</td>
           <td>${monthSelect(position.id, "payoutMonth", position.payoutMonth)}</td>
           <td class="day-cell"><input class="small-input day-input" type="number" min="1" max="31" step="1" value="${
             position.payoutDay
           }" data-position-id="${position.id}" data-position-field="payoutDay" /></td>
+          ${
+            isIncome
+              ? ""
+              : `
           <td class="check-cell interest-toggle-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="interestBearing" ${
-            position.payoutType !== "once" && position.interestBearing ? "checked" : ""
-          } ${position.payoutType !== "once" ? "" : "disabled"} /></td>
+                  position.payoutType !== "once" && position.interestBearing ? "checked" : ""
+                } ${position.payoutType !== "once" ? "" : "disabled"} /></td>
           <td class="check-cell cashback-toggle-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="cashback" ${
-            position.type === "temporary" && position.cashback ? "checked" : ""
-          } ${position.type === "temporary" ? "" : "disabled"} /></td>
+                  position.type === "temporary" && position.cashback ? "checked" : ""
+                } ${position.type === "temporary" ? "" : "disabled"} /></td>
+          `
+          }
           <td><button class="icon-button danger" type="button" data-action="remove-${position.id}" aria-label="Position entfernen">x</button></td>
         </tr>
       `;
@@ -316,6 +342,49 @@ function renderPositions(): void {
   }
 }
 
+function renderPositionModeControls(): void {
+  for (const flow of ["income", "expense"] as PositionFlow[]) {
+    const button = document.querySelector<HTMLButtonElement>(`[data-action='show-${flow}-positions']`);
+    if (!button) continue;
+    const active = selectedPositionFlow === flow;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+  const addButton = document.querySelector<HTMLButtonElement>("#addPositionButton");
+  if (addButton) {
+    addButton.textContent = selectedPositionFlow === "income" ? "Einnahme hinzufuegen" : "Ausgabe hinzufuegen";
+  }
+}
+
+function renderPositionTableHead(): void {
+  const head = document.querySelector<HTMLTableSectionElement>("#positionsHead");
+  if (!head) return;
+  const timingLabel = selectedPositionFlow === "income" ? "Eingang" : "Abgang";
+  const monthLabel = selectedPositionFlow === "income" ? "Eingangsmonat" : "Abgangsmonat";
+  head.innerHTML = `
+    <tr>
+      <th class="reorder-col"></th>
+      <th>Aktiv</th>
+      <th>View</th>
+      <th>Name</th>
+      <th>Art</th>
+      <th class="amount-col">Betrag</th>
+      <th>Start</th>
+      <th>Ende</th>
+      ${selectedPositionFlow === "income" ? "<th>Jahr</th>" : ""}
+      <th>${timingLabel}</th>
+      <th>${monthLabel}</th>
+      <th class="day-col">Tag</th>
+      ${
+        selectedPositionFlow === "expense"
+          ? '<th class="interest-toggle-col">Zinsen</th><th class="cashback-toggle-col">Cashback</th>'
+          : ""
+      }
+      <th></th>
+    </tr>
+  `;
+}
+
 function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>): void {
   const head = document.querySelector<HTMLTableSectionElement>("#resultHead");
   const body = document.querySelector<HTMLTableSectionElement>("#resultBody");
@@ -326,7 +395,8 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
     <tr>
       <th class="month-col">Monat</th>
       ${summary.visiblePositions.map((position) => `<th>${makeHeaderLabel(position.name)}</th>`).join("")}
-      <th class="result-compact-col"><span class="split-header">Verplant ohne<span>Fixbestand</span></span></th>
+      <th class="result-compact-col">Einnahmen</th>
+      <th class="result-compact-col">Ausgaben</th>
       <th>Netto uebrig</th>
       <th class="highlight-col">Max. Bedarf Monatsanfang</th>
       <th class="result-compact-col"><span class="split-header">Dauerhafter<span>Bestand</span></span></th>
@@ -341,6 +411,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
         <tr>
           <td>${row.month}</td>
           ${summary.visiblePositions.map((position) => `<td>${money(row.values[position.id] || 0)}</td>`).join("")}
+          <td class="positive result-compact-col">${money(row.plannedIncome)}</td>
           <td class="result-compact-col">${money(row.plannedOutflow)}</td>
           <td class="${amountClass(row.monthlyRemaining)}">${money(row.monthlyRemaining)}</td>
           <td class="highlight-col">${money(row.maxNeeded)}</td>
@@ -356,8 +427,9 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
     <tr>
       <th>Summe / Maximum</th>
       ${summary.visiblePositions
-        .map((position) => `<th>${money(summary.rows[11]?.values[position.id] || 0)}</th>`)
+        .map((position) => `<th>${money(positionFooterValue(position, summary))}</th>`)
         .join("")}
+      <th class="positive result-compact-col">${money(summary.totalPlannedIncome)}</th>
       <th class="result-compact-col">${money(summary.totalPlannedOutflow)}</th>
       <th class="${amountClass(summary.yearlyRemaining)}">${money(summary.yearlyRemaining)}</th>
       <th class="highlight-col">${money(summary.maxRow.maxNeeded)}</th>
@@ -366,6 +438,13 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       <th class="positive">${money(summary.totalCashback)}</th>
     </tr>
   `;
+}
+
+function positionFooterValue(position: ReservePosition, summary: ReturnType<typeof calculateReserveSummary>): number {
+  if (isIncomePosition(position)) {
+    return summary.rows.reduce((sum, row) => sum + (row.values[position.id] || 0), 0);
+  }
+  return summary.rows[11]?.values[position.id] || 0;
 }
 
 function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserveSummary>): void {
@@ -385,7 +464,9 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
   setText("interestInvestmentAmount", `${money(summary.totalInterest)} jaehrlich aus Jahrestabelle`);
   setText("cashbackInvestmentAmount", `${money(summary.totalCashback)} jaehrlich aus Jahrestabelle`);
 
-  const savingsPositions = state.positions.filter((position) => position.type === "savings");
+  const savingsPositions = state.positions.filter(
+    (position) => position.type === "savings" && positionFlow(position) === "expense"
+  );
   if (!savingsPositions.length) {
     list.innerHTML = `<div class="include-empty">Keine Sparrate angelegt.</div>`;
     return;
@@ -410,7 +491,7 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
 
 function investmentPositionSubtitle(position: ReservePosition): string {
   const amount = investmentPositionAmountText(position);
-  return `${amount} | ${labelForType(position.type)} | Abgang ${labelForPayout(position.payoutType)}`;
+  return `${amount} | ${labelForType(position.type)} | Abgang ${labelForPayout(position.payoutType, positionFlow(position))}`;
 }
 
 function investmentPositionAmountText(position: ReservePosition): string {
@@ -421,7 +502,7 @@ function investmentPositionAmountText(position: ReservePosition): string {
   return `${money(position.amount)} monatlich`;
 }
 
-function positionDateCells(position: ReservePosition): string {
+function expenseDateCells(position: ReservePosition): string {
   if (position.payoutType === "once") {
     return `
       <td class="once-year-label">Abgangsjahr</td>
@@ -435,6 +516,19 @@ function positionDateCells(position: ReservePosition): string {
   return `
     <td>${monthSelect(position.id, "startMonth", position.startMonth)}</td>
     <td>${monthSelect(position.id, "endMonth", position.endMonth)}</td>
+  `;
+}
+
+function incomeDateCells(position: ReservePosition): string {
+  const disabled = position.payoutType === "once";
+  return `
+    <td>${monthSelect(position.id, "startMonth", position.startMonth, disabled)}</td>
+    <td>${monthSelect(position.id, "endMonth", position.endMonth, disabled)}</td>
+    <td>
+      <input class="small-input payout-year-input" type="number" min="2000" max="2200" step="1" value="${
+        position.payoutYear
+      }" data-position-id="${position.id}" data-position-field="payoutYear" />
+    </td>
   `;
 }
 
@@ -516,10 +610,10 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
         next.visible = Boolean(value);
         break;
       case "interestBearing":
-        next.interestBearing = next.payoutType !== "once" && Boolean(value);
+        next.interestBearing = positionFlow(next) === "expense" && next.payoutType !== "once" && Boolean(value);
         break;
       case "cashback":
-        next.cashback = next.type === "temporary" && Boolean(value);
+        next.cashback = positionFlow(next) === "expense" && next.type === "temporary" && Boolean(value);
         break;
       case "amount":
       case "startMonth":
@@ -530,14 +624,22 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
         next[field] = numberValue(String(value));
         break;
       case "type":
-        if (value === "fixed" || value === "reserve" || value === "temporary" || value === "savings") {
+        if (isPositionType(value)) {
           next.type = value;
-          if (next.type !== "temporary") next.cashback = false;
+          next.flow = flowForType(value);
+          if (next.flow === "income") {
+            next.interestBearing = false;
+            next.cashback = false;
+            if (value === "incomeMonthly") next.payoutType = "monthly";
+            if (value === "incomeYearly") next.payoutType = "yearly";
+            if (value === "incomeTemporary" && next.payoutType === "none") next.payoutType = "monthly";
+          }
+          if (next.flow === "expense" && next.type !== "temporary") next.cashback = false;
         }
         break;
       case "payoutType":
         if (value === "none" || value === "monthly" || value === "yearly" || value === "once") {
-          next.payoutType = value;
+          next.payoutType = positionFlow(next) === "income" && value === "none" ? "monthly" : value;
           if (next.payoutType === "once") {
             next.payoutYear = Number(next.payoutYear || state.settings.year);
             next.startMonth = next.payoutMonth;
@@ -548,6 +650,14 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
         break;
       case "name":
         next.name = String(value);
+        break;
+      case "flow":
+        if (value === "income" || value === "expense") {
+          next.flow = value;
+          next.type = value === "income" ? "incomeMonthly" : "temporary";
+          next.interestBearing = false;
+          next.cashback = false;
+        }
         break;
       case "id":
         break;
@@ -565,26 +675,34 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
       next.interestBearing = false;
     }
 
+    if (positionFlow(next) === "income") {
+      next.interestBearing = false;
+      next.cashback = false;
+      if (next.payoutType === "none") next.payoutType = "monthly";
+    }
+
     return next;
   });
 }
 
 function addPosition(): void {
+  const isIncome = selectedPositionFlow === "income";
   state.positions = [
     ...state.positions,
     {
       id: createId(),
+      flow: selectedPositionFlow,
       active: true,
       visible: true,
-      name: "Neue Position",
-      type: "temporary",
+      name: isIncome ? "Neue Einnahme" : "Neue Ausgabe",
+      type: isIncome ? "incomeMonthly" : "temporary",
       amount: 0,
       startMonth: 1,
       endMonth: 12,
       payoutType: "monthly",
       payoutYear: state.settings.year,
-      payoutMonth: 12,
-      payoutDay: 14,
+      payoutMonth: isIncome ? 1 : 12,
+      payoutDay: isIncome ? 1 : 14,
       interestBearing: false,
       cashback: false
     }
@@ -628,6 +746,11 @@ function toggleCashbackInvestment(): void {
     includeAccountCashback: !state.investment.includeAccountCashback
   };
   renderAll();
+}
+
+function setSelectedPositionFlow(flow: PositionFlow): void {
+  selectedPositionFlow = flow;
+  renderPositions();
 }
 
 function reorderPosition(sourceId: string, targetId: string, afterTarget: boolean): void {
@@ -711,7 +834,9 @@ async function importPositionsFromFile(file: File | undefined): Promise<void> {
   state.investment = {
     ...state.investment,
     includedIds: state.investment.includedIds.filter((id) =>
-      imported.some((position) => position.id === id && position.type === "savings")
+      imported.some(
+        (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
+      )
     )
   };
   renderAll();
@@ -927,7 +1052,9 @@ function buildCurrentAssetProjection(summary: ReturnType<typeof calculateReserve
 function investmentPositionsForProjection(summary: ReturnType<typeof calculateReserveSummary>): ReservePosition[] {
   const virtualPositions: ReservePosition[] = [];
   if (state.investment.includeAccountInterest && summary.totalInterest > 0) {
-    virtualPositions.push(virtualInvestmentPosition(INTEREST_INVESTMENT_POSITION_ID, "Zinsen aus Jahrestabelle", summary.totalInterest));
+    virtualPositions.push(
+      virtualInvestmentPosition(INTEREST_INVESTMENT_POSITION_ID, "Zinsen aus Jahrestabelle", summary.totalInterest)
+    );
   }
   if (state.investment.includeAccountCashback && summary.totalCashback > 0) {
     virtualPositions.push(
@@ -939,8 +1066,12 @@ function investmentPositionsForProjection(summary: ReturnType<typeof calculateRe
 
 function investmentSettingsForProjection(summary: ReturnType<typeof calculateReserveSummary>): InvestmentSettings {
   const includedIds = new Set(state.investment.includedIds);
-  if (state.investment.includeAccountInterest && summary.totalInterest > 0) includedIds.add(INTEREST_INVESTMENT_POSITION_ID);
-  if (state.investment.includeAccountCashback && summary.totalCashback > 0) includedIds.add(CASHBACK_INVESTMENT_POSITION_ID);
+  if (state.investment.includeAccountInterest && summary.totalInterest > 0) {
+    includedIds.add(INTEREST_INVESTMENT_POSITION_ID);
+  }
+  if (state.investment.includeAccountCashback && summary.totalCashback > 0) {
+    includedIds.add(CASHBACK_INVESTMENT_POSITION_ID);
+  }
   return {
     ...state.investment,
     includedIds: Array.from(includedIds)
@@ -950,6 +1081,7 @@ function investmentSettingsForProjection(summary: ReturnType<typeof calculateRes
 function virtualInvestmentPosition(id: string, name: string, amount: number): ReservePosition {
   return {
     id,
+    flow: "expense",
     active: true,
     name,
     type: "savings",

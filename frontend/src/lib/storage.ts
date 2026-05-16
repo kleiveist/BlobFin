@@ -1,5 +1,6 @@
 import { createId, defaultAppState, defaultInvestmentSettings, defaultPlanningSettings } from "../data/defaults";
-import type { AppState, InvestmentSettings, PlanningSettings, ReservePosition, ThemeMode } from "../types";
+import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
+import type { AppState, InvestmentSettings, PlanningSettings, PositionFlow, ReservePosition, ThemeMode } from "../types";
 
 const STORAGE_KEY = "blobfin.reserveCalculator.v1";
 const LEGACY_STORAGE_KEY = "jahreskalkulatorState";
@@ -32,11 +33,15 @@ function normalizeState(value: unknown): AppState {
   const fallback = defaultAppState();
   if (!isRecord(value)) return fallback;
   const settings = normalizePlanningSettings(value.settings);
+  const positions = migrateMonthlyNetIncomePosition(
+    settings,
+    normalizePositions(value.positions, fallback.positions, settings.year)
+  );
 
   return {
     theme: normalizeThemeMode(value.theme, fallback.theme),
-    settings,
-    positions: normalizePositions(value.positions, fallback.positions, settings.year),
+    settings: { ...settings, monthlyNetIncome: 0 },
+    positions,
     investment: normalizeInvestmentSettings(value.investment)
   };
 }
@@ -52,11 +57,15 @@ function normalizeLegacyState(value: unknown): AppState {
     cashbackRatePercent: numberOrDefault(value.cashbackRate, fallback.settings.cashbackRatePercent),
     emergencyFund: 0
   };
+  const positions = migrateMonthlyNetIncomePosition(
+    settings,
+    normalizePositions(value.positions, fallback.positions, settings.year)
+  );
 
   return {
     theme: normalizeThemeMode(value.theme, fallback.theme),
-    settings,
-    positions: normalizePositions(value.positions, fallback.positions, settings.year),
+    settings: { ...settings, monthlyNetIncome: 0 },
+    positions,
     investment: normalizeLegacyInvestmentSettings(value.investmentSettings)
   };
 }
@@ -137,9 +146,12 @@ function normalizePositions(
   return value
     .map((item) => {
       if (!isRecord(item)) return null;
-      const type = normalizePositionType(item.type);
+      const rawType = normalizePositionType(item.type);
+      const flow = normalizePositionFlow(item.flow ?? item.direction ?? item.category, flowForType(rawType));
+      const type = typeForFlow(rawType, flow);
       const position: ReservePosition = {
         id: String(item.id || createId()),
+        flow,
         active: booleanOrDefault(item.active, true),
         visible: booleanOrDefault(item.visible ?? item.view, true),
         name: String(item.name || "Position"),
@@ -154,8 +166,8 @@ function normalizePositions(
         payoutYear: numberOrDefault(item.payoutYear ?? item.year, fallbackPayoutYear),
         payoutMonth: numberOrDefault(item.payoutMonth, 12),
         payoutDay: numberOrDefault(item.payoutDay, 31),
-        interestBearing: booleanOrDefault(item.interestBearing ?? item.interest, false),
-        cashback: Boolean(item.cashback) && type === "temporary"
+        interestBearing: flow === "expense" && booleanOrDefault(item.interestBearing ?? item.interest, false),
+        cashback: flow === "expense" && Boolean(item.cashback) && type === "temporary"
       };
       if (position.id === "investitionsrate" && position.type === "temporary") {
         position.type = "savings";
@@ -166,9 +178,47 @@ function normalizePositions(
         position.endMonth = position.payoutMonth;
         position.interestBearing = false;
       }
+      if (position.flow === "income") {
+        position.interestBearing = false;
+        position.cashback = false;
+        if (position.payoutType === "none") position.payoutType = defaultIncomePayoutType(position.type);
+      }
       return position;
     })
     .filter((position): position is ReservePosition => position !== null);
+}
+
+function migrateMonthlyNetIncomePosition(settings: PlanningSettings, positions: ReservePosition[]): ReservePosition[] {
+  if (settings.monthlyNetIncome <= 0) {
+    return positions;
+  }
+  const incomeIndex = positions.findIndex((position) => position.flow === "income" || isIncomeType(position.type));
+  if (incomeIndex >= 0) {
+    return positions.map((position, index) =>
+      index === incomeIndex && position.amount === 0 ? { ...position, amount: settings.monthlyNetIncome } : position
+    );
+  }
+
+  return [
+    {
+      id: "nettoeinkommen",
+      flow: "income",
+      active: true,
+      visible: true,
+      name: "Nettoeinkommen",
+      type: "incomeMonthly",
+      amount: settings.monthlyNetIncome,
+      startMonth: 1,
+      endMonth: 12,
+      payoutType: "monthly",
+      payoutYear: settings.year,
+      payoutMonth: 1,
+      payoutDay: 1,
+      interestBearing: false,
+      cashback: false
+    },
+    ...positions
+  ];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -191,6 +241,34 @@ function booleanOrDefault(value: unknown, fallback: boolean): boolean {
 }
 
 function normalizePositionType(value: unknown): ReservePosition["type"] {
-  if (value === "fixed" || value === "reserve" || value === "temporary" || value === "savings") return value;
+  if (isPositionType(value)) return value;
   return "reserve";
+}
+
+function normalizePositionFlow(value: unknown, fallback: PositionFlow): PositionFlow {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (
+    normalized === "income" ||
+    normalized === "einnahme" ||
+    normalized === "einnahmen" ||
+    normalized === "einlage" ||
+    normalized === "einlagen"
+  ) {
+    return "income";
+  }
+  if (
+    normalized === "expense" ||
+    normalized === "expenses" ||
+    normalized === "ausgabe" ||
+    normalized === "ausgaben" ||
+    normalized === "kosten"
+  ) {
+    return "expense";
+  }
+  return fallback;
+}
+
+function defaultIncomePayoutType(type: ReservePosition["type"]): ReservePosition["payoutType"] {
+  if (type === "incomeYearly") return "yearly";
+  return "monthly";
 }

@@ -1,5 +1,6 @@
 import { MONTHS } from "../data/defaults";
 import { labelForPayout } from "../lib/format";
+import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
 export function renderAppShell(): string {
@@ -55,7 +56,6 @@ export function renderAppShell(): string {
           </div>
           <div class="field-grid settings-field-grid">
             ${numberField("year", "Jahr", "setting", "year", { min: 2000, max: 2100, step: 1 })}
-            ${numberField("monthlyNetIncome", "Monatliches Nettoeinkommen", "setting", "monthlyNetIncome", { min: 0, step: 0.01 })}
             ${numberField("interestRatePercent", "Jahreszins Konto in %", "setting", "interestRatePercent", { min: 0, step: 0.01 })}
             ${numberField("cashbackRatePercent", "Cashback in %", "setting", "cashbackRatePercent", { min: 0, step: 0.01 })}
           </div>
@@ -70,8 +70,8 @@ export function renderAppShell(): string {
             ${metric("yearEndBalance", "Dauerhafter Bestand Jahresende", "ohne temporaere Durchlaufbetraege", false)}
             ${metric("totalInterest", "Zinsen pro Jahr", "vereinfachte Tages-/Monatslogik", false)}
             ${metric("totalCashback", "Cashback pro Jahr", "nur Positionen mit Cashback", false)}
-            ${metric("minMonthlyRemaining", "Niedrigster Monatsrest", "Nettoeinkommen minus Positionen", true)}
-            ${metric("yearlyRemaining", "Rest im Jahr", "Nettoeinkommen minus Positionen", false)}
+            ${metric("minMonthlyRemaining", "Niedrigster Monatsrest", "Einnahmen minus Ausgaben", true)}
+            ${metric("yearlyRemaining", "Rest im Jahr", "Einnahmen minus Ausgaben", false)}
             ${metric("investmentNetWealthTop", "Vermoegen fuer Auszahlung", "Steuer erst bei Entnahme", true)}
             ${metric("investmentMonthlyPensionTop", "Monatliche Rente netto", "vereinfachte Entnahme", true)}
             ${metric("investmentRealWealthTop", "Reales Vermoegen", "inflationsbereinigt", false)}
@@ -85,7 +85,11 @@ export function renderAppShell(): string {
             <h2>Kosten- und Ruecklagenpositionen</h2>
           </div>
           <div class="button-row">
-            <button class="button" type="button" data-action="add-position">Position hinzufuegen</button>
+            <div class="position-mode-switch" role="tablist" aria-label="Positionstabelle">
+              <button class="position-mode-button" type="button" data-action="show-income-positions" aria-pressed="false">Einnahmen</button>
+              <button class="position-mode-button" type="button" data-action="show-expense-positions" aria-pressed="true">Ausgaben</button>
+            </div>
+            <button class="button" id="addPositionButton" type="button" data-action="add-position">Ausgabe hinzufuegen</button>
             <button class="button secondary" type="button" data-action="import-positions">Positionen importieren</button>
             <button class="button secondary" type="button" data-action="export-positions">Positionen exportieren</button>
             <button class="button secondary" type="button" data-action="export-year">Jahrestabelle exportieren</button>
@@ -95,24 +99,7 @@ export function renderAppShell(): string {
         </div>
         <div class="table-wrap position-table-wrap">
           <table class="position-table">
-            <thead>
-              <tr>
-                <th class="reorder-col"></th>
-                <th>Aktiv</th>
-                <th>View</th>
-                <th>Name</th>
-                <th>Art</th>
-                <th class="amount-col">Betrag</th>
-                <th>Start</th>
-                <th>Ende</th>
-                <th>Abgang</th>
-                <th>Abgangsmonat</th>
-                <th class="day-col">Tag</th>
-                <th class="interest-toggle-col">Zinsen</th>
-                <th class="cashback-toggle-col">Cashback</th>
-                <th></th>
-              </tr>
-            </thead>
+            <thead id="positionsHead"></thead>
             <tbody id="positionsBody"></tbody>
           </table>
         </div>
@@ -234,6 +221,17 @@ export function renderAppShell(): string {
 }
 
 export function positionTypeSelect(position: ReservePosition): string {
+  const flow = positionFlow(position);
+  if (flow === "income") {
+    return `
+      <select data-position-id="${position.id}" data-position-field="type">
+        <option value="incomeMonthly" ${position.type === "incomeMonthly" ? "selected" : ""}>Monatliches Einkommen</option>
+        <option value="incomeYearly" ${position.type === "incomeYearly" ? "selected" : ""}>Jaehrliche Einnahme</option>
+        <option value="incomeTemporary" ${position.type === "incomeTemporary" ? "selected" : ""}>Temporaere Einnahme</option>
+      </select>
+    `;
+  }
+
   return `
     <select data-position-id="${position.id}" data-position-field="type">
       <option value="fixed" ${position.type === "fixed" ? "selected" : ""}>Fixbestand</option>
@@ -245,12 +243,23 @@ export function positionTypeSelect(position: ReservePosition): string {
 }
 
 export function payoutSelect(position: ReservePosition): string {
+  const flow = positionFlow(position);
+  if (flow === "income") {
+    return `
+      <select data-position-id="${position.id}" data-position-field="payoutType">
+        <option value="monthly" ${position.payoutType === "monthly" ? "selected" : ""}>${labelForPayout("monthly", flow)}</option>
+        <option value="yearly" ${position.payoutType === "yearly" ? "selected" : ""}>${labelForPayout("yearly", flow)}</option>
+        <option value="once" ${position.payoutType === "once" ? "selected" : ""}>${labelForPayout("once", flow)}</option>
+      </select>
+    `;
+  }
+
   return `
     <select data-position-id="${position.id}" data-position-field="payoutType">
-      <option value="none" ${position.payoutType === "none" ? "selected" : ""}>${labelForPayout("none")}</option>
-      <option value="monthly" ${position.payoutType === "monthly" ? "selected" : ""}>${labelForPayout("monthly")}</option>
-      <option value="yearly" ${position.payoutType === "yearly" ? "selected" : ""}>${labelForPayout("yearly")}</option>
-      <option value="once" ${position.payoutType === "once" ? "selected" : ""}>${labelForPayout("once")}</option>
+      <option value="none" ${position.payoutType === "none" ? "selected" : ""}>${labelForPayout("none", flow)}</option>
+      <option value="monthly" ${position.payoutType === "monthly" ? "selected" : ""}>${labelForPayout("monthly", flow)}</option>
+      <option value="yearly" ${position.payoutType === "yearly" ? "selected" : ""}>${labelForPayout("yearly", flow)}</option>
+      <option value="once" ${position.payoutType === "once" ? "selected" : ""}>${labelForPayout("once", flow)}</option>
     </select>
   `;
 }

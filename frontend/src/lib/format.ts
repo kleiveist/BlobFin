@@ -1,5 +1,5 @@
 import { MONTHS } from "../data/defaults";
-import type { PayoutType, PositionType } from "../types";
+import type { PayoutType, PositionFlow, PositionType } from "../types";
 
 export function money(value: number): string {
   return new Intl.NumberFormat("de-DE", {
@@ -64,17 +64,24 @@ export function cleanText(value: unknown): string {
 }
 
 export function labelForType(type: PositionType): string {
+  if (type === "incomeMonthly") return "Monatliches Einkommen";
+  if (type === "incomeYearly") return "Jaehrliche Einnahme";
+  if (type === "incomeTemporary") return "Temporaere Einnahme";
   if (type === "fixed") return "Fixbestand";
   if (type === "reserve") return "Monatliche Ruecklage";
   if (type === "savings") return "Sparrate";
   return "Temporaer";
 }
 
-export function labelForPayout(type: PayoutType): string {
+export function labelForFlow(flow: PositionFlow): string {
+  return flow === "income" ? "Einnahme" : "Ausgabe";
+}
+
+export function labelForPayout(type: PayoutType, flow: PositionFlow = "expense"): string {
   if (type === "monthly") return "monatlich";
   if (type === "yearly") return "jaehrlich";
   if (type === "once") return "einmalig";
-  return "kein Abgang";
+  return flow === "income" ? "kein Eingang" : "kein Abgang";
 }
 
 export function makeHeaderLabel(name: string): string {

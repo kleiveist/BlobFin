@@ -210,6 +210,34 @@ button:focus-visible {
   gap: 8px;
 }
 
+.position-mode-switch {
+  display: inline-flex;
+  min-height: 38px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+}
+
+.position-mode-button {
+  min-width: 104px;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 12px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.position-mode-button:last-child {
+  border-right: 0;
+}
+
+.position-mode-button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .app-settings {
   position: relative;
 }
@@ -455,6 +483,13 @@ th:first-child {
 }
 
 .check-cell {
+  text-align: center;
+}
+
+td.position-empty {
+  height: 64px;
+  color: var(--muted);
+  font-weight: 800;
   text-align: center;
 }
 

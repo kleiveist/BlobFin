@@ -5,11 +5,13 @@ import {
   clamp,
   formatCsvNumber,
   labelForPayout,
+  labelForFlow,
   labelForType,
   monthName,
   normalizeHeader
 } from "./format";
-import type { PlanningSettings, PayoutType, PositionType, ReservePosition } from "../types";
+import { flowForType, isIncomeType, typeForFlow } from "./positionKinds";
+import type { PlanningSettings, PayoutType, PositionFlow, PositionType, ReservePosition } from "../types";
 
 export function parseCsv(text: string): string[][] {
   const delimiter = detectCsvDelimiter(text);
@@ -95,24 +97,39 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
       const name = cleanText(get(row, ["name", "position"], 1));
       const amount = parseMoneyValue(get(row, ["betrag", "amount"], 3));
       if (!name) return null;
+      const parsedType = parseTypeValue(get(row, ["art", "type"], 2));
+      const flow = parseFlowValue(get(row, ["richtung", "flow", "typgruppe"], -1), flowForType(parsedType));
+      const type = typeForFlow(parsedType, flow);
 
       const position: ReservePosition = {
         id: createId(),
+        flow,
         active: parseBooleanValue(get(row, ["aktiv", "active"], 0), true),
         visible: parseBooleanValue(get(row, ["view", "visible", "sichtbar", "anzeigen"], -1), true),
         name,
-        type: parseTypeValue(get(row, ["art", "type"], 2)),
+        type,
         amount,
         startMonth: parseMonthValue(get(row, ["startmonat", "start"], 4), 1),
         endMonth: parseMonthValue(get(row, ["endmonat", "ende", "end"], 5), 12),
-        payoutType: parsePayoutValue(get(row, ["abgang", "payout", "abgangsart"], 6)),
-        payoutYear: parseYearValue(get(row, ["abgangsjahr", "payoutyear", "year"], -1), defaultPlanningSettings().year),
-        payoutMonth: parseMonthValue(get(row, ["abgangsmonat", "payoutmonth"], 7), 12),
-        payoutDay: clamp(parseMoneyValue(get(row, ["abgangstag", "payoutday"], 8)) || 31, 1, 31),
+        payoutType: parsePayoutValue(
+          get(row, ["abgang", "eingang", "payout", "abgangsart", "zahlungsart"], 6),
+          flow
+        ),
+        payoutYear: parseYearValue(
+          get(row, ["jahr", "abgangsjahr", "eingangsjahr", "payoutyear", "year"], -1),
+          defaultPlanningSettings().year
+        ),
+        payoutMonth: parseMonthValue(get(row, ["monat", "abgangsmonat", "eingangsmonat", "payoutmonth"], 7), 12),
+        payoutDay: clamp(parseMoneyValue(get(row, ["tag", "abgangstag", "eingangstag", "payoutday"], 8)) || 31, 1, 31),
         interestBearing: parseBooleanValue(get(row, ["zinsen", "zins", "interest", "verzinsung"], -1), false),
         cashback: parseBooleanValue(get(row, ["cashback", "cashbackfrage"], 9), false)
       };
-      if (position.type !== "temporary") position.cashback = false;
+      if (position.flow === "income") {
+        position.interestBearing = false;
+        position.cashback = false;
+        if (position.payoutType === "none") position.payoutType = defaultIncomePayoutType(position.type);
+      }
+      if (position.flow === "expense" && position.type !== "temporary") position.cashback = false;
       if (position.payoutType === "once") {
         position.startMonth = position.payoutMonth;
         position.endMonth = position.payoutMonth;
@@ -135,6 +152,7 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
     [
       "Aktiv",
       "View",
+      "Richtung",
       "Name",
       "Art",
       "Betrag",
@@ -153,12 +171,13 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
     rows.push([
       position.active ? "Ja" : "Nein",
       position.visible ? "Ja" : "Nein",
+      labelForFlow(position.flow),
       position.name,
       labelForType(position.type),
       formatCsvNumber(position.amount),
       monthName(position.startMonth),
       monthName(position.endMonth),
-      labelForPayout(position.payoutType),
+      labelForPayout(position.payoutType, position.flow),
       String(position.payoutYear),
       monthName(position.payoutMonth),
       String(position.payoutDay),
@@ -179,7 +198,8 @@ export function exportYearTableCsv(settings: PlanningSettings, positions: Reserv
     [
       "Monat",
       ...visiblePositions.map((position) => position.name),
-      "Verplant ohne Fixbestand",
+      "Einnahmen",
+      "Ausgaben",
       "Netto uebrig",
       "Max. benoetigter Kontostand am Monatsanfang",
       "Dauerhafter Bestand nach Abgaengen",
@@ -192,6 +212,7 @@ export function exportYearTableCsv(settings: PlanningSettings, positions: Reserv
     csvRows.push([
       row.month,
       ...visiblePositions.map((position) => formatCsvNumber(row.values[position.id] || 0)),
+      formatCsvNumber(row.plannedIncome),
       formatCsvNumber(row.plannedOutflow),
       formatCsvNumber(row.monthlyRemaining),
       formatCsvNumber(row.maxNeeded),
@@ -231,6 +252,31 @@ function parseBooleanValue(value: unknown, fallback: boolean): boolean {
 
 function parseTypeValue(value: unknown): PositionType {
   const normalized = normalizeHeader(value);
+  if (
+    ["monatlicheseinkommen", "einkommenmonatlich", "monthlyincome", "income", "nettoeinkommen"].includes(normalized)
+  ) {
+    return "incomeMonthly";
+  }
+  if (
+    [
+      "jaehrlicheeinnahme",
+      "jahrlicheeinnahme",
+      "jahreseinnahme",
+      "annualincome",
+      "yearlyincome",
+      "steuererklaerung",
+      "steuererstattung"
+    ].includes(normalized)
+  ) {
+    return "incomeYearly";
+  }
+  if (
+    ["temporaereeinnahme", "temporareeinnahme", "temporaryincome", "referral", "selbststaendigkeit"].includes(
+      normalized
+    )
+  ) {
+    return "incomeTemporary";
+  }
   if (["fixbestand", "fixed", "fix"].includes(normalized)) return "fixed";
   if (["monatlicheruecklage", "ruecklage", "reserve", "monthlyreserve"].includes(normalized)) return "reserve";
   if (["temporaermonatlich", "temporarmonatlich", "temporary", "durchlauf"].includes(normalized)) return "temporary";
@@ -240,13 +286,27 @@ function parseTypeValue(value: unknown): PositionType {
   return "reserve";
 }
 
-function parsePayoutValue(value: unknown): PayoutType {
+function parsePayoutValue(value: unknown, flow: PositionFlow = "expense"): PayoutType {
   const normalized = normalizeHeader(value);
-  if (["keinabgang", "keiner", "none", "nein", ""].includes(normalized)) return "none";
+  if (["keinabgang", "keineingang", "keiner", "none", "nein", ""].includes(normalized)) {
+    return flow === "income" ? "monthly" : "none";
+  }
   if (["monatlich", "monthly"].includes(normalized)) return "monthly";
   if (["jaehrlich", "jahrlich", "yearly", "annual"].includes(normalized)) return "yearly";
   if (["einmalig", "einmal", "once", "single", "onetime"].includes(normalized)) return "once";
   return "none";
+}
+
+function parseFlowValue(value: unknown, fallback: PositionFlow): PositionFlow {
+  const normalized = normalizeHeader(value);
+  if (["einnahme", "einnahmen", "einlage", "einlagen", "income"].includes(normalized)) return "income";
+  if (["ausgabe", "ausgaben", "kosten", "expense", "expenses"].includes(normalized)) return "expense";
+  return fallback;
+}
+
+function defaultIncomePayoutType(type: PositionType): PayoutType {
+  if (isIncomeType(type) && type === "incomeYearly") return "yearly";
+  return "monthly";
 }
 
 function parseMonthValue(value: unknown, fallback: number): number {

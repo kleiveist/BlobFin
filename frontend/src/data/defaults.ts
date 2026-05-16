@@ -35,7 +35,25 @@ export function defaultPlanningSettings(): PlanningSettings {
 export function defaultPositions(): ReservePosition[] {
   return [
     {
+      id: "nettoeinkommen",
+      flow: "income",
+      active: true,
+      visible: true,
+      name: "Nettoeinkommen",
+      type: "incomeMonthly",
+      amount: 0,
+      startMonth: 1,
+      endMonth: 12,
+      payoutType: "monthly",
+      payoutYear: 2026,
+      payoutMonth: 1,
+      payoutDay: 1,
+      interestBearing: false,
+      cashback: false
+    },
+    {
       id: "dispo-reserve",
+      flow: "expense",
       active: true,
       visible: true,
       name: "Dispo-Reserve",
@@ -52,6 +70,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "kfz-ruecklage",
+      flow: "expense",
       active: true,
       visible: true,
       name: "Kfz-Versicherung Ruecklage",
@@ -68,6 +87,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "katzen-ruecklage",
+      flow: "expense",
       active: true,
       visible: true,
       name: "Katzenversicherung Ruecklage",
@@ -84,6 +104,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "uni-gebuehr",
+      flow: "expense",
       active: true,
       visible: true,
       name: "Uni-Gebuehr",
@@ -100,6 +121,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "investitionsrate",
+      flow: "expense",
       active: true,
       visible: true,
       name: "Investitionsrate",

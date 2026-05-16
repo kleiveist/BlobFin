@@ -1,4 +1,5 @@
 import { isActiveInMonth, isOneTimePayoutInMonth } from "./reserveCalculator";
+import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
 export function investmentContributionForMonth(position: ReservePosition, month: number): number {
@@ -21,7 +22,11 @@ export function oneTimeInvestmentContributionForMonth(
 
 export function selectedMonthlyPattern(positions: ReservePosition[], settings: InvestmentSettings): number[] {
   const selectedPositions = positions.filter(
-    (position) => position.type === "savings" && settings.includedIds.includes(position.id) && position.active
+    (position) =>
+      position.type === "savings" &&
+      positionFlow(position) === "expense" &&
+      settings.includedIds.includes(position.id) &&
+      position.active
   );
   const pattern: number[] = [];
 
@@ -67,6 +72,10 @@ export function selectedOneTimeInvestmentContributionForProjectionMonth(
 
 function selectedInvestmentPositions(positions: ReservePosition[], settings: InvestmentSettings): ReservePosition[] {
   return positions.filter(
-    (position) => position.type === "savings" && settings.includedIds.includes(position.id) && position.active
+    (position) =>
+      position.type === "savings" &&
+      positionFlow(position) === "expense" &&
+      settings.includedIds.includes(position.id) &&
+      position.active
   );
 }

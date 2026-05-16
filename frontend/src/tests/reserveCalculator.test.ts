@@ -27,6 +27,7 @@ describe("reserve calculator", () => {
     state.positions = [
       {
         id: "annual-temp",
+        flow: "expense",
         active: true,
         visible: true,
         name: "Annual Temp",
@@ -43,6 +44,7 @@ describe("reserve calculator", () => {
       },
       {
         id: "reserve-no-cashback",
+        flow: "expense",
         active: true,
         visible: true,
         name: "Reserve",
@@ -71,6 +73,7 @@ describe("reserve calculator", () => {
     state.positions = [
       {
         id: "one-time-temp",
+        flow: "expense",
         active: true,
         visible: true,
         name: "One Time Temp",
@@ -108,6 +111,7 @@ describe("reserve calculator", () => {
     state.positions = [
       {
         id: "future-one-time",
+        flow: "expense",
         active: true,
         visible: true,
         name: "Future One Time",
@@ -133,6 +137,91 @@ describe("reserve calculator", () => {
     expect(payoutYear.totalCashback).toBe(5);
   });
 
+  it("calculates monthly, yearly, and temporary income positions as planned income", () => {
+    const state = defaultAppState();
+    state.positions = [
+      {
+        id: "salary",
+        flow: "income",
+        active: true,
+        visible: true,
+        name: "Salary",
+        type: "incomeMonthly",
+        amount: 3000,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "monthly",
+        payoutYear: state.settings.year,
+        payoutMonth: 1,
+        payoutDay: 1,
+        interestBearing: false,
+        cashback: false
+      },
+      {
+        id: "tax-refund",
+        flow: "income",
+        active: true,
+        visible: true,
+        name: "Tax Refund",
+        type: "incomeYearly",
+        amount: 900,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "yearly",
+        payoutYear: state.settings.year,
+        payoutMonth: 5,
+        payoutDay: 15,
+        interestBearing: false,
+        cashback: false
+      },
+      {
+        id: "referral",
+        flow: "income",
+        active: true,
+        visible: true,
+        name: "Referral",
+        type: "incomeTemporary",
+        amount: 400,
+        startMonth: 3,
+        endMonth: 4,
+        payoutType: "monthly",
+        payoutYear: state.settings.year,
+        payoutMonth: 3,
+        payoutDay: 1,
+        interestBearing: false,
+        cashback: false
+      },
+      {
+        id: "rent",
+        flow: "expense",
+        active: true,
+        visible: true,
+        name: "Rent",
+        type: "temporary",
+        amount: 1000,
+        startMonth: 1,
+        endMonth: 12,
+        payoutType: "monthly",
+        payoutYear: state.settings.year,
+        payoutMonth: 1,
+        payoutDay: 1,
+        interestBearing: false,
+        cashback: false
+      }
+    ];
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+
+    expect(summary.rows[0].plannedIncome).toBe(3000);
+    expect(summary.rows[2].plannedIncome).toBe(3400);
+    expect(summary.rows[4].plannedIncome).toBe(3900);
+    expect(summary.rows[0].monthlyRemaining).toBe(2000);
+    expect(summary.rows[4].monthlyRemaining).toBe(2900);
+    expect(summary.totalPlannedIncome).toBe(37700);
+    expect(summary.totalPlannedOutflow).toBe(12000);
+    expect(summary.yearlyRemaining).toBe(25700);
+  });
+
   it("calculates hidden positions without showing them in year table columns", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>
@@ -155,6 +244,7 @@ describe("reserve calculator", () => {
     state.positions = [
       {
         id: "interest-bearing",
+        flow: "expense",
         active: true,
         visible: true,
         name: "Interest Bearing",
@@ -171,6 +261,7 @@ describe("reserve calculator", () => {
       },
       {
         id: "no-interest",
+        flow: "expense",
         active: true,
         visible: true,
         name: "No Interest",
@@ -197,12 +288,22 @@ describe("reserve calculator", () => {
     const state = defaultAppState();
     const csv = exportPositionsCsv(state.positions);
     const imported = positionsFromCsvRows(parseCsv(csv));
+    const dispo = imported.find((position) => position.id !== "nettoeinkommen" && position.name === "Dispo-Reserve");
 
     expect(imported).toHaveLength(state.positions.length);
     expect(imported[0]).toMatchObject({
       active: true,
       visible: true,
+      name: "Nettoeinkommen",
+      flow: "income",
+      type: "incomeMonthly",
+      amount: 0
+    });
+    expect(dispo).toMatchObject({
+      active: true,
+      visible: true,
       name: "Dispo-Reserve",
+      flow: "expense",
       type: "fixed",
       amount: 500,
       interestBearing: false

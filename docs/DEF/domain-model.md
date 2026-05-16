@@ -7,11 +7,12 @@ This page documents the calculation rules implemented in the frontend domain mod
 
 ## Core Types
 
-`ReservePosition` represents one row in the cost and reserve table.
+`ReservePosition` represents one row in the income or cost/reserve table.
 
 Important fields:
 
-- `type`: `fixed`, `reserve`, `temporary`, or `savings`.
+- `flow`: `income` or `expense`.
+- `type`: expense rows use `fixed`, `reserve`, `temporary`, or `savings`; income rows use `incomeMonthly`, `incomeYearly`, or `incomeTemporary`.
 - `payoutType`: `none`, `monthly`, `yearly`, or `once`.
 - `active`: whether the row participates in calculations.
 - `visible`: whether the row appears in the yearly table.
@@ -19,7 +20,7 @@ Important fields:
 - `cashback`: whether cashback is calculated.
 - `payoutYear`, `payoutMonth`, `payoutDay`: payout timing.
 
-`PlanningSettings` contains the planning year, monthly net income, account interest rate, cashback rate, and emergency fund value.
+`PlanningSettings` contains the planning year, account interest rate, cashback rate, and emergency fund value. The legacy `monthlyNetIncome` setting is migrated into an income position and no longer drives calculations directly.
 
 `InvestmentSettings` contains selected investment IDs, special interest/cashback investment toggles, age settings, return, tax, inflation, and percentage withdrawal settings.
 
@@ -30,12 +31,13 @@ Implemented in `frontend/src/domain/reserveCalculator.ts`.
 Rules:
 
 - Inactive positions return zero.
-- Fixed positions are not treated as planned outflows.
+- Income positions create monthly planned income.
+- Fixed expense positions are not treated as planned outflows.
 - Reserve positions can accumulate and optionally reset on monthly or yearly payout.
 - Temporary and savings positions are outflows while active.
 - One-time payout positions are only counted in their matching `payoutYear` and `payoutMonth`.
 - One-time payout positions are excluded from visible yearly table position columns.
-- Monthly remaining amount is `monthlyNetIncome - plannedOutflow`.
+- Monthly remaining amount is `plannedIncome - plannedOutflow`.
 
 ## Interest Calculation
 
@@ -62,7 +64,7 @@ Monthly, yearly, and one-time payout cadence decides when cashback is created. T
 
 Implemented in `frontend/src/domain/investmentContributions.ts`.
 
-Only active selected positions with `type = savings` are investable.
+Only active selected expense positions with `type = savings` are investable.
 
 Recurring contributions:
 
