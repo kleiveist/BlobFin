@@ -32,7 +32,7 @@ def _dev_config_override(frontend_port: int) -> str:
         {
             "build": {
                 "beforeDevCommand": (
-                    "cd frontend && npm run dev -- "
+                    "cd ../frontend && npm run dev -- "
                     f"--host 127.0.0.1 --port {frontend_port}"
                 ),
                 "devUrl": f"http://127.0.0.1:{frontend_port}",

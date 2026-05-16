@@ -116,7 +116,7 @@ This means the Tauri dev command is running from the wrong working directory or 
 The expected command inside Tauri config is:
 
 ```bash
-cd frontend && npm run dev -- --host 127.0.0.1 --port 5173
+cd ../frontend && npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
 ### npm could not determine executable to run
@@ -198,7 +198,7 @@ python tools/control.py tauri build --appimage
 If the command reports missing AppImage prerequisites, install the host packages first. On Arch/CachyOS:
 
 ```bash
-sudo pacman -S --needed patchelf squashfs-tools desktop-file-utils fuse2 file
+sudo pacman -S --needed --noconfirm patchelf squashfs-tools desktop-file-utils fuse2 file
 ```
 
 On Debian/Ubuntu:

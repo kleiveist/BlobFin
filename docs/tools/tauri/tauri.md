@@ -237,7 +237,7 @@ When running from VS Code Flatpak, the preflight also checks host paths such as 
 On Arch/CachyOS, install those packages with:
 
 ```bash
-sudo pacman -S --needed patchelf squashfs-tools desktop-file-utils fuse2 file
+sudo pacman -S --needed --noconfirm patchelf squashfs-tools desktop-file-utils fuse2 file
 ```
 
 On Debian/Ubuntu:

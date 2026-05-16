@@ -9,6 +9,7 @@ def install(*, dry_run: bool) -> int:
         "pacman",
         "-S",
         "--needed",
+        "--noconfirm",
         "webkit2gtk-4.1",
         "gtk3",
         "librsvg",

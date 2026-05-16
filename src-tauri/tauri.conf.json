@@ -5,8 +5,8 @@
   "identifier": "de.kleiveist.blobfin",
   "mainBinaryName": "BlobFin",
   "build": {
-    "beforeDevCommand": "cd frontend && npm run dev -- --host 127.0.0.1 --port 5173",
-    "beforeBuildCommand": "cd frontend && npm run build",
+    "beforeDevCommand": "cd ../frontend && npm run dev -- --host 127.0.0.1 --port 5173",
+    "beforeBuildCommand": "cd ../frontend && npm run build",
     "devUrl": "http://127.0.0.1:5173",
     "frontendDist": "../frontend/dist"
   },

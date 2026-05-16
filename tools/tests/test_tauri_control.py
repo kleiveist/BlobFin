@@ -11,6 +11,7 @@ from tools import control
 from tools.tauri import common, doctor, paths, run
 from tools.tauri.build import appimage, installappimage
 from tools.tauri.linux import install as linux_install
+from tools.tauri.linux import install_arch
 
 
 def test_tauri_parser_recognizes_subcommands() -> None:
@@ -107,6 +108,23 @@ def test_tauri_install_dry_run_skips_mutating_commands(monkeypatch) -> None:
 
     assert code == 0
     assert commands
+
+
+def test_tauri_arch_install_uses_noninteractive_pacman(monkeypatch) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
+        commands.append(command)
+        return common.CommandResult(command=command, cwd=paths.ROOT, returncode=0)
+
+    monkeypatch.setattr(common, "run_command", fake_run_command)
+
+    code = install_arch.install(dry_run=False)
+
+    assert code == 0
+    assert commands
+    assert "--needed" in commands[0]
+    assert "--noconfirm" in commands[0]
 
 
 def test_tauri_build_dry_run_does_not_run_real_build(monkeypatch) -> None:
@@ -477,7 +495,7 @@ def test_tauri_cli_fallback_uses_tauri_apps_cli_package(monkeypatch) -> None:
 def test_tauri_run_override_uses_frontend_cwd_command() -> None:
     payload = json.loads(run._dev_config_override(5174))
 
-    assert payload["build"]["beforeDevCommand"] == "cd frontend && npm run dev -- --host 127.0.0.1 --port 5174"
+    assert payload["build"]["beforeDevCommand"] == "cd ../frontend && npm run dev -- --host 127.0.0.1 --port 5174"
     assert payload["build"]["devUrl"] == "http://127.0.0.1:5174"
 
 

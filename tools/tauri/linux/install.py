@@ -28,7 +28,7 @@ def install_system_dependencies(*, dry_run: bool) -> int:
 def appimage_install_hint() -> str:
     distro = _detect_distro()
     if distro in {"arch", "manjaro"}:
-        return "sudo pacman -S --needed patchelf squashfs-tools desktop-file-utils fuse2 file"
+        return "sudo pacman -S --needed --noconfirm patchelf squashfs-tools desktop-file-utils fuse2 file"
     if distro == "ubuntu":
         return "sudo apt-get install -y patchelf squashfs-tools desktop-file-utils file libfuse2"
     if distro == "debian":
