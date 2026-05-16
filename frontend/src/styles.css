@@ -375,6 +375,12 @@ button:focus-visible {
   color: var(--accent-strong);
 }
 
+.button.mini {
+  min-height: 30px;
+  padding: 6px 9px;
+  font-size: 0.76rem;
+}
+
 .button.danger {
   background: var(--danger-soft);
   color: var(--danger);
@@ -415,6 +421,282 @@ button:focus-visible {
 
 .result-column-switch {
   min-height: 34px;
+}
+
+.result-panel {
+  position: relative;
+}
+
+.year-chart-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.reserve-chart-popup {
+  position: absolute;
+  right: 16px;
+  bottom: 62px;
+  z-index: 7;
+  width: min(1120px, calc(100% - 32px));
+  max-height: min(78vh, 780px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 22px 56px rgba(54, 44, 28, 0.18);
+  padding: 16px;
+}
+
+.reserve-chart-popup[hidden] {
+  display: none;
+}
+
+.reserve-chart-head,
+.reserve-chart-subhead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reserve-chart-head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.reserve-chart-head span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.reserve-chart-head strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 1.08rem;
+}
+
+.reserve-chart-popup .chart-popup-close {
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.reserve-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.reserve-chart-controls.scenario {
+  margin-bottom: 14px;
+}
+
+.reserve-chart-toggle {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 7px 10px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.reserve-chart-toggle.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.reserve-chart-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.reserve-chart-stat {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.reserve-chart-stat span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.reserve-chart-stat strong {
+  font-size: 1rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.reserve-chart-stat.income strong {
+  color: var(--good);
+}
+
+.reserve-chart-stat.expense strong {
+  color: var(--danger);
+}
+
+.reserve-chart-stat.savings strong {
+  color: var(--accent-strong);
+}
+
+.reserve-chart-plot {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(46px, 1fr));
+  gap: 8px;
+  min-width: 720px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--table-bg);
+  padding: 12px 12px 8px;
+}
+
+.reserve-chart-month {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.reserve-chart-month > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.reserve-chart-bars {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 220px;
+  border-bottom: 1px solid var(--row-border);
+}
+
+.reserve-chart-bar {
+  display: block;
+  width: 12px;
+  min-height: 3px;
+  border-radius: 5px 5px 0 0;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.reserve-chart-bar.income {
+  background: var(--good);
+}
+
+.reserve-chart-bar.expense {
+  background: var(--danger);
+}
+
+.reserve-chart-bar.savings {
+  background: var(--accent);
+}
+
+.reserve-chart-bar.selected {
+  width: 8px;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-soft);
+}
+
+.reserve-chart-bar.muted {
+  opacity: 0.16;
+}
+
+.reserve-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.reserve-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot.gold {
+  background: var(--gold);
+}
+
+.reserve-chart-insight {
+  margin-top: 12px;
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  padding: 10px 12px;
+  font-weight: 850;
+}
+
+.reserve-chart-positions {
+  margin-top: 14px;
+}
+
+.reserve-chart-adjustment {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.reserve-chart-position-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reserve-chart-position {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 9px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reserve-chart-position span,
+.reserve-chart-position strong,
+.reserve-chart-position small {
+  overflow-wrap: anywhere;
+}
+
+.reserve-chart-position span {
+  font-weight: 900;
+}
+
+.reserve-chart-position strong {
+  color: var(--muted);
+}
+
+.reserve-chart-position small {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.reserve-chart-position.active {
+  border-color: var(--gold);
+  background: var(--gold-soft);
 }
 
 .summary-grid {
@@ -1235,11 +1517,23 @@ tfoot th {
   }
 
   .summary-grid,
+  .reserve-chart-summary,
   .field-grid,
   .field-grid.wide,
   .investment-input-grid,
   .details-grid {
     grid-template-columns: 1fr;
+  }
+
+  .reserve-chart-popup {
+    right: 8px;
+    bottom: 58px;
+    width: calc(100% - 16px);
+    padding: 12px;
+  }
+
+  .reserve-chart-plot {
+    min-width: 620px;
   }
 
   .range-field {
