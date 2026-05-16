@@ -238,6 +238,13 @@ describe("reserve calculator", () => {
     expect(csv).not.toContain("Kfz-Versicherung Ruecklage");
   });
 
+  it("can include the max-needed column in the year table export", () => {
+    const state = defaultAppState();
+    const csv = exportYearTableCsv(state.settings, state.positions, true);
+
+    expect(csv).toContain("Max. benoetigter Kontostand am Monatsanfang");
+  });
+
   it("calculates account interest only for checked interest positions", () => {
     const state = defaultAppState();
     state.settings.interestRatePercent = 12;

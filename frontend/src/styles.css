@@ -398,6 +398,15 @@ button:focus-visible {
   margin-bottom: 0;
 }
 
+.result-table-heading {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.result-column-switch {
+  min-height: 34px;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -529,12 +538,6 @@ tfoot th {
   background: var(--surface-muted);
 }
 
-.highlight-col {
-  background: var(--highlight);
-  color: var(--accent-strong);
-  font-weight: 850;
-}
-
 .positive {
   color: var(--good);
   font-weight: 850;
@@ -612,6 +615,14 @@ tfoot th {
 .result-compact-col {
   width: 112px;
   min-width: 112px;
+}
+
+.result-max-needed-col {
+  width: 132px;
+  min-width: 132px;
+  background: var(--highlight);
+  color: var(--accent-strong);
+  font-weight: 850;
 }
 
 .result-interest-col {

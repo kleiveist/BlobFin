@@ -27,6 +27,9 @@ describe("investment calculator", () => {
     expect(projection.annualSavingsRate).toBe(1800);
     expect(projection.percentageWithdrawalStartAge).toBe(32);
     expect(projection.percentageWithdrawalRatePercent).toBe(4);
+    expect(projection.withdrawalGainMonthlyAtStart).toBeCloseTo(
+      projection.percentageWithdrawalMonthlyAtStart - projection.monthlyRate
+    );
     expect(projection.wealthAtRetirement).toBeGreaterThan(40000);
     expect(projection.points.some((point) => point.phase === "payout")).toBe(true);
   });

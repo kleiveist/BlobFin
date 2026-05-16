@@ -107,8 +107,13 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel">
-        <div class="section-heading">
+        <div class="section-heading result-table-heading">
           <h2>Jahrestabelle</h2>
+          <div class="position-mode-switch result-column-switch" role="group" aria-label="Jahrestabellen-Spalten">
+            <button class="position-mode-button" type="button" data-action="toggle-result-max-needed" aria-pressed="false">
+              Max. Bedarf Monatsanfang
+            </button>
+          </div>
         </div>
         <div class="table-wrap result-table-wrap">
           <table>

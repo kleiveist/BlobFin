@@ -46,6 +46,7 @@ let state = loadInitialState();
 let draggedPositionId: string | null = null;
 let exportStatusTimeoutId: number | undefined;
 let selectedPositionMode: PositionTableMode = "expense";
+let showResultMaxNeeded = false;
 normalizeInvestmentBounds();
 applyTheme();
 
@@ -140,6 +141,7 @@ function bindEvents(): void {
     if (action === "show-income-positions") setSelectedPositionMode("income");
     if (action === "show-expense-positions") setSelectedPositionMode("expense");
     if (action === "show-savings-positions") setSelectedPositionMode("savings");
+    if (action === "toggle-result-max-needed") toggleResultMaxNeeded();
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
@@ -158,7 +160,7 @@ function bindEvents(): void {
     if (action === "export-year") {
       void exportCsvFile(
         "jahreskalkulator-ruecklagen.csv",
-        exportYearTableCsv(state.settings, state.positions),
+        exportYearTableCsv(state.settings, state.positions, showResultMaxNeeded),
         "Jahrestabellen-Export"
       );
     }
@@ -424,6 +426,18 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
   const foot = document.querySelector<HTMLTableSectionElement>("#resultFoot");
   if (!head || !body || !foot) return;
 
+  const maxNeededHead = showResultMaxNeeded
+    ? '<th class="result-max-needed-col"><span class="split-header">Max. Bedarf<span>Monatsanfang</span></span></th>'
+    : "";
+  const maxNeededFoot = showResultMaxNeeded
+    ? `<th class="result-max-needed-col">${money(summary.maxRow.maxNeeded)}</th>`
+    : "";
+  const toggleButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-result-max-needed']");
+  if (toggleButton) {
+    toggleButton.classList.toggle("active", showResultMaxNeeded);
+    toggleButton.setAttribute("aria-pressed", String(showResultMaxNeeded));
+  }
+
   head.innerHTML = `
     <tr>
       <th class="month-col">Monat</th>
@@ -431,7 +445,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       <th class="result-compact-col">Einnahmen</th>
       <th class="result-compact-col">Ausgaben</th>
       <th>Netto uebrig</th>
-      <th class="highlight-col">Max. Bedarf Monatsanfang</th>
+      ${maxNeededHead}
       <th class="result-compact-col"><span class="split-header">Dauerhafter<span>Bestand</span></span></th>
       <th class="result-interest-col"><span class="split-header">ca.<span>Monatszins</span></span></th>
       <th>Cashback</th>
@@ -447,7 +461,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
           <td class="positive result-compact-col">${money(row.plannedIncome)}</td>
           <td class="result-compact-col">${money(row.plannedOutflow)}</td>
           <td class="${amountClass(row.monthlyRemaining)}">${money(row.monthlyRemaining)}</td>
-          <td class="highlight-col">${money(row.maxNeeded)}</td>
+          ${showResultMaxNeeded ? `<td class="result-max-needed-col">${money(row.maxNeeded)}</td>` : ""}
           <td class="result-compact-col">${money(row.permanentAfterMonthlyOutflows)}</td>
           <td class="positive result-interest-col">${money(row.monthlyInterest)}</td>
           <td class="positive">${money(row.monthlyCashback)}</td>
@@ -465,7 +479,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       <th class="positive result-compact-col">${money(summary.totalPlannedIncome)}</th>
       <th class="result-compact-col">${money(summary.totalPlannedOutflow)}</th>
       <th class="${amountClass(summary.yearlyRemaining)}">${money(summary.yearlyRemaining)}</th>
-      <th class="highlight-col">${money(summary.maxRow.maxNeeded)}</th>
+      ${maxNeededFoot}
       <th class="result-compact-col">${money(summary.yearEndBalance)}</th>
       <th class="positive result-interest-col">${money(summary.totalInterest)}</th>
       <th class="positive">${money(summary.totalCashback)}</th>
@@ -840,6 +854,11 @@ function toggleCashbackInvestment(): void {
     ...state.investment,
     includeAccountCashback: !state.investment.includeAccountCashback
   };
+  renderAll();
+}
+
+function toggleResultMaxNeeded(): void {
+  showResultMaxNeeded = !showResultMaxNeeded;
   renderAll();
 }
 

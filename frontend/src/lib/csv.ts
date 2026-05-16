@@ -189,7 +189,11 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
   return rows.map((row) => row.map(csvCell).join(";")).join("\n");
 }
 
-export function exportYearTableCsv(settings: PlanningSettings, positions: ReservePosition[]): string {
+export function exportYearTableCsv(
+  settings: PlanningSettings,
+  positions: ReservePosition[],
+  includeMaxNeeded = false
+): string {
   const rows = calculateMonthlyRows(settings, positions);
   const visiblePositions = positions.filter(
     (position) => position.active && position.visible && position.payoutType !== "once"
@@ -201,7 +205,7 @@ export function exportYearTableCsv(settings: PlanningSettings, positions: Reserv
       "Einnahmen",
       "Ausgaben",
       "Netto uebrig",
-      "Max. benoetigter Kontostand am Monatsanfang",
+      ...(includeMaxNeeded ? ["Max. benoetigter Kontostand am Monatsanfang"] : []),
       "Dauerhafter Bestand nach Abgaengen",
       "ca. Monatszins",
       "Cashback"
@@ -215,7 +219,7 @@ export function exportYearTableCsv(settings: PlanningSettings, positions: Reserv
       formatCsvNumber(row.plannedIncome),
       formatCsvNumber(row.plannedOutflow),
       formatCsvNumber(row.monthlyRemaining),
-      formatCsvNumber(row.maxNeeded),
+      ...(includeMaxNeeded ? [formatCsvNumber(row.maxNeeded)] : []),
       formatCsvNumber(row.permanentAfterMonthlyOutflows),
       formatCsvNumber(row.monthlyInterest),
       formatCsvNumber(row.monthlyCashback)
