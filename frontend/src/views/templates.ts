@@ -91,9 +91,9 @@ export function renderAppShell(): string {
           </div>
           <div class="button-row">
             <button class="button" id="addPositionButton" type="button" data-action="add-position">Ausgabe hinzufuegen</button>
-            <button class="button secondary" type="button" data-action="import-positions">Positionen importieren</button>
-            <button class="button secondary" type="button" data-action="export-positions">Positionen exportieren</button>
-            <button class="button secondary" type="button" data-action="export-year">Jahrestabelle exportieren</button>
+            ${toolbarIconButton("import-positions", "Positionen importieren", "upload")}
+            ${toolbarIconButton("export-positions", "Positionen exportieren", "download")}
+            ${toolbarIconButton("export-year", "Jahrestabelle exportieren", "table")}
             <input class="visually-hidden" id="positionsCsvImport" type="file" accept=".csv,text/csv" />
             <span id="exportStatus" class="export-status" aria-live="polite"></span>
           </div>
@@ -346,4 +346,34 @@ function metric(id: string, label: string, hint: string, strong: boolean): strin
 
 function detailLine(label: string, id: string): string {
   return `<div class="detail-line"><span>${label}</span><strong id="${id}">-</strong></div>`;
+}
+
+function toolbarIconButton(action: string, label: string, icon: "upload" | "download" | "table"): string {
+  return `
+    <button
+      class="icon-button toolbar-icon-button"
+      type="button"
+      data-action="${action}"
+      aria-label="${label}"
+      title="${label}"
+    >
+      ${toolbarIcon(icon)}
+    </button>
+  `;
+}
+
+function toolbarIcon(icon: "upload" | "download" | "table"): string {
+  const paths = {
+    upload: '<path d="M12 17V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /><path d="M5 16v4" /><path d="M19 16v4" />',
+    download:
+      '<path d="M12 4v13" /><path d="m7 12 5 5 5-5" /><path d="M5 20h14" /><path d="M5 16v4" /><path d="M19 16v4" />',
+    table:
+      '<rect x="4" y="5" width="16" height="14" rx="2" /><path d="M4 10h16" /><path d="M9 5v14" /><path d="M15 5v14" /><path d="M4 15h16" />'
+  };
+
+  return `
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      ${paths[icon]}
+    </svg>
+  `;
 }
