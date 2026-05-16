@@ -313,11 +313,11 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
     <tr>
       <th class="month-col">Monat</th>
       ${summary.visiblePositions.map((position) => `<th>${makeHeaderLabel(position.name)}</th>`).join("")}
-      <th>Verplant ohne Fixbestand</th>
+      <th class="result-compact-col"><span class="split-header">Verplant ohne<span>Fixbestand</span></span></th>
       <th>Netto uebrig</th>
       <th class="highlight-col">Max. Bedarf Monatsanfang</th>
-      <th>Dauerhafter Bestand</th>
-      <th>ca. Monatszins</th>
+      <th class="result-compact-col"><span class="split-header">Dauerhafter<span>Bestand</span></span></th>
+      <th class="result-interest-col"><span class="split-header">ca.<span>Monatszins</span></span></th>
       <th>Cashback</th>
     </tr>
   `;
@@ -328,11 +328,11 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
         <tr>
           <td>${row.month}</td>
           ${summary.visiblePositions.map((position) => `<td>${money(row.values[position.id] || 0)}</td>`).join("")}
-          <td>${money(row.plannedOutflow)}</td>
+          <td class="result-compact-col">${money(row.plannedOutflow)}</td>
           <td class="${amountClass(row.monthlyRemaining)}">${money(row.monthlyRemaining)}</td>
           <td class="highlight-col">${money(row.maxNeeded)}</td>
-          <td>${money(row.permanentAfterMonthlyOutflows)}</td>
-          <td class="positive">${money(row.monthlyInterest)}</td>
+          <td class="result-compact-col">${money(row.permanentAfterMonthlyOutflows)}</td>
+          <td class="positive result-interest-col">${money(row.monthlyInterest)}</td>
           <td class="positive">${money(row.monthlyCashback)}</td>
         </tr>
       `;
@@ -345,11 +345,11 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       ${summary.visiblePositions
         .map((position) => `<th>${money(summary.rows[11]?.values[position.id] || 0)}</th>`)
         .join("")}
-      <th>${money(summary.totalPlannedOutflow)}</th>
+      <th class="result-compact-col">${money(summary.totalPlannedOutflow)}</th>
       <th class="${amountClass(summary.yearlyRemaining)}">${money(summary.yearlyRemaining)}</th>
       <th class="highlight-col">${money(summary.maxRow.maxNeeded)}</th>
-      <th>${money(summary.yearEndBalance)}</th>
-      <th class="positive">${money(summary.totalInterest)}</th>
+      <th class="result-compact-col">${money(summary.yearEndBalance)}</th>
+      <th class="positive result-interest-col">${money(summary.totalInterest)}</th>
       <th class="positive">${money(summary.totalCashback)}</th>
     </tr>
   `;

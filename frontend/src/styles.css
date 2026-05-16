@@ -559,6 +559,26 @@ tfoot th {
   min-width: 112px;
 }
 
+.result-compact-col {
+  width: 112px;
+  min-width: 112px;
+}
+
+.result-interest-col {
+  width: 94px;
+  min-width: 94px;
+}
+
+.split-header {
+  display: grid;
+  gap: 1px;
+  line-height: 1.05;
+}
+
+.split-header span {
+  display: block;
+}
+
 .icon-button {
   width: 34px;
   height: 34px;
