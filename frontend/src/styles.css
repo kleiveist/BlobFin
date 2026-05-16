@@ -331,6 +331,11 @@ tfoot th {
   font-weight: 850;
 }
 
+.negative {
+  color: var(--danger);
+  font-weight: 850;
+}
+
 .muted {
   color: var(--muted);
   font-size: 0.85rem;

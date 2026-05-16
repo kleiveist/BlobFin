@@ -156,6 +156,8 @@ export function exportYearTableCsv(settings: PlanningSettings, positions: Reserv
     [
       "Monat",
       ...activePositions.map((position) => position.name),
+      "Verplant ohne Fixbestand",
+      "Netto uebrig",
       "Max. benoetigter Kontostand am Monatsanfang",
       "Dauerhafter Bestand nach Abgaengen",
       "ca. Monatszins",
@@ -167,6 +169,8 @@ export function exportYearTableCsv(settings: PlanningSettings, positions: Reserv
     csvRows.push([
       row.month,
       ...activePositions.map((position) => formatCsvNumber(row.values[position.id] || 0)),
+      formatCsvNumber(row.plannedOutflow),
+      formatCsvNumber(row.monthlyRemaining),
       formatCsvNumber(row.maxNeeded),
       formatCsvNumber(row.permanentAfterMonthlyOutflows),
       formatCsvNumber(row.monthlyInterest),

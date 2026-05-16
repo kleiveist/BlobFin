@@ -75,6 +75,7 @@ export function buildAssetProjection(
     previousTax = snapshot.tax;
   }
   const finalPoint = points[points.length - 1];
+  const unrealizedTaxAtRetirement = taxForUnrealizedGrowth(retirementSnapshot, settings);
 
   return {
     points,
@@ -96,6 +97,9 @@ export function buildAssetProjection(
     growthAtRetirement: retirementSnapshot.growth,
     taxAtRetirement: retirementSnapshot.tax,
     taxAtEnd: finalPoint?.tax ?? retirementSnapshot.tax,
+    costBasisAtRetirement: retirementSnapshot.costBasis,
+    unrealizedTaxAtRetirement,
+    netWealthAfterFullTaxAtRetirement: Math.max(0, retirementSnapshot.netBalance - unrealizedTaxAtRetirement),
     inflationFactorAtRetirement: retirementSnapshot.inflationFactor,
     wealthAtRetirement: retirementSnapshot.netBalance,
     realWealthAtRetirement: retirementSnapshot.realNetBalance
@@ -280,6 +284,10 @@ function solveNetMonthlyPension(
 function netPercentageWithdrawalAtStart(snapshot: SavingSnapshot, settings: InvestmentSettings): number {
   const grossWithdrawal = snapshot.grossBalance * (settings.percentageWithdrawalRatePercent / 100) / 12;
   return applyGrossWithdrawal(snapshot.grossBalance, snapshot.costBasis, grossWithdrawal, settings).netWithdrawal;
+}
+
+function taxForUnrealizedGrowth(snapshot: SavingSnapshot, settings: InvestmentSettings): number {
+  return Math.max(0, snapshot.growth) * (settings.capitalGainsTaxPercent / 100);
 }
 
 function pointFromSnapshot(

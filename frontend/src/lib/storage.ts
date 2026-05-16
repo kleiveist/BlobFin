@@ -47,6 +47,7 @@ function normalizeLegacyState(value: unknown): AppState {
     settings: {
       ...defaultPlanningSettings(),
       year: numberOrDefault(value.year, fallback.settings.year),
+      monthlyNetIncome: numberOrDefault(value.monthlyNetIncome, fallback.settings.monthlyNetIncome),
       interestRatePercent: numberOrDefault(value.interestRate, fallback.settings.interestRatePercent),
       cashbackRatePercent: numberOrDefault(value.cashbackRate, fallback.settings.cashbackRatePercent),
       emergencyFund: 0
@@ -61,6 +62,7 @@ function normalizePlanningSettings(value: unknown): PlanningSettings {
   if (!isRecord(value)) return fallback;
   return {
     year: numberOrDefault(value.year, fallback.year),
+    monthlyNetIncome: numberOrDefault(value.monthlyNetIncome, fallback.monthlyNetIncome),
     interestRatePercent: numberOrDefault(value.interestRatePercent, fallback.interestRatePercent),
     cashbackRatePercent: numberOrDefault(value.cashbackRatePercent, fallback.cashbackRatePercent),
     emergencyFund: 0

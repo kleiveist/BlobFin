@@ -12,6 +12,10 @@ describe("reserve calculator", () => {
     expect(summary.rows).toHaveLength(12);
     expect(summary.maxRow.month).toBe("Dezember");
     expect(summary.maxRow.maxNeeded).toBe(2294);
+    expect(summary.rows[0].plannedOutflow).toBe(584);
+    expect(summary.rows[0].monthlyRemaining).toBe(-584);
+    expect(summary.totalPlannedOutflow).toBe(7008);
+    expect(summary.yearlyRemaining).toBe(-7008);
     expect(summary.yearEndBalance).toBe(1040);
     expect(summary.rows[0].monthlyCashback).toBeCloseTo(3.24, 2);
     expect(Math.round(summary.totalCashback * 100) / 100).toBe(38.88);
@@ -81,6 +85,10 @@ describe("reserve calculator", () => {
     expect(summary.rows[5].values["one-time-temp"]).toBe(0);
     expect(summary.rows[6].values["one-time-temp"]).toBe(0);
     expect(summary.maxRow.maxNeeded).toBe(0);
+    expect(summary.rows[5].plannedOutflow).toBe(500);
+    expect(summary.rows[5].monthlyRemaining).toBe(-500);
+    expect(summary.totalPlannedOutflow).toBe(500);
+    expect(summary.yearlyRemaining).toBe(-500);
     expect(summary.totalInterest).toBe(0);
     expect(summary.rows[5].monthlyCashback).toBe(5);
     expect(summary.totalCashback).toBe(5);

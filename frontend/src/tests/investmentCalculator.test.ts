@@ -51,7 +51,10 @@ describe("investment calculator", () => {
     expect(projection.monthlyRate).toBe(3);
     expect(projection.annualSavingsRate).toBe(36);
     expect(projection.totalContribution).toBe(1152);
+    expect(projection.costBasisAtRetirement).toBe(1152);
     expect(projection.taxAtRetirement).toBe(0);
+    expect(projection.unrealizedTaxAtRetirement).toBeGreaterThan(0);
+    expect(projection.netWealthAfterFullTaxAtRetirement).toBeLessThan(projection.wealthAtRetirement);
     expect(projection.wealthAtRetirement).toBeCloseTo(16769.53, 1);
     expect(projection.monthlyPension).toBeCloseTo(139.98, 1);
     expect(projection.realWealthAtRetirement).toBeCloseTo(7609.52, 1);
@@ -111,5 +114,11 @@ describe("investment calculator", () => {
     expect(firstTaxedSavingPoint?.tax).toBeGreaterThan(0);
     expect(firstTaxedSavingPoint?.periodTax).toBeGreaterThan(0);
     expect(firstPayoutPoint?.costBasis).toBeGreaterThan(0);
+    expect(projection.unrealizedTaxAtRetirement).toBeCloseTo(
+      projection.growthAtRetirement * (state.investment.capitalGainsTaxPercent / 100)
+    );
+    expect(projection.netWealthAfterFullTaxAtRetirement).toBeCloseTo(
+      projection.wealthAtRetirement - projection.unrealizedTaxAtRetirement
+    );
   });
 });

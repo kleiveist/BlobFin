@@ -17,6 +17,7 @@ export interface ReservePosition {
 
 export interface PlanningSettings {
   year: number;
+  monthlyNetIncome: number;
   interestRatePercent: number;
   cashbackRatePercent: number;
   emergencyFund: number;
@@ -48,6 +49,8 @@ export interface MonthlyReserveRow {
   month: string;
   values: Record<string, number>;
   maxNeeded: number;
+  plannedOutflow: number;
+  monthlyRemaining: number;
   permanentAfterMonthlyOutflows: number;
   monthlyInterest: number;
   monthlyCashback: number;
@@ -57,6 +60,9 @@ export interface ReserveSummary {
   rows: MonthlyReserveRow[];
   activePositions: ReservePosition[];
   maxRow: MonthlyReserveRow;
+  minRemainingRow: MonthlyReserveRow;
+  totalPlannedOutflow: number;
+  yearlyRemaining: number;
   totalInterest: number;
   totalCashback: number;
   yearEndBalance: number;
@@ -116,6 +122,9 @@ export interface AssetProjection {
   growthAtRetirement: number;
   taxAtRetirement: number;
   taxAtEnd: number;
+  costBasisAtRetirement: number;
+  unrealizedTaxAtRetirement: number;
+  netWealthAfterFullTaxAtRetirement: number;
   inflationFactorAtRetirement: number;
   wealthAtRetirement: number;
   realWealthAtRetirement: number;

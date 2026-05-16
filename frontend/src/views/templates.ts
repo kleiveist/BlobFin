@@ -22,6 +22,7 @@ export function renderAppShell(): string {
           </div>
           <div class="field-grid settings-field-grid">
             ${numberField("year", "Jahr", "setting", "year", { min: 2000, max: 2100, step: 1 })}
+            ${numberField("monthlyNetIncome", "Monatliches Nettoeinkommen", "setting", "monthlyNetIncome", { min: 0, step: 0.01 })}
             ${numberField("interestRatePercent", "Jahreszins Konto in %", "setting", "interestRatePercent", { min: 0, step: 0.01 })}
             ${numberField("cashbackRatePercent", "Cashback in %", "setting", "cashbackRatePercent", { min: 0, step: 0.01 })}
           </div>
@@ -36,6 +37,8 @@ export function renderAppShell(): string {
             ${metric("yearEndBalance", "Dauerhafter Bestand Jahresende", "ohne temporaere Durchlaufbetraege", false)}
             ${metric("totalInterest", "Zinsen pro Jahr", "vereinfachte Tages-/Monatslogik", false)}
             ${metric("totalCashback", "Cashback pro Jahr", "nur Positionen mit Cashback", false)}
+            ${metric("minMonthlyRemaining", "Niedrigster Monatsrest", "Nettoeinkommen minus Positionen", true)}
+            ${metric("yearlyRemaining", "Rest im Jahr", "Nettoeinkommen minus Positionen", false)}
             ${metric("investmentNetWealthTop", "Vermoegen fuer Auszahlung", "Steuer erst bei Entnahme", true)}
             ${metric("investmentMonthlyPensionTop", "Monatliche Rente netto", "vereinfachte Entnahme", true)}
             ${metric("investmentRealWealthTop", "Reales Vermoegen", "inflationsbereinigt", false)}
@@ -160,10 +163,13 @@ export function renderAppShell(): string {
               </div>
               <div class="investment-statistics">
                 <div class="detail-list" aria-label="Berechnungsdetails">
-                ${detailLine("Eigenbeitrag", "detailContribution")}
-                ${detailLine("Wertzuwachs", "detailGrowth")}
+                ${detailLine("Eingezahlter Eigenbeitrag", "detailContribution")}
+                ${detailLine("Verbleibender Eigenbeitrag", "detailCostBasis")}
+                ${detailLine("Nicht realisierter Wertzuwachs", "detailGrowth")}
                 ${detailLine("Bruttovermoegen", "detailGrossWealth")}
                 ${detailLine("Realisierte Steuern bis Rente", "detailTax")}
+                ${detailLine("Offene Steuer bei Verkauf zur Rente", "detailUnrealizedTax")}
+                ${detailLine("Depotwert nach Komplettverkauf", "detailLiquidationWealth")}
                 ${detailLine("Depotwert fuer Auszahlung", "detailNetWealth")}
                 ${detailLine("Inflationsfaktor", "detailInflationFactor")}
                 ${detailLine("Reales Vermoegen", "detailRealWealth")}

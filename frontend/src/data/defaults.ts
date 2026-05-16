@@ -25,6 +25,7 @@ export function createId(): string {
 export function defaultPlanningSettings(): PlanningSettings {
   return {
     year: 2026,
+    monthlyNetIncome: 0,
     interestRatePercent: 2,
     cashbackRatePercent: 1,
     emergencyFund: 0

@@ -176,6 +176,10 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("yearEndBalance", money(reserve.yearEndBalance));
   setText("totalInterest", money(reserve.totalInterest));
   setText("totalCashback", money(reserve.totalCashback));
+  setText("minMonthlyRemaining", money(reserve.minRemainingRow.monthlyRemaining));
+  setText("minMonthlyRemainingHint", `${reserve.minRemainingRow.month}, ohne Fixbestand`);
+  setText("yearlyRemaining", money(reserve.yearlyRemaining));
+  setText("yearlyRemainingHint", `${money(reserve.totalPlannedOutflow)} verplant`);
 
   setText("investmentNetWealthTop", money(projection.wealthAtRetirement));
   setText("investmentMonthlyPensionTop", money(projection.monthlyPension));
@@ -199,9 +203,15 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
       projection.savingMonths
     )} Monate)`
   );
+  setText("detailCostBasis", money(projection.costBasisAtRetirement));
   setText("detailGrowth", money(projection.growthAtRetirement));
   setText("detailGrossWealth", money(projection.grossWealthAtRetirement));
   setText("detailTax", projection.taxAtRetirement > 0 ? `-${money(projection.taxAtRetirement)}` : money(0));
+  setText(
+    "detailUnrealizedTax",
+    projection.unrealizedTaxAtRetirement > 0 ? `-${money(projection.unrealizedTaxAtRetirement)}` : money(0)
+  );
+  setText("detailLiquidationWealth", money(projection.netWealthAfterFullTaxAtRetirement));
   setText("detailNetWealth", money(projection.wealthAtRetirement));
   setText("detailInflationFactor", `${projection.inflationFactorAtRetirement.toFixed(2).replace(".", ",")}x`);
   setText("detailRealWealth", money(projection.realWealthAtRetirement));
@@ -279,6 +289,8 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
     <tr>
       <th class="month-col">Monat</th>
       ${summary.activePositions.map((position) => `<th>${makeHeaderLabel(position.name)}</th>`).join("")}
+      <th>Verplant ohne Fixbestand</th>
+      <th>Netto uebrig</th>
       <th class="highlight-col">Max. Bedarf Monatsanfang</th>
       <th>Dauerhafter Bestand</th>
       <th>ca. Monatszins</th>
@@ -292,6 +304,8 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
         <tr>
           <td>${row.month}</td>
           ${summary.activePositions.map((position) => `<td>${money(row.values[position.id] || 0)}</td>`).join("")}
+          <td>${money(row.plannedOutflow)}</td>
+          <td class="${amountClass(row.monthlyRemaining)}">${money(row.monthlyRemaining)}</td>
           <td class="highlight-col">${money(row.maxNeeded)}</td>
           <td>${money(row.permanentAfterMonthlyOutflows)}</td>
           <td class="positive">${money(row.monthlyInterest)}</td>
@@ -307,6 +321,8 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       ${summary.activePositions
         .map((position) => `<th>${money(summary.rows[11]?.values[position.id] || 0)}</th>`)
         .join("")}
+      <th>${money(summary.totalPlannedOutflow)}</th>
+      <th class="${amountClass(summary.yearlyRemaining)}">${money(summary.yearlyRemaining)}</th>
       <th class="highlight-col">${money(summary.maxRow.maxNeeded)}</th>
       <th>${money(summary.yearEndBalance)}</th>
       <th class="positive">${money(summary.totalInterest)}</th>
@@ -604,6 +620,12 @@ function setText(id: string, value: string): void {
 
 function setRangeLabel(key: keyof InvestmentSettings, value: string): void {
   setText(`${key}Value`, value);
+}
+
+function amountClass(value: number): string {
+  if (value < 0) return "negative";
+  if (value > 0) return "positive";
+  return "";
 }
 
 function setInputValue(selector: string, value: number | string | string[]): void {

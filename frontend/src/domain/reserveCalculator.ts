@@ -111,6 +111,15 @@ export function calculateCashbackForSingleMonth(
   return 0;
 }
 
+export function calculatePlannedOutflowForSingleMonth(position: ReservePosition, monthNumber: number): number {
+  if (!position.active || position.type === "fixed") return 0;
+  if (position.payoutType === "once") return isPayoutMonth(position, monthNumber) ? Number(position.amount) : 0;
+  if (!isActiveInMonth(position, monthNumber)) return 0;
+  if (position.type === "reserve") return Number(position.amount);
+  if (position.payoutType === "yearly") return isPayoutMonth(position, monthNumber) ? Number(position.amount) : 0;
+  return Number(position.amount);
+}
+
 function isSingleMonthPayout(position: ReservePosition): boolean {
   return position.payoutType === "yearly" || position.payoutType === "once";
 }
@@ -127,6 +136,7 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
   for (let month = 1; month <= 12; month += 1) {
     const values: Record<string, number> = {};
     let maxNeeded = 0;
+    let plannedOutflow = 0;
     let permanentAfterMonthlyOutflows = 0;
     let monthlyInterest = 0;
     let monthlyCashback = 0;
@@ -140,6 +150,7 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
       const value = calculatePositionValueAtMonthStart(position, month);
       values[position.id] = value;
       maxNeeded += value;
+      plannedOutflow += calculatePlannedOutflowForSingleMonth(position, month);
       permanentAfterMonthlyOutflows += calculatePositionEndOfMonthPermanent(position, month);
       monthlyInterest += calculateInterestForSingleMonth(position, settings.year, month, annualRate);
       monthlyCashback += calculateCashbackForSingleMonth(position, month, cashbackRate);
@@ -150,6 +161,8 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
       month: MONTHS[month - 1],
       values,
       maxNeeded,
+      plannedOutflow,
+      monthlyRemaining: Number(settings.monthlyNetIncome) - plannedOutflow,
       permanentAfterMonthlyOutflows,
       monthlyInterest,
       monthlyCashback
@@ -163,18 +176,27 @@ export function calculateReserveSummary(settings: PlanningSettings, positions: R
   const rows = calculateMonthlyRows(settings, positions);
   const activePositions = positions.filter((position) => position.active && position.payoutType !== "once");
   const maxRow = rows.reduce((best, row) => (row.maxNeeded > best.maxNeeded ? row : best), rows[0]);
+  const minRemainingRow = rows.reduce(
+    (lowest, row) => (row.monthlyRemaining < lowest.monthlyRemaining ? row : lowest),
+    rows[0]
+  );
   const annualRate = settings.interestRatePercent / 100;
   const totalInterest = positions.reduce(
     (sum, position) => sum + calculateInterestForPosition(position, settings.year, annualRate),
     0
   );
   const totalCashback = rows.reduce((sum, row) => sum + row.monthlyCashback, 0);
+  const totalPlannedOutflow = rows.reduce((sum, row) => sum + row.plannedOutflow, 0);
+  const yearlyRemaining = Number(settings.monthlyNetIncome) * 12 - totalPlannedOutflow;
   const yearEndBalance = rows[11]?.permanentAfterMonthlyOutflows || 0;
 
   return {
     rows,
     activePositions,
     maxRow,
+    minRemainingRow,
+    totalPlannedOutflow,
+    yearlyRemaining,
     totalInterest,
     totalCashback,
     yearEndBalance,
