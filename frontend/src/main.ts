@@ -17,7 +17,7 @@ import {
   percent
 } from "./lib/format";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
-import type { AppState, InvestmentSettings, PlanningSettings, ReservePosition } from "./types";
+import type { AppState, AssetProjection, AssetProjectionPoint, InvestmentSettings, PlanningSettings, ReservePosition } from "./types";
 import { drawInvestmentChart } from "./views/investmentChart";
 import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from "./views/templates";
 
@@ -111,6 +111,7 @@ function bindEvents(): void {
     if (action === "reset") resetState();
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
+    if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
     if (action === "export-positions") downloadText("kosten-und-ruecklagenpositionen.csv", exportPositionsCsv(state.positions));
     if (action === "export-year") downloadText("jahreskalkulator-ruecklagen.csv", exportYearTableCsv(state.settings, state.positions));
@@ -228,7 +229,8 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("detailSelectedMonthlyRate", money(projection.monthlyRate));
 
   renderResultTable(reserve);
-  drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection);
+  hideInvestmentChartPopup();
+  drawInvestmentChartWithPopup(projection);
 }
 
 function renderPositions(): void {
@@ -660,7 +662,74 @@ function setInputBounds(selector: string, min: number, max: number): void {
 function drawCurrentInvestmentChart(): void {
   const reserve = calculateReserveSummary(state.settings, state.positions);
   const projection = buildCurrentAssetProjection(reserve);
-  drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection);
+  hideInvestmentChartPopup();
+  drawInvestmentChartWithPopup(projection);
+}
+
+function drawInvestmentChartWithPopup(projection: AssetProjection): void {
+  drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection, (selection) => {
+    showInvestmentChartPopup(projection, selection.point, selection.clientX, selection.clientY);
+  });
+}
+
+function showInvestmentChartPopup(
+  projection: AssetProjection,
+  point: AssetProjectionPoint,
+  clientX: number,
+  clientY: number
+): void {
+  const popup = document.querySelector<HTMLDivElement>("#investmentChartPopup");
+  const card = popup?.closest<HTMLElement>(".investment-chart-card");
+  if (!popup || !card) return;
+
+  const eigenbeitrag = Math.min(Math.max(0, point.netBalance), Math.max(0, point.costBasis));
+  const tax = Math.max(0, point.periodTax);
+  const growth = Math.max(0, Math.max(0, point.netBalance - eigenbeitrag) - tax);
+  const payoutBalance = point.phase === "payout" ? Math.max(0, point.netBalance) : 0;
+  const year = state.settings.year + Math.round(point.age - projection.ageToday);
+
+  popup.innerHTML = `
+    <div class="chart-popup-head">
+      <div>
+        <span>Balkendetails</span>
+        <strong>Alter ${intNumber(point.age)} | Jahr ${intNumber(year)}</strong>
+      </div>
+      <button class="chart-popup-close" type="button" data-action="close-investment-chart-popup" aria-label="Popup schliessen">x</button>
+    </div>
+    <div class="chart-popup-list">
+      ${chartPopupLine("grey", "Eigenbeitrag", money(eigenbeitrag))}
+      ${chartPopupLine("orange", "Zulagen", money(point.allowance))}
+      ${chartPopupLine("green", "Wertzuwachs", money(growth))}
+      ${chartPopupLine("purple", "Restguthaben (Auszahlung)", money(payoutBalance))}
+      ${chartPopupLine("red", "Kapitalertragsteuer", tax > 0 ? `-${money(tax)}` : money(0))}
+    </div>
+  `;
+
+  popup.hidden = false;
+  popup.style.left = "12px";
+  popup.style.top = "12px";
+
+  const cardRect = card.getBoundingClientRect();
+  const popupRect = popup.getBoundingClientRect();
+  const left = clamp(clientX - cardRect.left + 14, 12, Math.max(12, cardRect.width - popupRect.width - 12));
+  const top = clamp(clientY - cardRect.top + 14, 12, Math.max(12, cardRect.height - popupRect.height - 12));
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
+}
+
+function chartPopupLine(color: string, label: string, value: string): string {
+  return `
+    <div class="chart-popup-line">
+      <span><i class="chart-popup-dot ${escapeHtml(color)}"></i>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function hideInvestmentChartPopup(): void {
+  const popup = document.querySelector<HTMLDivElement>("#investmentChartPopup");
+  if (!popup) return;
+  popup.hidden = true;
 }
 
 function buildCurrentAssetProjection(summary: ReturnType<typeof calculateReserveSummary>) {

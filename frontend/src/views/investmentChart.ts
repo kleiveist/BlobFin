@@ -28,7 +28,35 @@ interface BarSegment {
   overlay?: boolean;
 }
 
-export function drawInvestmentChart(canvas: HTMLCanvasElement | null, projection: AssetProjection): void {
+interface BarHitArea {
+  point: AssetProjectionPoint;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+interface ChartInteraction {
+  areas: BarHitArea[];
+  onSelect?: InvestmentChartSelectHandler;
+}
+
+export interface InvestmentChartSelection {
+  point: AssetProjectionPoint;
+  clientX: number;
+  clientY: number;
+}
+
+export type InvestmentChartSelectHandler = (selection: InvestmentChartSelection) => void;
+
+const chartInteractions = new WeakMap<HTMLCanvasElement, ChartInteraction>();
+const interactiveCanvases = new WeakSet<HTMLCanvasElement>();
+
+export function drawInvestmentChart(
+  canvas: HTMLCanvasElement | null,
+  projection: AssetProjection,
+  onSelect?: InvestmentChartSelectHandler
+): void {
   if (!canvas) return;
 
   const context = canvas.getContext("2d");
@@ -56,9 +84,11 @@ export function drawInvestmentChart(canvas: HTMLCanvasElement | null, projection
   );
 
   drawGrid(context, padding, chartWidth, chartHeight);
-  drawBars(context, projection.points, padding, chartWidth, chartHeight, baseY, maxValue);
+  const areas = drawBars(context, projection.points, padding, chartWidth, chartHeight, baseY, maxValue);
   drawDashedLine(context, projection.points, padding, chartWidth, chartHeight, maxValue);
   drawAxisLabels(context, projection, padding, chartWidth, chartHeight, baseY);
+  chartInteractions.set(canvas, { areas, onSelect });
+  ensureChartInteraction(canvas);
 }
 
 function makeChartScale(pointsLength: number, chartWidth: number): ChartScale {
@@ -103,12 +133,23 @@ function drawBars(
   chartHeight: number,
   baseY: number,
   maxValue: number
-): void {
+): BarHitArea[] {
   const scale = makeChartScale(points.length, chartWidth);
+  const areas: BarHitArea[] = [];
 
   points.forEach((point, index) => {
     const x = xForIndex(index, padding, scale);
     const barX = x - scale.barWidth / 2;
+    const barHeight = valueToHeight(point.netBalance, padding, chartHeight, maxValue, baseY);
+    if (barHeight > 0) {
+      areas.push({
+        point,
+        left: barX - 5,
+        right: barX + scale.barWidth + 5,
+        top: baseY - barHeight,
+        bottom: baseY
+      });
+    }
     if (point.phase === "saving") {
       drawSavingBar(context, point, barX, scale.barWidth, padding, chartHeight, baseY, maxValue);
       return;
@@ -116,6 +157,47 @@ function drawBars(
 
     drawPayoutBar(context, point, barX, scale.barWidth, padding, chartHeight, baseY, maxValue);
   });
+
+  return areas;
+}
+
+function ensureChartInteraction(canvas: HTMLCanvasElement): void {
+  if (interactiveCanvases.has(canvas)) return;
+  interactiveCanvases.add(canvas);
+  canvas.addEventListener("click", handleChartClick);
+  canvas.addEventListener("pointermove", handleChartPointerMove);
+  canvas.addEventListener("pointerleave", () => {
+    canvas.style.cursor = "";
+  });
+}
+
+function handleChartClick(event: MouseEvent): void {
+  const canvas = event.currentTarget;
+  if (!(canvas instanceof HTMLCanvasElement)) return;
+  const interaction = chartInteractions.get(canvas);
+  if (!interaction?.onSelect) return;
+  const point = pointFromPointerEvent(canvas, event, interaction.areas);
+  if (!point) return;
+  interaction.onSelect({ point, clientX: event.clientX, clientY: event.clientY });
+}
+
+function handleChartPointerMove(event: PointerEvent): void {
+  const canvas = event.currentTarget;
+  if (!(canvas instanceof HTMLCanvasElement)) return;
+  const interaction = chartInteractions.get(canvas);
+  canvas.style.cursor = interaction && pointFromPointerEvent(canvas, event, interaction.areas) ? "pointer" : "";
+}
+
+function pointFromPointerEvent(
+  canvas: HTMLCanvasElement,
+  event: MouseEvent | PointerEvent,
+  areas: BarHitArea[]
+): AssetProjectionPoint | null {
+  const rect = canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  const hit = areas.find((area) => x >= area.left && x <= area.right && y >= area.top && y <= area.bottom);
+  return hit?.point ?? null;
 }
 
 function drawSavingBar(

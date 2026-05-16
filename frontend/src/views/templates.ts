@@ -155,6 +155,7 @@ export function renderAppShell(): string {
                 </div>
               </div>
               <canvas id="investmentChart"></canvas>
+              <div id="investmentChartPopup" class="investment-chart-popup" role="dialog" aria-label="Balkendetails" hidden></div>
               <div class="investment-legend">
                 <span class="legend-item"><span class="legend-dot grey"></span> Eigenbeitrag</span>
                 <span class="legend-item"><span class="legend-dot orange"></span> Zulagen</span>
