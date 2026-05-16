@@ -184,7 +184,6 @@ export function renderAppShell(): string {
                 ${detailLine("Prozent-Entnahme p. a.", "detailPercentageWithdrawalRate")}
                 ${detailLine("Monatliche Prozent-Entnahme", "detailPercentageWithdrawalMonthly")}
                 ${detailLine("Jaehrliche Prozent-Entnahme", "detailPercentageWithdrawalAnnual")}
-                ${detailLine("Realisierte Steuern bis Endalter", "detailTaxAtEnd")}
                 ${detailLine("Ansparzeit", "detailSavingMonths")}
                 ${detailLine("Monatliche gleichmaessige Entnahme netto", "detailMonthlyPension")}
                 ${detailLine("Monatliche gleichmaessige Entnahme real", "detailRealMonthlyPension")}

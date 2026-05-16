@@ -222,7 +222,6 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("detailPercentageWithdrawalRate", percent(projection.percentageWithdrawalRatePercent));
   setText("detailPercentageWithdrawalMonthly", money(projection.percentageWithdrawalMonthlyAtStart));
   setText("detailPercentageWithdrawalAnnual", money(projection.percentageWithdrawalAnnualAtStart));
-  setText("detailTaxAtEnd", projection.taxAtEnd > 0 ? `-${money(projection.taxAtEnd)}` : money(0));
   setText("detailSavingMonths", `${intNumber(projection.savingMonths)} Monate`);
   setText("detailMonthlyPension", money(projection.monthlyPension));
   setText("detailRealMonthlyPension", money(projection.realMonthlyPension));
