@@ -40,7 +40,7 @@ export function calculatePositionValueAtMonthStart(
 
   if (position.payoutType === "once") return 0;
   if (position.type === "fixed") return Number(position.amount);
-  if (position.type === "temporary" || position.type === "savings") return Number(position.amount);
+  if (position.type === "temporary") return Number(position.amount);
 
   let balance = 0;
   for (let month = 1; month <= monthNumber; month += 1) {
