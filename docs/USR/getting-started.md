@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](USR.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Getting Started
 
 BlobFin runs locally in the browser. The app stores planning data in the browser's `localStorage`; no account is required for the current frontend workflow.

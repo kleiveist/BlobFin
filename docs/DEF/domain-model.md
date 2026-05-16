@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](DEF.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Domain Model
 
 This page documents the calculation rules implemented in the frontend domain modules.

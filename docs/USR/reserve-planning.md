@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](USR.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Reserve Planning
 
 The `Kosten- und Ruecklagenpositionen` table is the base for the yearly planning view and for investable contributions.

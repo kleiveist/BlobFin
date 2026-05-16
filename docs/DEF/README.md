@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](DEF.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Developer Guide
 
 This folder documents BlobFin from a developer perspective: architecture, module ownership, domain calculations, backend services, tooling, and tests.

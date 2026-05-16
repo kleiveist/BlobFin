@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](DEF.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Frontend
 
 The frontend is a Vite + TypeScript single page application without a component framework.

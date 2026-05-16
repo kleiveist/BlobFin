@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](DEF.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Backend
 
 The backend is a FastAPI application under `backend/app`.

@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](DEF.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Architecture
 
 BlobFin is organized as a small monorepo with frontend, backend, shared data, and Python tooling.

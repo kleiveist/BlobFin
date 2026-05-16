@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](USR.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Investment Planning
 
 The `Investment- und Auszahlungsplanung` section projects selected savings into an asset development chart and payout statistics.

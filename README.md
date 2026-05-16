@@ -1,3 +1,43 @@
+<!-- AUTO-GENERATED:docs-index START -->
+
+## 📄 Files
+- ⏭️ (keine Markdown-Dateien im Projekt-Root)
+
+# DOCS
+- 📚 [Docs Home](docs/index.md)
+
+## 📁 DEF
+- 🗂️ [Overview](docs/def/def.md)
+
+## 📁 DEF
+- 🗂️ [Overview](docs/DEF/DEF.md)
+- 📝 [Architecture](docs/DEF/architecture.md)
+- 📝 [Backend](docs/DEF/backend.md)
+- 📝 [Domain Model](docs/DEF/domain-model.md)
+- 📝 [Frontend](docs/DEF/frontend.md)
+- 📝 [Testing](docs/DEF/testing.md)
+- 📝 [Tooling](docs/DEF/tooling.md)
+
+## 📁 Tools Documentation (Current Implemented State)
+- 🗂️ [Overview](docs/tools/tools.md)
+- 📝 [build Command](docs/tools/build.md)
+- 📝 [doctor Command](docs/tools/doctor.md)
+- 📝 [install Command](docs/tools/install.md)
+- 📝 [Tool Logging and Output Semantics](docs/tools/logging.md)
+- 📝 [run and stop Commands](docs/tools/run-stop.md)
+- 📝 [test Command](docs/tools/test.md)
+
+## 📁 USR
+- 🗂️ [Overview](docs/usr/usr.md)
+
+## 📁 USR
+- 🗂️ [Overview](docs/USR/USR.md)
+- 📝 [Data, Export, And Reset](docs/USR/data-export-reset.md)
+- 📝 [Getting Started](docs/USR/getting-started.md)
+- 📝 [Investment Planning](docs/USR/investment-planning.md)
+- 📝 [Reserve Planning](docs/USR/reserve-planning.md)
+
+<!-- AUTO-GENERATED:docs-index END -->
 # BlobFin
 
 BlobFin is a local finance planning application for yearly reserve planning, cashflow visibility, and long-term investment and payout projections. The current primary product surface is a Vite + TypeScript frontend. The repository also contains a FastAPI backend, shared JSON schemas, PDF/report assets, and a Python control CLI inherited from an earlier project.

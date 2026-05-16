@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](USR.md)
+<!-- AUTO-GENERATED:backlink END -->
 # User Guide
 
 This folder explains BlobFin from an application user perspective. It focuses on what to enter, which options influence calculations, and how to read the results.

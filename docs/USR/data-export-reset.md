@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](USR.md)
+<!-- AUTO-GENERATED:backlink END -->
 # Data, Export, And Reset
 
 ## Local Storage
