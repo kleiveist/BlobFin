@@ -1164,6 +1164,7 @@ function showInvestmentChartPopup(
       ${chartPopupLine("green", "Wertzuwachs", money(growth))}
       ${chartPopupLine("purple", "Restguthaben (Auszahlung)", money(payoutBalance))}
       ${chartPopupLine("red", "Kapitalertragsteuer", tax > 0 ? `-${money(tax)}` : money(0))}
+      ${chartPopupTotalLine("Gesamtkapital", money(Math.max(0, point.netBalance)))}
     </div>
   `;
 
@@ -1183,6 +1184,15 @@ function chartPopupLine(color: string, label: string, value: string): string {
   return `
     <div class="chart-popup-line">
       <span><i class="chart-popup-dot ${escapeHtml(color)}"></i>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function chartPopupTotalLine(label: string, value: string): string {
+  return `
+    <div class="chart-popup-line chart-popup-total">
+      <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
     </div>
   `;

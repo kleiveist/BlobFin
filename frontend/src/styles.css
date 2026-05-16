@@ -1080,6 +1080,19 @@ tfoot th {
   font-size: 0.88rem;
 }
 
+.chart-popup-total {
+  margin-top: 4px;
+  border-top: 3px double var(--chart-border);
+  padding-top: 9px;
+}
+
+.chart-popup-total span,
+.chart-popup-total strong {
+  color: var(--chart-text);
+  font-size: 0.96rem;
+  font-weight: 950;
+}
+
 .chart-popup-dot {
   display: inline-block;
   width: 10px;
