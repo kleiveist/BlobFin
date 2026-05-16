@@ -109,7 +109,7 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
         name,
         type,
         amount,
-        startMonth: parseMonthValue(get(row, ["startmonat", "start"], 4), 1),
+        startMonth: parseMonthValue(get(row, ["startmonat", "anfangsmonat", "anfangmonat", "anfang", "start"], 4), 1),
         endMonth: parseMonthValue(get(row, ["endmonat", "ende", "end"], 5), 12),
         payoutType: parsePayoutValue(
           get(row, ["abgang", "eingang", "payout", "abgangsart", "zahlungsart"], 6),
@@ -130,13 +130,15 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
         if (position.payoutType === "none") position.payoutType = defaultIncomePayoutType(position.type);
       }
       if (position.flow === "expense" && position.type !== "temporary") position.cashback = false;
-      if (position.payoutType === "once") {
+      if (position.payoutType === "once" && position.type !== "savings") {
         position.startMonth = position.payoutMonth;
         position.endMonth = position.payoutMonth;
         position.interestBearing = false;
+      } else if (position.payoutType === "once") {
+        position.interestBearing = false;
       }
 
-      if (position.startMonth > position.endMonth) {
+      if (position.type !== "savings" && position.startMonth > position.endMonth) {
         const startMonth = position.startMonth;
         position.startMonth = position.endMonth;
         position.endMonth = startMonth;

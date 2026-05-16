@@ -607,6 +607,12 @@ tfoot th {
   text-transform: uppercase;
 }
 
+.date-detail-cell {
+  display: grid;
+  gap: 5px;
+  min-width: 132px;
+}
+
 .month-col {
   width: 112px;
   min-width: 112px;
@@ -622,6 +628,14 @@ tfoot th {
   min-width: 132px;
   background: var(--highlight);
   color: var(--accent-strong);
+  font-weight: 850;
+}
+
+.result-permanent-col {
+  width: 112px;
+  min-width: 112px;
+  background: var(--gold-soft);
+  color: var(--gold);
   font-weight: 850;
 }
 

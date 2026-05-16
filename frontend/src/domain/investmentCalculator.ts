@@ -19,7 +19,7 @@ export function calculateInvestmentResult(
   const savingMonths = Math.max(0, Math.round(yearsUntilPayout * 12));
   const payoutMonths = Math.max(1, Math.round(payoutYears * 12));
 
-  const monthlyPattern = selectedMonthlyPattern(positions, settings);
+  const monthlyPattern = selectedMonthlyPattern(positions, settings, year);
   const averageMonthlyContribution = monthlyPattern.reduce((sum, value) => sum + value, 0) / 12;
   const annualReturn = settings.investmentReturnPercent / 100;
   const monthlyReturn = (1 + annualReturn) ** (1 / 12) - 1;

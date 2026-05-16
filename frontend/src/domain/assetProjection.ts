@@ -31,7 +31,7 @@ export function buildAssetProjection(
   const retirementAge = payoutStartAge(settings);
   const startAge = Math.min(settings.chartStartAge, retirementAge);
   const endAge = Math.max(settings.payoutEndAge, retirementAge + 1);
-  const monthlyPattern = selectedMonthlyPattern(positions, settings);
+  const monthlyPattern = selectedMonthlyPattern(positions, settings, year);
   const monthlyRate = monthlyPattern.reduce((sum, value) => sum + value, 0) / 12;
   const annualSavingsRate = monthlyRate * 12;
   const annualReturn = settings.investmentReturnPercent / 100;

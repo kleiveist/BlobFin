@@ -376,6 +376,13 @@ function renderPositionModeControls(): void {
 function renderPositionTableHead(): void {
   const head = document.querySelector<HTMLTableSectionElement>("#positionsHead");
   if (!head) return;
+  const dateHeaders =
+    selectedPositionMode === "savings"
+      ? [
+          '<th><span class="split-header">Fix-Start<span>Abgangsjahr</span></span></th>',
+          '<th><span class="split-header">Fix-Ende<span>Anfang Monat</span></span></th>'
+        ].join("")
+      : "<th>Start</th><th>Ende</th>";
   const timingLabel =
     selectedPositionMode === "income" ? "Eingang" : selectedPositionMode === "savings" ? "Transfer" : "Abgang";
   const monthLabel =
@@ -392,8 +399,7 @@ function renderPositionTableHead(): void {
       <th>Name</th>
       <th>Art</th>
       <th class="amount-col">Betrag</th>
-      <th>Start</th>
-      <th>Ende</th>
+      ${dateHeaders}
       ${selectedPositionMode === "income" ? "<th>Jahr</th>" : ""}
       <th>${timingLabel}</th>
       <th>${monthLabel}</th>
@@ -446,7 +452,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       <th class="result-compact-col">Ausgaben</th>
       <th>Netto uebrig</th>
       ${maxNeededHead}
-      <th class="result-compact-col"><span class="split-header">Dauerhafter<span>Bestand</span></span></th>
+      <th class="result-permanent-col"><span class="split-header">Dauerhafter<span>Bestand</span></span></th>
       <th class="result-interest-col"><span class="split-header">ca.<span>Monatszins</span></span></th>
       <th>Cashback</th>
     </tr>
@@ -462,7 +468,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
           <td class="result-compact-col">${money(row.plannedOutflow)}</td>
           <td class="${amountClass(row.monthlyRemaining)}">${money(row.monthlyRemaining)}</td>
           ${showResultMaxNeeded ? `<td class="result-max-needed-col">${money(row.maxNeeded)}</td>` : ""}
-          <td class="result-compact-col">${money(row.permanentAfterMonthlyOutflows)}</td>
+          <td class="result-permanent-col">${money(row.permanentAfterMonthlyOutflows)}</td>
           <td class="positive result-interest-col">${money(row.monthlyInterest)}</td>
           <td class="positive">${money(row.monthlyCashback)}</td>
         </tr>
@@ -480,7 +486,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
       <th class="result-compact-col">${money(summary.totalPlannedOutflow)}</th>
       <th class="${amountClass(summary.yearlyRemaining)}">${money(summary.yearlyRemaining)}</th>
       ${maxNeededFoot}
-      <th class="result-compact-col">${money(summary.yearEndBalance)}</th>
+      <th class="result-permanent-col">${money(summary.yearEndBalance)}</th>
       <th class="positive result-interest-col">${money(summary.totalInterest)}</th>
       <th class="positive">${money(summary.totalCashback)}</th>
     </tr>
@@ -545,11 +551,18 @@ function investmentPositionAmountText(position: ReservePosition): string {
   if (position.payoutType === "once") {
     return `${money(position.amount)} einmalig (${monthName(position.payoutMonth)} ${intNumber(position.payoutYear)})`;
   }
-  if (position.payoutType === "yearly") return `${money(position.amount)} jaehrlich (${monthName(position.payoutMonth)})`;
-  return `${money(position.amount)} monatlich`;
+  const startText =
+    position.type === "savings" ? ` ab ${monthName(position.startMonth)} ${intNumber(position.payoutYear)}` : "";
+  if (position.payoutType === "yearly") {
+    return `${money(position.amount)} jaehrlich (${monthName(position.payoutMonth)})${startText}`;
+  }
+  return `${money(position.amount)} monatlich${startText}`;
 }
 
 function expenseDateCells(position: ReservePosition): string {
+  if (position.type === "savings") return savingsDateCells(position);
+  if (position.type === "fixed") return monthRangeDateCells(position);
+
   if (position.payoutType === "once") {
     return `
       <td class="once-year-label">Abgangsjahr</td>
@@ -560,9 +573,30 @@ function expenseDateCells(position: ReservePosition): string {
       </td>
     `;
   }
+  return monthRangeDateCells(position);
+}
+
+function monthRangeDateCells(position: ReservePosition): string {
   return `
     <td>${monthSelect(position.id, "startMonth", position.startMonth)}</td>
     <td>${monthSelect(position.id, "endMonth", position.endMonth)}</td>
+  `;
+}
+
+function savingsDateCells(position: ReservePosition): string {
+  return `
+    <td>
+      <div class="date-detail-cell">
+        <input class="small-input payout-year-input" type="number" min="2000" max="2200" step="1" value="${
+          position.payoutYear
+        }" data-position-id="${position.id}" data-position-field="payoutYear" />
+      </div>
+    </td>
+    <td>
+      <div class="date-detail-cell">
+        ${monthSelect(position.id, "startMonth", position.startMonth)}
+      </div>
+    </td>
   `;
 }
 
@@ -689,8 +723,10 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
           next.payoutType = positionFlow(next) === "income" && value === "none" ? "monthly" : value;
           if (next.payoutType === "once") {
             next.payoutYear = Number(next.payoutYear || state.settings.year);
-            next.startMonth = next.payoutMonth;
-            next.endMonth = next.payoutMonth;
+            if (next.type !== "savings") {
+              next.startMonth = next.payoutMonth;
+              next.endMonth = next.payoutMonth;
+            }
             next.interestBearing = false;
           }
         }
@@ -710,15 +746,17 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
         break;
     }
 
-    if (next.startMonth > next.endMonth) {
+    if (next.type !== "savings" && next.startMonth > next.endMonth) {
       const startMonth = next.startMonth;
       next.startMonth = next.endMonth;
       next.endMonth = startMonth;
     }
 
     if (next.payoutType === "once") {
-      next.startMonth = next.payoutMonth;
-      next.endMonth = next.payoutMonth;
+      if (next.type !== "savings") {
+        next.startMonth = next.payoutMonth;
+        next.endMonth = next.payoutMonth;
+      }
       next.interestBearing = false;
     }
 
@@ -741,13 +779,13 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
   let startMonth = finiteIntegerInRange(position.startMonth, 1, 12, 1);
   let endMonth = finiteIntegerInRange(position.endMonth, 1, 12, 12);
 
-  if (startMonth > endMonth) {
+  if (type !== "savings" && startMonth > endMonth) {
     const previousStart = startMonth;
     startMonth = endMonth;
     endMonth = previousStart;
   }
 
-  if (payoutType === "once") {
+  if (payoutType === "once" && type !== "savings") {
     startMonth = payoutMonth;
     endMonth = payoutMonth;
   }

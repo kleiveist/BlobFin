@@ -173,9 +173,11 @@ function normalizePositions(
         position.type = "savings";
         position.cashback = false;
       }
-      if (position.payoutType === "once") {
+      if (position.payoutType === "once" && position.type !== "savings") {
         position.startMonth = position.payoutMonth;
         position.endMonth = position.payoutMonth;
+        position.interestBearing = false;
+      } else if (position.payoutType === "once") {
         position.interestBearing = false;
       }
       if (position.flow === "income") {

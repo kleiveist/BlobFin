@@ -63,6 +63,23 @@ describe("investment calculator", () => {
     expect(projection.realWealthAtRetirement).toBeCloseTo(7609.52, 1);
   });
 
+  it("starts recurring investment positions in their configured start year and month", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate"
+        ? { ...position, amount: 120, startMonth: 7, endMonth: 1, payoutYear: state.settings.year + 1 }
+        : position
+    );
+
+    const currentYear = buildAssetProjection(state.settings.year, state.positions, state.investment);
+    const startYear = buildAssetProjection(state.settings.year + 1, state.positions, state.investment);
+    const laterYear = buildAssetProjection(state.settings.year + 2, state.positions, state.investment);
+
+    expect(currentYear.monthlyRate).toBe(0);
+    expect(startYear.monthlyRate).toBe(60);
+    expect(laterYear.monthlyRate).toBe(120);
+  });
+
   it("adds one-time savings positions once without raising the annual savings rate", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>

@@ -1,10 +1,10 @@
-import { isActiveInMonth, isOneTimePayoutInMonth } from "./reserveCalculator";
+import { isOneTimePayoutInMonth, isSavingsActiveInMonth } from "./reserveCalculator";
 import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
-export function investmentContributionForMonth(position: ReservePosition, month: number): number {
-  if (!isActiveInMonth(position, month)) return 0;
+export function investmentContributionForMonth(position: ReservePosition, year: number, month: number): number {
   if (position.payoutType === "once") return 0;
+  if (!isSavingsActiveInMonth(position, year, month)) return 0;
   if (position.payoutType === "yearly") {
     return Number(position.payoutMonth) === month ? Number(position.amount) : 0;
   }
@@ -20,7 +20,11 @@ export function oneTimeInvestmentContributionForMonth(
   return Number(position.amount);
 }
 
-export function selectedMonthlyPattern(positions: ReservePosition[], settings: InvestmentSettings): number[] {
+export function selectedMonthlyPattern(
+  positions: ReservePosition[],
+  settings: InvestmentSettings,
+  year: number
+): number[] {
   const selectedPositions = positions.filter(
     (position) =>
       position.type === "savings" &&
@@ -33,7 +37,7 @@ export function selectedMonthlyPattern(positions: ReservePosition[], settings: I
   for (let month = 1; month <= 12; month += 1) {
     pattern.push(
       selectedPositions.reduce((sum, position) => {
-        return sum + investmentContributionForMonth(position, month);
+        return sum + investmentContributionForMonth(position, year, month);
       }, 0)
     );
   }
@@ -53,7 +57,7 @@ export function selectedInvestmentContributionForProjectionMonth(
     if (position.payoutType === "once") {
       return sum + oneTimeInvestmentContributionForMonth(position, calendarYear, month);
     }
-    return sum + investmentContributionForMonth(position, month);
+    return sum + investmentContributionForMonth(position, calendarYear, month);
   }, 0);
 }
 

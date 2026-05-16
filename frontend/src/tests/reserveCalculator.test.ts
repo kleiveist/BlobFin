@@ -137,6 +137,40 @@ describe("reserve calculator", () => {
     expect(payoutYear.totalCashback).toBe(5);
   });
 
+  it("starts recurring savings positions in their configured start year and month", () => {
+    const state = defaultAppState();
+    state.positions = [
+      {
+        id: "future-savings",
+        flow: "expense",
+        active: true,
+        visible: true,
+        name: "Future Savings",
+        type: "savings",
+        amount: 200,
+        startMonth: 4,
+        endMonth: 1,
+        payoutType: "monthly",
+        payoutYear: state.settings.year + 4,
+        payoutMonth: 12,
+        payoutDay: 14,
+        interestBearing: false,
+        cashback: false
+      }
+    ];
+
+    const beforeStart = calculateReserveSummary(state.settings, state.positions);
+    const startYear = calculateReserveSummary({ ...state.settings, year: state.settings.year + 4 }, state.positions);
+    const laterYear = calculateReserveSummary({ ...state.settings, year: state.settings.year + 5 }, state.positions);
+
+    expect(beforeStart.totalPlannedOutflow).toBe(0);
+    expect(startYear.rows[2].plannedOutflow).toBe(0);
+    expect(startYear.rows[3].plannedOutflow).toBe(200);
+    expect(startYear.totalPlannedOutflow).toBe(1800);
+    expect(laterYear.rows[0].plannedOutflow).toBe(200);
+    expect(laterYear.totalPlannedOutflow).toBe(2400);
+  });
+
   it("calculates monthly, yearly, and temporary income positions as planned income", () => {
     const state = defaultAppState();
     state.positions = [

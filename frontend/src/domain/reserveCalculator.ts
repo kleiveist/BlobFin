@@ -10,6 +10,13 @@ export function isActiveInMonth(position: ReservePosition, monthNumber: number):
   return position.active && monthNumber >= Number(position.startMonth) && monthNumber <= Number(position.endMonth);
 }
 
+export function isSavingsActiveInMonth(position: ReservePosition, year: number, monthNumber: number): boolean {
+  if (!position.active || position.type !== "savings") return false;
+  const startYear = Number(position.payoutYear || year);
+  if (year < startYear) return false;
+  return year > startYear || monthNumber >= Number(position.startMonth || 1);
+}
+
 export function isOneTimePayoutInMonth(position: ReservePosition, year: number, monthNumber: number): boolean {
   return (
     position.active &&
@@ -19,8 +26,16 @@ export function isOneTimePayoutInMonth(position: ReservePosition, year: number, 
   );
 }
 
-export function calculatePositionValueAtMonthStart(position: ReservePosition, monthNumber: number): number {
+export function calculatePositionValueAtMonthStart(
+  position: ReservePosition,
+  year: number,
+  monthNumber: number
+): number {
   if (isIncomePosition(position)) return 0;
+  if (position.type === "savings") {
+    if (!isSavingsActiveInMonth(position, year, monthNumber)) return 0;
+    return position.payoutType === "once" ? 0 : Number(position.amount);
+  }
   if (!isActiveInMonth(position, monthNumber)) return 0;
 
   if (position.payoutType === "once") return 0;
@@ -68,7 +83,9 @@ export function calculateInterestForSingleMonth(
   annualRate: number
 ): number {
   if (isIncomePosition(position)) return 0;
-  if (!position.active || !position.interestBearing || !isActiveInMonth(position, monthNumber)) return 0;
+  if (!position.active || !position.interestBearing) return 0;
+  if (position.type === "savings" && !isSavingsActiveInMonth(position, year, monthNumber)) return 0;
+  if (position.type !== "savings" && !isActiveInMonth(position, monthNumber)) return 0;
   if (position.payoutType === "once") return 0;
 
   const monthIndex = monthNumber - 1;
@@ -81,7 +98,7 @@ export function calculateInterestForSingleMonth(
     return (Number(position.amount) * annualRate * payoutDay) / 365;
   }
 
-  const balance = calculatePositionValueAtMonthStart(position, monthNumber);
+  const balance = calculatePositionValueAtMonthStart(position, year, monthNumber);
   let daysHeld = dim;
   if (position.payoutType === "monthly") daysHeld = Math.max(1, Math.min(Number(position.payoutDay || dim), dim));
   if (isSingleMonthPayout(position) && isPayoutMonth(position, monthNumber)) {
@@ -134,6 +151,10 @@ export function calculatePlannedOutflowForSingleMonth(
   if (!position.active || isIncomePosition(position) || position.type === "fixed") return 0;
   if (position.payoutType === "once") {
     return isOneTimePayoutInMonth(position, year, monthNumber) ? Number(position.amount) : 0;
+  }
+  if (position.type === "savings") {
+    if (!isSavingsActiveInMonth(position, year, monthNumber)) return 0;
+    return position.payoutType === "yearly" && !isPayoutMonth(position, monthNumber) ? 0 : Number(position.amount);
   }
   if (!isActiveInMonth(position, monthNumber)) return 0;
   if (position.type === "reserve") return Number(position.amount);
@@ -193,7 +214,9 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
       }
 
       const income = calculatePlannedIncomeForSingleMonth(position, settings.year, month);
-      const value = isIncomePosition(position) ? income : calculatePositionValueAtMonthStart(position, month);
+      const value = isIncomePosition(position)
+        ? income
+        : calculatePositionValueAtMonthStart(position, settings.year, month);
       values[position.id] = value;
       plannedIncome += income;
       if (isExpensePosition(position)) maxNeeded += value;
