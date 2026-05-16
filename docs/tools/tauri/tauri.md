@@ -405,7 +405,7 @@ python tools/control.py tauri copy
 ```
 
 On Linux, this target prepares `cargo-xwin` when needed, runs Tauri with
-`--runner cargo-xwin --target x86_64-pc-windows-msvc --bundles none`, and writes
+`--runner cargo-xwin --target x86_64-pc-windows-msvc --no-bundle`, and writes
 the portable ZIP to `.dist/desktop/BlobFin-windows-portable.zip`.
 
 Check tooling without modifying the system:

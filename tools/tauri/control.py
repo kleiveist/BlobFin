@@ -38,10 +38,11 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     build_parser = tauri_subparsers.add_parser("build", help="Build Tauri desktop artifacts")
     build_parser.add_argument(
         "--target",
-        choices=["linux", "windows", "windows-portable", "windows-cross-linux", "macos"],
         default="linux",
-        help="Desktop build target",
+        help="Desktop build target. Use windows-portable for a portable Windows ZIP.",
     )
+    build_parser.add_argument("--runner", help=argparse.SUPPRESS)
+    build_parser.add_argument("--no-bundle", action="store_true", help=argparse.SUPPRESS)
     build_parser.add_argument("--dry-run", action="store_true", help="Print build command without running it")
     build_parser.add_argument("--no-clean", action="store_true", help="Do not clean previous Tauri build output")
     build_parser.add_argument(

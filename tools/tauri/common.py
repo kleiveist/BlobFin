@@ -104,14 +104,17 @@ def run_command(
         logger.info(f"DRY-RUN {command_to_string(command)} (cwd={resolved_cwd})")
         return CommandResult(command=command, cwd=resolved_cwd, returncode=0, dry_run=True)
 
-    completed = subprocess.run(
-        command,
-        cwd=resolved_cwd,
-        env={**os.environ, **(env or {})},
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=resolved_cwd,
+            env={**os.environ, **(env or {})},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError as exc:
+        return CommandResult(command=command, cwd=resolved_cwd, returncode=127, stderr=str(exc))
     return CommandResult(
         command=command,
         cwd=resolved_cwd,
