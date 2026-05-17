@@ -19,7 +19,6 @@ Two additional investment toggles can be enabled per depot:
 
 - `Zinsen`: invests yearly account interest from the yearly table.
 - `Cashback`: invests yearly cashback from the yearly table.
-- `Altersvorsorgedepot aktivieren`: appears only on the `Altersvorsorgedepot` tab and adds the communicated allowance model to that projection.
 
 Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depot at a time. Savings positions already used by the other depot are hidden in the current tab.
 
@@ -27,15 +26,15 @@ Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depo
 
 - `Geburtsjahr`: used with the planning year to calculate today's age.
 - `Startalter Grafik`: first age shown in the chart.
-- `Rentenalter`: derived from payout end age and payout duration.
-- `Endalter`: last age in the projection.
+- `Rentenalter`: derived from payout end age and payout duration. This value is shared by `Depot` and `Altersvorsorgedepot`.
+- `Endalter`: last age in the projection. This value is shared by `Depot` and `Altersvorsorgedepot`.
 - `Entnahme ab Alter`: age when percentage withdrawals begin. This appears only in the normal `Depot` tab.
 - `Prozent-Entnahme p. a.`: annual percentage withdrawal rate. This appears only in the normal `Depot` tab.
 - `Kindergeldberechtigte Kinder`: children counted for the retirement depot child allowance. This appears only in the `Altersvorsorgedepot` tab.
 
 `Entnahme ab Alter` cannot be lower than `Startalter Grafik` and cannot be higher than `Rentenalter`.
 
-When `Altersvorsorgedepot aktivieren` is checked, the retirement age for the retirement depot is floored at 65. It can still be set higher. Percentage withdrawals are not part of the retirement depot page.
+For the retirement depot, the retirement age is floored at 65. It can still be set higher. Percentage withdrawals are not part of the retirement depot page.
 
 ## Retirement Depot Allowances
 

@@ -150,7 +150,6 @@ export function defaultInvestmentSettings(): InvestmentSettings {
     retirementIncludeAccountCashback: false,
     retirementDepotEnabled: false,
     retirementDepotChildren: 0,
-    retirementDepotPreviousSettings: null,
     birthYear: 1993,
     chartStartAge: 32,
     payoutEndAge: 95,

@@ -39,7 +39,6 @@ import type {
   InvestmentSettings,
   PlanningSettings,
   ReservePosition,
-  RetirementDepotPreviousSettings,
   ThemeMode
 } from "./types";
 import { drawInvestmentChart } from "./views/investmentChart";
@@ -167,12 +166,6 @@ function bindEvents(): void {
   root.addEventListener("change", (event) => {
     const target = formControl(event.target);
     if (!target) return;
-
-    if (target.dataset.retirementDepotToggle && target instanceof HTMLInputElement) {
-      toggleRetirementDepot(target.checked);
-      renderAll();
-      return;
-    }
 
     if (target.dataset.positionId && target.dataset.positionField) {
       const value = target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value;
@@ -340,10 +333,7 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("combinedMonthlyRateMetric", money(combinedProjection.monthlyRate));
   setText("combinedMonthlyPensionMetric", money(combinedProjection.monthlyPension));
   setText("combinedRealWealthMetric", money(combinedProjection.realWealthAtRetirement));
-  setText(
-    "retirementDepotFundingStatus",
-    projection.retirementDepotEnabled ? "Aktiv nach Reformlogik ab 2027" : "Altersvorsorgedepot deaktiviert"
-  );
+  setText("retirementDepotFundingStatus", "Aktiv nach Reformlogik ab 2027");
   setText("retirementDepotOwnContributionMetric", money(projection.retirementDepotAnnualOwnContribution));
   setText("retirementDepotBaseAllowanceMetric", money(projection.retirementDepotBaseAllowanceAnnual));
   setText("retirementDepotChildAllowanceMetric", money(projection.retirementDepotChildAllowanceAnnual));
@@ -1122,7 +1112,6 @@ function syncInvestmentInputsFromState(): void {
   for (const key of inputInvestmentFields()) {
     setInputValue(`[data-investment="${key}"]`, settings[key]);
   }
-  setInputChecked("[data-retirement-depot-toggle]", state.investment.retirementDepotEnabled);
   setInputValue("[data-retirement-age]", calculatePayoutStartAge(settings));
   syncInvestmentDepotTabs();
   syncRetirementDepotControls();
@@ -1132,20 +1121,20 @@ function syncInvestmentInputBounds(): void {
   const settings = depotInvestmentSettings(activeInvestmentDepot());
   const retirementAge = calculatePayoutStartAge(settings);
   const chartStartAge = settings.chartStartAge;
-  const retirementMin = settings.retirementDepotEnabled ? RETIREMENT_DEPOT_MIN_AGE : 50;
+  const retirementMin = RETIREMENT_DEPOT_MIN_AGE;
+  const retirementMax = retirementAgeMaxForPayoutEndAge(settings.payoutEndAge);
   setInputBounds(
     '[data-investment="chartStartAge"]',
     investmentMin("chartStartAge"),
     Math.min(investmentMax("chartStartAge"), retirementAge)
   );
   setInputBounds('[data-investment="percentageWithdrawalStartAge"]', chartStartAge, retirementAge);
-  setInputBounds("[data-retirement-age]", retirementMin, 85);
+  setInputBounds("[data-retirement-age]", retirementMin, retirementMax);
 }
 
 function syncRetirementDepotControls(): void {
   const depot = activeInvestmentDepot();
   const isRetirement = depot === "retirement";
-  setRetirementDepotToggleVisible(isRetirement);
   syncDepotScopedInvestmentFields(depot);
   setSectionHidden("#retirementDepotFunding", !isRetirement);
   setDetailLineHidden("detailAllowance", !isRetirement);
@@ -1180,15 +1169,8 @@ function updatePlanningSetting(field: keyof PlanningSettings, value: string): vo
 function updateInvestmentSetting(field: keyof InvestmentSettings, value: string): void {
   if (!isNumericInvestmentSetting(field)) return;
   const depot = activeInvestmentDepot();
-  const settings = depotInvestmentSettings(depot);
   if (field === "payoutEndAge") {
-    const retirementAge = calculatePayoutStartAge(settings);
-    const payoutEndAge = clamp(numberValue(value), investmentMin(field), investmentMax(field));
-    updateDepotInvestmentSettings(depot, {
-      payoutEndAge,
-      payoutYears: clamp(payoutEndAge - retirementAge, 1, 50)
-    });
-    normalizeInvestmentBounds();
+    updateSharedPayoutEndAge(value);
     return;
   }
 
@@ -1196,44 +1178,38 @@ function updateInvestmentSetting(field: keyof InvestmentSettings, value: string)
   normalizeInvestmentBounds();
 }
 
-function toggleRetirementDepot(checked: boolean): void {
-  if (checked === state.investment.retirementDepotEnabled) return;
-
-  const previous = state.investment.retirementDepotPreviousSettings;
+function updateSharedPayoutEndAge(value: string): void {
+  const payoutEndAge = clamp(numberValue(value), investmentMin("payoutEndAge"), investmentMax("payoutEndAge"));
+  const retirementAge = clampRetirementAge(currentSharedRetirementAge(), payoutEndAge);
+  const payoutYears = payoutYearsForRetirementAge(payoutEndAge, retirementAge);
   state.investment = {
     ...state.investment,
-    retirementDepotEnabled: checked,
-    retirementDepotPreviousSettings: checked ? retirementDepotPreviousSettings() : null
+    payoutEndAge,
+    retirementPayoutEndAge: payoutEndAge,
+    payoutYears,
+    retirementPayoutYears: payoutYears
   };
-  if (checked) enforceRetirementDepotAgeFloor();
-  if (!checked && previous) {
-    updateDepotInvestmentSettings("retirement", {
-      payoutEndAge: previous.payoutEndAge,
-      payoutYears: previous.payoutYears,
-      percentageWithdrawalStartAge: previous.percentageWithdrawalStartAge,
-      percentageWithdrawalRatePercent: previous.percentageWithdrawalRatePercent
-    });
-  }
   normalizeInvestmentBounds();
 }
 
-function retirementDepotPreviousSettings(): RetirementDepotPreviousSettings {
-  const settings = depotInvestmentSettings("retirement");
-  return {
-    payoutEndAge: settings.payoutEndAge,
-    payoutYears: settings.payoutYears,
-    percentageWithdrawalStartAge: settings.percentageWithdrawalStartAge,
-    percentageWithdrawalRatePercent: settings.percentageWithdrawalRatePercent
-  };
+function currentSharedRetirementAge(): number {
+  return Math.max(
+    RETIREMENT_DEPOT_MIN_AGE,
+    calculatePayoutStartAge(depotInvestmentSettings("standard")),
+    calculatePayoutStartAge(depotInvestmentSettings("retirement"))
+  );
 }
 
-function enforceRetirementDepotAgeFloor(): void {
-  const settings = depotInvestmentSettings("retirement");
-  const currentRetirementAge = Math.max(0, settings.payoutEndAge - settings.payoutYears);
-  if (currentRetirementAge >= RETIREMENT_DEPOT_MIN_AGE) return;
-  updateDepotInvestmentSettings("retirement", {
-    payoutYears: clamp(settings.payoutEndAge - RETIREMENT_DEPOT_MIN_AGE, 1, 50)
-  });
+function clampRetirementAge(retirementAge: number, payoutEndAge: number): number {
+  return clamp(retirementAge, RETIREMENT_DEPOT_MIN_AGE, retirementAgeMaxForPayoutEndAge(payoutEndAge));
+}
+
+function retirementAgeMaxForPayoutEndAge(payoutEndAge: number): number {
+  return Math.max(RETIREMENT_DEPOT_MIN_AGE, Math.min(85, payoutEndAge - investmentMin("payoutYears")));
+}
+
+function payoutYearsForRetirementAge(payoutEndAge: number, retirementAge: number): number {
+  return clamp(payoutEndAge - retirementAge, investmentMin("payoutYears"), investmentMax("payoutYears"));
 }
 
 function isNumericInvestmentSetting(field: keyof InvestmentSettings): field is NumericInvestmentSetting {
@@ -1321,14 +1297,15 @@ function depotInvestmentSettings(depot: InvestmentDepotKey): InvestmentSettings 
   return {
     ...state.investment,
     activeDepot: "retirement",
+    retirementDepotEnabled: true,
     includedIds: state.investment.retirementIncludedIds,
     includeAccountInterest: state.investment.retirementIncludeAccountInterest,
     includeAccountCashback: state.investment.retirementIncludeAccountCashback,
     birthYear: state.investment.retirementBirthYear,
     chartStartAge: state.investment.retirementChartStartAge,
-    payoutEndAge: state.investment.retirementPayoutEndAge,
+    payoutEndAge: state.investment.payoutEndAge,
     payoutYears: state.investment.retirementPayoutYears,
-    percentageWithdrawalStartAge: state.investment.retirementPayoutEndAge - state.investment.retirementPayoutYears,
+    percentageWithdrawalStartAge: state.investment.payoutEndAge - state.investment.retirementPayoutYears,
     percentageWithdrawalRatePercent: 0,
     investmentReturnPercent: state.investment.retirementInvestmentReturnPercent,
     capitalGainsTaxPercent: state.investment.retirementCapitalGainsTaxPercent,
@@ -1338,20 +1315,24 @@ function depotInvestmentSettings(depot: InvestmentDepotKey): InvestmentSettings 
 }
 
 function updateDepotInvestmentSettings(depot: InvestmentDepotKey, updates: Partial<InvestmentSettings>): void {
+  const payoutEndAge = updates.payoutEndAge ?? state.investment.payoutEndAge;
   if (depot === "standard") {
     state.investment = {
       ...state.investment,
-      ...updates
+      ...updates,
+      payoutEndAge,
+      retirementPayoutEndAge: payoutEndAge
     };
     return;
   }
 
   state.investment = {
     ...state.investment,
+    payoutEndAge,
     retirementDepotChildren: updates.retirementDepotChildren ?? state.investment.retirementDepotChildren,
     retirementBirthYear: updates.birthYear ?? state.investment.retirementBirthYear,
     retirementChartStartAge: updates.chartStartAge ?? state.investment.retirementChartStartAge,
-    retirementPayoutEndAge: updates.payoutEndAge ?? state.investment.retirementPayoutEndAge,
+    retirementPayoutEndAge: payoutEndAge,
     retirementPayoutYears: updates.payoutYears ?? state.investment.retirementPayoutYears,
     retirementInvestmentReturnPercent:
       updates.investmentReturnPercent ?? state.investment.retirementInvestmentReturnPercent,
@@ -1364,13 +1345,15 @@ function updateDepotInvestmentSettings(depot: InvestmentDepotKey, updates: Parti
 }
 
 function updateRetirementAge(value: string): void {
-  const depot = activeInvestmentDepot();
-  const settings = depotInvestmentSettings(depot);
-  const minAge = settings.retirementDepotEnabled ? RETIREMENT_DEPOT_MIN_AGE : 50;
-  const retirementAge = clamp(numberValue(value), minAge, 85);
-  updateDepotInvestmentSettings(depot, {
-    payoutYears: clamp(settings.payoutEndAge - retirementAge, 1, 50)
-  });
+  const payoutEndAge = state.investment.payoutEndAge;
+  const retirementAge = clampRetirementAge(numberValue(value), payoutEndAge);
+  const payoutYears = payoutYearsForRetirementAge(payoutEndAge, retirementAge);
+  state.investment = {
+    ...state.investment,
+    retirementPayoutEndAge: payoutEndAge,
+    payoutYears,
+    retirementPayoutYears: payoutYears
+  };
   normalizeInvestmentBounds();
 }
 
@@ -1868,21 +1851,11 @@ function setInputValue(selector: string, value: number | string | string[]): voi
   if (input) input.value = String(value);
 }
 
-function setInputChecked(selector: string, checked: boolean): void {
-  const input = document.querySelector<HTMLInputElement>(selector);
-  if (input) input.checked = checked;
-}
-
 function setInputBounds(selector: string, min: number, max: number): void {
   const input = document.querySelector<HTMLInputElement>(selector);
   if (!input) return;
   input.min = String(min);
   input.max = String(max);
-}
-
-function setRetirementDepotToggleVisible(visible: boolean): void {
-  const wrapper = document.querySelector<HTMLElement>(".retirement-depot-toggle");
-  if (wrapper) wrapper.hidden = !visible;
 }
 
 function syncDepotScopedInvestmentFields(activeDepot: InvestmentDepotKey): void {
@@ -2182,15 +2155,31 @@ function normalizeInvestmentBounds(): void {
     )
   };
   nextInvestment.activeDepot = nextInvestment.activeDepot === "retirement" ? "retirement" : "standard";
-  if (nextInvestment.retirementDepotEnabled) {
-    const rawRetirementAge = Math.max(0, nextInvestment.retirementPayoutEndAge - nextInvestment.retirementPayoutYears);
-    if (rawRetirementAge < RETIREMENT_DEPOT_MIN_AGE) {
-      nextInvestment = {
-        ...nextInvestment,
-        retirementPayoutYears: clamp(nextInvestment.retirementPayoutEndAge - RETIREMENT_DEPOT_MIN_AGE, 1, 50)
-      };
-    }
-  }
+  const payoutEndAgeSource =
+    nextInvestment.activeDepot === "retirement" ? nextInvestment.retirementPayoutEndAge : nextInvestment.payoutEndAge;
+  const sharedPayoutEndAge = numericInvestmentValue(
+    "payoutEndAge",
+    String(payoutEndAgeSource)
+  );
+  nextInvestment = {
+    ...nextInvestment,
+    payoutEndAge: sharedPayoutEndAge,
+    retirementPayoutEndAge: sharedPayoutEndAge
+  };
+  const sharedRetirementAge = clampRetirementAge(
+    Math.max(
+      RETIREMENT_DEPOT_MIN_AGE,
+      nextInvestment.payoutEndAge - nextInvestment.payoutYears,
+      nextInvestment.payoutEndAge - nextInvestment.retirementPayoutYears
+    ),
+    sharedPayoutEndAge
+  );
+  const sharedPayoutYears = payoutYearsForRetirementAge(sharedPayoutEndAge, sharedRetirementAge);
+  nextInvestment = {
+    ...nextInvestment,
+    payoutYears: sharedPayoutYears,
+    retirementPayoutYears: sharedPayoutYears
+  };
 
   const standardRetirementAge = calculatePayoutStartAge({
     ...nextInvestment,
@@ -2207,11 +2196,12 @@ function normalizeInvestmentBounds(): void {
     includedIds: nextInvestment.retirementIncludedIds,
     includeAccountInterest: nextInvestment.retirementIncludeAccountInterest,
     includeAccountCashback: nextInvestment.retirementIncludeAccountCashback,
+    retirementDepotEnabled: true,
     birthYear: nextInvestment.retirementBirthYear,
     chartStartAge: nextInvestment.retirementChartStartAge,
-    payoutEndAge: nextInvestment.retirementPayoutEndAge,
+    payoutEndAge: nextInvestment.payoutEndAge,
     payoutYears: nextInvestment.retirementPayoutYears,
-    percentageWithdrawalStartAge: nextInvestment.retirementPayoutEndAge - nextInvestment.retirementPayoutYears,
+    percentageWithdrawalStartAge: nextInvestment.payoutEndAge - nextInvestment.retirementPayoutYears,
     percentageWithdrawalRatePercent: 0,
     investmentReturnPercent: nextInvestment.retirementInvestmentReturnPercent,
     capitalGainsTaxPercent: nextInvestment.retirementCapitalGainsTaxPercent,
@@ -2226,8 +2216,14 @@ function normalizeInvestmentBounds(): void {
   );
   state.investment = {
     ...nextInvestment,
+    payoutEndAge: sharedPayoutEndAge,
+    retirementPayoutEndAge: sharedPayoutEndAge,
     chartStartAge: standardChartStartAge,
-    percentageWithdrawalStartAge: clamp(nextInvestment.percentageWithdrawalStartAge, standardChartStartAge, standardRetirementAge),
+    percentageWithdrawalStartAge: clamp(
+      nextInvestment.percentageWithdrawalStartAge,
+      standardChartStartAge,
+      standardRetirementAge
+    ),
     retirementChartStartAge,
     retirementDepotChildren: numericInvestmentValue(
       "retirementDepotChildren",

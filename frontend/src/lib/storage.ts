@@ -7,7 +7,6 @@ import type {
   PlanningSettings,
   PositionFlow,
   ReservePosition,
-  RetirementDepotPreviousSettings,
   ThemeMode
 } from "../types";
 
@@ -114,7 +113,6 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     ),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
-    retirementDepotPreviousSettings: normalizeRetirementDepotPreviousSettings(value.retirementDepotPreviousSettings),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
@@ -173,7 +171,6 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     ),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
-    retirementDepotPreviousSettings: normalizeRetirementDepotPreviousSettings(value.retirementDepotPreviousSettings),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
@@ -215,22 +212,6 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
 
 function normalizeInvestmentDepotKey(value: unknown, fallback: InvestmentDepotKey): InvestmentDepotKey {
   return value === "retirement" || value === "standard" ? value : fallback;
-}
-
-function normalizeRetirementDepotPreviousSettings(value: unknown): RetirementDepotPreviousSettings | null {
-  if (!isRecord(value)) return null;
-  return {
-    payoutEndAge: numberOrDefault(value.payoutEndAge, defaultInvestmentSettings().payoutEndAge),
-    payoutYears: numberOrDefault(value.payoutYears, defaultInvestmentSettings().payoutYears),
-    percentageWithdrawalStartAge: numberOrDefault(
-      value.percentageWithdrawalStartAge,
-      defaultInvestmentSettings().percentageWithdrawalStartAge
-    ),
-    percentageWithdrawalRatePercent: numberOrDefault(
-      value.percentageWithdrawalRatePercent,
-      defaultInvestmentSettings().percentageWithdrawalRatePercent
-    )
-  };
 }
 
 function normalizePositions(

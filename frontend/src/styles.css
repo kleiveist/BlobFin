@@ -1227,42 +1227,6 @@ tfoot th {
   cursor: not-allowed;
 }
 
-.retirement-depot-toggle {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 74px;
-  width: min(100%, 360px);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-soft);
-  color: var(--text);
-  padding: 11px 12px;
-}
-
-.retirement-depot-toggle strong,
-.retirement-depot-toggle small {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.retirement-depot-toggle strong {
-  font-size: 0.9rem;
-}
-
-.retirement-depot-toggle small {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 750;
-}
-
-.retirement-depot-toggle:has(input:checked) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
 .savings-rate-card {
   display: grid;
   gap: 4px;

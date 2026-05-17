@@ -42,7 +42,6 @@ export interface InvestmentSettings {
   retirementIncludeAccountCashback: boolean;
   retirementDepotEnabled: boolean;
   retirementDepotChildren: number;
-  retirementDepotPreviousSettings: RetirementDepotPreviousSettings | null;
   birthYear: number;
   chartStartAge: number;
   payoutEndAge: number;
@@ -61,13 +60,6 @@ export interface InvestmentSettings {
   retirementCapitalGainsTaxPercent: number;
   retirementInflationRatePercent: number;
   retirementBequestReservePercent: number;
-}
-
-export interface RetirementDepotPreviousSettings {
-  payoutEndAge: number;
-  payoutYears: number;
-  percentageWithdrawalStartAge: number;
-  percentageWithdrawalRatePercent: number;
 }
 
 export interface AppState {

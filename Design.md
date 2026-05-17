@@ -189,7 +189,6 @@ Reserve-Chart-Regeln:
 | `.reserve-chart-toggle` | min-height `34px`, Padding `7px 10px`, Radius `6px` | Inaktiv BG `--surface-soft`, aktiv BG `--accent`, Text `#FFFFFF` | Grafikfilter |
 | `.theme-option` | min-height `48px`, Radius `8px` | BG `--surface-soft`, aktiv BG `--accent-soft` | Hell/Dunkel-Auswahl |
 | `.include-transfer-toggle` | min-height `74px`, Radius `8px`, Padding `11px 12px` | Inaktiv BG `--accent-soft`, aktiv BG `--accent`, Text `#FFFFFF` | Zinsen/Cashback investieren |
-| `.retirement-depot-toggle` | min-height `74px`, Breite bis `360px`, Radius `8px`, Padding `11px 12px` | Inaktiv BG `--surface-soft`, aktiv BG `--accent-soft`, Text `--accent-strong` | Altersvorsorgedepot aktivieren |
 | `.drag-handle` | `34px x 34px`, Radius `6px` | BG `--surface-soft`, Text `--muted` | Tabellenposition verschieben |
 
 Hover: `.button` und `.icon-button` nutzen `filter: brightness(0.98)`. Focus: Inputs, Selects und Buttons nutzen `3px` Outline in `--focus` mit `2px` Offset.

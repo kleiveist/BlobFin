@@ -154,7 +154,6 @@ export function renderAppShell(): string {
 
           <div class="investment-controls">
             <div class="investment-control-top">
-              ${retirementDepotToggle()}
               <aside class="savings-rate-card" aria-label="Sparrate">
                 <span>Jaehrliche Sparrate</span>
                 <strong id="annualSavingsRateMetric">-</strong>
@@ -205,7 +204,7 @@ export function renderAppShell(): string {
               <div class="retirement-depot-funding" id="retirementDepotFunding" aria-label="Foerderung">
                 <div class="retirement-depot-funding-head">
                   <span>Foerderung</span>
-                  <strong id="retirementDepotFundingStatus">Altersvorsorgedepot deaktiviert</strong>
+                  <strong id="retirementDepotFundingStatus">Aktiv nach Reformlogik ab 2027</strong>
                 </div>
                 <div class="retirement-depot-funding-grid">
                   ${chartMetric("retirementDepotOwnContributionMetric", "Eigenbeitrag p. a.")}
@@ -365,18 +364,6 @@ function rangeField(key: keyof InvestmentSettings, label: string, min: number, m
       <span>${label}</span>
       <input type="range" min="${min}" max="${max}" step="${step}" data-investment="${key}" />
       <strong id="${key}Value">-</strong>
-    </label>
-  `;
-}
-
-function retirementDepotToggle(): string {
-  return `
-    <label class="retirement-depot-toggle" for="retirementDepotEnabled" hidden>
-      <input id="retirementDepotEnabled" type="checkbox" data-retirement-depot-toggle="true" />
-      <span>
-        <strong>Altersvorsorgedepot aktivieren</strong>
-        <small>Zulagen einpreisen, Rentenalter mindestens 65 Jahre</small>
-      </span>
     </label>
   `;
 }
