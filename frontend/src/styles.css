@@ -1135,6 +1135,10 @@ tfoot th {
   overflow-wrap: anywhere;
 }
 
+.investment-depot-switch .position-mode-button span {
+  display: block;
+}
+
 .investment-selector,
 .investment-controls,
 .investment-visual,

@@ -133,7 +133,10 @@ export function renderAppShell(): string {
           <h2>Investment- und Auszahlungsplanung</h2>
           <div class="position-mode-switch investment-depot-switch" role="tablist" aria-label="Depot-Auswahl">
             <button class="position-mode-button" type="button" data-action="set-investment-depot-standard" aria-pressed="true">Depot</button>
-            <button class="position-mode-button" type="button" data-action="set-investment-depot-retirement" aria-pressed="false">Altersvorsorgedepot</button>
+            <button class="position-mode-button" type="button" data-action="set-investment-depot-retirement" aria-pressed="false" aria-label="Altersvorsorge-depot">
+              <span>Altersvorsorge-</span>
+              <span>depot</span>
+            </button>
             <button class="position-mode-button" type="button" data-action="set-investment-depot-child" aria-pressed="false">Kinderdepot</button>
           </div>
         </div>
