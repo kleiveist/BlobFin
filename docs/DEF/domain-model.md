@@ -22,7 +22,7 @@ Important fields:
 
 `PlanningSettings` contains the planning year, account interest rate, cashback rate, and emergency fund value. The legacy `monthlyNetIncome` setting is migrated into an income position and no longer drives calculations directly.
 
-`InvestmentSettings` contains separate normal-depot and retirement-depot selections, special interest/cashback investment toggles, retirement depot settings, age settings, return, tax, inflation, and percentage withdrawal settings.
+`InvestmentSettings` contains separate normal-depot and retirement-depot selections, special interest/cashback investment toggles, retirement depot settings, age settings, return, tax, inflation, reserve/bequest, and percentage withdrawal settings.
 
 ## Reserve Calculation
 
@@ -120,7 +120,7 @@ During the payout phase:
 - the retirement snapshot is used as the starting depot,
 - future one-time selected savings can still be added at their configured projection month,
 - percentage withdrawals can continue,
-- a net monthly pension is solved by binary search so the depot is consumed by the end age,
+- a net monthly pension is solved by binary search so the configured reserve/bequest percentage remains at the end age,
 - realized taxes are included in the withdrawal simulation.
 
 ## Tax Model

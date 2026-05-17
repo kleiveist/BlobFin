@@ -130,6 +130,7 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     investmentReturnPercent: numberOrDefault(value.investmentReturnPercent, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTaxPercent, fallback.capitalGainsTaxPercent),
     inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent),
+    bequestReservePercent: numberOrDefault(value.bequestReservePercent, fallback.bequestReservePercent),
     retirementBirthYear: numberOrDefault(value.retirementBirthYear, fallback.retirementBirthYear),
     retirementChartStartAge: numberOrDefault(value.retirementChartStartAge, fallback.retirementChartStartAge),
     retirementPayoutEndAge: numberOrDefault(value.retirementPayoutEndAge, fallback.retirementPayoutEndAge),
@@ -145,6 +146,10 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     retirementInflationRatePercent: numberOrDefault(
       value.retirementInflationRatePercent,
       fallback.retirementInflationRatePercent
+    ),
+    retirementBequestReservePercent: numberOrDefault(
+      value.retirementBequestReservePercent,
+      fallback.retirementBequestReservePercent
     )
   };
 }
@@ -184,6 +189,7 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     investmentReturnPercent: numberOrDefault(value.investmentReturn, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTax, fallback.capitalGainsTaxPercent),
     inflationRatePercent: numberOrDefault(value.inflationRate, fallback.inflationRatePercent),
+    bequestReservePercent: numberOrDefault(value.bequestReservePercent, fallback.bequestReservePercent),
     retirementBirthYear: numberOrDefault(value.retirementBirthYear, fallback.retirementBirthYear),
     retirementChartStartAge: numberOrDefault(value.retirementChartStartAge, fallback.retirementChartStartAge),
     retirementPayoutEndAge: numberOrDefault(value.retirementPayoutEndAge, fallback.retirementPayoutEndAge),
@@ -199,6 +205,10 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     retirementInflationRatePercent: numberOrDefault(
       value.retirementInflationRate ?? value.inflationRate,
       fallback.retirementInflationRatePercent
+    ),
+    retirementBequestReservePercent: numberOrDefault(
+      value.retirementBequestReservePercent ?? value.bequestReservePercent,
+      fallback.retirementBequestReservePercent
     )
   };
 }

@@ -57,7 +57,8 @@ type NumericInvestmentSetting =
   | "percentageWithdrawalRatePercent"
   | "investmentReturnPercent"
   | "capitalGainsTaxPercent"
-  | "inflationRatePercent";
+  | "inflationRatePercent"
+  | "bequestReservePercent";
 type ReserveChartCategory = "all" | "income" | "expense" | "savings";
 type ReserveChartScenario = "current" | "lowerExpenses" | "raiseSavings" | "balanced";
 type ReserveChartAdjustment = "none" | "down10" | "up10";
@@ -355,6 +356,7 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setRangeLabel("investmentReturnPercent", percent(activeSettings.investmentReturnPercent));
   setRangeLabel("capitalGainsTaxPercent", percent(activeSettings.capitalGainsTaxPercent));
   setRangeLabel("inflationRatePercent", percent(activeSettings.inflationRatePercent));
+  setRangeLabel("bequestReservePercent", percent(activeSettings.bequestReservePercent));
   setInputValue("[data-retirement-age]", projection.retirementAge);
 
   setText(
@@ -388,6 +390,10 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("detailSavingMonths", `${intNumber(projection.savingMonths)} Monate`);
   setText("detailMonthlyPension", money(projection.monthlyPension));
   setText("detailRealMonthlyPension", money(projection.realMonthlyPension));
+  setText(
+    "detailBequestReserve",
+    `${money(projection.bequestReserveAtEnd)} (${percent(projection.bequestReservePercent)})`
+  );
   setText("detailSelectedMonthlyRate", money(projection.monthlyRate));
 
   renderResultTable(reserve);
@@ -1244,7 +1250,8 @@ function inputInvestmentFields(): NumericInvestmentSetting[] {
     "percentageWithdrawalRatePercent",
     "investmentReturnPercent",
     "capitalGainsTaxPercent",
-    "inflationRatePercent"
+    "inflationRatePercent",
+    "bequestReservePercent"
   ];
 }
 
@@ -1273,6 +1280,8 @@ function numericInvestmentPatch(field: NumericInvestmentSetting, value: number):
       return { capitalGainsTaxPercent: value };
     case "inflationRatePercent":
       return { inflationRatePercent: value };
+    case "bequestReservePercent":
+      return { bequestReservePercent: value };
   }
   return {};
 }
@@ -1323,7 +1332,8 @@ function depotInvestmentSettings(depot: InvestmentDepotKey): InvestmentSettings 
     percentageWithdrawalRatePercent: 0,
     investmentReturnPercent: state.investment.retirementInvestmentReturnPercent,
     capitalGainsTaxPercent: state.investment.retirementCapitalGainsTaxPercent,
-    inflationRatePercent: state.investment.retirementInflationRatePercent
+    inflationRatePercent: state.investment.retirementInflationRatePercent,
+    bequestReservePercent: state.investment.retirementBequestReservePercent
   };
 }
 
@@ -1347,7 +1357,9 @@ function updateDepotInvestmentSettings(depot: InvestmentDepotKey, updates: Parti
       updates.investmentReturnPercent ?? state.investment.retirementInvestmentReturnPercent,
     retirementCapitalGainsTaxPercent:
       updates.capitalGainsTaxPercent ?? state.investment.retirementCapitalGainsTaxPercent,
-    retirementInflationRatePercent: updates.inflationRatePercent ?? state.investment.retirementInflationRatePercent
+    retirementInflationRatePercent: updates.inflationRatePercent ?? state.investment.retirementInflationRatePercent,
+    retirementBequestReservePercent:
+      updates.bequestReservePercent ?? state.investment.retirementBequestReservePercent
   };
 }
 
@@ -2083,6 +2095,8 @@ function combineAssetProjections(standard: AssetProjection, retirement: AssetPro
     retirementDepotChildren: retirement.retirementDepotChildren,
     monthlyPension: standard.monthlyPension + retirement.monthlyPension,
     realMonthlyPension: standard.realMonthlyPension + retirement.realMonthlyPension,
+    bequestReservePercent: Math.max(standard.bequestReservePercent, retirement.bequestReservePercent),
+    bequestReserveAtEnd: standard.bequestReserveAtEnd + retirement.bequestReserveAtEnd,
     percentageWithdrawalMonthlyAtStart:
       standard.percentageWithdrawalMonthlyAtStart + retirement.percentageWithdrawalMonthlyAtStart,
     percentageWithdrawalAnnualAtStart:
@@ -2201,7 +2215,8 @@ function normalizeInvestmentBounds(): void {
     percentageWithdrawalRatePercent: 0,
     investmentReturnPercent: nextInvestment.retirementInvestmentReturnPercent,
     capitalGainsTaxPercent: nextInvestment.retirementCapitalGainsTaxPercent,
-    inflationRatePercent: nextInvestment.retirementInflationRatePercent
+    inflationRatePercent: nextInvestment.retirementInflationRatePercent,
+    bequestReservePercent: nextInvestment.retirementBequestReservePercent
   };
   const retirementAge = calculatePayoutStartAge(retirementSettings);
   const retirementChartStartAge = clamp(
@@ -2217,6 +2232,14 @@ function normalizeInvestmentBounds(): void {
     retirementDepotChildren: numericInvestmentValue(
       "retirementDepotChildren",
       String(nextInvestment.retirementDepotChildren)
+    ),
+    bequestReservePercent: numericInvestmentValue(
+      "bequestReservePercent",
+      String(nextInvestment.bequestReservePercent)
+    ),
+    retirementBequestReservePercent: numericInvestmentValue(
+      "bequestReservePercent",
+      String(nextInvestment.retirementBequestReservePercent)
     )
   };
 }
@@ -2266,5 +2289,6 @@ function investmentMax(field: keyof InvestmentSettings): number {
   if (field === "investmentReturnPercent") return 30;
   if (field === "capitalGainsTaxPercent") return 50;
   if (field === "inflationRatePercent") return 10;
+  if (field === "bequestReservePercent") return 50;
   return Number.MAX_SAFE_INTEGER;
 }

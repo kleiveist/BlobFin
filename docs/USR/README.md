@@ -19,5 +19,5 @@ This folder explains BlobFin from an application user perspective. It focuses on
 3. Mark which positions are active, visible, interest-bearing, cashback-enabled, or investable.
 4. Check the yearly table and result metrics.
 5. Select investable positions for the investment projection.
-6. Configure age, return, tax, inflation, withdrawal, and payout assumptions.
+6. Configure age, return, tax, inflation, reserve, withdrawal, and payout assumptions.
 7. Inspect the investment chart and statistics.

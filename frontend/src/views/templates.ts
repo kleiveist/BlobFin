@@ -175,6 +175,7 @@ export function renderAppShell(): string {
                 ${rangeField("investmentReturnPercent", "Jaehrliche Rendite", 0, 30, 0.1)}
                 ${rangeField("capitalGainsTaxPercent", "Kapitalertragsteuer auf Wertzuwachs", 0, 50, 0.1)}
                 ${rangeField("inflationRatePercent", "Inflation pro Jahr", 1, 10, 0.1)}
+                ${rangeField("bequestReservePercent", "Reserve/Erbe vom Maximalvermoegen", 0, 50, 0.5)}
               </div>
             </div>
           </div>
@@ -242,6 +243,7 @@ export function renderAppShell(): string {
                 ${detailLine("Ansparzeit", "detailSavingMonths")}
                 ${detailLine("Monatliche gleichmaessige Entnahme netto", "detailMonthlyPension")}
                 ${detailLine("Monatliche gleichmaessige Entnahme real", "detailRealMonthlyPension")}
+                ${detailLine("Reserve/Erbe zum Endalter", "detailBequestReserve")}
                 ${detailLine("Gewaehlte Monatsrate", "detailSelectedMonthlyRate")}
                 </div>
               </div>

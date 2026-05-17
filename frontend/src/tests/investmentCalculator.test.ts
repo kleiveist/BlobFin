@@ -135,7 +135,8 @@ describe("investment calculator", () => {
       payoutEndAge: 95,
       payoutYears: 30,
       percentageWithdrawalRatePercent: 0,
-      inflationRatePercent: 2.5
+      inflationRatePercent: 2.5,
+      bequestReservePercent: 0
     };
 
     const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
@@ -150,6 +151,30 @@ describe("investment calculator", () => {
     expect(projection.wealthAtRetirement).toBeCloseTo(16769.53, 1);
     expect(projection.monthlyPension).toBeCloseTo(139.98, 1);
     expect(projection.realWealthAtRetirement).toBeCloseTo(7609.52, 1);
+  });
+
+  it("holds back the configured reserve for inheritance or longevity", () => {
+    const state = defaultAppState();
+    state.investment = {
+      ...state.investment,
+      payoutEndAge: 82,
+      payoutYears: 20,
+      percentageWithdrawalRatePercent: 0,
+      investmentReturnPercent: 5,
+      bequestReservePercent: 10
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+    const noReserveProjection = buildAssetProjection(state.settings.year, state.positions, {
+      ...state.investment,
+      bequestReservePercent: 0
+    });
+    const finalPoint = projection.points[projection.points.length - 1];
+
+    expect(projection.bequestReservePercent).toBe(10);
+    expect(projection.monthlyPension).toBeLessThan(noReserveProjection.monthlyPension);
+    expect(projection.bequestReserveAtEnd).toBeCloseTo(finalPoint.netBalance, 2);
+    expect(projection.bequestReserveAtEnd).toBeCloseTo(projection.wealthAtRetirement * 0.1, 0);
   });
 
   it("starts recurring investment positions in their configured start year and month", () => {

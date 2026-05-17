@@ -160,13 +160,15 @@ export function defaultInvestmentSettings(): InvestmentSettings {
     investmentReturnPercent: 14,
     capitalGainsTaxPercent: 26.375,
     inflationRatePercent: 2,
+    bequestReservePercent: 10,
     retirementBirthYear: 1993,
     retirementChartStartAge: 32,
     retirementPayoutEndAge: 95,
     retirementPayoutYears: 30,
     retirementInvestmentReturnPercent: 14,
     retirementCapitalGainsTaxPercent: 26.375,
-    retirementInflationRatePercent: 2
+    retirementInflationRatePercent: 2,
+    retirementBequestReservePercent: 10
   };
 }
 

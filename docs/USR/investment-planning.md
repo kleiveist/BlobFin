@@ -21,7 +21,7 @@ Two additional investment toggles can be enabled per depot:
 - `Cashback`: invests yearly cashback from the yearly table.
 - `Altersvorsorgedepot aktivieren`: appears only on the `Altersvorsorgedepot` tab and adds the communicated allowance model to that projection.
 
-Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depot at a time. If a value is already used by the other depot, the control is disabled in the current tab.
+Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depot at a time. Savings positions already used by the other depot are hidden in the current tab.
 
 ## Age And Timeline Fields
 
@@ -54,6 +54,7 @@ The retirement depot chart adds eligible allowances as depot contributions and s
 - `Jaehrliche Rendite`: annual investment return assumption.
 - `Kapitalertragsteuer auf Wertzuwachs`: tax rate applied only to realized gains.
 - `Inflation pro Jahr`: inflation rate used for real-value metrics.
+- `Reserve/Erbe vom Maximalvermoegen`: share of retirement wealth held back until the end age as inheritance or longevity reserve. The default is 10%.
 
 Capital gains tax is not applied during pure holding periods. It is applied when withdrawals realize gains. The taxable part of a withdrawal is based on the gain share of the current depot balance. The contributed cost basis is not taxed.
 
@@ -83,5 +84,6 @@ Click a bar to open a popup for that year. The popup shows:
 - `Monatlicher Zugewinn durch Entnahme`: monthly percentage withdrawal split into the remaining recurring monthly investment rate after offset and the remaining net withdrawal, floored at zero.
 - `Monatliche Rente netto`: simulated net monthly payout over the payout period.
 - `Reales Vermoegen zur Rente`: retirement wealth adjusted for inflation.
+- `Reserve/Erbe zum Endalter`: projected remaining depot value at the end age based on the configured reserve/bequest percentage.
 - `Realisierte Steuern bis Rente`: taxes realized before retirement through percentage withdrawals.
 - `Offene Steuer bei Verkauf zur Rente`: estimated tax on unrealized gains if the whole depot were sold at retirement.

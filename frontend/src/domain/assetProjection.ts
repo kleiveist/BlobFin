@@ -84,6 +84,7 @@ export function buildAssetProjection(
   const percentageWithdrawalAnnualAtStart = percentageWithdrawalMonthlyAtStart * 12;
   const withdrawalRemainingSavingsMonthlyAtStart = Math.max(0, monthlyRate - percentageWithdrawalMonthlyAtStart);
   const withdrawalGainMonthlyAtStart = Math.max(0, percentageWithdrawalMonthlyAtStart - monthlyRate);
+  const reservePercent = bequestReservePercent(settings);
 
   const points: AssetProjectionPoint[] = [];
   let previousTax = 0;
@@ -120,6 +121,8 @@ export function buildAssetProjection(
     retirementDepotChildren: settings.retirementDepotChildren,
     monthlyPension,
     realMonthlyPension,
+    bequestReservePercent: reservePercent,
+    bequestReserveAtEnd: finalPoint?.netBalance ?? 0,
     percentageWithdrawalMonthlyAtStart,
     percentageWithdrawalAnnualAtStart,
     withdrawalRemainingSavingsMonthlyAtStart,
@@ -394,6 +397,7 @@ function solveNetMonthlyPension(
     monthlyReturn,
     payoutMonths
   );
+  const targetReserve = Math.max(1, startSnapshot.grossBalance * (bequestReservePercent(settings) / 100));
   let low = 0;
   let high = grossMonthlyPension;
 
@@ -410,7 +414,7 @@ function solveNetMonthlyPension(
       retirementAge,
       endAge
     );
-    if (snapshot.grossBalance > 1) low = candidate;
+    if (snapshot.grossBalance > targetReserve) low = candidate;
     else high = candidate;
   }
 
@@ -423,6 +427,10 @@ function percentageWithdrawalStartAge(settings: InvestmentSettings): number {
 
 function percentageWithdrawalRatePercent(settings: InvestmentSettings): number {
   return settings.retirementDepotEnabled ? 0 : settings.percentageWithdrawalRatePercent;
+}
+
+function bequestReservePercent(settings: InvestmentSettings): number {
+  return Math.min(100, Math.max(0, settings.bequestReservePercent));
 }
 
 function netPercentageWithdrawalAtStart(snapshot: SavingSnapshot, settings: InvestmentSettings): number {

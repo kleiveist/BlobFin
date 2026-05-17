@@ -52,6 +52,7 @@ export interface InvestmentSettings {
   investmentReturnPercent: number;
   capitalGainsTaxPercent: number;
   inflationRatePercent: number;
+  bequestReservePercent: number;
   retirementBirthYear: number;
   retirementChartStartAge: number;
   retirementPayoutEndAge: number;
@@ -59,6 +60,7 @@ export interface InvestmentSettings {
   retirementInvestmentReturnPercent: number;
   retirementCapitalGainsTaxPercent: number;
   retirementInflationRatePercent: number;
+  retirementBequestReservePercent: number;
 }
 
 export interface RetirementDepotPreviousSettings {
@@ -150,6 +152,8 @@ export interface AssetProjection {
   retirementDepotChildren: number;
   monthlyPension: number;
   realMonthlyPension: number;
+  bequestReservePercent: number;
+  bequestReserveAtEnd: number;
   percentageWithdrawalMonthlyAtStart: number;
   percentageWithdrawalAnnualAtStart: number;
   withdrawalRemainingSavingsMonthlyAtStart: number;
