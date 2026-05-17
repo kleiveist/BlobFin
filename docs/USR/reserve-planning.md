@@ -3,7 +3,7 @@
 <!-- AUTO-GENERATED:backlink END -->
 # Reserve Planning
 
-The `Kosten- und Ruecklagenpositionen` table is the base for the yearly planning view and for investable contributions. It can be switched between `Einnahmen`, `Ausgaben`, and `Sparen`.
+The `Kosten- und Ruecklagenpositionen` table is the base for the yearly planning view and for investable contributions. It can be switched between `Einnahmen`, `Ausgaben`, `Ruecklagen`, and `Sparen`.
 
 ## Position Fields
 
@@ -32,12 +32,15 @@ Income rows:
 
 Expense rows:
 
-- `Ruecklage`: money built up for future costs.
 - `Temporar`: active expense or temporary cost position.
+
+Reserve rows:
+
+- `Fixbestand`: a fixed balance or baseline amount. It is not treated as a planned outflow.
+- `Ruecklage`: money built up for future costs.
 
 Savings rows:
 
-- `Fixbestand`: a fixed balance or baseline amount. It is not treated as a planned outflow.
 - `Sparrate`: savings position. Only this type can be selected for the investment projection.
 
 ## Payout Cadence
@@ -64,6 +67,10 @@ Cashback is only valid for `Temporar` positions with `Cashback` enabled.
 - One-time payout creates cashback once in the configured payout year and month.
 
 The yearly cashback result can be transferred into one investment depot with the `Cashback` toggle.
+
+## Positions Chart
+
+The `Positionsgrafik` can be shown as bars or as a pie chart. It separates `Einnahmen`, `Ausgaben`, `Ruecklagen`, and `Sparrate`; reserve rows are no longer grouped into expenses in this chart.
 
 ## Yearly Table
 

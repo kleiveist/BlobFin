@@ -20,6 +20,7 @@
   --accent-soft: #d9ede7;
   --gold: #b87514;
   --gold-soft: #f3dfba;
+  --reserve: #c65f1a;
   --danger: #b42318;
   --good: #11795f;
   --focus: rgba(31, 122, 104, 0.18);
@@ -48,6 +49,7 @@
   --accent-soft: #203b33;
   --gold: #e5b760;
   --gold-soft: #352a18;
+  --reserve: #f09a54;
   --danger: #ff8a80;
   --good: #6fe0b4;
   --focus: rgba(70, 196, 157, 0.25);
@@ -234,7 +236,7 @@ button:focus-visible {
 
 .position-table-switch {
   display: grid;
-  grid-template-columns: repeat(3, minmax(104px, 1fr));
+  grid-template-columns: repeat(4, minmax(104px, 1fr));
 }
 
 .position-mode-button {
@@ -589,6 +591,10 @@ button:focus-visible {
   color: var(--danger);
 }
 
+.reserve-chart-stat.reserve strong {
+  color: var(--reserve);
+}
+
 .reserve-chart-stat.savings strong {
   color: var(--accent-strong);
 }
@@ -643,6 +649,10 @@ button:focus-visible {
   background: var(--danger);
 }
 
+.reserve-chart-bar.reserve {
+  background: var(--reserve);
+}
+
 .reserve-chart-bar.savings {
   background: var(--accent);
 }
@@ -675,6 +685,22 @@ button:focus-visible {
 
 .legend-dot.gold {
   background: var(--gold);
+}
+
+.reserve-chart-legend .legend-dot.green {
+  background: var(--good);
+}
+
+.reserve-chart-legend .legend-dot.red {
+  background: var(--danger);
+}
+
+.reserve-chart-legend .legend-dot.orange {
+  background: var(--reserve);
+}
+
+.reserve-chart-legend .legend-dot.purple {
+  background: var(--accent);
 }
 
 .reserve-chart-insight {

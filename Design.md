@@ -37,6 +37,7 @@ BlobFin ist ein ruhiges Finanz- und Planungstool. Die Oberflaeche nutzt kompakte
 | `--accent-soft` | Primaer weich | `#D9EDE7` | Sekundaerbutton, Infobox, Toggle-Flaeche |
 | `--gold` | Gold | `#B87514` | Markierung, permanente Werte |
 | `--gold-soft` | Gold weich | `#F3DFBA` | Markierte Position, permanente Spalte |
+| `--reserve` | Ruecklagen | `#C65F1A` | Ruecklagen-Balken und Kreisdiagramm-Segment |
 | `--danger` | Negativ/Gefahr | `#B42318` | Negative Werte, Ausgaben, Danger-Text |
 | `--good` | Positiv | `#11795F` | Positive Werte, Einnahmen |
 | `--focus` | Fokus | `rgba(31, 122, 104, 0.18)` / `#1F7A682E` | Focus outline |
@@ -66,6 +67,7 @@ BlobFin ist ein ruhiges Finanz- und Planungstool. Die Oberflaeche nutzt kompakte
 | `--accent-soft` | Primaer weich | `#203B33` | Sekundaerbutton, Infobox, Toggle-Flaeche |
 | `--gold` | Gold | `#E5B760` | Markierung, permanente Werte |
 | `--gold-soft` | Gold weich | `#352A18` | Markierte Position, permanente Spalte |
+| `--reserve` | Ruecklagen | `#F09A54` | Ruecklagen-Balken und Kreisdiagramm-Segment |
 | `--danger` | Negativ/Gefahr | `#FF8A80` | Negative Werte, Ausgaben, Danger-Text |
 | `--good` | Positiv | `#6FE0B4` | Positive Werte, Einnahmen |
 | `--focus` | Fokus | `rgba(70, 196, 157, 0.25)` / `#46C49D40` | Focus outline |
@@ -120,6 +122,7 @@ Investment-Canvas:
 | --- | --- | --- |
 | Einnahmen | `--good` (`#11795F` hell, `#6FE0B4` dunkel) | Balken, Statistik, positives Ergebnis |
 | Ausgaben | `--danger` (`#B42318` hell, `#FF8A80` dunkel) | Balken, Statistik, negatives Ergebnis |
+| Ruecklagen | `--reserve` (`#C65F1A` hell, `#F09A54` dunkel) | Balken, Statistik, Kreisdiagramm-Segment |
 | Sparen | `--accent` (`#1F7A68` hell, `#46C49D` dunkel) | Balken und Kreisdiagramm-Segment |
 | Markierte Position | `--gold` (`#B87514` hell, `#E5B760` dunkel) | Selektierter Balken und Legendenpunkt |
 | Markierte Position weich | `--gold-soft` (`#F3DFBA` hell, `#352A18` dunkel) | Hintergrund aktiver Positionskarte |
@@ -133,7 +136,7 @@ Reserve-Chart-Regeln:
 - Plot: `12` Monats-Spalten, `8px` Gap, `1px` Border, `8px` Radius.
 - Monatsbalken: `12px` breit, `3px` Mindesthoehe, Radius `5px 5px 0 0`.
 - Selektionsbalken: `8px` breit, `--gold`, Ring `0 0 0 2px --gold-soft`.
-- Kreisdiagramm: `conic-gradient` aus Ausgaben, Sparen, Uebrig, Fehlbetrag.
+- Kreisdiagramm: `conic-gradient` aus Ausgaben, Ruecklagen, Sparen, Uebrig, Fehlbetrag.
 - Kreisdiagramm-Center: `52%` Durchmesser, `1px` Border, `--surface`.
 
 ## Typografie
@@ -184,8 +187,8 @@ Reserve-Chart-Regeln:
 | `.settings-button` | `38px x 38px`, Radius `8px` | BG `--surface`, Text/Fuellung `--accent-strong`, Border `--border` | Theme-Menue |
 | `.chart-popup-close` | `28px x 28px`, Radius `6px` | BG `--chart-field` oder `--surface-soft`, Text `--chart-text` oder `--text` | Popup schliessen |
 | `.position-mode-switch` | min-height `38px`, Radius `6px` | BG `--surface-soft`, Border `--border` | Segmented Control |
-| `.position-mode-button` | min-width `104px`, Padding `9px 12px` | Inaktiv Text `--muted`, aktiv BG `--accent`, Text `#FFFFFF` | Einnahmen/Ausgaben/Sparen |
-| `.investment-depot-switch` | 2 Spalten, min `120px` je Tab | wie Segmented Control | Depot/Altersvorsorgedepot |
+| `.position-mode-button` | min-width `104px`, Padding `9px 12px` | Inaktiv Text `--muted`, aktiv BG `--accent`, Text `#FFFFFF` | Einnahmen/Ausgaben/Ruecklagen/Sparen |
+| `.investment-depot-switch` | responsive Tabs, min `118px` je Tab | wie Segmented Control | Depot/Altersvorsorge-depot/Kinderdepot |
 | `.reserve-chart-toggle` | min-height `34px`, Padding `7px 10px`, Radius `6px` | Inaktiv BG `--surface-soft`, aktiv BG `--accent`, Text `#FFFFFF` | Grafikfilter |
 | `.theme-option` | min-height `48px`, Radius `8px` | BG `--surface-soft`, aktiv BG `--accent-soft` | Hell/Dunkel-Auswahl |
 | `.include-transfer-toggle` | min-height `74px`, Radius `8px`, Padding `11px 12px` | Inaktiv BG `--accent-soft`, aktiv BG `--accent`, Text `#FFFFFF` | Zinsen/Cashback investieren |

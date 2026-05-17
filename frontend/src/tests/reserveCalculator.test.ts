@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultAppState } from "../data/defaults";
 import { calculateReserveSummary } from "../domain/reserveCalculator";
 import { exportPositionsCsv, exportYearTableCsv, parseCsv, positionsFromCsvRows } from "../lib/csv";
+import { positionTableMode } from "../lib/positionKinds";
 
 describe("reserve calculator", () => {
   it("keeps the imported default yearly values deterministic", () => {
@@ -20,6 +21,15 @@ describe("reserve calculator", () => {
     expect(summary.rows[0].monthlyCashback).toBeCloseTo(3.24, 2);
     expect(Math.round(summary.totalCashback * 100) / 100).toBe(38.88);
     expect(summary.maxNeededWithEmergencyFund).toBe(2294);
+  });
+
+  it("keeps reserve positions in their own table mode", () => {
+    const state = defaultAppState();
+
+    expect(positionTableMode(state.positions.find((position) => position.id === "dispo-reserve")!)).toBe("reserve");
+    expect(positionTableMode(state.positions.find((position) => position.id === "kfz-ruecklage")!)).toBe("reserve");
+    expect(positionTableMode(state.positions.find((position) => position.id === "uni-gebuehr")!)).toBe("expense");
+    expect(positionTableMode(state.positions.find((position) => position.id === "investitionsrate")!)).toBe("savings");
   });
 
   it("only grants cashback for temporary positions with matching payout cadence", () => {

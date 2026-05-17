@@ -86,6 +86,7 @@ export function renderAppShell(): string {
             <div class="position-mode-switch position-table-switch" role="tablist" aria-label="Positionstabelle">
               <button class="position-mode-button" type="button" data-action="show-income-positions" aria-pressed="false">Einnahmen</button>
               <button class="position-mode-button" type="button" data-action="show-expense-positions" aria-pressed="true">Ausgaben</button>
+              <button class="position-mode-button" type="button" data-action="show-reserve-positions" aria-pressed="false">Ruecklagen</button>
               <button class="position-mode-button" type="button" data-action="show-savings-positions" aria-pressed="false">Sparen</button>
             </div>
           </div>
@@ -294,18 +295,25 @@ export function positionTypeSelect(position: ReservePosition): string {
     `;
   }
 
-  if (position.type === "fixed" || position.type === "savings") {
+  if (position.type === "savings") {
+    return `
+      <select data-position-id="${position.id}" data-position-field="type">
+        <option value="savings" ${position.type === "savings" ? "selected" : ""}>Sparrate</option>
+      </select>
+    `;
+  }
+
+  if (position.type === "fixed" || position.type === "reserve") {
     return `
       <select data-position-id="${position.id}" data-position-field="type">
         <option value="fixed" ${position.type === "fixed" ? "selected" : ""}>Fixbestand</option>
-        <option value="savings" ${position.type === "savings" ? "selected" : ""}>Sparrate</option>
+        <option value="reserve" ${position.type === "reserve" ? "selected" : ""}>Monatliche Ruecklage</option>
       </select>
     `;
   }
 
   return `
     <select data-position-id="${position.id}" data-position-field="type">
-      <option value="reserve" ${position.type === "reserve" ? "selected" : ""}>Monatliche Ruecklage</option>
       <option value="temporary" ${position.type === "temporary" ? "selected" : ""}>Temporaer</option>
     </select>
   `;

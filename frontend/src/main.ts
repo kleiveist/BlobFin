@@ -60,7 +60,7 @@ type NumericInvestmentSetting =
   | "capitalGainsTaxPercent"
   | "inflationRatePercent"
   | "bequestReservePercent";
-type ReserveChartCategory = "all" | "income" | "expense" | "savings";
+type ReserveChartCategory = "all" | "income" | "expense" | "reserve" | "savings";
 type ReserveChartScenario = "current" | "lowerExpenses" | "raiseSavings" | "balanced";
 type ReserveChartAdjustment = "none" | "down10" | "up10";
 type ReserveChartStyle = "bars" | "pie";
@@ -68,6 +68,7 @@ interface ReserveChartMonth {
   month: string;
   income: number;
   expense: number;
+  reserve: number;
   savings: number;
   selected: number;
 }
@@ -75,6 +76,7 @@ interface ReserveChartMonth {
 interface ReserveChartTotals {
   income: number;
   expense: number;
+  reserve: number;
   savings: number;
   remaining: number;
 }
@@ -198,6 +200,7 @@ function bindEvents(): void {
     if (action === "reset") resetState();
     if (action === "show-income-positions") setSelectedPositionMode("income");
     if (action === "show-expense-positions") setSelectedPositionMode("expense");
+    if (action === "show-reserve-positions") setSelectedPositionMode("reserve");
     if (action === "show-savings-positions") setSelectedPositionMode("savings");
     if (action === "toggle-result-max-needed") toggleResultMaxNeeded();
     if (action === "set-investment-depot-standard") setInvestmentDepot("standard");
@@ -500,7 +503,7 @@ function renderPositions(): void {
 }
 
 function renderPositionModeControls(): void {
-  for (const mode of ["income", "expense", "savings"] as PositionTableMode[]) {
+  for (const mode of ["income", "expense", "reserve", "savings"] as PositionTableMode[]) {
     const button = document.querySelector<HTMLButtonElement>(`[data-action='show-${mode}-positions']`);
     if (!button) continue;
     const active = selectedPositionMode === mode;
@@ -556,12 +559,14 @@ function renderPositionTableHead(): void {
 
 function positionModeEmptyLabel(mode: PositionTableMode): string {
   if (mode === "income") return "Einnahmen";
+  if (mode === "reserve") return "Ruecklagen";
   if (mode === "savings") return "Sparpositionen";
   return "Ausgaben";
 }
 
 function addPositionButtonLabel(mode: PositionTableMode): string {
   if (mode === "income") return "Einnahme hinzufuegen";
+  if (mode === "reserve") return "Ruecklage hinzufuegen";
   if (mode === "savings") return "Sparposition hinzufuegen";
   return "Ausgabe hinzufuegen";
 }
@@ -653,7 +658,7 @@ function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSumm
     <div class="reserve-chart-head">
       <div>
         <span>Positionsgrafik</span>
-        <strong>Einnahmen, Ausgaben und Sparrate</strong>
+        <strong>Einnahmen, Ausgaben, Ruecklagen und Sparrate</strong>
       </div>
       <div class="reserve-chart-head-actions">
         <div class="reserve-chart-style-switch" role="group" aria-label="Grafikstil">
@@ -667,6 +672,7 @@ function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSumm
       ${reserveChartToggle("category", "all", "Alle", reserveChartCategory)}
       ${reserveChartToggle("category", "income", "Einnahmen", reserveChartCategory)}
       ${reserveChartToggle("category", "expense", "Ausgaben", reserveChartCategory)}
+      ${reserveChartToggle("category", "reserve", "Ruecklagen", reserveChartCategory)}
       ${reserveChartToggle("category", "savings", "Sparen", reserveChartCategory)}
     </div>
     <div class="reserve-chart-controls scenario" aria-label="Szenario">
@@ -678,6 +684,7 @@ function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSumm
     <div class="reserve-chart-summary">
       ${reserveChartStat("Einnahmen", model.totals.income, "income")}
       ${reserveChartStat("Ausgaben", model.totals.expense, "expense")}
+      ${reserveChartStat("Ruecklagen", model.totals.reserve, "reserve")}
       ${reserveChartStat("Sparrate", model.totals.savings, "savings")}
       ${reserveChartStat("Uebrig", model.totals.remaining, model.totals.remaining >= 0 ? "income" : "expense")}
     </div>
@@ -685,6 +692,7 @@ function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSumm
     <div class="reserve-chart-legend">
       <span><i class="legend-dot green"></i>Einnahmen</span>
       <span><i class="legend-dot red"></i>Ausgaben</span>
+      <span><i class="legend-dot orange"></i>Ruecklagen</span>
       <span><i class="legend-dot purple"></i>Sparen</span>
       ${reserveChartHighlightId ? '<span><i class="legend-dot gold"></i>Markierte Position</span>' : ""}
     </div>
@@ -718,6 +726,11 @@ function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSumm
 function buildReserveChartModel(summary: ReturnType<typeof calculateReserveSummary>): ReserveChartModel {
   const factors = reserveChartScenarioFactors();
   const months = summary.rows.map((row) => {
+    const reserves = state.positions.reduce((sum, position) => {
+      return position.type === "reserve"
+        ? sum + calculatePlannedOutflowForSingleMonth(position, state.settings.year, row.monthNumber)
+        : sum;
+    }, 0);
     const savings = state.positions.reduce((sum, position) => {
       return position.type === "savings"
         ? sum + calculatePlannedOutflowForSingleMonth(position, state.settings.year, row.monthNumber)
@@ -731,13 +744,15 @@ function buildReserveChartModel(summary: ReturnType<typeof calculateReserveSumma
     const selectedCategory = reserveChartHighlightId ? reserveHighlightedPositionCategory() : null;
     const income = row.plannedIncome + (selectedCategory === "income" ? selectedDelta : 0);
     const expense =
-      Math.max(0, row.plannedOutflow - savings) * factors.expense +
+      Math.max(0, row.plannedOutflow - reserves - savings) * factors.expense +
       (selectedCategory === "expense" ? selectedDelta : 0);
+    const displayReserve = reserves + (selectedCategory === "reserve" ? selectedDelta : 0);
     const displaySavings = savings * factors.savings + (selectedCategory === "savings" ? selectedDelta : 0);
     return {
       month: row.month,
       income: Math.max(0, income),
       expense: Math.max(0, expense),
+      reserve: Math.max(0, displayReserve),
       savings: Math.max(0, displaySavings),
       selected
     };
@@ -746,14 +761,15 @@ function buildReserveChartModel(summary: ReturnType<typeof calculateReserveSumma
     (sum, month) => ({
       income: sum.income + month.income,
       expense: sum.expense + month.expense,
+      reserve: sum.reserve + month.reserve,
       savings: sum.savings + month.savings,
-      remaining: sum.remaining + month.income - month.expense - month.savings
+      remaining: sum.remaining + month.income - month.expense - month.reserve - month.savings
     }),
-    { income: 0, expense: 0, savings: 0, remaining: 0 }
+    { income: 0, expense: 0, reserve: 0, savings: 0, remaining: 0 }
   );
   const maxValue = Math.max(
     1,
-    ...months.flatMap((month) => [month.income, month.expense, month.savings, month.selected])
+    ...months.flatMap((month) => [month.income, month.expense, month.reserve, month.savings, month.selected])
   );
 
   return {
@@ -779,6 +795,7 @@ function reserveBarChart(model: ReserveChartModel): string {
           <div class="reserve-chart-bars">
             ${reserveChartBar("income", month.income, model.maxValue)}
             ${reserveChartBar("expense", month.expense, model.maxValue)}
+            ${reserveChartBar("reserve", month.reserve, model.maxValue)}
             ${reserveChartBar("savings", month.savings, model.maxValue)}
             ${month.selected > 0 ? reserveChartSelectedBar(month.selected, model.maxValue) : ""}
           </div>
@@ -806,7 +823,8 @@ function reservePieChart(model: ReserveChartModel): string {
       </div>
       <div class="reserve-pie-details">
         ${reservePieField("income", "Einnahmen", model.totals.income, "Bezugswert")}
-        ${reservePieField("expense", "Kosten / Ausgaben", model.totals.expense, "Anteil am Einkommen")}
+        ${reservePieField("expense", "Ausgaben", model.totals.expense, "Anteil am Einkommen")}
+        ${reservePieField("reserve", "Ruecklagen", model.totals.reserve, "Anteil am Einkommen")}
         ${reservePieField("savings", "Sparrate", model.totals.savings, `Sparquote ${percent(savingsRate * 100)}`)}
         ${reservePieField(
           model.totals.remaining >= 0 ? "remaining" : "deficit",
@@ -824,6 +842,7 @@ function reservePieSegments(totals: ReserveChartTotals): Array<{ key: string; va
   const deficit = Math.max(0, -totals.remaining);
   return [
     { key: "expense", value: totals.expense, color: "var(--danger)" },
+    { key: "reserve", value: totals.reserve, color: "var(--reserve)" },
     { key: "savings", value: totals.savings, color: "var(--accent)" },
     { key: "remaining", value: remaining, color: "var(--good)" },
     { key: "deficit", value: deficit, color: "var(--gold)" }
@@ -844,7 +863,9 @@ function reservePieBackground(segments: Array<{ key: string; value: number; colo
 
 function reservePieField(key: string, label: string, value: number, detail: string): string {
   const action =
-    key === "income" || key === "expense" || key === "savings" ? `data-action="set-reserve-chart-category-${key}"` : "";
+    key === "income" || key === "expense" || key === "reserve" || key === "savings"
+      ? `data-action="set-reserve-chart-category-${key}"`
+      : "";
   const active =
     key === reserveChartCategory || (key === "remaining" && reserveChartCategory === "all") ? " active" : "";
   return `
@@ -899,6 +920,7 @@ function reserveChartPositions(): ReserveChartPosition[] {
 
 function reservePositionCategory(position: ReservePosition): Exclude<ReserveChartCategory, "all"> {
   if (isIncomePosition(position)) return "income";
+  if (position.type === "reserve") return "reserve";
   if (position.type === "savings") return "savings";
   return "expense";
 }
@@ -1606,6 +1628,7 @@ function finiteNumber(value: unknown, fallback: number): number {
 
 function addPosition(): void {
   const isIncome = selectedPositionMode === "income";
+  const isReserve = selectedPositionMode === "reserve";
   const isSavings = selectedPositionMode === "savings";
   state.positions = [
     ...state.positions,
@@ -1614,8 +1637,8 @@ function addPosition(): void {
       flow: isIncome ? "income" : "expense",
       active: true,
       visible: true,
-      name: isIncome ? "Neue Einnahme" : isSavings ? "Neue Sparrate" : "Neue Ausgabe",
-      type: isIncome ? "incomeMonthly" : isSavings ? "savings" : "temporary",
+      name: isIncome ? "Neue Einnahme" : isReserve ? "Neue Ruecklage" : isSavings ? "Neue Sparrate" : "Neue Ausgabe",
+      type: isIncome ? "incomeMonthly" : isReserve ? "reserve" : isSavings ? "savings" : "temporary",
       amount: 0,
       startMonth: 1,
       endMonth: 12,
@@ -1731,7 +1754,7 @@ function hideReserveChartPopup(): void {
 }
 
 function setReserveChartCategory(category: ReserveChartCategory): void {
-  if (!["all", "income", "expense", "savings"].includes(category)) return;
+  if (!["all", "income", "expense", "reserve", "savings"].includes(category)) return;
   reserveChartCategory = category;
   reserveChartHighlightId = null;
   reserveChartAdjustment = "none";
