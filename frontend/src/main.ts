@@ -1004,17 +1004,24 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
     return;
   }
 
-  list.innerHTML = savingsPositions
+  const blockedPositionIds = new Set(blockedSettings.includedIds);
+  const visibleSavingsPositions = savingsPositions.filter(
+    (position) => !blockedPositionIds.has(position.id) || settings.includedIds.includes(position.id)
+  );
+  if (!visibleSavingsPositions.length) {
+    list.innerHTML = `<div class="include-empty">Alle Sparraten sind im ${blockedLabel} eingeplant.</div>`;
+    return;
+  }
+
+  list.innerHTML = visibleSavingsPositions
     .map((position) => {
       const checked = settings.includedIds.includes(position.id) ? "checked" : "";
-      const blocked = blockedSettings.includedIds.includes(position.id);
       const inactive = position.active ? "" : `<span class="muted">(inaktiv)</span>`;
-      const blockedText = blocked ? `<span class="muted">(belegt im ${blockedLabel})</span>` : "";
       return `
-        <label class="include-item ${blocked ? "blocked" : ""}">
-          <input type="checkbox" data-include-position="${position.id}" ${checked} ${blocked ? "disabled" : ""} />
+        <label class="include-item">
+          <input type="checkbox" data-include-position="${position.id}" ${checked} />
           <span>
-            <span class="include-name">${escapeHtml(position.name)} ${inactive} ${blockedText}</span>
+            <span class="include-name">${escapeHtml(position.name)} ${inactive}</span>
             <span class="include-amount">${escapeHtml(investmentPositionSubtitle(position))}</span>
           </span>
         </label>
