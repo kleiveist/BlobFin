@@ -4,7 +4,7 @@ export type IncomePositionType = "incomeMonthly" | "incomeYearly" | "incomeTempo
 export type PositionType = ExpensePositionType | IncomePositionType;
 export type PayoutType = "none" | "monthly" | "yearly" | "once";
 export type ThemeMode = "light" | "dark";
-export type InvestmentDepotKey = "standard" | "retirement";
+export type InvestmentDepotKey = "standard" | "retirement" | "child";
 
 export interface ReservePosition {
   id: string;
@@ -40,6 +40,9 @@ export interface InvestmentSettings {
   retirementIncludedIds: string[];
   retirementIncludeAccountInterest: boolean;
   retirementIncludeAccountCashback: boolean;
+  childIncludedIds: string[];
+  childIncludeAccountInterest: boolean;
+  childIncludeAccountCashback: boolean;
   retirementDepotEnabled: boolean;
   retirementDepotChildren: number;
   birthYear: number;
@@ -60,6 +63,12 @@ export interface InvestmentSettings {
   retirementCapitalGainsTaxPercent: number;
   retirementInflationRatePercent: number;
   retirementBequestReservePercent: number;
+  childBirthYear: number;
+  childChartStartAge: number;
+  childInvestmentReturnPercent: number;
+  childCapitalGainsTaxPercent: number;
+  childInflationRatePercent: number;
+  childBequestReservePercent: number;
 }
 
 export interface AppState {
@@ -157,6 +166,8 @@ export interface AssetProjection {
   ageToday: number;
   savingMonths: number;
   totalContribution: number;
+  recurringContributionAtRetirement: number;
+  oneTimeContributionAtRetirement: number;
   grossWealthAtRetirement: number;
   growthAtRetirement: number;
   taxAtRetirement: number;

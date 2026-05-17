@@ -1,8 +1,7 @@
 import { annuityPayment } from "./investmentCalculator";
 import {
   selectedInvestmentContributionForProjectionMonth,
-  selectedMonthlyPattern,
-  selectedInvestmentContributionForProjectionYear,
+  selectedRecurringInvestmentContributionForProjectionYear,
   selectedOneTimeInvestmentContributionForProjectionMonth
 } from "./investmentContributions";
 import {
@@ -16,6 +15,8 @@ interface SavingSnapshot {
   grossBalance: number;
   costBasis: number;
   contribution: number;
+  recurringContribution: number;
+  oneTimeContribution: number;
   allowance: number;
   allowanceBasis: number;
   withdrawals: number;
@@ -39,34 +40,38 @@ export function buildAssetProjection(
   const ageToday = Math.max(0, year - settings.birthYear);
   const retirementAge = payoutStartAge(settings);
   const startAge = Math.min(settings.chartStartAge, retirementAge);
-  const endAge = Math.max(settings.payoutEndAge, retirementAge + 1);
-  const monthlyPattern = selectedMonthlyPattern(positions, settings, year);
-  const monthlyRate = monthlyPattern.reduce((sum, value) => sum + value, 0) / 12;
-  const annualSavingsRate = monthlyRate * 12;
-  const retirementDepotAnnualOwnContribution = selectedInvestmentContributionForProjectionYear(
+  const hasPayoutPhase = settings.payoutYears > 0 && settings.payoutEndAge > retirementAge;
+  const endAge = hasPayoutPhase ? Math.max(settings.payoutEndAge, retirementAge + 1) : retirementAge;
+  const savingMonths = Math.max(0, Math.round((retirementAge - ageToday) * 12));
+  const contributionDisplayYearIndex = firstRecurringContributionYearIndex(positions, settings, year, savingMonths);
+  const annualSavingsRate = selectedRecurringInvestmentContributionForProjectionYear(
     positions,
     settings,
     year,
-    0
+    contributionDisplayYearIndex
   );
+  const monthlyRate = annualSavingsRate / 12;
+  const retirementDepotAnnualOwnContribution = annualSavingsRate;
   const retirementDepotAllowance = settings.retirementDepotEnabled
     ? calculateRetirementDepotAllowance(retirementDepotAnnualOwnContribution, settings.retirementDepotChildren)
     : calculateRetirementDepotAllowance(0, 0);
   const annualReturn = settings.investmentReturnPercent / 100;
   const monthlyReturn = (1 + annualReturn) ** (1 / 12) - 1;
   const retirementSnapshot = savingSnapshot(positions, monthlyReturn, settings, year, ageToday, retirementAge);
-  const payoutMonths = Math.max(1, Math.round((endAge - retirementAge) * 12));
-  const monthlyPension = solveNetMonthlyPension(
-    retirementSnapshot,
-    positions,
-    year,
-    monthlyReturn,
-    settings,
-    ageToday,
-    retirementAge,
-    endAge,
-    payoutMonths
-  );
+  const payoutMonths = hasPayoutPhase ? Math.max(1, Math.round((endAge - retirementAge) * 12)) : 0;
+  const monthlyPension = hasPayoutPhase
+    ? solveNetMonthlyPension(
+        retirementSnapshot,
+        positions,
+        year,
+        monthlyReturn,
+        settings,
+        ageToday,
+        retirementAge,
+        endAge,
+        payoutMonths
+      )
+    : 0;
   const realMonthlyPension =
     retirementSnapshot.inflationFactor > 0 ? monthlyPension / retirementSnapshot.inflationFactor : monthlyPension;
   const percentageBase = snapshotAtAge(
@@ -106,6 +111,9 @@ export function buildAssetProjection(
   }
   const finalPoint = points[points.length - 1];
   const unrealizedTaxAtRetirement = taxForUnrealizedGrowth(retirementSnapshot, settings);
+  const bequestReserveAtEnd = hasPayoutPhase
+    ? finalPoint?.netBalance ?? 0
+    : retirementSnapshot.netBalance * (reservePercent / 100);
 
   return {
     points,
@@ -122,7 +130,7 @@ export function buildAssetProjection(
     monthlyPension,
     realMonthlyPension,
     bequestReservePercent: reservePercent,
-    bequestReserveAtEnd: finalPoint?.netBalance ?? 0,
+    bequestReserveAtEnd,
     percentageWithdrawalMonthlyAtStart,
     percentageWithdrawalAnnualAtStart,
     withdrawalRemainingSavingsMonthlyAtStart,
@@ -132,8 +140,10 @@ export function buildAssetProjection(
     retirementAge,
     endAge,
     ageToday,
-    savingMonths: Math.max(0, Math.round((retirementAge - ageToday) * 12)),
+    savingMonths,
     totalContribution: retirementSnapshot.contribution,
+    recurringContributionAtRetirement: retirementSnapshot.recurringContribution,
+    oneTimeContributionAtRetirement: retirementSnapshot.oneTimeContribution,
     grossWealthAtRetirement: retirementSnapshot.grossBalance,
     growthAtRetirement: retirementSnapshot.growth,
     taxAtRetirement: retirementSnapshot.tax,
@@ -147,6 +157,25 @@ export function buildAssetProjection(
     wealthAtRetirement: retirementSnapshot.netBalance,
     realWealthAtRetirement: retirementSnapshot.realNetBalance
   };
+}
+
+function firstRecurringContributionYearIndex(
+  positions: ReservePosition[],
+  settings: InvestmentSettings,
+  baseYear: number,
+  savingMonths: number
+): number {
+  const projectionYears = Math.max(0, Math.ceil(savingMonths / 12));
+  for (let yearIndex = 0; yearIndex < projectionYears; yearIndex += 1) {
+    const contribution = selectedRecurringInvestmentContributionForProjectionYear(
+      positions,
+      settings,
+      baseYear,
+      yearIndex
+    );
+    if (contribution > 0) return yearIndex;
+  }
+  return 0;
 }
 
 function snapshotAtAge(
@@ -188,6 +217,8 @@ function savingSnapshot(
   let grossBalance = 0;
   let costBasis = 0;
   let contribution = 0;
+  let recurringContribution = 0;
+  let oneTimeContribution = 0;
   let allowance = 0;
   let allowanceBasis = 0;
   let withdrawals = 0;
@@ -197,11 +228,20 @@ function savingSnapshot(
   for (let index = 0; index < months; index += 1) {
     const ageAtMonth = ageToday + index / 12;
     const monthlyContribution = selectedInvestmentContributionForProjectionMonth(positions, settings, baseYear, index);
+    const monthlyOneTimeContribution = selectedOneTimeInvestmentContributionForProjectionMonth(
+      positions,
+      settings,
+      baseYear,
+      index
+    );
+    const monthlyRecurringContribution = Math.max(0, monthlyContribution - monthlyOneTimeContribution);
     const monthlyAllowance = retirementDepotAllowanceForProjectionMonth(positions, settings, baseYear, index);
     grossBalance = grossBalance * (1 + monthlyReturn) + monthlyContribution + monthlyAllowance;
     costBasis += monthlyContribution;
     costBasis += monthlyAllowance;
     contribution += monthlyContribution;
+    recurringContribution += monthlyRecurringContribution;
+    oneTimeContribution += monthlyOneTimeContribution;
     allowance += monthlyAllowance;
     allowanceBasis += monthlyAllowance;
     if (ageAtMonth >= percentageWithdrawalStartAge(settings)) {
@@ -219,6 +259,8 @@ function savingSnapshot(
     grossBalance,
     costBasis,
     contribution,
+    recurringContribution,
+    oneTimeContribution,
     allowance,
     allowanceBasis,
     withdrawals,
@@ -243,6 +285,8 @@ function payoutSnapshot(
   let grossBalance = startSnapshot.grossBalance;
   let costBasis = startSnapshot.costBasis;
   let contribution = startSnapshot.contribution;
+  let recurringContribution = startSnapshot.recurringContribution;
+  let oneTimeContribution = startSnapshot.oneTimeContribution;
   let allowance = startSnapshot.allowance;
   let allowanceBasis = startSnapshot.allowanceBasis;
   let withdrawals = 0;
@@ -252,16 +296,17 @@ function payoutSnapshot(
 
   for (let index = 0; index < months; index += 1) {
     const ageAtMonth = retirementAge + index / 12;
-    const oneTimeContribution = selectedOneTimeInvestmentContributionForProjectionMonth(
+    const monthlyOneTimeContribution = selectedOneTimeInvestmentContributionForProjectionMonth(
       positions,
       settings,
       baseYear,
       retirementMonthIndex + index
     );
     grossBalance *= 1 + monthlyReturn;
-    grossBalance += oneTimeContribution;
-    costBasis += oneTimeContribution;
-    contribution += oneTimeContribution;
+    grossBalance += monthlyOneTimeContribution;
+    costBasis += monthlyOneTimeContribution;
+    contribution += monthlyOneTimeContribution;
+    oneTimeContribution += monthlyOneTimeContribution;
     if (ageAtMonth >= percentageWithdrawalStartAge(settings)) {
       const percentageWithdrawal = grossBalance * (percentageWithdrawalRatePercent(settings) / 100) / 12;
       const result = applyGrossWithdrawal(grossBalance, costBasis, allowanceBasis, percentageWithdrawal, settings);
@@ -283,6 +328,8 @@ function payoutSnapshot(
     grossBalance,
     costBasis,
     contribution,
+    recurringContribution,
+    oneTimeContribution,
     allowance,
     allowanceBasis,
     withdrawals,
@@ -297,6 +344,8 @@ function completeSnapshot(
   grossBalance: number,
   costBasis: number,
   contribution: number,
+  recurringContribution: number,
+  oneTimeContribution: number,
   allowance: number,
   allowanceBasis: number,
   withdrawals: number,
@@ -315,6 +364,8 @@ function completeSnapshot(
     grossBalance,
     costBasis,
     contribution,
+    recurringContribution,
+    oneTimeContribution,
     allowance,
     allowanceBasis,
     withdrawals,

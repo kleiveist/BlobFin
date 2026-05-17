@@ -111,6 +111,15 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
       value.retirementIncludeAccountCashback,
       fallback.retirementIncludeAccountCashback
     ),
+    childIncludedIds: stringArrayOrDefault(value.childIncludedIds, fallback.childIncludedIds),
+    childIncludeAccountInterest: booleanOrDefault(
+      value.childIncludeAccountInterest,
+      fallback.childIncludeAccountInterest
+    ),
+    childIncludeAccountCashback: booleanOrDefault(
+      value.childIncludeAccountCashback,
+      fallback.childIncludeAccountCashback
+    ),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
@@ -148,6 +157,21 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     retirementBequestReservePercent: numberOrDefault(
       value.retirementBequestReservePercent,
       fallback.retirementBequestReservePercent
+    ),
+    childBirthYear: numberOrDefault(value.childBirthYear, fallback.childBirthYear),
+    childChartStartAge: numberOrDefault(value.childChartStartAge, fallback.childChartStartAge),
+    childInvestmentReturnPercent: numberOrDefault(
+      value.childInvestmentReturnPercent,
+      fallback.childInvestmentReturnPercent
+    ),
+    childCapitalGainsTaxPercent: numberOrDefault(
+      value.childCapitalGainsTaxPercent,
+      fallback.childCapitalGainsTaxPercent
+    ),
+    childInflationRatePercent: numberOrDefault(value.childInflationRatePercent, fallback.childInflationRatePercent),
+    childBequestReservePercent: numberOrDefault(
+      value.childBequestReservePercent,
+      fallback.childBequestReservePercent
     )
   };
 }
@@ -168,6 +192,15 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     retirementIncludeAccountCashback: booleanOrDefault(
       value.retirementIncludeAccountCashback,
       fallback.retirementIncludeAccountCashback
+    ),
+    childIncludedIds: stringArrayOrDefault(value.childIncludedIds, fallback.childIncludedIds),
+    childIncludeAccountInterest: booleanOrDefault(
+      value.childIncludeAccountInterest,
+      fallback.childIncludeAccountInterest
+    ),
+    childIncludeAccountCashback: booleanOrDefault(
+      value.childIncludeAccountCashback,
+      fallback.childIncludeAccountCashback
     ),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
@@ -206,12 +239,30 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     retirementBequestReservePercent: numberOrDefault(
       value.retirementBequestReservePercent ?? value.bequestReservePercent,
       fallback.retirementBequestReservePercent
+    ),
+    childBirthYear: numberOrDefault(value.childBirthYear, fallback.childBirthYear),
+    childChartStartAge: numberOrDefault(value.childChartStartAge, fallback.childChartStartAge),
+    childInvestmentReturnPercent: numberOrDefault(
+      value.childInvestmentReturn ?? value.investmentReturn,
+      fallback.childInvestmentReturnPercent
+    ),
+    childCapitalGainsTaxPercent: numberOrDefault(
+      value.childCapitalGainsTax ?? value.capitalGainsTax,
+      fallback.childCapitalGainsTaxPercent
+    ),
+    childInflationRatePercent: numberOrDefault(
+      value.childInflationRate ?? value.inflationRate,
+      fallback.childInflationRatePercent
+    ),
+    childBequestReservePercent: numberOrDefault(
+      value.childBequestReservePercent ?? value.bequestReservePercent,
+      fallback.childBequestReservePercent
     )
   };
 }
 
 function normalizeInvestmentDepotKey(value: unknown, fallback: InvestmentDepotKey): InvestmentDepotKey {
-  return value === "retirement" || value === "standard" ? value : fallback;
+  return value === "child" || value === "retirement" || value === "standard" ? value : fallback;
 }
 
 function normalizePositions(

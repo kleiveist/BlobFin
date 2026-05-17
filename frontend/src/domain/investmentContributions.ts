@@ -75,6 +75,22 @@ export function selectedInvestmentContributionForProjectionYear(
   return total;
 }
 
+export function selectedRecurringInvestmentContributionForProjectionYear(
+  positions: ReservePosition[],
+  settings: InvestmentSettings,
+  baseYear: number,
+  projectionYearIndex: number
+): number {
+  const calendarYear = baseYear + projectionYearIndex;
+  let total = 0;
+  for (let month = 1; month <= 12; month += 1) {
+    total += selectedInvestmentPositions(positions, settings).reduce((sum, position) => {
+      return sum + investmentContributionForMonth(position, calendarYear, month);
+    }, 0);
+  }
+  return total;
+}
+
 export function selectedOneTimeInvestmentContributionForProjectionMonth(
   positions: ReservePosition[],
   settings: InvestmentSettings,

@@ -148,6 +148,9 @@ export function defaultInvestmentSettings(): InvestmentSettings {
     retirementIncludedIds: [],
     retirementIncludeAccountInterest: false,
     retirementIncludeAccountCashback: false,
+    childIncludedIds: [],
+    childIncludeAccountInterest: false,
+    childIncludeAccountCashback: false,
     retirementDepotEnabled: false,
     retirementDepotChildren: 0,
     birthYear: 1993,
@@ -167,7 +170,13 @@ export function defaultInvestmentSettings(): InvestmentSettings {
     retirementInvestmentReturnPercent: 14,
     retirementCapitalGainsTaxPercent: 26.375,
     retirementInflationRatePercent: 2,
-    retirementBequestReservePercent: 10
+    retirementBequestReservePercent: 10,
+    childBirthYear: 2026,
+    childChartStartAge: 0,
+    childInvestmentReturnPercent: 7,
+    childCapitalGainsTaxPercent: 26.5,
+    childInflationRatePercent: 2.7,
+    childBequestReservePercent: 10
   };
 }
 

@@ -134,6 +134,7 @@ export function renderAppShell(): string {
           <div class="position-mode-switch investment-depot-switch" role="tablist" aria-label="Depot-Auswahl">
             <button class="position-mode-button" type="button" data-action="set-investment-depot-standard" aria-pressed="true">Depot</button>
             <button class="position-mode-button" type="button" data-action="set-investment-depot-retirement" aria-pressed="false">Altersvorsorgedepot</button>
+            <button class="position-mode-button" type="button" data-action="set-investment-depot-child" aria-pressed="false">Kinderdepot</button>
           </div>
         </div>
         <div class="investment-grid">
@@ -165,7 +166,8 @@ export function renderAppShell(): string {
                 ${numberField("birthYear", "Geburtsjahr", "investment", "birthYear", { min: 1962, max: 2009, step: 1 })}
                 ${numberField("chartStartAge", "Startalter Grafik", "investment", "chartStartAge", { min: 0, max: 80, step: 1 })}
                 ${retirementAgeField()}
-                ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1 })}
+                ${fixedNumberField("childPayoutAge", "Auszahlungsalter", 18, "child")}
+                ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1, depotScope: "standard retirement" })}
                 ${numberField("retirementDepotChildren", "Kindergeldberechtigte Kinder", "investment", "retirementDepotChildren", { min: 0, max: 20, step: 1, depotScope: "retirement" })}
                 ${numberField("percentageWithdrawalStartAge", "Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1, depotScope: "standard" })}
                 ${numberField("percentageWithdrawalRatePercent", "Prozent-Entnahme p. a.", "investment", "percentageWithdrawalRatePercent", { min: 0, max: 20, step: 0.1, depotScope: "standard" })}
@@ -174,7 +176,7 @@ export function renderAppShell(): string {
                 ${rangeField("investmentReturnPercent", "Jaehrliche Rendite", 0, 30, 0.1)}
                 ${rangeField("capitalGainsTaxPercent", "Kapitalertragsteuer auf Wertzuwachs", 0, 50, 0.1)}
                 ${rangeField("inflationRatePercent", "Inflation pro Jahr", 1, 10, 0.1)}
-                ${rangeField("bequestReservePercent", "Reserve/Erbe vom Maximalvermoegen", 0, 50, 0.5)}
+                ${rangeField("bequestReservePercent", "Reserve/Erbe vom Maximalvermoegen", 0, 50, 0.5, { depotScope: "standard retirement" })}
               </div>
             </div>
           </div>
@@ -247,7 +249,7 @@ export function renderAppShell(): string {
                 </div>
               </div>
             </section>
-            <section class="investment-chart-card combined-investment-card" aria-label="Gemeinsame Anlageentwicklung">
+            <section class="investment-chart-card combined-investment-card" id="combinedInvestmentCard" aria-label="Gemeinsame Anlageentwicklung">
               <div class="investment-chart-header">
                 <div class="investment-chart-title">Gemeinsame Anlageentwicklung</div>
                 <div class="investment-chart-metrics">
@@ -344,7 +346,7 @@ function numberField(
   label: string,
   scope: "setting" | "investment",
   key: string,
-  options: { min: number; max?: number; step: number; depotScope?: "standard" | "retirement" }
+  options: { min: number; max?: number; step: number; depotScope?: string }
 ): string {
   const dataAttr = scope === "setting" ? `data-setting="${key}"` : `data-investment="${key}"`;
   const depotScopeAttr = options.depotScope ? `data-depot-scope="${options.depotScope}"` : "";
@@ -358,9 +360,26 @@ function numberField(
   `;
 }
 
-function rangeField(key: keyof InvestmentSettings, label: string, min: number, max: number, step: number): string {
+function fixedNumberField(id: string, label: string, value: number, depotScope: string): string {
   return `
-    <label class="range-field">
+    <label class="field" for="${id}" data-depot-scope="${depotScope}">
+      <span>${label}</span>
+      <input id="${id}" type="number" value="${value}" disabled data-force-disabled="true" />
+    </label>
+  `;
+}
+
+function rangeField(
+  key: keyof InvestmentSettings,
+  label: string,
+  min: number,
+  max: number,
+  step: number,
+  options: { depotScope?: string } = {}
+): string {
+  const depotScopeAttr = options.depotScope ? `data-depot-scope="${options.depotScope}"` : "";
+  return `
+    <label class="range-field" ${depotScopeAttr}>
       <span>${label}</span>
       <input type="range" min="${min}" max="${max}" step="${step}" data-investment="${key}" />
       <strong id="${key}Value">-</strong>
@@ -370,7 +389,7 @@ function rangeField(key: keyof InvestmentSettings, label: string, min: number, m
 
 function retirementAgeField(): string {
   return `
-    <label class="field" for="retirementAge">
+    <label class="field" for="retirementAge" data-depot-scope="standard retirement">
       <span>Rentenalter</span>
       <input id="retirementAge" type="number" min="50" max="85" step="1" data-retirement-age="true" />
     </label>
@@ -379,8 +398,8 @@ function retirementAgeField(): string {
 
 function chartMetric(id: string, label: string): string {
   return `
-    <div class="chart-metric">
-      <div class="chart-label">${label}</div>
+    <div class="chart-metric" id="${id}Card">
+      <div class="chart-label" id="${id}Label">${label}</div>
       <div class="chart-value" id="${id}">-</div>
     </div>
   `;
@@ -388,15 +407,15 @@ function chartMetric(id: string, label: string): string {
 
 function withdrawalGainMetric(): string {
   return `
-    <div class="chart-metric chart-metric-split">
-      <div class="chart-label">Monatlicher Zugewinn durch Entnahme</div>
+    <div class="chart-metric chart-metric-split" id="withdrawalGainMetricCard">
+      <div class="chart-label" id="withdrawalGainMetricLabel">Monatlicher Zugewinn durch Entnahme</div>
       <div class="chart-split-values">
         <div class="chart-split-item">
-          <span>Kumulierte Sparrate</span>
+          <span id="withdrawalOffsetMetricLabel">Kumulierte Sparrate</span>
           <strong id="withdrawalOffsetMetric">-</strong>
         </div>
         <div class="chart-split-item">
-          <span>Netto</span>
+          <span id="withdrawalNetMetricLabel">Netto</span>
           <strong id="withdrawalGainMetric">-</strong>
         </div>
       </div>
@@ -415,7 +434,7 @@ function metric(id: string, label: string, hint: string, strong: boolean): strin
 }
 
 function detailLine(label: string, id: string): string {
-  return `<div class="detail-line"><span>${label}</span><strong id="${id}">-</strong></div>`;
+  return `<div class="detail-line"><span id="${id}Label">${label}</span><strong id="${id}">-</strong></div>`;
 }
 
 function toolbarIconButton(action: string, label: string, icon: "upload" | "download" | "table"): string {

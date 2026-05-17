@@ -3,7 +3,7 @@
 <!-- AUTO-GENERATED:backlink END -->
 # Investment Planning
 
-The `Investment- und Auszahlungsplanung` section separates a normal `Depot` and an `Altersvorsorgedepot`. Each tab has its own selected savings, assumptions, asset development chart, and payout statistics. A combined chart below the tab content sums both depot projections.
+The `Investment- und Auszahlungsplanung` section separates a normal `Depot`, an `Altersvorsorgedepot`, and a `Kinderdepot`. Each tab has its own selected savings, assumptions, asset development chart, and payout statistics. A combined chart below the adult tab content sums only `Depot` and `Altersvorsorgedepot`; the `Kinderdepot` stays separate.
 
 ## Investable Positions
 
@@ -20,14 +20,17 @@ Two additional investment toggles can be enabled per depot:
 - `Zinsen`: invests yearly account interest from the yearly table.
 - `Cashback`: invests yearly cashback from the yearly table.
 
-Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depot at a time. Savings positions already used by the other depot are hidden in the current tab.
+Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depot at a time. Savings positions already used by another depot are hidden in the current tab.
+
+If a selected recurring savings position starts in a future year, the displayed monthly and yearly savings rate uses the first active contribution year in the saving phase. One-time savings positions still count toward the projection wealth, but not toward the running savings-rate display.
 
 ## Age And Timeline Fields
 
-- `Geburtsjahr`: used with the planning year to calculate today's age.
+- `Geburtsjahr`: used with the planning year to calculate today's age. In the `Kinderdepot`, the value is limited to children up to the fixed payout age of 18.
 - `Startalter Grafik`: first age shown in the chart.
 - `Rentenalter`: derived from payout end age and payout duration. This value is shared by `Depot` and `Altersvorsorgedepot`.
 - `Endalter`: last age in the projection. This value is shared by `Depot` and `Altersvorsorgedepot`.
+- `Auszahlungsalter`: fixed at 18 for the `Kinderdepot`.
 - `Entnahme ab Alter`: age when percentage withdrawals begin. This appears only in the normal `Depot` tab.
 - `Prozent-Entnahme p. a.`: annual percentage withdrawal rate. This appears only in the normal `Depot` tab.
 - `Kindergeldberechtigte Kinder`: children counted for the retirement depot child allowance. This appears only in the `Altersvorsorgedepot` tab.
@@ -35,6 +38,8 @@ Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depo
 `Entnahme ab Alter` cannot be lower than `Startalter Grafik` and cannot be higher than `Rentenalter`.
 
 For the retirement depot, the retirement age is floored at 65. It can still be set higher. Percentage withdrawals are not part of the retirement depot page.
+
+The child depot is an accumulation-only projection through age 18, so monthly retirement or withdrawal metrics are not shown there.
 
 ## Retirement Depot Allowances
 
@@ -48,12 +53,14 @@ The implemented allowance model follows the communicated 2027 reform logic used 
 
 The retirement depot chart adds eligible allowances as depot contributions and shows them as `Zulagen`. The `Foerderung` block is shown only on the `Altersvorsorgedepot` tab and shows annual own contribution, base allowance, child allowance, allowance rate, total yearly allowances, total yearly depot inflow, and allowances accumulated by retirement.
 
+The annual allowance rows use the first active contribution year, so a contribution that starts in 2027 is still shown with its yearly allowance values even when the planning year is 2026.
+
 ## Market Assumptions
 
 - `Jaehrliche Rendite`: annual investment return assumption.
 - `Kapitalertragsteuer auf Wertzuwachs`: tax rate applied only to realized gains.
 - `Inflation pro Jahr`: inflation rate used for real-value metrics.
-- `Reserve/Erbe vom Maximalvermoegen`: share of retirement wealth held back until the end age as inheritance or longevity reserve. The default is 10%.
+- `Reserve/Erbe vom Maximalvermoegen`: share of retirement wealth held back until the end age as inheritance or longevity reserve. The default is 10%. This appears only on `Depot` and `Altersvorsorgedepot`.
 
 Capital gains tax is not applied during pure holding periods. It is applied when withdrawals realize gains. The taxable part of a withdrawal is based on the gain share of the current depot balance. The contributed cost basis is not taxed.
 

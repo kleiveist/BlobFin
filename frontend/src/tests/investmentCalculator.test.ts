@@ -89,6 +89,26 @@ describe("investment calculator", () => {
     expect(projection.points.some((point) => point.allowance > 0)).toBe(true);
   });
 
+  it("uses the first active contribution year for retirement depot annual allowance metrics", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate" ? { ...position, payoutYear: state.settings.year + 1 } : position
+    );
+    state.investment = {
+      ...state.investment,
+      retirementDepotEnabled: true
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.monthlyRate).toBe(150);
+    expect(projection.annualSavingsRate).toBe(1800);
+    expect(projection.retirementDepotAnnualOwnContribution).toBe(1800);
+    expect(projection.retirementDepotBaseAllowanceAnnual).toBe(540);
+    expect(projection.retirementDepotAllowanceRatePercent).toBe(30);
+    expect(projection.allowanceAtRetirement).toBeGreaterThan(0);
+  });
+
   it("does not show negative withdrawal gain values", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>
@@ -177,6 +197,33 @@ describe("investment calculator", () => {
     expect(projection.bequestReserveAtEnd).toBeCloseTo(projection.wealthAtRetirement * 0.1, 0);
   });
 
+  it("keeps a child depot as an accumulation-only projection until payout age", () => {
+    const state = defaultAppState();
+    state.investment = {
+      ...state.investment,
+      birthYear: state.settings.year,
+      chartStartAge: 0,
+      payoutEndAge: 18,
+      payoutYears: 0,
+      percentageWithdrawalStartAge: 18,
+      percentageWithdrawalRatePercent: 0,
+      investmentReturnPercent: 7,
+      capitalGainsTaxPercent: 26.5,
+      inflationRatePercent: 2.7,
+      bequestReservePercent: 10
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.points[0].age).toBe(0);
+    expect(projection.retirementAge).toBe(18);
+    expect(projection.endAge).toBe(18);
+    expect(projection.points.every((point) => point.phase === "saving")).toBe(true);
+    expect(projection.monthlyPension).toBe(0);
+    expect(projection.realMonthlyPension).toBe(0);
+    expect(projection.bequestReserveAtEnd).toBeCloseTo(projection.wealthAtRetirement * 0.1, 2);
+  });
+
   it("starts recurring investment positions in their configured start year and month", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>
@@ -189,7 +236,8 @@ describe("investment calculator", () => {
     const startYear = buildAssetProjection(state.settings.year + 1, state.positions, state.investment);
     const laterYear = buildAssetProjection(state.settings.year + 2, state.positions, state.investment);
 
-    expect(currentYear.monthlyRate).toBe(0);
+    expect(currentYear.monthlyRate).toBe(60);
+    expect(currentYear.annualSavingsRate).toBe(720);
     expect(startYear.monthlyRate).toBe(60);
     expect(laterYear.monthlyRate).toBe(120);
   });
