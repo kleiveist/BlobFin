@@ -22,7 +22,7 @@ Important fields:
 
 `PlanningSettings` contains the planning year, account interest rate, cashback rate, and emergency fund value. The legacy `monthlyNetIncome` setting is migrated into an income position and no longer drives calculations directly.
 
-`InvestmentSettings` contains selected investment IDs, special interest/cashback investment toggles, retirement depot settings, age settings, return, tax, inflation, and percentage withdrawal settings.
+`InvestmentSettings` contains separate normal-depot and retirement-depot selections, special interest/cashback investment toggles, retirement depot settings, age settings, return, tax, inflation, and percentage withdrawal settings.
 
 ## Reserve Calculation
 
@@ -48,7 +48,7 @@ Interest is calculated only when `interestBearing` is true.
 - Temporary and savings positions use payout-day timing.
 - Reserve positions use accumulated balance and payout timing.
 
-The yearly interest total can be represented as a virtual investment position when the user enables `Zinsen in Altersvorsorge`.
+The yearly interest total can be represented as a virtual investment position when the user enables `Zinsen` in one depot.
 
 ## Cashback Calculation
 
@@ -58,13 +58,13 @@ Cashback is calculated only when all of these are true:
 - `cashback` is true,
 - `type` is `temporary`.
 
-Monthly, yearly, and one-time payout cadence decides when cashback is created. The yearly cashback total can be represented as a virtual investment position when the user enables `Cashback in Altersvorsorge`.
+Monthly, yearly, and one-time payout cadence decides when cashback is created. The yearly cashback total can be represented as a virtual investment position when the user enables `Cashback` in one depot.
 
 ## Investment Contributions
 
 Implemented in `frontend/src/domain/investmentContributions.ts`.
 
-Only active selected expense positions with `type = savings` are investable.
+Only active selected expense positions with `type = savings` are investable. A selected savings position, account interest, or cashback transfer can belong to only one investment depot at a time.
 
 Recurring contributions:
 

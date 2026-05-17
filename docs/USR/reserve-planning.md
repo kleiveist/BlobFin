@@ -53,7 +53,7 @@ For one-time expense payouts, `Start` and `Ende` are replaced by `Abgangsjahr`. 
 
 Interest is only calculated for positions with `Zinsen` enabled. One-time positions do not earn account interest.
 
-The yearly interest result can be transferred into the investment plan with the `Zinsen in Altersvorsorge` toggle in the investment section.
+The yearly interest result can be transferred into one investment depot with the `Zinsen` toggle in the investment section.
 
 ## Cashback
 
@@ -63,7 +63,7 @@ Cashback is only valid for `Temporar` positions with `Cashback` enabled.
 - Yearly payout creates cashback in the payout month.
 - One-time payout creates cashback once in the configured payout year and month.
 
-The yearly cashback result can be transferred into the investment plan with the `Cashback in Altersvorsorge` toggle.
+The yearly cashback result can be transferred into one investment depot with the `Cashback` toggle.
 
 ## Yearly Table
 

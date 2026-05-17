@@ -3,7 +3,7 @@
 <!-- AUTO-GENERATED:backlink END -->
 # Investment Planning
 
-The `Investment- und Auszahlungsplanung` section projects selected savings into an asset development chart and payout statistics.
+The `Investment- und Auszahlungsplanung` section separates a normal `Depot` and an `Altersvorsorgedepot`. Each tab has its own selected savings, assumptions, asset development chart, and payout statistics. A combined chart below the tab content sums both depot projections.
 
 ## Investable Positions
 
@@ -15,11 +15,13 @@ Recurring savings positions contribute to the regular annual savings rate. One-t
 - they are added once in their configured payout year and month,
 - they do not increase the displayed recurring `Jaehrliche Sparrate`.
 
-Two additional investment toggles can be enabled:
+Two additional investment toggles can be enabled per depot:
 
-- `Zinsen in Altersvorsorge`: invests yearly account interest from the yearly table.
-- `Cashback in Altersvorsorge`: invests yearly cashback from the yearly table.
-- `Altersvorsorgedepot aktivieren`: adds the communicated allowance model to the projection.
+- `Zinsen`: invests yearly account interest from the yearly table.
+- `Cashback`: invests yearly cashback from the yearly table.
+- `Altersvorsorgedepot aktivieren`: appears only on the `Altersvorsorgedepot` tab and adds the communicated allowance model to that projection.
+
+Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depot at a time. If a value is already used by the other depot, the control is disabled in the current tab.
 
 ## Age And Timeline Fields
 
@@ -27,13 +29,13 @@ Two additional investment toggles can be enabled:
 - `Startalter Grafik`: first age shown in the chart.
 - `Rentenalter`: derived from payout end age and payout duration.
 - `Endalter`: last age in the projection.
-- `Entnahme ab Alter`: age when percentage withdrawals begin.
-- `Prozent-Entnahme p. a.`: annual percentage withdrawal rate.
-- `Kindergeldberechtigte Kinder`: children counted for the retirement depot child allowance.
+- `Entnahme ab Alter`: age when percentage withdrawals begin. This appears only in the normal `Depot` tab.
+- `Prozent-Entnahme p. a.`: annual percentage withdrawal rate. This appears only in the normal `Depot` tab.
+- `Kindergeldberechtigte Kinder`: children counted for the retirement depot child allowance. This appears only in the `Altersvorsorgedepot` tab.
 
 `Entnahme ab Alter` cannot be lower than `Startalter Grafik` and cannot be higher than `Rentenalter`.
 
-When `Altersvorsorgedepot aktivieren` is checked, the retirement age is floored at 65. It can still be set higher. The percentage withdrawal fields stay visible but are disabled and ignored while the retirement depot is active. Disabling the retirement depot restores the age and percentage withdrawal values that were active before enabling it. The child-count field is disabled while the retirement depot is inactive.
+When `Altersvorsorgedepot aktivieren` is checked, the retirement age for the retirement depot is floored at 65. It can still be set higher. Percentage withdrawals are not part of the retirement depot page.
 
 ## Retirement Depot Allowances
 
@@ -45,7 +47,7 @@ The implemented allowance model follows the communicated 2027 reform logic used 
 - maximum base allowance of 540 EUR per year,
 - child allowance of 1 EUR per 1 EUR own contribution, capped at 300 EUR per child and year.
 
-The chart adds eligible allowances as depot contributions and shows them as `Zulagen`. The `Foerderung` block below the chart shows annual own contribution, base allowance, child allowance, allowance rate, total yearly allowances, total yearly depot inflow, and allowances accumulated by retirement.
+The retirement depot chart adds eligible allowances as depot contributions and shows them as `Zulagen`. The `Foerderung` block is shown only on the `Altersvorsorgedepot` tab and shows annual own contribution, base allowance, child allowance, allowance rate, total yearly allowances, total yearly depot inflow, and allowances accumulated by retirement.
 
 ## Market Assumptions
 

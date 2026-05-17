@@ -173,14 +173,6 @@ h3 {
   font-weight: 750;
 }
 
-.field.field-disabled {
-  opacity: 0.68;
-}
-
-.field.field-disabled span {
-  color: var(--muted);
-}
-
 input,
 select {
   width: 100%;
@@ -1123,6 +1115,16 @@ tfoot th {
   align-items: start;
 }
 
+.investment-heading {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.investment-depot-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+}
+
 .investment-selector,
 .investment-controls,
 .investment-visual,
@@ -1210,6 +1212,15 @@ tfoot th {
 
 .include-transfer-toggle.active strong {
   color: rgba(255, 255, 255, 0.86);
+}
+
+.include-transfer-toggle.blocked,
+.include-item.blocked {
+  opacity: 0.58;
+}
+
+.include-transfer-toggle:disabled {
+  cursor: not-allowed;
 }
 
 .retirement-depot-toggle {
@@ -1372,6 +1383,10 @@ tfoot th {
   color: var(--chart-text);
 }
 
+.combined-investment-card {
+  margin-top: 18px;
+}
+
 :root[data-theme="dark"] .investment-chart-card {
   --chart-bg: #17191c;
   --chart-field: #111315;
@@ -1453,7 +1468,8 @@ tfoot th {
   overflow-wrap: anywhere;
 }
 
-#investmentChart {
+#investmentChart,
+#combinedInvestmentChart {
   display: block;
   width: 100%;
   height: min(62vh, 640px);
@@ -1762,7 +1778,8 @@ tfoot th {
     padding: 16px 16px 0;
   }
 
-  #investmentChart {
+  #investmentChart,
+  #combinedInvestmentChart {
     height: 460px;
   }
 

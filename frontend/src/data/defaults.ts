@@ -141,9 +141,13 @@ export function defaultPositions(): ReservePosition[] {
 
 export function defaultInvestmentSettings(): InvestmentSettings {
   return {
+    activeDepot: "standard",
     includedIds: ["investitionsrate"],
     includeAccountInterest: false,
     includeAccountCashback: false,
+    retirementIncludedIds: [],
+    retirementIncludeAccountInterest: false,
+    retirementIncludeAccountCashback: false,
     retirementDepotEnabled: false,
     retirementDepotChildren: 0,
     retirementDepotPreviousSettings: null,
@@ -155,7 +159,14 @@ export function defaultInvestmentSettings(): InvestmentSettings {
     percentageWithdrawalRatePercent: 4,
     investmentReturnPercent: 14,
     capitalGainsTaxPercent: 26.375,
-    inflationRatePercent: 2
+    inflationRatePercent: 2,
+    retirementBirthYear: 1993,
+    retirementChartStartAge: 32,
+    retirementPayoutEndAge: 95,
+    retirementPayoutYears: 30,
+    retirementInvestmentReturnPercent: 14,
+    retirementCapitalGainsTaxPercent: 26.375,
+    retirementInflationRatePercent: 2
   };
 }
 

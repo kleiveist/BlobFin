@@ -2,6 +2,7 @@ import { createId, defaultAppState, defaultInvestmentSettings, defaultPlanningSe
 import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
 import type {
   AppState,
+  InvestmentDepotKey,
   InvestmentSettings,
   PlanningSettings,
   PositionFlow,
@@ -101,6 +102,16 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
     includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
     includeAccountCashback: booleanOrDefault(value.includeAccountCashback, fallback.includeAccountCashback),
+    activeDepot: normalizeInvestmentDepotKey(value.activeDepot, fallback.activeDepot),
+    retirementIncludedIds: stringArrayOrDefault(value.retirementIncludedIds, fallback.retirementIncludedIds),
+    retirementIncludeAccountInterest: booleanOrDefault(
+      value.retirementIncludeAccountInterest,
+      fallback.retirementIncludeAccountInterest
+    ),
+    retirementIncludeAccountCashback: booleanOrDefault(
+      value.retirementIncludeAccountCashback,
+      fallback.retirementIncludeAccountCashback
+    ),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
     retirementDepotPreviousSettings: normalizeRetirementDepotPreviousSettings(value.retirementDepotPreviousSettings),
@@ -118,7 +129,23 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     ),
     investmentReturnPercent: numberOrDefault(value.investmentReturnPercent, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTaxPercent, fallback.capitalGainsTaxPercent),
-    inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent)
+    inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent),
+    retirementBirthYear: numberOrDefault(value.retirementBirthYear, fallback.retirementBirthYear),
+    retirementChartStartAge: numberOrDefault(value.retirementChartStartAge, fallback.retirementChartStartAge),
+    retirementPayoutEndAge: numberOrDefault(value.retirementPayoutEndAge, fallback.retirementPayoutEndAge),
+    retirementPayoutYears: numberOrDefault(value.retirementPayoutYears, fallback.retirementPayoutYears),
+    retirementInvestmentReturnPercent: numberOrDefault(
+      value.retirementInvestmentReturnPercent,
+      fallback.retirementInvestmentReturnPercent
+    ),
+    retirementCapitalGainsTaxPercent: numberOrDefault(
+      value.retirementCapitalGainsTaxPercent,
+      fallback.retirementCapitalGainsTaxPercent
+    ),
+    retirementInflationRatePercent: numberOrDefault(
+      value.retirementInflationRatePercent,
+      fallback.retirementInflationRatePercent
+    )
   };
 }
 
@@ -129,6 +156,16 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
     includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
     includeAccountCashback: booleanOrDefault(value.includeAccountCashback, fallback.includeAccountCashback),
+    activeDepot: normalizeInvestmentDepotKey(value.activeDepot, fallback.activeDepot),
+    retirementIncludedIds: stringArrayOrDefault(value.retirementIncludedIds, fallback.retirementIncludedIds),
+    retirementIncludeAccountInterest: booleanOrDefault(
+      value.retirementIncludeAccountInterest,
+      fallback.retirementIncludeAccountInterest
+    ),
+    retirementIncludeAccountCashback: booleanOrDefault(
+      value.retirementIncludeAccountCashback,
+      fallback.retirementIncludeAccountCashback
+    ),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
     retirementDepotPreviousSettings: normalizeRetirementDepotPreviousSettings(value.retirementDepotPreviousSettings),
@@ -146,8 +183,28 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     ),
     investmentReturnPercent: numberOrDefault(value.investmentReturn, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTax, fallback.capitalGainsTaxPercent),
-    inflationRatePercent: numberOrDefault(value.inflationRate, fallback.inflationRatePercent)
+    inflationRatePercent: numberOrDefault(value.inflationRate, fallback.inflationRatePercent),
+    retirementBirthYear: numberOrDefault(value.retirementBirthYear, fallback.retirementBirthYear),
+    retirementChartStartAge: numberOrDefault(value.retirementChartStartAge, fallback.retirementChartStartAge),
+    retirementPayoutEndAge: numberOrDefault(value.retirementPayoutEndAge, fallback.retirementPayoutEndAge),
+    retirementPayoutYears: numberOrDefault(value.retirementPayoutYears, fallback.retirementPayoutYears),
+    retirementInvestmentReturnPercent: numberOrDefault(
+      value.retirementInvestmentReturn ?? value.investmentReturn,
+      fallback.retirementInvestmentReturnPercent
+    ),
+    retirementCapitalGainsTaxPercent: numberOrDefault(
+      value.retirementCapitalGainsTax ?? value.capitalGainsTax,
+      fallback.retirementCapitalGainsTaxPercent
+    ),
+    retirementInflationRatePercent: numberOrDefault(
+      value.retirementInflationRate ?? value.inflationRate,
+      fallback.retirementInflationRatePercent
+    )
   };
+}
+
+function normalizeInvestmentDepotKey(value: unknown, fallback: InvestmentDepotKey): InvestmentDepotKey {
+  return value === "retirement" || value === "standard" ? value : fallback;
 }
 
 function normalizeRetirementDepotPreviousSettings(value: unknown): RetirementDepotPreviousSettings | null {

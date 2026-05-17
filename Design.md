@@ -169,6 +169,7 @@ Reserve-Chart-Regeln:
 | Reserve Popup | Padding `16px`, Radius `8px` | `--surface`, `1px --border` | Reserve-Grafik |
 | Investment Chart Card | Radius `8px`, Overflow hidden | Chart-Tokens | Chart-Container |
 | Foerderung Block | Grid `auto-fit minmax(160px, 1fr)`, Margin `0 24px 22px` | Chart-Tokens, `4px double --chart-border` oben | Altersvorsorgedepot-Zulagen unter Anlageentwicklung |
+| Combined Investment Card | Margin oben `18px` | Chart-Tokens | Summierte Entwicklung aus Depot und Altersvorsorgedepot |
 
 ## Buttons und Controls
 
@@ -184,6 +185,7 @@ Reserve-Chart-Regeln:
 | `.chart-popup-close` | `28px x 28px`, Radius `6px` | BG `--chart-field` oder `--surface-soft`, Text `--chart-text` oder `--text` | Popup schliessen |
 | `.position-mode-switch` | min-height `38px`, Radius `6px` | BG `--surface-soft`, Border `--border` | Segmented Control |
 | `.position-mode-button` | min-width `104px`, Padding `9px 12px` | Inaktiv Text `--muted`, aktiv BG `--accent`, Text `#FFFFFF` | Einnahmen/Ausgaben/Sparen |
+| `.investment-depot-switch` | 2 Spalten, min `120px` je Tab | wie Segmented Control | Depot/Altersvorsorgedepot |
 | `.reserve-chart-toggle` | min-height `34px`, Padding `7px 10px`, Radius `6px` | Inaktiv BG `--surface-soft`, aktiv BG `--accent`, Text `#FFFFFF` | Grafikfilter |
 | `.theme-option` | min-height `48px`, Radius `8px` | BG `--surface-soft`, aktiv BG `--accent-soft` | Hell/Dunkel-Auswahl |
 | `.include-transfer-toggle` | min-height `74px`, Radius `8px`, Padding `11px 12px` | Inaktiv BG `--accent-soft`, aktiv BG `--accent`, Text `#FFFFFF` | Zinsen/Cashback investieren |
@@ -222,11 +224,10 @@ App-Icon-Dateien liegen in `src-tauri/icons/`:
 | Element | Masse | Farben | Verwendung |
 | --- | --- | --- | --- |
 | `input`, `select` | Breite `100%`, Padding `9px 10px`, Radius `6px` | BG `--input-bg`, Text `--text`, Border `--border` | Zahlen, Auswahlfelder |
-| `input:disabled`, `select:disabled` | wie Input | BG `--surface-muted`, Text `--muted`, Border `--row-border` | Nicht bearbeitbare Felder, z. B. je nach Altersvorsorgedepot-Szenario |
+| `input:disabled`, `select:disabled` | wie Input | BG `--surface-muted`, Text `--muted`, Border `--row-border` | Gesperrte Eingaben |
 | Checkbox | `18px x 18px` | `accent-color: --accent` | Aktiv/Sichtbar/Zinsen/Cashback/Altersvorsorgedepot |
 | Range | keine Border, kein Padding | `accent-color: --accent` | Investment-Parameter |
 | `.field` | Grid, Gap `6px` | Label `--muted` | Standard-Feld |
-| `.field.field-disabled` | Opacity `0.68` | gedimmte Input-Tokens | Sichtbar, aber gesperrt |
 | `.range-field` | Grid `220px / 1fr / auto`, Radius `8px`, Padding `10px 12px` | BG `--surface-soft`, Border `--border`, Wert `--gold` | Slider-Zeile |
 | `.small-input` | min-width `86px` | Input-Tokens | Kleine Tabellenwerte |
 | `.amount-input` | `104px` | Input-Tokens | Betrag |

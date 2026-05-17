@@ -35,6 +35,7 @@ import type {
   AppState,
   AssetProjection,
   AssetProjectionPoint,
+  InvestmentDepotKey,
   InvestmentSettings,
   PlanningSettings,
   ReservePosition,
@@ -47,14 +48,16 @@ import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from ".
 const root = requireRootElement();
 const INTEREST_INVESTMENT_POSITION_ID = "__account-interest-investment";
 const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
-type NumericInvestmentSetting = Exclude<
-  keyof InvestmentSettings,
-  | "includedIds"
-  | "includeAccountInterest"
-  | "includeAccountCashback"
-  | "retirementDepotEnabled"
-  | "retirementDepotPreviousSettings"
->;
+type NumericInvestmentSetting =
+  | "birthYear"
+  | "chartStartAge"
+  | "payoutEndAge"
+  | "retirementDepotChildren"
+  | "percentageWithdrawalStartAge"
+  | "percentageWithdrawalRatePercent"
+  | "investmentReturnPercent"
+  | "capitalGainsTaxPercent"
+  | "inflationRatePercent";
 type ReserveChartCategory = "all" | "income" | "expense" | "savings";
 type ReserveChartScenario = "current" | "lowerExpenses" | "raiseSavings" | "balanced";
 type ReserveChartAdjustment = "none" | "down10" | "up10";
@@ -201,6 +204,8 @@ function bindEvents(): void {
     if (action === "show-expense-positions") setSelectedPositionMode("expense");
     if (action === "show-savings-positions") setSelectedPositionMode("savings");
     if (action === "toggle-result-max-needed") toggleResultMaxNeeded();
+    if (action === "set-investment-depot-standard") setInvestmentDepot("standard");
+    if (action === "set-investment-depot-retirement") setInvestmentDepot("retirement");
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "show-reserve-chart") showReserveChartPopup();
@@ -292,6 +297,7 @@ function bindEvents(): void {
 
 function renderAll(): void {
   normalizeInvestmentBounds();
+  normalizeInvestmentDepotSelections();
   const reserve = calculateReserveSummary(state.settings, state.positions);
   renderPositions();
   renderInvestmentIncludeList(reserve);
@@ -301,7 +307,10 @@ function renderAll(): void {
 }
 
 function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>): void {
-  const projection = buildCurrentAssetProjection(reserve);
+  const standardProjection = buildDepotAssetProjection(reserve, "standard");
+  const retirementProjection = buildDepotAssetProjection(reserve, "retirement");
+  const projection = activeInvestmentDepot() === "retirement" ? retirementProjection : standardProjection;
+  const combinedProjection = combineAssetProjections(standardProjection, retirementProjection);
 
   setText("maxNeeded", money(reserve.maxRow.maxNeeded));
   setText("maxNeededHint", reserve.maxRow.month);
@@ -313,9 +322,9 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("yearlyRemaining", money(reserve.yearlyRemaining));
   setText("yearlyRemainingHint", `${money(reserve.totalPlannedIncome)} Einnahmen | ${money(reserve.totalPlannedOutflow)} Ausgaben`);
 
-  setText("investmentNetWealthTop", money(projection.wealthAtRetirement));
-  setText("investmentMonthlyPensionTop", money(projection.monthlyPension));
-  setText("investmentRealWealthTop", money(projection.realWealthAtRetirement));
+  setText("investmentNetWealthTop", money(combinedProjection.wealthAtRetirement));
+  setText("investmentMonthlyPensionTop", money(combinedProjection.monthlyPension));
+  setText("investmentRealWealthTop", money(combinedProjection.realWealthAtRetirement));
   setText("monthlyRateMetric", money(projection.monthlyRate));
   setText("monthlySavingsRateMetric", `${money(projection.monthlyRate)} monatlich`);
   setText("annualSavingsRateMetric", money(projection.annualSavingsRate));
@@ -324,6 +333,12 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("withdrawalGainMetric", money(projection.withdrawalGainMonthlyAtStart));
   setText("monthlyPensionMetric", money(projection.monthlyPension));
   setText("realWealthMetric", money(projection.realWealthAtRetirement));
+  setText("combinedStandardWealthMetric", money(standardProjection.wealthAtRetirement));
+  setText("combinedRetirementWealthMetric", money(retirementProjection.wealthAtRetirement));
+  setText("combinedWealthMetric", money(combinedProjection.wealthAtRetirement));
+  setText("combinedMonthlyRateMetric", money(combinedProjection.monthlyRate));
+  setText("combinedMonthlyPensionMetric", money(combinedProjection.monthlyPension));
+  setText("combinedRealWealthMetric", money(combinedProjection.realWealthAtRetirement));
   setText(
     "retirementDepotFundingStatus",
     projection.retirementDepotEnabled ? "Aktiv nach Reformlogik ab 2027" : "Altersvorsorgedepot deaktiviert"
@@ -336,9 +351,10 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   setText("retirementDepotTotalContributionMetric", money(projection.retirementDepotAnnualContributionWithAllowance));
   setText("retirementDepotAllowanceAtRetirementMetric", money(projection.allowanceAtRetirement));
 
-  setRangeLabel("investmentReturnPercent", percent(state.investment.investmentReturnPercent));
-  setRangeLabel("capitalGainsTaxPercent", percent(state.investment.capitalGainsTaxPercent));
-  setRangeLabel("inflationRatePercent", percent(state.investment.inflationRatePercent));
+  const activeSettings = depotInvestmentSettings(activeInvestmentDepot());
+  setRangeLabel("investmentReturnPercent", percent(activeSettings.investmentReturnPercent));
+  setRangeLabel("capitalGainsTaxPercent", percent(activeSettings.capitalGainsTaxPercent));
+  setRangeLabel("inflationRatePercent", percent(activeSettings.inflationRatePercent));
   setInputValue("[data-retirement-age]", projection.retirementAge);
 
   setText(
@@ -378,6 +394,7 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   renderReserveChartPopup(reserve);
   hideInvestmentChartPopup();
   drawInvestmentChartWithPopup(projection);
+  drawInvestmentChartWithPopup(combinedProjection, "#combinedInvestmentChart", "#combinedInvestmentChartPopup");
 }
 
 function renderPositions(): void {
@@ -945,18 +962,39 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
   const list = document.querySelector<HTMLDivElement>("#investmentIncludeList");
   if (!list) return;
 
+  const depot = activeInvestmentDepot();
+  const settings = depotInvestmentSettings(depot);
+  const blockedDepot = oppositeInvestmentDepot(depot);
+  const blockedSettings = depotInvestmentSettings(blockedDepot);
+  const blockedLabel = depotLabel(blockedDepot);
   const interestButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-interest-investment']");
   if (interestButton) {
-    interestButton.classList.toggle("active", state.investment.includeAccountInterest);
-    interestButton.setAttribute("aria-pressed", String(state.investment.includeAccountInterest));
+    const blocked = blockedSettings.includeAccountInterest;
+    interestButton.classList.toggle("active", settings.includeAccountInterest);
+    interestButton.disabled = blocked;
+    interestButton.classList.toggle("blocked", blocked);
+    interestButton.setAttribute("aria-pressed", String(settings.includeAccountInterest));
   }
   const cashbackButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-cashback-investment']");
   if (cashbackButton) {
-    cashbackButton.classList.toggle("active", state.investment.includeAccountCashback);
-    cashbackButton.setAttribute("aria-pressed", String(state.investment.includeAccountCashback));
+    const blocked = blockedSettings.includeAccountCashback;
+    cashbackButton.classList.toggle("active", settings.includeAccountCashback);
+    cashbackButton.disabled = blocked;
+    cashbackButton.classList.toggle("blocked", blocked);
+    cashbackButton.setAttribute("aria-pressed", String(settings.includeAccountCashback));
   }
-  setText("interestInvestmentAmount", `${money(summary.totalInterest)} jaehrlich aus Jahrestabelle`);
-  setText("cashbackInvestmentAmount", `${money(summary.totalCashback)} jaehrlich aus Jahrestabelle`);
+  setText(
+    "interestInvestmentAmount",
+    blockedSettings.includeAccountInterest
+      ? `belegt im ${blockedLabel}`
+      : `${money(summary.totalInterest)} jaehrlich aus Jahrestabelle`
+  );
+  setText(
+    "cashbackInvestmentAmount",
+    blockedSettings.includeAccountCashback
+      ? `belegt im ${blockedLabel}`
+      : `${money(summary.totalCashback)} jaehrlich aus Jahrestabelle`
+  );
 
   const savingsPositions = state.positions.filter(
     (position) => position.type === "savings" && positionFlow(position) === "expense"
@@ -968,13 +1006,15 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
 
   list.innerHTML = savingsPositions
     .map((position) => {
-      const checked = state.investment.includedIds.includes(position.id) ? "checked" : "";
+      const checked = settings.includedIds.includes(position.id) ? "checked" : "";
+      const blocked = blockedSettings.includedIds.includes(position.id);
       const inactive = position.active ? "" : `<span class="muted">(inaktiv)</span>`;
+      const blockedText = blocked ? `<span class="muted">(belegt im ${blockedLabel})</span>` : "";
       return `
-        <label class="include-item">
-          <input type="checkbox" data-include-position="${position.id}" ${checked} />
+        <label class="include-item ${blocked ? "blocked" : ""}">
+          <input type="checkbox" data-include-position="${position.id}" ${checked} ${blocked ? "disabled" : ""} />
           <span>
-            <span class="include-name">${escapeHtml(position.name)} ${inactive}</span>
+            <span class="include-name">${escapeHtml(position.name)} ${inactive} ${blockedText}</span>
             <span class="include-amount">${escapeHtml(investmentPositionSubtitle(position))}</span>
           </span>
         </label>
@@ -1064,19 +1104,22 @@ function syncAllInputsFromState(): void {
 
 function syncInvestmentInputsFromState(): void {
   syncInvestmentInputBounds();
-  for (const key of Object.keys(state.investment) as Array<keyof InvestmentSettings>) {
-    if (!isNumericInvestmentSetting(key)) continue;
-    setInputValue(`[data-investment="${key}"]`, state.investment[key]);
+  const depot = activeInvestmentDepot();
+  const settings = depotInvestmentSettings(depot);
+  for (const key of inputInvestmentFields()) {
+    setInputValue(`[data-investment="${key}"]`, settings[key]);
   }
   setInputChecked("[data-retirement-depot-toggle]", state.investment.retirementDepotEnabled);
-  setInputValue("[data-retirement-age]", calculatePayoutStartAge(state.investment));
+  setInputValue("[data-retirement-age]", calculatePayoutStartAge(settings));
+  syncInvestmentDepotTabs();
   syncRetirementDepotControls();
 }
 
 function syncInvestmentInputBounds(): void {
-  const retirementAge = calculatePayoutStartAge(state.investment);
-  const chartStartAge = state.investment.chartStartAge;
-  const retirementMin = state.investment.retirementDepotEnabled ? RETIREMENT_DEPOT_MIN_AGE : 50;
+  const settings = depotInvestmentSettings(activeInvestmentDepot());
+  const retirementAge = calculatePayoutStartAge(settings);
+  const chartStartAge = settings.chartStartAge;
+  const retirementMin = settings.retirementDepotEnabled ? RETIREMENT_DEPOT_MIN_AGE : 50;
   setInputBounds(
     '[data-investment="chartStartAge"]',
     investmentMin("chartStartAge"),
@@ -1087,14 +1130,31 @@ function syncInvestmentInputBounds(): void {
 }
 
 function syncRetirementDepotControls(): void {
-  const enabled = state.investment.retirementDepotEnabled;
-  setInvestmentFieldDisabled("retirementDepotChildren", !enabled);
-  setInvestmentFieldDisabled("percentageWithdrawalStartAge", enabled);
-  setInvestmentFieldDisabled("percentageWithdrawalRatePercent", enabled);
-  setDetailLineHidden("detailPercentageWithdrawalStartAge", enabled);
-  setDetailLineHidden("detailPercentageWithdrawalRate", enabled);
-  setDetailLineHidden("detailPercentageWithdrawalMonthly", enabled);
-  setDetailLineHidden("detailPercentageWithdrawalAnnual", enabled);
+  const depot = activeInvestmentDepot();
+  const isRetirement = depot === "retirement";
+  setRetirementDepotToggleVisible(isRetirement);
+  syncDepotScopedInvestmentFields(depot);
+  setSectionHidden("#retirementDepotFunding", !isRetirement);
+  setDetailLineHidden("detailAllowance", !isRetirement);
+  setDetailLineHidden("detailAllowanceBasis", !isRetirement);
+  setDetailLineHidden("detailPercentageWithdrawalStartAge", isRetirement);
+  setDetailLineHidden("detailPercentageWithdrawalRate", isRetirement);
+  setDetailLineHidden("detailPercentageWithdrawalMonthly", isRetirement);
+  setDetailLineHidden("detailPercentageWithdrawalAnnual", isRetirement);
+}
+
+function syncInvestmentDepotTabs(): void {
+  const active = activeInvestmentDepot();
+  for (const depot of ["standard", "retirement"] as InvestmentDepotKey[]) {
+    const button = document.querySelector<HTMLButtonElement>(`[data-action="set-investment-depot-${depot}"]`);
+    if (!button) continue;
+    button.classList.toggle("active", depot === active);
+    button.setAttribute("aria-pressed", String(depot === active));
+  }
+  setText(
+    "investmentActiveDepotTitle",
+    active === "retirement" ? "Anlageentwicklung Altersvorsorgedepot" : "Anlageentwicklung Depot"
+  );
 }
 
 function updatePlanningSetting(field: keyof PlanningSettings, value: string): void {
@@ -1106,75 +1166,79 @@ function updatePlanningSetting(field: keyof PlanningSettings, value: string): vo
 
 function updateInvestmentSetting(field: keyof InvestmentSettings, value: string): void {
   if (!isNumericInvestmentSetting(field)) return;
+  const depot = activeInvestmentDepot();
+  const settings = depotInvestmentSettings(depot);
   if (field === "payoutEndAge") {
-    const retirementAge = calculatePayoutStartAge(state.investment);
+    const retirementAge = calculatePayoutStartAge(settings);
     const payoutEndAge = clamp(numberValue(value), investmentMin(field), investmentMax(field));
-    state.investment = {
-      ...state.investment,
+    updateDepotInvestmentSettings(depot, {
       payoutEndAge,
       payoutYears: clamp(payoutEndAge - retirementAge, 1, 50)
-    };
+    });
     normalizeInvestmentBounds();
     return;
   }
 
-  state.investment = {
-    ...state.investment,
-    [field]: numericInvestmentValue(field, value)
-  };
+  updateDepotInvestmentSettings(depot, numericInvestmentPatch(field, numericInvestmentValue(field, value)));
   normalizeInvestmentBounds();
 }
 
 function toggleRetirementDepot(checked: boolean): void {
   if (checked === state.investment.retirementDepotEnabled) return;
 
-  if (checked) {
-    state.investment = {
-      ...state.investment,
-      retirementDepotEnabled: true,
-      retirementDepotPreviousSettings: retirementDepotPreviousSettings()
-    };
-    enforceRetirementDepotAgeFloor();
-    normalizeInvestmentBounds();
-    return;
-  }
-
   const previous = state.investment.retirementDepotPreviousSettings;
   state.investment = {
     ...state.investment,
-    retirementDepotEnabled: false,
-    retirementDepotPreviousSettings: null,
-    ...(previous ?? {})
+    retirementDepotEnabled: checked,
+    retirementDepotPreviousSettings: checked ? retirementDepotPreviousSettings() : null
   };
+  if (checked) enforceRetirementDepotAgeFloor();
+  if (!checked && previous) {
+    updateDepotInvestmentSettings("retirement", {
+      payoutEndAge: previous.payoutEndAge,
+      payoutYears: previous.payoutYears,
+      percentageWithdrawalStartAge: previous.percentageWithdrawalStartAge,
+      percentageWithdrawalRatePercent: previous.percentageWithdrawalRatePercent
+    });
+  }
   normalizeInvestmentBounds();
 }
 
 function retirementDepotPreviousSettings(): RetirementDepotPreviousSettings {
+  const settings = depotInvestmentSettings("retirement");
   return {
-    payoutEndAge: state.investment.payoutEndAge,
-    payoutYears: state.investment.payoutYears,
-    percentageWithdrawalStartAge: state.investment.percentageWithdrawalStartAge,
-    percentageWithdrawalRatePercent: state.investment.percentageWithdrawalRatePercent
+    payoutEndAge: settings.payoutEndAge,
+    payoutYears: settings.payoutYears,
+    percentageWithdrawalStartAge: settings.percentageWithdrawalStartAge,
+    percentageWithdrawalRatePercent: settings.percentageWithdrawalRatePercent
   };
 }
 
 function enforceRetirementDepotAgeFloor(): void {
-  const currentRetirementAge = Math.max(0, state.investment.payoutEndAge - state.investment.payoutYears);
+  const settings = depotInvestmentSettings("retirement");
+  const currentRetirementAge = Math.max(0, settings.payoutEndAge - settings.payoutYears);
   if (currentRetirementAge >= RETIREMENT_DEPOT_MIN_AGE) return;
-  state.investment = {
-    ...state.investment,
-    payoutYears: clamp(state.investment.payoutEndAge - RETIREMENT_DEPOT_MIN_AGE, 1, 50)
-  };
+  updateDepotInvestmentSettings("retirement", {
+    payoutYears: clamp(settings.payoutEndAge - RETIREMENT_DEPOT_MIN_AGE, 1, 50)
+  });
 }
 
 function isNumericInvestmentSetting(field: keyof InvestmentSettings): field is NumericInvestmentSetting {
-  return (
-    field !== "includedIds" &&
-    field !== "includeAccountInterest" &&
-    field !== "includeAccountCashback" &&
-    field !== "retirementDepotEnabled" &&
-    field !== "retirementDepotPreviousSettings"
-  );
+  return inputInvestmentFields().includes(field as NumericInvestmentSetting);
+}
+
+function inputInvestmentFields(): NumericInvestmentSetting[] {
+  return [
+    "birthYear",
+    "chartStartAge",
+    "payoutEndAge",
+    "retirementDepotChildren",
+    "percentageWithdrawalStartAge",
+    "percentageWithdrawalRatePercent",
+    "investmentReturnPercent",
+    "capitalGainsTaxPercent",
+    "inflationRatePercent"
+  ];
 }
 
 function numericInvestmentValue(field: NumericInvestmentSetting, value: string): number {
@@ -1182,13 +1246,112 @@ function numericInvestmentValue(field: NumericInvestmentSetting, value: string):
   return field === "retirementDepotChildren" ? Math.floor(nextValue) : nextValue;
 }
 
-function updateRetirementAge(value: string): void {
-  const minAge = state.investment.retirementDepotEnabled ? RETIREMENT_DEPOT_MIN_AGE : 50;
-  const retirementAge = clamp(numberValue(value), minAge, 85);
+function numericInvestmentPatch(field: NumericInvestmentSetting, value: number): Partial<InvestmentSettings> {
+  switch (field) {
+    case "birthYear":
+      return { birthYear: value };
+    case "chartStartAge":
+      return { chartStartAge: value };
+    case "payoutEndAge":
+      return { payoutEndAge: value };
+    case "retirementDepotChildren":
+      return { retirementDepotChildren: value };
+    case "percentageWithdrawalStartAge":
+      return { percentageWithdrawalStartAge: value };
+    case "percentageWithdrawalRatePercent":
+      return { percentageWithdrawalRatePercent: value };
+    case "investmentReturnPercent":
+      return { investmentReturnPercent: value };
+    case "capitalGainsTaxPercent":
+      return { capitalGainsTaxPercent: value };
+    case "inflationRatePercent":
+      return { inflationRatePercent: value };
+  }
+  return {};
+}
+
+function setInvestmentDepot(depot: InvestmentDepotKey): void {
+  if (state.investment.activeDepot === depot) return;
   state.investment = {
     ...state.investment,
-    payoutYears: clamp(state.investment.payoutEndAge - retirementAge, 1, 50)
+    activeDepot: depot
   };
+  hideInvestmentChartPopup();
+  renderAll();
+}
+
+function activeInvestmentDepot(): InvestmentDepotKey {
+  return state.investment.activeDepot === "retirement" ? "retirement" : "standard";
+}
+
+function oppositeInvestmentDepot(depot: InvestmentDepotKey): InvestmentDepotKey {
+  return depot === "standard" ? "retirement" : "standard";
+}
+
+function depotLabel(depot: InvestmentDepotKey): string {
+  return depot === "standard" ? "Depot" : "Altersvorsorgedepot";
+}
+
+function depotInvestmentSettings(depot: InvestmentDepotKey): InvestmentSettings {
+  if (depot === "standard") {
+    return {
+      ...state.investment,
+      activeDepot: "standard",
+      retirementDepotEnabled: false,
+      retirementDepotChildren: 0
+    };
+  }
+
+  return {
+    ...state.investment,
+    activeDepot: "retirement",
+    includedIds: state.investment.retirementIncludedIds,
+    includeAccountInterest: state.investment.retirementIncludeAccountInterest,
+    includeAccountCashback: state.investment.retirementIncludeAccountCashback,
+    birthYear: state.investment.retirementBirthYear,
+    chartStartAge: state.investment.retirementChartStartAge,
+    payoutEndAge: state.investment.retirementPayoutEndAge,
+    payoutYears: state.investment.retirementPayoutYears,
+    percentageWithdrawalStartAge: state.investment.retirementPayoutEndAge - state.investment.retirementPayoutYears,
+    percentageWithdrawalRatePercent: 0,
+    investmentReturnPercent: state.investment.retirementInvestmentReturnPercent,
+    capitalGainsTaxPercent: state.investment.retirementCapitalGainsTaxPercent,
+    inflationRatePercent: state.investment.retirementInflationRatePercent
+  };
+}
+
+function updateDepotInvestmentSettings(depot: InvestmentDepotKey, updates: Partial<InvestmentSettings>): void {
+  if (depot === "standard") {
+    state.investment = {
+      ...state.investment,
+      ...updates
+    };
+    return;
+  }
+
+  state.investment = {
+    ...state.investment,
+    retirementDepotChildren: updates.retirementDepotChildren ?? state.investment.retirementDepotChildren,
+    retirementBirthYear: updates.birthYear ?? state.investment.retirementBirthYear,
+    retirementChartStartAge: updates.chartStartAge ?? state.investment.retirementChartStartAge,
+    retirementPayoutEndAge: updates.payoutEndAge ?? state.investment.retirementPayoutEndAge,
+    retirementPayoutYears: updates.payoutYears ?? state.investment.retirementPayoutYears,
+    retirementInvestmentReturnPercent:
+      updates.investmentReturnPercent ?? state.investment.retirementInvestmentReturnPercent,
+    retirementCapitalGainsTaxPercent:
+      updates.capitalGainsTaxPercent ?? state.investment.retirementCapitalGainsTaxPercent,
+    retirementInflationRatePercent: updates.inflationRatePercent ?? state.investment.retirementInflationRatePercent
+  };
+}
+
+function updateRetirementAge(value: string): void {
+  const depot = activeInvestmentDepot();
+  const settings = depotInvestmentSettings(depot);
+  const minAge = settings.retirementDepotEnabled ? RETIREMENT_DEPOT_MIN_AGE : 50;
+  const retirementAge = clamp(numberValue(value), minAge, 85);
+  updateDepotInvestmentSettings(depot, {
+    payoutYears: clamp(settings.payoutEndAge - retirementAge, 1, 50)
+  });
   normalizeInvestmentBounds();
 }
 
@@ -1382,30 +1545,54 @@ function removePosition(id: string): void {
   state.positions = state.positions.filter((position) => position.id !== id);
   state.investment = {
     ...state.investment,
-    includedIds: state.investment.includedIds.filter((item) => item !== id)
+    includedIds: state.investment.includedIds.filter((item) => item !== id),
+    retirementIncludedIds: state.investment.retirementIncludedIds.filter((item) => item !== id)
   };
 }
 
 function toggleInvestmentPosition(id: string, checked: boolean): void {
-  const includedIds = new Set(state.investment.includedIds);
+  const depot = activeInvestmentDepot();
+  const other = oppositeInvestmentDepot(depot);
+  if (checked && depotInvestmentSettings(other).includedIds.includes(id)) return;
+  const includedIds = new Set(depotInvestmentSettings(depot).includedIds);
   if (checked) includedIds.add(id);
   else includedIds.delete(id);
-  state.investment = { ...state.investment, includedIds: Array.from(includedIds) };
+  if (depot === "standard") {
+    state.investment = { ...state.investment, includedIds: Array.from(includedIds) };
+    return;
+  }
+  state.investment = { ...state.investment, retirementIncludedIds: Array.from(includedIds) };
 }
 
 function toggleInterestInvestment(): void {
-  state.investment = {
-    ...state.investment,
-    includeAccountInterest: !state.investment.includeAccountInterest
-  };
+  const depot = activeInvestmentDepot();
+  const other = oppositeInvestmentDepot(depot);
+  if (!depotInvestmentSettings(depot).includeAccountInterest && depotInvestmentSettings(other).includeAccountInterest) {
+    return;
+  }
+  state.investment =
+    depot === "standard"
+      ? { ...state.investment, includeAccountInterest: !state.investment.includeAccountInterest }
+      : {
+          ...state.investment,
+          retirementIncludeAccountInterest: !state.investment.retirementIncludeAccountInterest
+        };
   renderAll();
 }
 
 function toggleCashbackInvestment(): void {
-  state.investment = {
-    ...state.investment,
-    includeAccountCashback: !state.investment.includeAccountCashback
-  };
+  const depot = activeInvestmentDepot();
+  const other = oppositeInvestmentDepot(depot);
+  if (!depotInvestmentSettings(depot).includeAccountCashback && depotInvestmentSettings(other).includeAccountCashback) {
+    return;
+  }
+  state.investment =
+    depot === "standard"
+      ? { ...state.investment, includeAccountCashback: !state.investment.includeAccountCashback }
+      : {
+          ...state.investment,
+          retirementIncludeAccountCashback: !state.investment.retirementIncludeAccountCashback
+        };
   renderAll();
 }
 
@@ -1546,6 +1733,11 @@ async function importPositionsFromFile(file: File | undefined): Promise<void> {
       imported.some(
         (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
       )
+    ),
+    retirementIncludedIds: state.investment.retirementIncludedIds.filter((id) =>
+      imported.some(
+        (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
+      )
     )
   };
   renderAll();
@@ -1669,11 +1861,26 @@ function setInputBounds(selector: string, min: number, max: number): void {
   input.max = String(max);
 }
 
-function setInvestmentFieldDisabled(field: NumericInvestmentSetting, disabled: boolean): void {
-  const input = document.querySelector<HTMLInputElement>(`[data-investment="${field}"]`);
-  const wrapper = input?.closest<HTMLElement>(".field");
-  if (input) input.disabled = disabled;
-  if (wrapper) wrapper.classList.toggle("field-disabled", disabled);
+function setRetirementDepotToggleVisible(visible: boolean): void {
+  const wrapper = document.querySelector<HTMLElement>(".retirement-depot-toggle");
+  if (wrapper) wrapper.hidden = !visible;
+}
+
+function syncDepotScopedInvestmentFields(activeDepot: InvestmentDepotKey): void {
+  for (const wrapper of document.querySelectorAll<HTMLElement>("[data-depot-scope]")) {
+    const hidden = wrapper.dataset.depotScope !== activeDepot;
+    wrapper.hidden = hidden;
+    for (const control of wrapper.querySelectorAll<
+      HTMLInputElement | HTMLSelectElement | HTMLButtonElement | HTMLTextAreaElement
+    >("input, select, button, textarea")) {
+      control.disabled = hidden;
+    }
+  }
+}
+
+function setSectionHidden(selector: string, hidden: boolean): void {
+  const element = document.querySelector<HTMLElement>(selector);
+  if (element) element.hidden = hidden;
 }
 
 function setDetailLineHidden(id: string, hidden: boolean): void {
@@ -1683,9 +1890,14 @@ function setDetailLineHidden(id: string, hidden: boolean): void {
 
 function drawCurrentInvestmentChart(): void {
   const reserve = calculateReserveSummary(state.settings, state.positions);
-  const projection = buildCurrentAssetProjection(reserve);
+  const projection = buildDepotAssetProjection(reserve, activeInvestmentDepot());
+  const combinedProjection = combineAssetProjections(
+    buildDepotAssetProjection(reserve, "standard"),
+    buildDepotAssetProjection(reserve, "retirement")
+  );
   hideInvestmentChartPopup();
   drawInvestmentChartWithPopup(projection);
+  drawInvestmentChartWithPopup(combinedProjection, "#combinedInvestmentChart", "#combinedInvestmentChartPopup");
 }
 
 function contributionDetailText(projection: AssetProjection): string {
@@ -1701,9 +1913,13 @@ function contributionDetailText(projection: AssetProjection): string {
   )} Monate)`;
 }
 
-function drawInvestmentChartWithPopup(projection: AssetProjection): void {
-  drawInvestmentChart(document.querySelector<HTMLCanvasElement>("#investmentChart"), projection, (selection) => {
-    showInvestmentChartPopup(projection, selection.point, selection.clientX, selection.clientY);
+function drawInvestmentChartWithPopup(
+  projection: AssetProjection,
+  canvasSelector = "#investmentChart",
+  popupSelector = "#investmentChartPopup"
+): void {
+  drawInvestmentChart(document.querySelector<HTMLCanvasElement>(canvasSelector), projection, (selection) => {
+    showInvestmentChartPopup(projection, selection.point, selection.clientX, selection.clientY, popupSelector);
   });
 }
 
@@ -1711,9 +1927,10 @@ function showInvestmentChartPopup(
   projection: AssetProjection,
   point: AssetProjectionPoint,
   clientX: number,
-  clientY: number
+  clientY: number,
+  popupSelector = "#investmentChartPopup"
 ): void {
-  const popup = document.querySelector<HTMLDivElement>("#investmentChartPopup");
+  const popup = document.querySelector<HTMLDivElement>(popupSelector);
   const card = popup?.closest<HTMLElement>(".investment-chart-card");
   if (!popup || !card) return;
 
@@ -1776,27 +1993,34 @@ function chartPopupTotalLine(label: string, value: string): string {
 }
 
 function hideInvestmentChartPopup(): void {
-  const popup = document.querySelector<HTMLDivElement>("#investmentChartPopup");
-  if (!popup) return;
-  popup.hidden = true;
+  for (const popup of document.querySelectorAll<HTMLDivElement>("#investmentChartPopup, #combinedInvestmentChartPopup")) {
+    popup.hidden = true;
+  }
 }
 
-function buildCurrentAssetProjection(summary: ReturnType<typeof calculateReserveSummary>) {
+function buildDepotAssetProjection(
+  summary: ReturnType<typeof calculateReserveSummary>,
+  depot: InvestmentDepotKey
+): AssetProjection {
   return buildAssetProjection(
     state.settings.year,
-    investmentPositionsForProjection(summary),
-    investmentSettingsForProjection(summary)
+    investmentPositionsForProjection(summary, depot),
+    investmentSettingsForProjection(summary, depot)
   );
 }
 
-function investmentPositionsForProjection(summary: ReturnType<typeof calculateReserveSummary>): ReservePosition[] {
+function investmentPositionsForProjection(
+  summary: ReturnType<typeof calculateReserveSummary>,
+  depot: InvestmentDepotKey
+): ReservePosition[] {
+  const settings = depotInvestmentSettings(depot);
   const virtualPositions: ReservePosition[] = [];
-  if (state.investment.includeAccountInterest && summary.totalInterest > 0) {
+  if (settings.includeAccountInterest && summary.totalInterest > 0) {
     virtualPositions.push(
       virtualInvestmentPosition(INTEREST_INVESTMENT_POSITION_ID, "Zinsen aus Jahrestabelle", summary.totalInterest)
     );
   }
-  if (state.investment.includeAccountCashback && summary.totalCashback > 0) {
+  if (settings.includeAccountCashback && summary.totalCashback > 0) {
     virtualPositions.push(
       virtualInvestmentPosition(CASHBACK_INVESTMENT_POSITION_ID, "Cashback aus Jahrestabelle", summary.totalCashback)
     );
@@ -1804,17 +2028,100 @@ function investmentPositionsForProjection(summary: ReturnType<typeof calculateRe
   return [...state.positions, ...virtualPositions];
 }
 
-function investmentSettingsForProjection(summary: ReturnType<typeof calculateReserveSummary>): InvestmentSettings {
-  const includedIds = new Set(state.investment.includedIds);
-  if (state.investment.includeAccountInterest && summary.totalInterest > 0) {
+function investmentSettingsForProjection(
+  summary: ReturnType<typeof calculateReserveSummary>,
+  depot: InvestmentDepotKey
+): InvestmentSettings {
+  const settings = depotInvestmentSettings(depot);
+  const includedIds = new Set(settings.includedIds);
+  if (settings.includeAccountInterest && summary.totalInterest > 0) {
     includedIds.add(INTEREST_INVESTMENT_POSITION_ID);
   }
-  if (state.investment.includeAccountCashback && summary.totalCashback > 0) {
+  if (settings.includeAccountCashback && summary.totalCashback > 0) {
     includedIds.add(CASHBACK_INVESTMENT_POSITION_ID);
   }
   return {
-    ...state.investment,
+    ...settings,
     includedIds: Array.from(includedIds)
+  };
+}
+
+function combineAssetProjections(standard: AssetProjection, retirement: AssetProjection): AssetProjection {
+  const pointsByAge = new Map<number, { standard?: AssetProjectionPoint; retirement?: AssetProjectionPoint }>();
+  for (const point of standard.points) {
+    pointsByAge.set(point.age, { ...(pointsByAge.get(point.age) ?? {}), standard: point });
+  }
+  for (const point of retirement.points) {
+    pointsByAge.set(point.age, { ...(pointsByAge.get(point.age) ?? {}), retirement: point });
+  }
+
+  const ages = Array.from(pointsByAge.keys()).sort((left, right) => left - right);
+  const points = ages.map((age) => {
+    const pair = pointsByAge.get(age) ?? {};
+    return sumProjectionPoint(age, pair.standard, pair.retirement);
+  });
+
+  return {
+    ...standard,
+    points,
+    monthlyRate: standard.monthlyRate + retirement.monthlyRate,
+    annualSavingsRate: standard.annualSavingsRate + retirement.annualSavingsRate,
+    retirementDepotEnabled: retirement.retirementDepotEnabled,
+    retirementDepotAnnualOwnContribution: retirement.retirementDepotAnnualOwnContribution,
+    retirementDepotBaseAllowanceAnnual: retirement.retirementDepotBaseAllowanceAnnual,
+    retirementDepotChildAllowanceAnnual: retirement.retirementDepotChildAllowanceAnnual,
+    retirementDepotAllowanceAnnual: retirement.retirementDepotAllowanceAnnual,
+    retirementDepotAllowanceRatePercent: retirement.retirementDepotAllowanceRatePercent,
+    retirementDepotAnnualContributionWithAllowance: retirement.retirementDepotAnnualContributionWithAllowance,
+    retirementDepotChildren: retirement.retirementDepotChildren,
+    monthlyPension: standard.monthlyPension + retirement.monthlyPension,
+    realMonthlyPension: standard.realMonthlyPension + retirement.realMonthlyPension,
+    percentageWithdrawalMonthlyAtStart:
+      standard.percentageWithdrawalMonthlyAtStart + retirement.percentageWithdrawalMonthlyAtStart,
+    percentageWithdrawalAnnualAtStart:
+      standard.percentageWithdrawalAnnualAtStart + retirement.percentageWithdrawalAnnualAtStart,
+    withdrawalRemainingSavingsMonthlyAtStart:
+      standard.withdrawalRemainingSavingsMonthlyAtStart + retirement.withdrawalRemainingSavingsMonthlyAtStart,
+    withdrawalGainMonthlyAtStart: standard.withdrawalGainMonthlyAtStart + retirement.withdrawalGainMonthlyAtStart,
+    retirementAge: Math.max(standard.retirementAge, retirement.retirementAge),
+    endAge: Math.max(standard.endAge, retirement.endAge),
+    ageToday: Math.min(standard.ageToday, retirement.ageToday),
+    savingMonths: standard.savingMonths + retirement.savingMonths,
+    totalContribution: standard.totalContribution + retirement.totalContribution,
+    grossWealthAtRetirement: standard.grossWealthAtRetirement + retirement.grossWealthAtRetirement,
+    growthAtRetirement: standard.growthAtRetirement + retirement.growthAtRetirement,
+    taxAtRetirement: standard.taxAtRetirement + retirement.taxAtRetirement,
+    taxAtEnd: standard.taxAtEnd + retirement.taxAtEnd,
+    costBasisAtRetirement: standard.costBasisAtRetirement + retirement.costBasisAtRetirement,
+    allowanceAtRetirement: standard.allowanceAtRetirement + retirement.allowanceAtRetirement,
+    allowanceBasisAtRetirement: standard.allowanceBasisAtRetirement + retirement.allowanceBasisAtRetirement,
+    unrealizedTaxAtRetirement: standard.unrealizedTaxAtRetirement + retirement.unrealizedTaxAtRetirement,
+    netWealthAfterFullTaxAtRetirement:
+      standard.netWealthAfterFullTaxAtRetirement + retirement.netWealthAfterFullTaxAtRetirement,
+    inflationFactorAtRetirement: Math.max(standard.inflationFactorAtRetirement, retirement.inflationFactorAtRetirement),
+    wealthAtRetirement: standard.wealthAtRetirement + retirement.wealthAtRetirement,
+    realWealthAtRetirement: standard.realWealthAtRetirement + retirement.realWealthAtRetirement
+  };
+}
+
+function sumProjectionPoint(
+  age: number,
+  standard: AssetProjectionPoint | undefined,
+  retirement: AssetProjectionPoint | undefined
+): AssetProjectionPoint {
+  return {
+    age,
+    phase: standard?.phase === "payout" || retirement?.phase === "payout" ? "payout" : "saving",
+    grossBalance: (standard?.grossBalance ?? 0) + (retirement?.grossBalance ?? 0),
+    contribution: (standard?.contribution ?? 0) + (retirement?.contribution ?? 0),
+    costBasis: (standard?.costBasis ?? 0) + (retirement?.costBasis ?? 0),
+    allowance: (standard?.allowance ?? 0) + (retirement?.allowance ?? 0),
+    growth: (standard?.growth ?? 0) + (retirement?.growth ?? 0),
+    tax: (standard?.tax ?? 0) + (retirement?.tax ?? 0),
+    periodTax: (standard?.periodTax ?? 0) + (retirement?.periodTax ?? 0),
+    netBalance: (standard?.netBalance ?? 0) + (retirement?.netBalance ?? 0),
+    realNetBalance: (standard?.realNetBalance ?? 0) + (retirement?.realNetBalance ?? 0),
+    normalDepot: (standard?.normalDepot ?? 0) + (retirement?.normalDepot ?? 0)
   };
 }
 
@@ -1853,28 +2160,70 @@ function normalizeInvestmentBounds(): void {
       String(state.investment.retirementDepotChildren)
     )
   };
+  nextInvestment.activeDepot = nextInvestment.activeDepot === "retirement" ? "retirement" : "standard";
   if (nextInvestment.retirementDepotEnabled) {
-    const rawRetirementAge = Math.max(0, nextInvestment.payoutEndAge - nextInvestment.payoutYears);
+    const rawRetirementAge = Math.max(0, nextInvestment.retirementPayoutEndAge - nextInvestment.retirementPayoutYears);
     if (rawRetirementAge < RETIREMENT_DEPOT_MIN_AGE) {
       nextInvestment = {
         ...nextInvestment,
-        payoutYears: clamp(nextInvestment.payoutEndAge - RETIREMENT_DEPOT_MIN_AGE, 1, 50)
+        retirementPayoutYears: clamp(nextInvestment.retirementPayoutEndAge - RETIREMENT_DEPOT_MIN_AGE, 1, 50)
       };
     }
   }
 
-  const retirementAge = calculatePayoutStartAge(nextInvestment);
-  const chartStartAge = clamp(
+  const standardRetirementAge = calculatePayoutStartAge({
+    ...nextInvestment,
+    retirementDepotEnabled: false,
+    retirementDepotChildren: 0
+  });
+  const standardChartStartAge = clamp(
     nextInvestment.chartStartAge,
+    investmentMin("chartStartAge"),
+    Math.min(investmentMax("chartStartAge"), standardRetirementAge)
+  );
+  const retirementSettings = {
+    ...nextInvestment,
+    includedIds: nextInvestment.retirementIncludedIds,
+    includeAccountInterest: nextInvestment.retirementIncludeAccountInterest,
+    includeAccountCashback: nextInvestment.retirementIncludeAccountCashback,
+    birthYear: nextInvestment.retirementBirthYear,
+    chartStartAge: nextInvestment.retirementChartStartAge,
+    payoutEndAge: nextInvestment.retirementPayoutEndAge,
+    payoutYears: nextInvestment.retirementPayoutYears,
+    percentageWithdrawalStartAge: nextInvestment.retirementPayoutEndAge - nextInvestment.retirementPayoutYears,
+    percentageWithdrawalRatePercent: 0,
+    investmentReturnPercent: nextInvestment.retirementInvestmentReturnPercent,
+    capitalGainsTaxPercent: nextInvestment.retirementCapitalGainsTaxPercent,
+    inflationRatePercent: nextInvestment.retirementInflationRatePercent
+  };
+  const retirementAge = calculatePayoutStartAge(retirementSettings);
+  const retirementChartStartAge = clamp(
+    nextInvestment.retirementChartStartAge,
     investmentMin("chartStartAge"),
     Math.min(investmentMax("chartStartAge"), retirementAge)
   );
   state.investment = {
     ...nextInvestment,
-    chartStartAge,
-    percentageWithdrawalStartAge: nextInvestment.retirementDepotEnabled
-      ? nextInvestment.percentageWithdrawalStartAge
-      : clamp(nextInvestment.percentageWithdrawalStartAge, chartStartAge, retirementAge)
+    chartStartAge: standardChartStartAge,
+    percentageWithdrawalStartAge: clamp(nextInvestment.percentageWithdrawalStartAge, standardChartStartAge, standardRetirementAge),
+    retirementChartStartAge,
+    retirementDepotChildren: numericInvestmentValue(
+      "retirementDepotChildren",
+      String(nextInvestment.retirementDepotChildren)
+    )
+  };
+}
+
+function normalizeInvestmentDepotSelections(): void {
+  const standardIds = new Set(state.investment.includedIds);
+  const retirementIds = state.investment.retirementIncludedIds.filter((id) => !standardIds.has(id));
+  state.investment = {
+    ...state.investment,
+    retirementIncludedIds: retirementIds,
+    retirementIncludeAccountInterest:
+      state.investment.includeAccountInterest ? false : state.investment.retirementIncludeAccountInterest,
+    retirementIncludeAccountCashback:
+      state.investment.includeAccountCashback ? false : state.investment.retirementIncludeAccountCashback
   };
 }
 

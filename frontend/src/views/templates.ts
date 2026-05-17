@@ -129,19 +129,23 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel investment-panel">
-        <div class="section-heading">
+        <div class="section-heading investment-heading">
           <h2>Investment- und Auszahlungsplanung</h2>
+          <div class="position-mode-switch investment-depot-switch" role="tablist" aria-label="Depot-Auswahl">
+            <button class="position-mode-button" type="button" data-action="set-investment-depot-standard" aria-pressed="true">Depot</button>
+            <button class="position-mode-button" type="button" data-action="set-investment-depot-retirement" aria-pressed="false">Altersvorsorgedepot</button>
+          </div>
         </div>
         <div class="investment-grid">
           <div class="investment-selector">
             <h3>Investierbare Positionen</h3>
             <div class="include-special-toggles">
               <button class="include-transfer-toggle" type="button" data-action="toggle-interest-investment" aria-pressed="false">
-                <span>Zinsen in Altersvorsorge</span>
+                <span>Zinsen</span>
                 <strong id="interestInvestmentAmount">-</strong>
               </button>
               <button class="include-transfer-toggle" type="button" data-action="toggle-cashback-investment" aria-pressed="false">
-                <span>Cashback in Altersvorsorge</span>
+                <span>Cashback</span>
                 <strong id="cashbackInvestmentAmount">-</strong>
               </button>
             </div>
@@ -163,9 +167,9 @@ export function renderAppShell(): string {
                 ${numberField("chartStartAge", "Startalter Grafik", "investment", "chartStartAge", { min: 0, max: 80, step: 1 })}
                 ${retirementAgeField()}
                 ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1 })}
-                ${numberField("retirementDepotChildren", "Kindergeldberechtigte Kinder", "investment", "retirementDepotChildren", { min: 0, max: 20, step: 1 })}
-                ${numberField("percentageWithdrawalStartAge", "Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1 })}
-                ${numberField("percentageWithdrawalRatePercent", "Prozent-Entnahme p. a.", "investment", "percentageWithdrawalRatePercent", { min: 0, max: 20, step: 0.1 })}
+                ${numberField("retirementDepotChildren", "Kindergeldberechtigte Kinder", "investment", "retirementDepotChildren", { min: 0, max: 20, step: 1, depotScope: "retirement" })}
+                ${numberField("percentageWithdrawalStartAge", "Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1, depotScope: "standard" })}
+                ${numberField("percentageWithdrawalRatePercent", "Prozent-Entnahme p. a.", "investment", "percentageWithdrawalRatePercent", { min: 0, max: 20, step: 0.1, depotScope: "standard" })}
               </div>
               <div class="investment-range-panel">
                 ${rangeField("investmentReturnPercent", "Jaehrliche Rendite", 0, 30, 0.1)}
@@ -178,7 +182,7 @@ export function renderAppShell(): string {
           <div class="investment-visual">
             <section class="investment-chart-card" aria-label="Anlageentwicklung Grafik">
               <div class="investment-chart-header">
-                <div class="investment-chart-title">Anlageentwicklung</div>
+                <div class="investment-chart-title" id="investmentActiveDepotTitle">Anlageentwicklung Depot</div>
                 <div class="investment-chart-metrics">
                   ${chartMetric("monthlyRateMetric", "Monatliche Investmentrate")}
                   ${chartMetric("wealthAtRetirementMetric", "Vermoegen zur Rente")}
@@ -197,7 +201,7 @@ export function renderAppShell(): string {
                 <span class="legend-item"><span class="legend-dot red"></span> Kapitalertragsteuer</span>
                 <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
               </div>
-              <div class="retirement-depot-funding" aria-label="Foerderung">
+              <div class="retirement-depot-funding" id="retirementDepotFunding" aria-label="Foerderung">
                 <div class="retirement-depot-funding-head">
                   <span>Foerderung</span>
                   <strong id="retirementDepotFundingStatus">Altersvorsorgedepot deaktiviert</strong>
@@ -240,6 +244,29 @@ export function renderAppShell(): string {
                 ${detailLine("Monatliche gleichmaessige Entnahme real", "detailRealMonthlyPension")}
                 ${detailLine("Gewaehlte Monatsrate", "detailSelectedMonthlyRate")}
                 </div>
+              </div>
+            </section>
+            <section class="investment-chart-card combined-investment-card" aria-label="Gemeinsame Anlageentwicklung">
+              <div class="investment-chart-header">
+                <div class="investment-chart-title">Gemeinsame Anlageentwicklung</div>
+                <div class="investment-chart-metrics">
+                  ${chartMetric("combinedStandardWealthMetric", "Depot zur Rente")}
+                  ${chartMetric("combinedRetirementWealthMetric", "Altersvorsorgedepot zur Rente")}
+                  ${chartMetric("combinedWealthMetric", "Gesamt zur Rente")}
+                  ${chartMetric("combinedMonthlyRateMetric", "Monatliche Rate gesamt")}
+                  ${chartMetric("combinedMonthlyPensionMetric", "Monatliche Rente gesamt")}
+                  ${chartMetric("combinedRealWealthMetric", "Reales Vermoegen gesamt")}
+                </div>
+              </div>
+              <canvas id="combinedInvestmentChart"></canvas>
+              <div id="combinedInvestmentChartPopup" class="investment-chart-popup" role="dialog" aria-label="Balkendetails gemeinsam" hidden></div>
+              <div class="investment-legend">
+                <span class="legend-item"><span class="legend-dot grey"></span> Eigenbeitrag</span>
+                <span class="legend-item"><span class="legend-dot orange"></span> Zulagen</span>
+                <span class="legend-item"><span class="legend-dot green"></span> Wertzuwachs</span>
+                <span class="legend-item"><span class="legend-dot purple"></span> Restguthaben (Auszahlung)</span>
+                <span class="legend-item"><span class="legend-dot red"></span> Kapitalertragsteuer</span>
+                <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
               </div>
             </section>
           </div>
@@ -316,11 +343,12 @@ function numberField(
   label: string,
   scope: "setting" | "investment",
   key: string,
-  options: { min: number; max?: number; step: number }
+  options: { min: number; max?: number; step: number; depotScope?: "standard" | "retirement" }
 ): string {
   const dataAttr = scope === "setting" ? `data-setting="${key}"` : `data-investment="${key}"`;
+  const depotScopeAttr = options.depotScope ? `data-depot-scope="${options.depotScope}"` : "";
   return `
-    <label class="field" for="${id}">
+    <label class="field" for="${id}" ${depotScopeAttr}>
       <span>${label}</span>
       <input id="${id}" type="number" min="${options.min}" ${options.max ? `max="${options.max}"` : ""} step="${
         options.step
@@ -341,7 +369,7 @@ function rangeField(key: keyof InvestmentSettings, label: string, min: number, m
 
 function retirementDepotToggle(): string {
   return `
-    <label class="retirement-depot-toggle" for="retirementDepotEnabled">
+    <label class="retirement-depot-toggle" for="retirementDepotEnabled" hidden>
       <input id="retirementDepotEnabled" type="checkbox" data-retirement-depot-toggle="true" />
       <span>
         <strong>Altersvorsorgedepot aktivieren</strong>
