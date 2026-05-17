@@ -251,18 +251,30 @@ function drawBalanceCompositionBar(
   const radius = Math.min(6, width / 2);
   const netBalance = Math.max(0, point.netBalance);
   const costBasis = Math.min(netBalance, Math.max(0, point.costBasis));
+  const allowance = Math.min(costBasis, Math.max(0, point.allowance));
+  const ownContribution = Math.max(0, costBasis - allowance);
   const growth = Math.max(0, netBalance - costBasis);
   const tax = Math.min(growth, Math.max(0, point.periodTax));
   const netGrowth = Math.max(0, growth - tax);
   const segments: BarSegment[] = showPayoutBalance
     ? [
         { height: valueToHeight(costBasis, padding, chartHeight, maxValue, baseY), color: chartColors.purple },
-        { height: valueToHeight(costBasis, padding, chartHeight, maxValue, baseY), color: chartColors.grey, overlay: true },
+        {
+          height: valueToHeight(ownContribution, padding, chartHeight, maxValue, baseY),
+          color: chartColors.grey,
+          overlay: true
+        },
+        {
+          height: valueToHeight(ownContribution + allowance, padding, chartHeight, maxValue, baseY),
+          color: chartColors.orange,
+          overlay: true
+        },
         { height: valueToHeight(netGrowth, padding, chartHeight, maxValue, baseY), color: chartColors.green },
         { height: valueToHeight(tax, padding, chartHeight, maxValue, baseY), color: chartColors.red }
       ].filter((segment) => segment.height > 0)
     : [
-        { height: valueToHeight(costBasis, padding, chartHeight, maxValue, baseY), color: chartColors.grey },
+        { height: valueToHeight(ownContribution, padding, chartHeight, maxValue, baseY), color: chartColors.grey },
+        { height: valueToHeight(allowance, padding, chartHeight, maxValue, baseY), color: chartColors.orange },
         { height: valueToHeight(netGrowth, padding, chartHeight, maxValue, baseY), color: chartColors.green },
         { height: valueToHeight(tax, padding, chartHeight, maxValue, baseY), color: chartColors.red }
       ].filter((segment) => segment.height > 0);

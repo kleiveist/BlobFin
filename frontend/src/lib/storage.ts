@@ -1,6 +1,14 @@
 import { createId, defaultAppState, defaultInvestmentSettings, defaultPlanningSettings } from "../data/defaults";
 import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
-import type { AppState, InvestmentSettings, PlanningSettings, PositionFlow, ReservePosition, ThemeMode } from "../types";
+import type {
+  AppState,
+  InvestmentSettings,
+  PlanningSettings,
+  PositionFlow,
+  ReservePosition,
+  RetirementDepotPreviousSettings,
+  ThemeMode
+} from "../types";
 
 const STORAGE_KEY = "blobfin.reserveCalculator.v1";
 const LEGACY_STORAGE_KEY = "jahreskalkulatorState";
@@ -93,6 +101,9 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
     includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
     includeAccountCashback: booleanOrDefault(value.includeAccountCashback, fallback.includeAccountCashback),
+    retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
+    retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
+    retirementDepotPreviousSettings: normalizeRetirementDepotPreviousSettings(value.retirementDepotPreviousSettings),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
@@ -118,6 +129,9 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
     includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
     includeAccountCashback: booleanOrDefault(value.includeAccountCashback, fallback.includeAccountCashback),
+    retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
+    retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
+    retirementDepotPreviousSettings: normalizeRetirementDepotPreviousSettings(value.retirementDepotPreviousSettings),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
     payoutEndAge: numberOrDefault(value.payoutEndAge, fallback.payoutEndAge),
@@ -133,6 +147,22 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     investmentReturnPercent: numberOrDefault(value.investmentReturn, fallback.investmentReturnPercent),
     capitalGainsTaxPercent: numberOrDefault(value.capitalGainsTax, fallback.capitalGainsTaxPercent),
     inflationRatePercent: numberOrDefault(value.inflationRate, fallback.inflationRatePercent)
+  };
+}
+
+function normalizeRetirementDepotPreviousSettings(value: unknown): RetirementDepotPreviousSettings | null {
+  if (!isRecord(value)) return null;
+  return {
+    payoutEndAge: numberOrDefault(value.payoutEndAge, defaultInvestmentSettings().payoutEndAge),
+    payoutYears: numberOrDefault(value.payoutYears, defaultInvestmentSettings().payoutYears),
+    percentageWithdrawalStartAge: numberOrDefault(
+      value.percentageWithdrawalStartAge,
+      defaultInvestmentSettings().percentageWithdrawalStartAge
+    ),
+    percentageWithdrawalRatePercent: numberOrDefault(
+      value.percentageWithdrawalRatePercent,
+      defaultInvestmentSettings().percentageWithdrawalRatePercent
+    )
   };
 }
 

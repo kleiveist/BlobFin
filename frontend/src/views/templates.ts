@@ -150,6 +150,7 @@ export function renderAppShell(): string {
 
           <div class="investment-controls">
             <div class="investment-control-top">
+              ${retirementDepotToggle()}
               <aside class="savings-rate-card" aria-label="Sparrate">
                 <span>Jaehrliche Sparrate</span>
                 <strong id="annualSavingsRateMetric">-</strong>
@@ -162,6 +163,7 @@ export function renderAppShell(): string {
                 ${numberField("chartStartAge", "Startalter Grafik", "investment", "chartStartAge", { min: 0, max: 80, step: 1 })}
                 ${retirementAgeField()}
                 ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1 })}
+                ${numberField("retirementDepotChildren", "Kindergeldberechtigte Kinder", "investment", "retirementDepotChildren", { min: 0, max: 20, step: 1 })}
                 ${numberField("percentageWithdrawalStartAge", "Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1 })}
                 ${numberField("percentageWithdrawalRatePercent", "Prozent-Entnahme p. a.", "investment", "percentageWithdrawalRatePercent", { min: 0, max: 20, step: 0.1 })}
               </div>
@@ -195,9 +197,26 @@ export function renderAppShell(): string {
                 <span class="legend-item"><span class="legend-dot red"></span> Kapitalertragsteuer</span>
                 <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
               </div>
+              <div class="retirement-depot-funding" aria-label="Foerderung">
+                <div class="retirement-depot-funding-head">
+                  <span>Foerderung</span>
+                  <strong id="retirementDepotFundingStatus">Altersvorsorgedepot deaktiviert</strong>
+                </div>
+                <div class="retirement-depot-funding-grid">
+                  ${chartMetric("retirementDepotOwnContributionMetric", "Eigenbeitrag p. a.")}
+                  ${chartMetric("retirementDepotBaseAllowanceMetric", "Grundzulage p. a.")}
+                  ${chartMetric("retirementDepotChildAllowanceMetric", "Kinderzulage p. a.")}
+                  ${chartMetric("retirementDepotAllowanceRateMetric", "Foerderquote")}
+                  ${chartMetric("retirementDepotTotalAllowanceMetric", "Zulagen p. a.")}
+                  ${chartMetric("retirementDepotTotalContributionMetric", "Gesamt im Depot p. a.")}
+                  ${chartMetric("retirementDepotAllowanceAtRetirementMetric", "Zulagen bis Rente")}
+                </div>
+              </div>
               <div class="investment-statistics">
                 <div class="detail-list" aria-label="Berechnungsdetails">
                 ${detailLine("Eingezahlter Eigenbeitrag", "detailContribution")}
+                ${detailLine("Eingepreiste Zulagen", "detailAllowance")}
+                ${detailLine("Verbleibende Zulagen", "detailAllowanceBasis")}
                 ${detailLine("Verbleibender Eigenbeitrag", "detailCostBasis")}
                 ${detailLine("Nicht realisierter Wertzuwachs", "detailGrowth")}
                 ${detailLine("Bruttovermoegen", "detailGrossWealth")}
@@ -316,6 +335,18 @@ function rangeField(key: keyof InvestmentSettings, label: string, min: number, m
       <span>${label}</span>
       <input type="range" min="${min}" max="${max}" step="${step}" data-investment="${key}" />
       <strong id="${key}Value">-</strong>
+    </label>
+  `;
+}
+
+function retirementDepotToggle(): string {
+  return `
+    <label class="retirement-depot-toggle" for="retirementDepotEnabled">
+      <input id="retirementDepotEnabled" type="checkbox" data-retirement-depot-toggle="true" />
+      <span>
+        <strong>Altersvorsorgedepot aktivieren</strong>
+        <small>Zulagen einpreisen, Rentenalter mindestens 65 Jahre</small>
+      </span>
     </label>
   `;
 }

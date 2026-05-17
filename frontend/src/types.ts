@@ -35,6 +35,9 @@ export interface InvestmentSettings {
   includedIds: string[];
   includeAccountInterest: boolean;
   includeAccountCashback: boolean;
+  retirementDepotEnabled: boolean;
+  retirementDepotChildren: number;
+  retirementDepotPreviousSettings: RetirementDepotPreviousSettings | null;
   birthYear: number;
   chartStartAge: number;
   payoutEndAge: number;
@@ -44,6 +47,13 @@ export interface InvestmentSettings {
   investmentReturnPercent: number;
   capitalGainsTaxPercent: number;
   inflationRatePercent: number;
+}
+
+export interface RetirementDepotPreviousSettings {
+  payoutEndAge: number;
+  payoutYears: number;
+  percentageWithdrawalStartAge: number;
+  percentageWithdrawalRatePercent: number;
 }
 
 export interface AppState {
@@ -118,6 +128,14 @@ export interface AssetProjection {
   points: AssetProjectionPoint[];
   monthlyRate: number;
   annualSavingsRate: number;
+  retirementDepotEnabled: boolean;
+  retirementDepotAnnualOwnContribution: number;
+  retirementDepotBaseAllowanceAnnual: number;
+  retirementDepotChildAllowanceAnnual: number;
+  retirementDepotAllowanceAnnual: number;
+  retirementDepotAllowanceRatePercent: number;
+  retirementDepotAnnualContributionWithAllowance: number;
+  retirementDepotChildren: number;
   monthlyPension: number;
   realMonthlyPension: number;
   percentageWithdrawalMonthlyAtStart: number;
@@ -136,6 +154,8 @@ export interface AssetProjection {
   taxAtRetirement: number;
   taxAtEnd: number;
   costBasisAtRetirement: number;
+  allowanceAtRetirement: number;
+  allowanceBasisAtRetirement: number;
   unrealizedTaxAtRetirement: number;
   netWealthAfterFullTaxAtRetirement: number;
   inflationFactorAtRetirement: number;

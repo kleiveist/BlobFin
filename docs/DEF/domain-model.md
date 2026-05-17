@@ -22,7 +22,7 @@ Important fields:
 
 `PlanningSettings` contains the planning year, account interest rate, cashback rate, and emergency fund value. The legacy `monthlyNetIncome` setting is migrated into an income position and no longer drives calculations directly.
 
-`InvestmentSettings` contains selected investment IDs, special interest/cashback investment toggles, age settings, return, tax, inflation, and percentage withdrawal settings.
+`InvestmentSettings` contains selected investment IDs, special interest/cashback investment toggles, retirement depot settings, age settings, return, tax, inflation, and percentage withdrawal settings.
 
 ## Reserve Calculation
 
@@ -91,9 +91,29 @@ monthlyReturn = (1 + annualReturn) ^ (1 / 12) - 1
 During the saving phase:
 
 - selected contributions are added monthly,
+- retirement depot allowances are added as separate allowance contributions when enabled,
 - gross balance compounds monthly,
 - optional percentage withdrawals can start before retirement,
 - realized taxes are accumulated only when withdrawals realize gains.
+
+When the retirement depot is enabled, the effective retirement age is at least 65 and percentage withdrawals are disabled in the projection.
+
+## Retirement Depot Allowance
+
+Implemented in `frontend/src/domain/retirementDepot.ts`.
+
+The allowance model is calculated from the selected annual own contribution:
+
+```text
+if annualOwnContribution < 120:
+  allowance = 0
+else:
+  baseAllowance = 50% of min(annualOwnContribution, 360)
+                + 25% of min(max(annualOwnContribution - 360, 0), 1440)
+  childAllowance = min(annualOwnContribution, 300) * eligibleChildren
+```
+
+The yearly base allowance is capped by the tier formula at 540 EUR. The projection distributes each year's allowance proportionally across months that receive selected own contributions. `AssetProjectionPoint.allowance` contains the remaining allowance basis for the chart's orange segment.
 
 During the payout phase:
 
@@ -131,6 +151,7 @@ Each `AssetProjectionPoint` represents one age in the chart. It includes:
 - gross and net balance,
 - total contributions,
 - remaining cost basis,
+- remaining allowance basis,
 - remaining growth,
 - cumulative realized tax,
 - period tax for the chart bar,

@@ -61,6 +61,20 @@ export function selectedInvestmentContributionForProjectionMonth(
   }, 0);
 }
 
+export function selectedInvestmentContributionForProjectionYear(
+  positions: ReservePosition[],
+  settings: InvestmentSettings,
+  baseYear: number,
+  projectionYearIndex: number
+): number {
+  const firstMonthIndex = projectionYearIndex * 12;
+  let total = 0;
+  for (let offset = 0; offset < 12; offset += 1) {
+    total += selectedInvestmentContributionForProjectionMonth(positions, settings, baseYear, firstMonthIndex + offset);
+  }
+  return total;
+}
+
 export function selectedOneTimeInvestmentContributionForProjectionMonth(
   positions: ReservePosition[],
   settings: InvestmentSettings,

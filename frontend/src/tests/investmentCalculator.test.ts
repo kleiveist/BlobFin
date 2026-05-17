@@ -3,8 +3,36 @@ import { describe, expect, it } from "vitest";
 import { defaultAppState } from "../data/defaults";
 import { buildAssetProjection } from "../domain/assetProjection";
 import { calculateInvestmentResult } from "../domain/investmentCalculator";
+import { calculateRetirementDepotAllowance } from "../domain/retirementDepot";
 
 describe("investment calculator", () => {
+  it("calculates the retirement depot allowance tiers and child allowance", () => {
+    expect(calculateRetirementDepotAllowance(119, 2)).toMatchObject({
+      baseAllowance: 0,
+      childAllowance: 0,
+      totalAllowance: 0,
+      allowanceRatePercent: 0
+    });
+    expect(calculateRetirementDepotAllowance(360, 0)).toMatchObject({
+      baseAllowance: 180,
+      childAllowance: 0,
+      totalAllowance: 180,
+      allowanceRatePercent: 50
+    });
+    expect(calculateRetirementDepotAllowance(1800, 0)).toMatchObject({
+      baseAllowance: 540,
+      childAllowance: 0,
+      totalAllowance: 540,
+      allowanceRatePercent: 30
+    });
+    expect(calculateRetirementDepotAllowance(300, 2)).toMatchObject({
+      baseAllowance: 150,
+      childAllowance: 600,
+      totalAllowance: 750,
+      allowanceRatePercent: 250
+    });
+  });
+
   it("projects the selected investment position into net payout values", () => {
     const state = defaultAppState();
     const result = calculateInvestmentResult(state.settings.year, state.positions, state.investment);
@@ -35,6 +63,30 @@ describe("investment calculator", () => {
     );
     expect(projection.wealthAtRetirement).toBeGreaterThan(40000);
     expect(projection.points.some((point) => point.phase === "payout")).toBe(true);
+  });
+
+  it("adds retirement depot allowances and enforces retirement age 65", () => {
+    const state = defaultAppState();
+    state.investment = {
+      ...state.investment,
+      retirementDepotEnabled: true,
+      percentageWithdrawalStartAge: 32,
+      percentageWithdrawalRatePercent: 4
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.retirementAge).toBe(65);
+    expect(projection.savingMonths).toBe(384);
+    expect(projection.retirementDepotAnnualOwnContribution).toBe(1800);
+    expect(projection.retirementDepotBaseAllowanceAnnual).toBe(540);
+    expect(projection.retirementDepotAllowanceRatePercent).toBe(30);
+    expect(projection.allowanceAtRetirement).toBeCloseTo(17280, 2);
+    expect(projection.percentageWithdrawalRatePercent).toBe(0);
+    expect(projection.percentageWithdrawalMonthlyAtStart).toBe(0);
+    expect(projection.taxAtRetirement).toBe(0);
+    expect(projection.wealthAtRetirement).toBeGreaterThan(projection.totalContribution);
+    expect(projection.points.some((point) => point.allowance > 0)).toBe(true);
   });
 
   it("does not show negative withdrawal gain values", () => {
