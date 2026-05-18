@@ -4,6 +4,7 @@ import { createId, defaultAppState, defaultInvestmentSettings } from "./data/def
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
 import {
+  calculateYearTableFooterValue,
   calculatePlannedIncomeForSingleMonth,
   calculatePlannedOutflowForSingleMonth,
   calculateReserveSummary
@@ -639,10 +640,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
 }
 
 function positionFooterValue(position: ReservePosition, summary: ReturnType<typeof calculateReserveSummary>): number {
-  if (isIncomePosition(position)) {
-    return summary.rows.reduce((sum, row) => sum + (row.values[position.id] || 0), 0);
-  }
-  return summary.rows[11]?.values[position.id] || 0;
+  return calculateYearTableFooterValue(position, summary.rows, state.settings.year);
 }
 
 function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSummary>): void {

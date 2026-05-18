@@ -243,6 +243,16 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
   return rows;
 }
 
+export function calculateYearTableFooterValue(position: ReservePosition, rows: MonthlyReserveRow[], year: number): number {
+  if (isIncomePosition(position)) {
+    return rows.reduce((sum, row) => sum + (row.values[position.id] || 0), 0);
+  }
+  if (position.type === "reserve") {
+    return rows.reduce((sum, row) => sum + calculatePlannedOutflowForSingleMonth(position, year, row.monthNumber), 0);
+  }
+  return rows[11]?.values[position.id] || 0;
+}
+
 export function calculateReserveSummary(settings: PlanningSettings, positions: ReservePosition[]): ReserveSummary {
   const rows = calculateMonthlyRows(settings, positions);
   const activePositions = positions.filter((position) => position.active && position.payoutType !== "once");

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
-import { calculateReserveSummary } from "../domain/reserveCalculator";
+import { calculateReserveSummary, calculateYearTableFooterValue } from "../domain/reserveCalculator";
 import { exportPositionsCsv, exportYearTableCsv, parseCsv, positionsFromCsvRows } from "../lib/csv";
 import { positionTableMode } from "../lib/positionKinds";
 
@@ -30,6 +30,18 @@ describe("reserve calculator", () => {
     expect(positionTableMode(state.positions.find((position) => position.id === "kfz-ruecklage")!)).toBe("reserve");
     expect(positionTableMode(state.positions.find((position) => position.id === "uni-gebuehr")!)).toBe("expense");
     expect(positionTableMode(state.positions.find((position) => position.id === "investitionsrate")!)).toBe("savings");
+  });
+
+  it("uses the yearly reserve sum as footer when payout happens before December", () => {
+    const state = defaultAppState();
+    const reserve = state.positions.find((position) => position.id === "kfz-ruecklage")!;
+    reserve.payoutMonth = 9;
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+
+    expect(summary.rows[8].values[reserve.id]).toBe(585);
+    expect(summary.rows[11].values[reserve.id]).toBe(195);
+    expect(calculateYearTableFooterValue(reserve, summary.rows, state.settings.year)).toBe(780);
   });
 
   it("only grants cashback for temporary positions with matching payout cadence", () => {
