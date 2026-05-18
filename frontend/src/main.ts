@@ -31,7 +31,12 @@ import {
   typeForFlow,
   type PositionTableMode
 } from "./lib/positionKinds";
-import { defaultPositionIconForPosition, normalizePositionIcon, positionIconSvg } from "./lib/positionIcons";
+import {
+  defaultPositionIconForPosition,
+  normalizePositionIcon,
+  POSITION_ICONS,
+  positionIconSvg
+} from "./lib/positionIcons";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
 import type {
   AppState,
@@ -113,6 +118,7 @@ let reserveChartScenario: ReserveChartScenario = "current";
 let reserveChartHighlightId: string | null = null;
 let reserveChartAdjustment: ReserveChartAdjustment = "none";
 let reserveChartStyle: ReserveChartStyle = "bars";
+let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 normalizeInvestmentBounds();
 applyTheme();
 
@@ -197,11 +203,20 @@ function bindEvents(): void {
   });
 
   root.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>("button[data-action]");
-    if (!button) return;
+    const target = event.target as HTMLElement | null;
+    const button = target?.closest<HTMLButtonElement>("button[data-action]");
+    if (!button) {
+      if (positionIconPicker && !target?.closest("#positionIconPicker")) {
+        hidePositionIconPicker();
+      }
+      return;
+    }
 
     event.preventDefault();
     const action = button.dataset.action;
+    if (action !== "open-position-icon-picker" && action !== "select-position-icon") {
+      hidePositionIconPicker();
+    }
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
     if (action === "show-income-positions") setSelectedPositionMode("income");
@@ -233,6 +248,11 @@ function bindEvents(): void {
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
     if (action === "toggle-theme-settings") toggleThemeSettings();
     if (action === "close-theme-settings") hideThemeSettings();
+    if (action === "open-position-icon-picker") showPositionIconPicker(button);
+    if (action === "close-position-icon-picker") hidePositionIconPicker();
+    if (action === "select-position-icon") {
+      selectPositionIcon(button.dataset.positionId || "", button.dataset.positionIcon || "");
+    }
     if (action === "set-theme-light") setThemeMode("light");
     if (action === "set-theme-dark") setThemeMode("dark");
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
@@ -450,6 +470,7 @@ function renderPositions(): void {
         </td>
       </tr>
     `;
+    renderPositionIconPicker();
     return;
   }
 
@@ -507,6 +528,82 @@ function renderPositions(): void {
       renderAll();
     });
   }
+  renderPositionIconPicker();
+}
+
+function showPositionIconPicker(button: HTMLButtonElement): void {
+  const positionId = button.dataset.positionId;
+  if (!positionId) return;
+  const rect = button.getBoundingClientRect();
+  const panelWidth = 320;
+  const panelHeight = 360;
+  const left =
+    rect.right + 12 + panelWidth <= window.innerWidth
+      ? rect.right + 12
+      : Math.max(12, rect.left - panelWidth - 12);
+  const top = Math.max(12, Math.min(rect.top, window.innerHeight - panelHeight - 12));
+  positionIconPicker = { positionId, top, left };
+  renderPositionIconPicker();
+}
+
+function hidePositionIconPicker(): void {
+  positionIconPicker = null;
+  renderPositionIconPicker();
+}
+
+function selectPositionIcon(positionId: string, icon: string): void {
+  if (!positionId || !icon) return;
+  state.positions = state.positions.map((position) =>
+    position.id === positionId ? { ...position, icon: normalizePositionIcon(icon, position.icon) } : position
+  );
+  positionIconPicker = null;
+  renderAll();
+}
+
+function renderPositionIconPicker(): void {
+  const picker = document.querySelector<HTMLDivElement>("#positionIconPicker");
+  if (!picker) return;
+  if (!positionIconPicker) {
+    picker.hidden = true;
+    return;
+  }
+
+  const position = state.positions.find((item) => item.id === positionIconPicker?.positionId);
+  if (!position) {
+    picker.hidden = true;
+    positionIconPicker = null;
+    return;
+  }
+
+  const currentIcon = normalizePositionIcon(position.icon);
+  picker.style.top = `${positionIconPicker.top}px`;
+  picker.style.left = `${positionIconPicker.left}px`;
+  picker.innerHTML = `
+    <div class="position-icon-picker-head">
+      <span>Label auswaehlen</span>
+      <button class="icon-button" type="button" data-action="close-position-icon-picker" aria-label="Labelauswahl schliessen">x</button>
+    </div>
+    <div class="position-icon-picker-grid">
+      ${POSITION_ICONS.map((icon) => {
+        const active = icon.id === currentIcon;
+        return `
+          <button
+            class="position-icon-option ${active ? "active" : ""}"
+            type="button"
+            data-action="select-position-icon"
+            data-position-id="${position.id}"
+            data-position-icon="${icon.id}"
+            aria-pressed="${active}"
+            title="${escapeHtml(icon.label)}"
+          >
+            ${positionIconSvg(icon.id)}
+            <span>${escapeHtml(icon.label)}</span>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+  picker.hidden = false;
 }
 
 function renderPositionModeControls(): void {

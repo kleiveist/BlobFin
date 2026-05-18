@@ -1,6 +1,6 @@
 import { MONTHS } from "../data/defaults";
 import { labelForPayout } from "../lib/format";
-import { normalizePositionIcon, POSITION_ICONS, positionIconSvg } from "../lib/positionIcons";
+import { normalizePositionIcon, positionIconLabel, positionIconSvg } from "../lib/positionIcons";
 import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
@@ -106,6 +106,7 @@ export function renderAppShell(): string {
             <tbody id="positionsBody"></tbody>
           </table>
         </div>
+        <div id="positionIconPicker" class="position-icon-picker" role="dialog" aria-label="Positionslabel auswaehlen" hidden></div>
       </section>
 
       <section class="panel result-panel">
@@ -327,20 +328,19 @@ export function positionTypeSelect(position: ReservePosition): string {
 
 export function positionIconSelect(position: ReservePosition): string {
   const icon = normalizePositionIcon(position.icon);
+  const label = positionIconLabel(icon);
   return `
-    <div class="position-label-control">
-      <span class="position-icon-preview" aria-hidden="true">${positionIconSvg(icon)}</span>
-      <select
-        class="position-icon-select"
-        data-position-id="${position.id}"
-        data-position-field="icon"
-        aria-label="Positionslabel"
-      >
-        ${POSITION_ICONS.map(
-          (item) => `<option value="${item.id}" ${item.id === icon ? "selected" : ""}>${item.label}</option>`
-        ).join("")}
-      </select>
-    </div>
+    <button
+      class="position-label-button"
+      type="button"
+      data-action="open-position-icon-picker"
+      data-position-id="${position.id}"
+      title="${label}"
+      aria-label="Positionslabel: ${label}"
+      aria-haspopup="dialog"
+    >
+      ${positionIconSvg(icon)}
+    </button>
   `;
 }
 
