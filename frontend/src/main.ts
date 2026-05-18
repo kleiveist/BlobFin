@@ -557,7 +557,7 @@ function renderPositionTableHead(): void {
       <th class="day-col">Tag</th>
       ${
         selectedPositionMode !== "income"
-          ? '<th class="interest-toggle-col">Zinsen</th><th class="cashback-toggle-col">Cashback</th>'
+          ? '<th class="interest-toggle-col">Zins</th><th class="cashback-toggle-col">Cashb.</th>'
           : ""
       }
       <th></th>

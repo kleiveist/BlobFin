@@ -87,7 +87,7 @@ button {
   align-items: end;
   justify-content: space-between;
   gap: 24px;
-  max-width: 1900px;
+  max-width: 1680px;
   margin: 0 auto;
   padding: 30px 20px 16px;
 }
@@ -127,7 +127,7 @@ h3 {
 .app-main {
   display: grid;
   gap: 16px;
-  max-width: 1900px;
+  max-width: 1680px;
   margin: 0 auto;
   padding: 0 20px 42px;
 }
@@ -958,14 +958,14 @@ th:first-child {
 
 .label-col,
 .label-cell {
-  width: 166px;
-  min-width: 166px;
+  width: 154px;
+  min-width: 154px;
 }
 
 .position-label-control {
   display: grid;
-  grid-template-columns: 30px minmax(104px, 1fr);
-  gap: 8px;
+  grid-template-columns: 28px minmax(96px, 1fr);
+  gap: 6px;
   align-items: center;
 }
 
@@ -991,7 +991,7 @@ th:first-child {
 }
 
 .position-icon-select {
-  min-width: 104px;
+  min-width: 96px;
   padding-right: 28px;
 }
 
@@ -1093,10 +1093,10 @@ tfoot th {
 .cashback-toggle-col,
 .interest-toggle-cell,
 .cashback-toggle-cell {
-  width: 64px;
-  min-width: 64px;
-  padding-right: 4px;
-  padding-left: 4px;
+  width: 50px;
+  min-width: 50px;
+  padding-right: 2px;
+  padding-left: 2px;
 }
 
 .payout-year-input {
