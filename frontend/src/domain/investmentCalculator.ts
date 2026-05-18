@@ -1,4 +1,8 @@
-import { selectedInvestmentContributionForProjectionMonth, selectedMonthlyPattern } from "./investmentContributions";
+import {
+  selectedInvestmentContributionForProjectionMonth,
+  selectedInvestmentStartYear,
+  selectedMonthlyPattern
+} from "./investmentContributions";
 import { RETIREMENT_DEPOT_MIN_AGE, retirementDepotAllowanceForProjectionMonth } from "./retirementDepot";
 import type { InvestmentResult, InvestmentSettings, ReservePosition } from "../types";
 
@@ -14,6 +18,11 @@ export function calculateInvestmentResult(
   settings: InvestmentSettings
 ): InvestmentResult {
   const ageToday = Math.max(0, year - settings.birthYear);
+  const simulationStartYear = Math.max(
+    settings.birthYear,
+    Math.min(year, selectedInvestmentStartYear(positions, settings, year))
+  );
+  const simulationStartAge = Math.max(0, simulationStartYear - settings.birthYear);
   const payoutYears = Math.min(settings.payoutYears, settings.payoutEndAge);
   const rawPayoutStartAge = Math.max(0, settings.payoutEndAge - payoutYears);
   const payoutStartAge = settings.retirementDepotEnabled
@@ -21,7 +30,7 @@ export function calculateInvestmentResult(
     : rawPayoutStartAge;
   const effectivePayoutYears = Math.max(1, settings.payoutEndAge - payoutStartAge);
   const yearsUntilPayout = Math.max(0, payoutStartAge - ageToday);
-  const savingMonths = Math.max(0, Math.round(yearsUntilPayout * 12));
+  const savingMonths = Math.max(0, Math.round((payoutStartAge - simulationStartAge) * 12));
   const payoutMonths = Math.max(1, Math.round(effectivePayoutYears * 12));
 
   const monthlyPattern = selectedMonthlyPattern(positions, settings, year);
@@ -33,8 +42,13 @@ export function calculateInvestmentResult(
   let totalAllowance = 0;
 
   for (let index = 0; index < savingMonths; index += 1) {
-    const contribution = selectedInvestmentContributionForProjectionMonth(positions, settings, year, index);
-    const allowance = retirementDepotAllowanceForProjectionMonth(positions, settings, year, index);
+    const contribution = selectedInvestmentContributionForProjectionMonth(
+      positions,
+      settings,
+      simulationStartYear,
+      index
+    );
+    const allowance = retirementDepotAllowanceForProjectionMonth(positions, settings, simulationStartYear, index);
     grossWealth = grossWealth * (1 + monthlyReturn) + contribution + allowance;
     totalContribution += contribution;
     totalAllowance += allowance;

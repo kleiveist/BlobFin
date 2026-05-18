@@ -104,6 +104,17 @@ export function selectedOneTimeInvestmentContributionForProjectionMonth(
   }, 0);
 }
 
+export function selectedInvestmentStartYear(
+  positions: ReservePosition[],
+  settings: InvestmentSettings,
+  fallbackYear: number
+): number {
+  return selectedInvestmentPositions(positions, settings).reduce((earliestYear, position) => {
+    const startYear = Number(position.payoutYear || fallbackYear);
+    return Number.isFinite(startYear) ? Math.min(earliestYear, startYear) : earliestYear;
+  }, fallbackYear);
+}
+
 function selectedInvestmentPositions(positions: ReservePosition[], settings: InvestmentSettings): ReservePosition[] {
   return positions.filter(
     (position) =>

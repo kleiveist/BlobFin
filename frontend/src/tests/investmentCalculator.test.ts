@@ -262,6 +262,28 @@ describe("investment calculator", () => {
     expect(laterYear.monthlyRate).toBe(120);
   });
 
+  it("includes recurring investment contributions that started before the planning year", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate"
+        ? { ...position, amount: 100, payoutYear: state.settings.year - 3, startMonth: 1 }
+        : position
+    );
+    state.investment = {
+      ...state.investment,
+      percentageWithdrawalRatePercent: 0
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+    const currentAgePoint = projection.points.find((point) => point.age === projection.ageToday);
+
+    expect(projection.annualSavingsRate).toBe(1200);
+    expect(projection.savingMonths).toBe(240);
+    expect(projection.totalContribution).toBe(24000);
+    expect(currentAgePoint?.contribution).toBe(3600);
+    expect(projection.wealthAtRetirement).toBeGreaterThan(24000);
+  });
+
   it("adds one-time savings positions once without raising the annual savings rate", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>
@@ -280,6 +302,29 @@ describe("investment calculator", () => {
     expect(projection.annualSavingsRate).toBe(0);
     expect(projection.totalContribution).toBe(1200);
     expect(projection.wealthAtRetirement).toBeGreaterThan(1200);
+  });
+
+  it("includes one-time investment contributions paid before the planning year", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate"
+        ? { ...position, amount: 5000, payoutType: "once", payoutYear: state.settings.year - 3, payoutMonth: 6 }
+        : position
+    );
+    state.investment = {
+      ...state.investment,
+      percentageWithdrawalRatePercent: 0
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+    const currentAgePoint = projection.points.find((point) => point.age === projection.ageToday);
+
+    expect(projection.monthlyRate).toBe(0);
+    expect(projection.annualSavingsRate).toBe(0);
+    expect(projection.totalContribution).toBe(5000);
+    expect(projection.oneTimeContributionAtRetirement).toBe(5000);
+    expect(currentAgePoint?.contribution).toBe(5000);
+    expect(projection.wealthAtRetirement).toBeGreaterThan(5000);
   });
 
   it("ignores selected positions that are not marked as savings rates", () => {

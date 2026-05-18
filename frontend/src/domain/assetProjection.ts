@@ -2,7 +2,8 @@ import { annuityPayment } from "./investmentCalculator";
 import {
   selectedInvestmentContributionForProjectionMonth,
   selectedRecurringInvestmentContributionForProjectionYear,
-  selectedOneTimeInvestmentContributionForProjectionMonth
+  selectedOneTimeInvestmentContributionForProjectionMonth,
+  selectedInvestmentStartYear
 } from "./investmentContributions";
 import {
   calculateRetirementDepotAllowance,
@@ -38,16 +39,26 @@ export function buildAssetProjection(
   settings: InvestmentSettings
 ): AssetProjection {
   const ageToday = Math.max(0, year - settings.birthYear);
+  const simulationStartYear = Math.max(
+    settings.birthYear,
+    Math.min(year, selectedInvestmentStartYear(positions, settings, year))
+  );
+  const simulationStartAge = Math.max(0, simulationStartYear - settings.birthYear);
   const retirementAge = payoutStartAge(settings);
   const startAge = Math.min(settings.chartStartAge, retirementAge);
   const hasPayoutPhase = settings.payoutYears > 0 && settings.payoutEndAge > retirementAge;
   const endAge = hasPayoutPhase ? Math.max(settings.payoutEndAge, retirementAge + 1) : retirementAge;
-  const savingMonths = Math.max(0, Math.round((retirementAge - ageToday) * 12));
-  const contributionDisplayYearIndex = firstRecurringContributionYearIndex(positions, settings, year, savingMonths);
+  const savingMonths = Math.max(0, Math.round((retirementAge - simulationStartAge) * 12));
+  const contributionDisplayYearIndex = firstRecurringContributionYearIndex(
+    positions,
+    settings,
+    simulationStartYear,
+    savingMonths
+  );
   const annualSavingsRate = selectedRecurringInvestmentContributionForProjectionYear(
     positions,
     settings,
-    year,
+    simulationStartYear,
     contributionDisplayYearIndex
   );
   const monthlyRate = annualSavingsRate / 12;
@@ -57,15 +68,24 @@ export function buildAssetProjection(
     : calculateRetirementDepotAllowance(0, 0);
   const annualReturn = settings.investmentReturnPercent / 100;
   const monthlyReturn = (1 + annualReturn) ** (1 / 12) - 1;
-  const retirementSnapshot = savingSnapshot(positions, monthlyReturn, settings, year, ageToday, retirementAge);
+  const retirementSnapshot = savingSnapshot(
+    positions,
+    monthlyReturn,
+    settings,
+    simulationStartYear,
+    simulationStartAge,
+    ageToday,
+    retirementAge
+  );
   const payoutMonths = hasPayoutPhase ? Math.max(1, Math.round((endAge - retirementAge) * 12)) : 0;
   const monthlyPension = hasPayoutPhase
     ? solveNetMonthlyPension(
         retirementSnapshot,
         positions,
-        year,
+        simulationStartYear,
         monthlyReturn,
         settings,
+        simulationStartAge,
         ageToday,
         retirementAge,
         endAge,
@@ -76,10 +96,11 @@ export function buildAssetProjection(
     retirementSnapshot.inflationFactor > 0 ? monthlyPension / retirementSnapshot.inflationFactor : monthlyPension;
   const percentageBase = snapshotAtAge(
     positions,
-    year,
+    simulationStartYear,
     monthlyReturn,
     monthlyPension,
     settings,
+    simulationStartAge,
     ageToday,
     retirementAge,
     Math.max(percentageWithdrawalStartAge(settings), ageToday),
@@ -97,10 +118,11 @@ export function buildAssetProjection(
   for (let age = startAge; age <= endAge; age += 1) {
     const snapshot = snapshotAtAge(
       positions,
-      year,
+      simulationStartYear,
       monthlyReturn,
       monthlyPension,
       settings,
+      simulationStartAge,
       ageToday,
       retirementAge,
       age,
@@ -184,13 +206,14 @@ function snapshotAtAge(
   monthlyReturn: number,
   monthlyPension: number,
   settings: InvestmentSettings,
+  simulationStartAge: number,
   ageToday: number,
   retirementAge: number,
   targetAge: number,
   retirementSnapshot: SavingSnapshot
 ): SavingSnapshot {
   if (targetAge <= retirementAge) {
-    return savingSnapshot(positions, monthlyReturn, settings, baseYear, ageToday, targetAge);
+    return savingSnapshot(positions, monthlyReturn, settings, baseYear, simulationStartAge, ageToday, targetAge);
   }
 
   return payoutSnapshot(
@@ -200,6 +223,7 @@ function snapshotAtAge(
     monthlyReturn,
     monthlyPension,
     settings,
+    simulationStartAge,
     ageToday,
     retirementAge,
     targetAge
@@ -211,6 +235,7 @@ function savingSnapshot(
   monthlyReturn: number,
   settings: InvestmentSettings,
   baseYear: number,
+  simulationStartAge: number,
   ageToday: number,
   targetAge: number
 ): SavingSnapshot {
@@ -223,10 +248,10 @@ function savingSnapshot(
   let allowanceBasis = 0;
   let withdrawals = 0;
   let tax = 0;
-  const months = Math.max(0, Math.round((targetAge - ageToday) * 12));
+  const months = Math.max(0, Math.round((targetAge - simulationStartAge) * 12));
 
   for (let index = 0; index < months; index += 1) {
-    const ageAtMonth = ageToday + index / 12;
+    const ageAtMonth = simulationStartAge + index / 12;
     const monthlyContribution = selectedInvestmentContributionForProjectionMonth(positions, settings, baseYear, index);
     const monthlyOneTimeContribution = selectedOneTimeInvestmentContributionForProjectionMonth(
       positions,
@@ -278,6 +303,7 @@ function payoutSnapshot(
   monthlyReturn: number,
   monthlyPension: number,
   settings: InvestmentSettings,
+  simulationStartAge: number,
   ageToday: number,
   retirementAge: number,
   targetAge: number
@@ -292,7 +318,7 @@ function payoutSnapshot(
   let withdrawals = 0;
   let tax = startSnapshot.tax;
   const months = Math.max(0, Math.round((targetAge - retirementAge) * 12));
-  const retirementMonthIndex = Math.max(0, Math.round((retirementAge - ageToday) * 12));
+  const retirementMonthIndex = Math.max(0, Math.round((retirementAge - simulationStartAge) * 12));
 
   for (let index = 0; index < months; index += 1) {
     const ageAtMonth = retirementAge + index / 12;
@@ -428,12 +454,13 @@ function solveNetMonthlyPension(
   baseYear: number,
   monthlyReturn: number,
   settings: InvestmentSettings,
+  simulationStartAge: number,
   ageToday: number,
   retirementAge: number,
   endAge: number,
   payoutMonths: number
 ): number {
-  const retirementMonthIndex = Math.max(0, Math.round((retirementAge - ageToday) * 12));
+  const retirementMonthIndex = Math.max(0, Math.round((retirementAge - simulationStartAge) * 12));
   let futureOneTimeContributions = 0;
   for (let index = 0; index < payoutMonths; index += 1) {
     futureOneTimeContributions += selectedOneTimeInvestmentContributionForProjectionMonth(
@@ -461,6 +488,7 @@ function solveNetMonthlyPension(
       monthlyReturn,
       candidate,
       settings,
+      simulationStartAge,
       ageToday,
       retirementAge,
       endAge
