@@ -44,6 +44,28 @@ describe("reserve calculator", () => {
     expect(calculateYearTableFooterValue(reserve, summary.rows, state.settings.year)).toBe(780);
   });
 
+  it("keeps reserve-funded expenses out of the remaining cashflow", () => {
+    const state = defaultAppState();
+    const reserve = state.positions.find((position) => position.id === "kfz-ruecklage")!;
+    state.positions.push({
+      ...reserve,
+      id: "kfz-versicherungsrechnung",
+      name: reserve.name,
+      type: "temporary",
+      amount: 780,
+      payoutType: "yearly",
+      payoutMonth: 12
+    });
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+
+    expect(summary.rows[11].values["kfz-versicherungsrechnung"]).toBe(780);
+    expect(summary.rows[11].plannedOutflow).toBe(584);
+    expect(summary.rows[11].monthlyRemaining).toBe(-584);
+    expect(summary.totalPlannedOutflow).toBe(7008);
+    expect(summary.yearlyRemaining).toBe(-7008);
+  });
+
   it("only grants cashback for temporary positions with matching payout cadence", () => {
     const state = defaultAppState();
     state.positions = [

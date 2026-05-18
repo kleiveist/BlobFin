@@ -193,12 +193,51 @@ function isPayoutMonth(position: ReservePosition, monthNumber: number): boolean 
   return Number(position.payoutMonth) === monthNumber;
 }
 
+function normalizedPositionName(name: string): string {
+  return name
+    .trim()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function reserveCoversExpenseInMonth(position: ReservePosition, year: number, monthNumber: number): boolean {
+  if (!position.active || position.type !== "reserve") return false;
+  if (position.payoutType === "monthly") return isActiveInMonth(position, monthNumber);
+  if (position.payoutType === "yearly") return isActiveInMonth(position, monthNumber) && isPayoutMonth(position, monthNumber);
+  if (position.payoutType === "once") return isOneTimePayoutInMonth(position, year, monthNumber);
+  return false;
+}
+
+function reserveFundedExpenseNamesForMonth(
+  positions: ReservePosition[],
+  year: number,
+  monthNumber: number
+): Set<string> {
+  return new Set(
+    positions
+      .filter((position) => reserveCoversExpenseInMonth(position, year, monthNumber))
+      .map((position) => normalizedPositionName(position.name))
+      .filter(Boolean)
+  );
+}
+
+function isReserveFundedExpense(position: ReservePosition, reserveFundedExpenseNames: Set<string>): boolean {
+  return (
+    isExpensePosition(position) &&
+    position.type === "temporary" &&
+    reserveFundedExpenseNames.has(normalizedPositionName(position.name))
+  );
+}
+
 export function calculateMonthlyRows(settings: PlanningSettings, positions: ReservePosition[]): MonthlyReserveRow[] {
   const rows: MonthlyReserveRow[] = [];
   const annualRate = settings.interestRatePercent / 100;
   const cashbackRate = settings.cashbackRatePercent / 100;
 
   for (let month = 1; month <= 12; month += 1) {
+    const reserveFundedExpenseNames = reserveFundedExpenseNamesForMonth(positions, settings.year, month);
     const values: Record<string, number> = {};
     let plannedIncome = 0;
     let maxNeeded = 0;
@@ -220,7 +259,8 @@ export function calculateMonthlyRows(settings: PlanningSettings, positions: Rese
       values[position.id] = value;
       plannedIncome += income;
       if (isExpensePosition(position)) maxNeeded += value;
-      plannedOutflow += calculatePlannedOutflowForSingleMonth(position, settings.year, month);
+      const outflow = calculatePlannedOutflowForSingleMonth(position, settings.year, month);
+      plannedOutflow += isReserveFundedExpense(position, reserveFundedExpenseNames) ? 0 : outflow;
       permanentAfterMonthlyOutflows += calculatePositionEndOfMonthPermanent(position, month);
       monthlyInterest += calculateInterestForSingleMonth(position, settings.year, month, annualRate);
       monthlyCashback += calculateCashbackForSingleMonth(position, settings.year, month, cashbackRate);
