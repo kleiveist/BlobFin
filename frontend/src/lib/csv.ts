@@ -10,6 +10,7 @@ import {
   monthName,
   normalizeHeader
 } from "./format";
+import { defaultPositionIconForPosition, normalizePositionIcon, positionIconLabel } from "./positionIcons";
 import { flowForType, isIncomeType, typeForFlow } from "./positionKinds";
 import type { PlanningSettings, PayoutType, PositionFlow, PositionType, ReservePosition } from "../types";
 
@@ -100,6 +101,10 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
       const parsedType = parseTypeValue(get(row, ["art", "type"], 2));
       const flow = parseFlowValue(get(row, ["richtung", "flow", "typgruppe"], -1), flowForType(parsedType));
       const type = typeForFlow(parsedType, flow);
+      const icon = normalizePositionIcon(
+        get(row, ["label", "icon", "symbol", "bild"], -1),
+        defaultPositionIconForPosition({ flow, type, name })
+      );
 
       const position: ReservePosition = {
         id: createId(),
@@ -107,6 +112,7 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
         active: parseBooleanValue(get(row, ["aktiv", "active"], 0), true),
         visible: parseBooleanValue(get(row, ["view", "visible", "sichtbar", "anzeigen"], -1), true),
         name,
+        icon,
         type,
         amount,
         startMonth: parseMonthValue(get(row, ["startmonat", "anfangsmonat", "anfangmonat", "anfang", "start"], 4), 1),
@@ -155,6 +161,7 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
       "Aktiv",
       "View",
       "Richtung",
+      "Label",
       "Name",
       "Art",
       "Betrag",
@@ -174,6 +181,7 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
       position.active ? "Ja" : "Nein",
       position.visible ? "Ja" : "Nein",
       labelForFlow(position.flow),
+      positionIconLabel(normalizePositionIcon(position.icon)),
       position.name,
       labelForType(position.type),
       formatCsvNumber(position.amount),

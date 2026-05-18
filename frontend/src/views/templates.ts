@@ -1,5 +1,6 @@
 import { MONTHS } from "../data/defaults";
 import { labelForPayout } from "../lib/format";
+import { normalizePositionIcon, POSITION_ICONS, positionIconSvg } from "../lib/positionIcons";
 import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
@@ -321,6 +322,25 @@ export function positionTypeSelect(position: ReservePosition): string {
     <select data-position-id="${position.id}" data-position-field="type">
       <option value="temporary" ${position.type === "temporary" ? "selected" : ""}>Temporaer</option>
     </select>
+  `;
+}
+
+export function positionIconSelect(position: ReservePosition): string {
+  const icon = normalizePositionIcon(position.icon);
+  return `
+    <div class="position-label-control">
+      <span class="position-icon-preview" aria-hidden="true">${positionIconSvg(icon)}</span>
+      <select
+        class="position-icon-select"
+        data-position-id="${position.id}"
+        data-position-field="icon"
+        aria-label="Positionslabel"
+      >
+        ${POSITION_ICONS.map(
+          (item) => `<option value="${item.id}" ${item.id === icon ? "selected" : ""}>${item.label}</option>`
+        ).join("")}
+      </select>
+    </div>
   `;
 }
 

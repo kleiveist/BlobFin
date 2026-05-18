@@ -87,9 +87,9 @@ button {
   align-items: end;
   justify-content: space-between;
   gap: 24px;
-  max-width: 1680px;
+  max-width: 1900px;
   margin: 0 auto;
-  padding: 30px 24px 16px;
+  padding: 30px 20px 16px;
 }
 
 .eyebrow {
@@ -127,14 +127,14 @@ h3 {
 .app-main {
   display: grid;
   gap: 16px;
-  max-width: 1680px;
+  max-width: 1900px;
   margin: 0 auto;
-  padding: 0 24px 42px;
+  padding: 0 20px 42px;
 }
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -752,6 +752,19 @@ button:focus-visible {
   font-weight: 900;
 }
 
+.reserve-chart-position-title {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.reserve-chart-position-title .position-icon-svg {
+  width: 22px;
+  height: 22px;
+  color: var(--accent-strong);
+}
+
 .reserve-chart-position strong {
   color: var(--muted);
 }
@@ -936,9 +949,50 @@ th:first-child {
   text-align: left;
 }
 
-.position-table td:nth-child(4),
-.position-table th:nth-child(4) {
+.position-table .label-cell,
+.position-table .label-col,
+.position-table .name-cell,
+.position-table .name-col {
   text-align: left;
+}
+
+.label-col,
+.label-cell {
+  width: 166px;
+  min-width: 166px;
+}
+
+.position-label-control {
+  display: grid;
+  grid-template-columns: 30px minmax(104px, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.position-icon-preview,
+.include-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--accent-strong);
+}
+
+.position-icon-svg {
+  width: 23px;
+  height: 23px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.position-icon-select {
+  min-width: 104px;
+  padding-right: 28px;
 }
 
 .reorder-col,
@@ -1103,6 +1157,19 @@ tfoot th {
 
 .split-header span {
   display: block;
+}
+
+.result-position-heading {
+  display: inline-grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 54px;
+}
+
+.result-position-heading .position-icon-svg {
+  width: 19px;
+  height: 19px;
+  color: var(--accent-strong);
 }
 
 .icon-button {
@@ -1291,13 +1358,17 @@ tfoot th {
 
 .include-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto 34px minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-soft);
   padding: 10px;
+}
+
+.include-icon {
+  color: var(--accent-strong);
 }
 
 .include-empty {

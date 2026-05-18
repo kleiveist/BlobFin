@@ -12,6 +12,7 @@ export interface ReservePosition {
   active: boolean;
   visible: boolean;
   name: string;
+  icon?: string;
   type: PositionType;
   amount: number;
   startMonth: number;

@@ -31,6 +31,7 @@ import {
   typeForFlow,
   type PositionTableMode
 } from "./lib/positionKinds";
+import { defaultPositionIconForPosition, normalizePositionIcon, positionIconSvg } from "./lib/positionIcons";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
 import type {
   AppState,
@@ -43,7 +44,7 @@ import type {
   ThemeMode
 } from "./types";
 import { drawInvestmentChart } from "./views/investmentChart";
-import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from "./views/templates";
+import { monthSelect, payoutSelect, positionIconSelect, positionTypeSelect, renderAppShell } from "./views/templates";
 
 const root = requireRootElement();
 const INTEREST_INVESTMENT_POSITION_ID = "__account-interest-investment";
@@ -88,6 +89,7 @@ interface ReserveChartTotals {
 interface ReserveChartPosition {
   id: string;
   name: string;
+  icon: string;
   total: number;
   category: Exclude<ReserveChartCategory, "all">;
 }
@@ -443,7 +445,7 @@ function renderPositions(): void {
   if (!positions.length) {
     body.innerHTML = `
       <tr>
-        <td class="position-empty" colspan="${selectedPositionMode === "income" ? 13 : 14}">
+        <td class="position-empty" colspan="${selectedPositionMode === "income" ? 14 : 15}">
           Noch keine ${positionModeEmptyLabel(selectedPositionMode)} angelegt.
         </td>
       </tr>
@@ -465,7 +467,8 @@ function renderPositions(): void {
           <td class="check-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="visible" ${
             position.visible ? "checked" : ""
           } /></td>
-          <td><input class="name-input" value="${escapeHtml(position.name)}" data-position-id="${
+          <td class="label-cell">${positionIconSelect(position)}</td>
+          <td class="name-cell"><input class="name-input" value="${escapeHtml(position.name)}" data-position-id="${
             position.id
           }" data-position-field="name" /></td>
           <td>${positionTypeSelect(position)}</td>
@@ -543,7 +546,8 @@ function renderPositionTableHead(): void {
       <th class="reorder-col"></th>
       <th>Aktiv</th>
       <th>View</th>
-      <th>Name</th>
+      <th class="label-col">Label</th>
+      <th class="name-col">Name</th>
       <th>Art</th>
       <th class="amount-col">Betrag</th>
       ${dateHeaders}
@@ -596,7 +600,7 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
   head.innerHTML = `
     <tr>
       <th class="month-col">Monat</th>
-      ${summary.visiblePositions.map((position) => `<th>${makeHeaderLabel(position.name)}</th>`).join("")}
+      ${summary.visiblePositions.map((position) => `<th>${positionHeaderLabel(position)}</th>`).join("")}
       <th class="result-compact-col">Einnahmen</th>
       <th class="result-compact-col">Ausgaben</th>
       <th>Netto uebrig</th>
@@ -644,6 +648,15 @@ function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>):
 
 function positionFooterValue(position: ReservePosition, summary: ReturnType<typeof calculateReserveSummary>): number {
   return calculateYearTableFooterValue(position, summary.rows, state.settings.year);
+}
+
+function positionHeaderLabel(position: ReservePosition): string {
+  return `
+    <span class="result-position-heading">
+      ${positionIconSvg(normalizePositionIcon(position.icon))}
+      <span>${makeHeaderLabel(position.name)}</span>
+    </span>
+  `;
 }
 
 function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSummary>): void {
@@ -911,7 +924,7 @@ function reserveChartPositions(): ReserveChartPosition[] {
     .map((position) => {
       const category = reservePositionCategory(position);
       const total = reservePositionYearValue(position);
-      return { id: position.id, name: position.name, total, category };
+      return { id: position.id, name: position.name, icon: normalizePositionIcon(position.icon), total, category };
     })
     .filter((position) => position.total > 0.01)
     .filter((position) => reserveChartCategory === "all" || position.category === reserveChartCategory)
@@ -1003,7 +1016,10 @@ function reserveChartPositionButton(position: ReserveChartPosition): string {
       data-reserve-position-id="${escapeHtml(position.id)}"
       aria-pressed="${active}"
     >
-      <span>${escapeHtml(position.name)}</span>
+      <span class="reserve-chart-position-title">
+        ${positionIconSvg(position.icon)}
+        <span>${escapeHtml(position.name)}</span>
+      </span>
       <strong>${money(position.total)}</strong>
       <small>${labelForType(state.positions.find((item) => item.id === position.id)?.type || "temporary")}</small>
     </button>
@@ -1072,6 +1088,7 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
       return `
         <label class="include-item">
           <input type="checkbox" data-include-position="${position.id}" ${checked} />
+          <span class="include-icon">${positionIconSvg(normalizePositionIcon(position.icon))}</span>
           <span>
             <span class="include-name">${escapeHtml(position.name)} ${inactive}</span>
             <span class="include-amount">${escapeHtml(investmentPositionSubtitle(position))}</span>
@@ -1549,10 +1566,14 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
       case "name":
         next.name = String(value);
         break;
+      case "icon":
+        next.icon = normalizePositionIcon(value, defaultPositionIconForPosition(next));
+        break;
       case "flow":
         if (value === "income" || value === "expense") {
           next.flow = value;
           next.type = value === "income" ? "incomeMonthly" : "temporary";
+          next.icon = defaultPositionIconForPosition(next);
           next.interestBearing = false;
           next.cashback = false;
         }
@@ -1613,6 +1634,7 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
     active: Boolean(position.active),
     visible: Boolean(position.visible),
     name: String(position.name || "Position"),
+    icon: normalizePositionIcon(position.icon, defaultPositionIconForPosition({ ...position, flow, type })),
     type,
     amount: Math.max(0, finiteNumber(position.amount, 0)),
     startMonth,
@@ -1650,15 +1672,19 @@ function addPosition(): void {
   const isIncome = selectedPositionMode === "income";
   const isReserve = selectedPositionMode === "reserve";
   const isSavings = selectedPositionMode === "savings";
+  const flow = isIncome ? "income" : "expense";
+  const name = isIncome ? "Neue Einnahme" : isReserve ? "Neue Ruecklage" : isSavings ? "Neue Sparrate" : "Neue Ausgabe";
+  const type = isIncome ? "incomeMonthly" : isReserve ? "reserve" : isSavings ? "savings" : "temporary";
   state.positions = [
     ...state.positions,
     {
       id: createId(),
-      flow: isIncome ? "income" : "expense",
+      flow,
       active: true,
       visible: true,
-      name: isIncome ? "Neue Einnahme" : isReserve ? "Neue Ruecklage" : isSavings ? "Neue Sparrate" : "Neue Ausgabe",
-      type: isIncome ? "incomeMonthly" : isReserve ? "reserve" : isSavings ? "savings" : "temporary",
+      name,
+      icon: defaultPositionIconForPosition({ flow, type, name }),
+      type,
       amount: 0,
       startMonth: 1,
       endMonth: 12,
@@ -2287,6 +2313,7 @@ function virtualInvestmentPosition(id: string, name: string, amount: number): Re
     flow: "expense",
     active: true,
     name,
+    icon: id === INTEREST_INVESTMENT_POSITION_ID ? "interest" : "cashback",
     type: "savings",
     amount,
     startMonth: 1,

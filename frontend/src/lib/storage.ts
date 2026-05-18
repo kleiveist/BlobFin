@@ -1,4 +1,5 @@
 import { createId, defaultAppState, defaultInvestmentSettings, defaultPlanningSettings } from "../data/defaults";
+import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
 import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
 import type {
   AppState,
@@ -280,12 +281,17 @@ function normalizePositions(
       const rawType = normalizePositionType(item.type);
       const flow = normalizePositionFlow(item.flow ?? item.direction ?? item.category, flowForType(rawType));
       const type = typeForFlow(rawType, flow);
+      const name = String(item.name || "Position");
       const position: ReservePosition = {
         id: String(item.id || createId()),
         flow,
         active: booleanOrDefault(item.active, true),
         visible: booleanOrDefault(item.visible ?? item.view, true),
-        name: String(item.name || "Position"),
+        name,
+        icon: normalizePositionIcon(
+          item.icon ?? item.labelIcon ?? item.label,
+          defaultPositionIconForPosition({ flow, type, name })
+        ),
         type,
         amount: numberOrDefault(item.amount, 0),
         startMonth: numberOrDefault(item.startMonth, 1),

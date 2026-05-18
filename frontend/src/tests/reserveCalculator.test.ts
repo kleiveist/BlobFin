@@ -375,8 +375,10 @@ describe("reserve calculator", () => {
     const imported = positionsFromCsvRows(parseCsv(csv));
     const dispo = imported.find((position) => position.id !== "nettoeinkommen" && position.name === "Dispo-Reserve");
     const uniFee = imported.find((position) => position.name === "Uni-Gebuehr");
+    const kfzReserve = imported.find((position) => position.name === "Kfz-Versicherung Ruecklage");
 
     expect(csv).toContain("Temporaere Ausgabe");
+    expect(csv).toContain("Auto");
     expect(imported).toHaveLength(state.positions.length);
     expect(imported[0]).toMatchObject({
       active: true,
@@ -398,9 +400,11 @@ describe("reserve calculator", () => {
     expect(uniFee).toMatchObject({
       flow: "expense",
       type: "temporary",
+      icon: "education",
       cashback: true
     });
     expect(positionTableMode(uniFee!)).toBe("expense");
+    expect(kfzReserve?.icon).toBe("car");
     expect(imported[imported.length - 1]?.type).toBe("savings");
   });
 });
