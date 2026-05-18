@@ -170,7 +170,12 @@ export function renderAppShell(): string {
                 ${numberField("birthYear", "Geburtsjahr", "investment", "birthYear", { min: 1962, max: 2009, step: 1 })}
                 ${numberField("chartStartAge", "Startalter Grafik", "investment", "chartStartAge", { min: 0, max: 80, step: 1 })}
                 ${retirementAgeField()}
-                ${fixedNumberField("childPayoutAge", "Auszahlungsalter", 18, "child")}
+                ${numberField("childPayoutAge", "Auszahlungsalter", "investment", "childPayoutAge", {
+                  min: 18,
+                  max: 25,
+                  step: 1,
+                  depotScope: "child"
+                })}
                 ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1, depotScope: "standard retirement" })}
                 ${numberField("retirementDepotChildren", "Kindergeldberechtigte Kinder", "investment", "retirementDepotChildren", { min: 0, max: 20, step: 1, depotScope: "retirement" })}
                 ${numberField("percentageWithdrawalStartAge", "Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1, depotScope: "standard" })}
@@ -367,15 +372,6 @@ function numberField(
       <input id="${id}" type="number" min="${options.min}" ${options.max ? `max="${options.max}"` : ""} step="${
         options.step
       }" ${dataAttr} />
-    </label>
-  `;
-}
-
-function fixedNumberField(id: string, label: string, value: number, depotScope: string): string {
-  return `
-    <label class="field" for="${id}" data-depot-scope="${depotScope}">
-      <span>${label}</span>
-      <input id="${id}" type="number" value="${value}" disabled data-force-disabled="true" />
     </label>
   `;
 }

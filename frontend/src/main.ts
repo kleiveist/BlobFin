@@ -48,11 +48,14 @@ import { monthSelect, payoutSelect, positionTypeSelect, renderAppShell } from ".
 const root = requireRootElement();
 const INTEREST_INVESTMENT_POSITION_ID = "__account-interest-investment";
 const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
-const CHILD_DEPOT_PAYOUT_AGE = 18;
+const CHILD_DEPOT_MIN_PAYOUT_AGE = 18;
+const CHILD_DEPOT_DEFAULT_PAYOUT_AGE = 18;
+const CHILD_DEPOT_MAX_PAYOUT_AGE = 25;
 const INVESTMENT_DEPOTS: InvestmentDepotKey[] = ["standard", "retirement", "child"];
 type NumericInvestmentSetting =
   | "birthYear"
   | "chartStartAge"
+  | "childPayoutAge"
   | "payoutEndAge"
   | "retirementDepotChildren"
   | "percentageWithdrawalStartAge"
@@ -1189,6 +1192,11 @@ function syncInvestmentInputBounds(): void {
   );
   setInputBounds('[data-investment="percentageWithdrawalStartAge"]', chartStartAge, retirementAge);
   setInputBounds("[data-retirement-age]", retirementMin, retirementMax);
+  setInputBounds(
+    '[data-investment="childPayoutAge"]',
+    investmentMin("childPayoutAge"),
+    investmentMax("childPayoutAge")
+  );
 }
 
 function syncRetirementDepotControls(): void {
@@ -1290,6 +1298,7 @@ function inputInvestmentFields(): NumericInvestmentSetting[] {
   return [
     "birthYear",
     "chartStartAge",
+    "childPayoutAge",
     "payoutEndAge",
     "retirementDepotChildren",
     "percentageWithdrawalStartAge",
@@ -1305,11 +1314,19 @@ function numericInvestmentValue(field: NumericInvestmentSetting, value: string):
   const min = field === "birthYear" && activeInvestmentDepot() === "child" ? childBirthYearMin() : investmentMin(field);
   const max = field === "birthYear" && activeInvestmentDepot() === "child" ? state.settings.year : investmentMax(field);
   const nextValue = clamp(numberValue(value), min, max);
-  return field === "retirementDepotChildren" ? Math.floor(nextValue) : nextValue;
+  return field === "retirementDepotChildren" || field === "childPayoutAge" ? Math.floor(nextValue) : nextValue;
 }
 
 function childBirthYearMin(): number {
-  return Math.max(investmentMin("birthYear"), state.settings.year - CHILD_DEPOT_PAYOUT_AGE);
+  return childBirthYearMinForPayoutAge(state.investment.childPayoutAge);
+}
+
+function childBirthYearMinForPayoutAge(payoutAge: number): number {
+  return Math.max(investmentMin("birthYear"), state.settings.year - clampChildPayoutAge(payoutAge));
+}
+
+function clampChildPayoutAge(value: number): number {
+  return clamp(value, investmentMin("childPayoutAge"), investmentMax("childPayoutAge"));
 }
 
 function numericInvestmentPatch(field: NumericInvestmentSetting, value: number): Partial<InvestmentSettings> {
@@ -1318,6 +1335,8 @@ function numericInvestmentPatch(field: NumericInvestmentSetting, value: number):
       return { birthYear: value };
     case "chartStartAge":
       return { chartStartAge: value };
+    case "childPayoutAge":
+      return { childPayoutAge: value };
     case "payoutEndAge":
       return { payoutEndAge: value };
     case "retirementDepotChildren":
@@ -1372,6 +1391,7 @@ function depotInvestmentSettings(depot: InvestmentDepotKey): InvestmentSettings 
   }
 
   if (depot === "child") {
+    const childPayoutAge = clampChildPayoutAge(state.investment.childPayoutAge);
     return {
       ...state.investment,
       activeDepot: "child",
@@ -1382,9 +1402,10 @@ function depotInvestmentSettings(depot: InvestmentDepotKey): InvestmentSettings 
       retirementDepotChildren: 0,
       birthYear: state.investment.childBirthYear,
       chartStartAge: state.investment.childChartStartAge,
-      payoutEndAge: CHILD_DEPOT_PAYOUT_AGE,
+      childPayoutAge,
+      payoutEndAge: childPayoutAge,
       payoutYears: 0,
-      percentageWithdrawalStartAge: CHILD_DEPOT_PAYOUT_AGE,
+      percentageWithdrawalStartAge: childPayoutAge,
       percentageWithdrawalRatePercent: 0,
       investmentReturnPercent: state.investment.childInvestmentReturnPercent,
       capitalGainsTaxPercent: state.investment.childCapitalGainsTaxPercent,
@@ -1430,6 +1451,7 @@ function updateDepotInvestmentSettings(depot: InvestmentDepotKey, updates: Parti
       ...state.investment,
       childBirthYear: updates.birthYear ?? state.investment.childBirthYear,
       childChartStartAge: updates.chartStartAge ?? state.investment.childChartStartAge,
+      childPayoutAge: updates.childPayoutAge ?? state.investment.childPayoutAge,
       childInvestmentReturnPercent:
         updates.investmentReturnPercent ?? state.investment.childInvestmentReturnPercent,
       childCapitalGainsTaxPercent:
@@ -2356,11 +2378,19 @@ function normalizeInvestmentBounds(): void {
     investmentMin("chartStartAge"),
     Math.min(investmentMax("chartStartAge"), retirementAge)
   );
-  const childBirthYear = clamp(nextInvestment.childBirthYear, childBirthYearMin(), state.settings.year);
+  const rawChildPayoutAge = Number.isFinite(nextInvestment.childPayoutAge)
+    ? nextInvestment.childPayoutAge
+    : CHILD_DEPOT_DEFAULT_PAYOUT_AGE;
+  const childPayoutAge = clampChildPayoutAge(rawChildPayoutAge);
+  const childBirthYear = clamp(
+    nextInvestment.childBirthYear,
+    childBirthYearMinForPayoutAge(childPayoutAge),
+    state.settings.year
+  );
   const childChartStartAge = clamp(
     nextInvestment.childChartStartAge,
     investmentMin("chartStartAge"),
-    CHILD_DEPOT_PAYOUT_AGE
+    childPayoutAge
   );
   state.investment = {
     ...nextInvestment,
@@ -2375,6 +2405,7 @@ function normalizeInvestmentBounds(): void {
     retirementChartStartAge,
     childBirthYear,
     childChartStartAge,
+    childPayoutAge,
     retirementDepotChildren: numericInvestmentValue(
       "retirementDepotChildren",
       String(nextInvestment.retirementDepotChildren)
@@ -2447,6 +2478,7 @@ function settingMax(field: keyof PlanningSettings): number {
 function investmentMin(field: keyof InvestmentSettings): number {
   if (field === "chartStartAge") return 0;
   if (field === "birthYear") return 1962;
+  if (field === "childPayoutAge") return CHILD_DEPOT_MIN_PAYOUT_AGE;
   if (field === "payoutEndAge") return 70;
   if (field === "percentageWithdrawalStartAge") return 0;
   if (field === "retirementDepotChildren") return 0;
@@ -2458,6 +2490,7 @@ function investmentMin(field: keyof InvestmentSettings): number {
 function investmentMax(field: keyof InvestmentSettings): number {
   if (field === "chartStartAge") return 80;
   if (field === "birthYear") return 2009;
+  if (field === "childPayoutAge") return CHILD_DEPOT_MAX_PAYOUT_AGE;
   if (field === "payoutEndAge") return 110;
   if (field === "percentageWithdrawalStartAge") return 110;
   if (field === "percentageWithdrawalRatePercent") return 20;

@@ -173,6 +173,7 @@ export function defaultInvestmentSettings(): InvestmentSettings {
     retirementBequestReservePercent: 10,
     childBirthYear: 2026,
     childChartStartAge: 0,
+    childPayoutAge: 18,
     childInvestmentReturnPercent: 7,
     childCapitalGainsTaxPercent: 26.5,
     childInflationRatePercent: 2.7,

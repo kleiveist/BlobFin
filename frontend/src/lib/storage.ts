@@ -160,6 +160,7 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     ),
     childBirthYear: numberOrDefault(value.childBirthYear, fallback.childBirthYear),
     childChartStartAge: numberOrDefault(value.childChartStartAge, fallback.childChartStartAge),
+    childPayoutAge: numberOrDefault(value.childPayoutAge, fallback.childPayoutAge),
     childInvestmentReturnPercent: numberOrDefault(
       value.childInvestmentReturnPercent,
       fallback.childInvestmentReturnPercent
@@ -242,6 +243,7 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     ),
     childBirthYear: numberOrDefault(value.childBirthYear, fallback.childBirthYear),
     childChartStartAge: numberOrDefault(value.childChartStartAge, fallback.childChartStartAge),
+    childPayoutAge: numberOrDefault(value.childPayoutAge, fallback.childPayoutAge),
     childInvestmentReturnPercent: numberOrDefault(
       value.childInvestmentReturn ?? value.investmentReturn,
       fallback.childInvestmentReturnPercent

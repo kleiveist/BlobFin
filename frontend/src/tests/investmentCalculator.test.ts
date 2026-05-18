@@ -224,6 +224,26 @@ describe("investment calculator", () => {
     expect(projection.bequestReserveAtEnd).toBeCloseTo(projection.wealthAtRetirement * 0.1, 2);
   });
 
+  it("supports child depot payout ages up to 25", () => {
+    const state = defaultAppState();
+    state.investment = {
+      ...state.investment,
+      birthYear: state.settings.year,
+      chartStartAge: 0,
+      payoutEndAge: 25,
+      payoutYears: 0,
+      percentageWithdrawalStartAge: 25,
+      percentageWithdrawalRatePercent: 0
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.retirementAge).toBe(25);
+    expect(projection.endAge).toBe(25);
+    expect(projection.points[projection.points.length - 1].age).toBe(25);
+    expect(projection.points.every((point) => point.phase === "saving")).toBe(true);
+  });
+
   it("starts recurring investment positions in their configured start year and month", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>

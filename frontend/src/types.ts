@@ -65,6 +65,7 @@ export interface InvestmentSettings {
   retirementBequestReservePercent: number;
   childBirthYear: number;
   childChartStartAge: number;
+  childPayoutAge: number;
   childInvestmentReturnPercent: number;
   childCapitalGainsTaxPercent: number;
   childInflationRatePercent: number;
