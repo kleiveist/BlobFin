@@ -285,11 +285,30 @@ function parseTypeValue(value: unknown): PositionType {
   }
   if (["fixbestand", "fixed", "fix"].includes(normalized)) return "fixed";
   if (["monatlicheruecklage", "ruecklage", "reserve", "monthlyreserve"].includes(normalized)) return "reserve";
-  if (["temporaermonatlich", "temporarmonatlich", "temporary", "durchlauf"].includes(normalized)) return "temporary";
+  if (
+    [
+      "temporaer",
+      "temporar",
+      "temporaereausgabe",
+      "temporareausgabe",
+      "temporaermonatlich",
+      "temporarmonatlich",
+      "temporary",
+      "temporaryexpense",
+      "ausgabe",
+      "ausgaben",
+      "kosten",
+      "expense",
+      "expenses",
+      "durchlauf"
+    ].includes(normalized)
+  ) {
+    return "temporary";
+  }
   if (["sparrate", "sparen", "saving", "savings", "investment", "investitionsrate"].includes(normalized)) {
     return "savings";
   }
-  return "reserve";
+  return "temporary";
 }
 
 function parsePayoutValue(value: unknown, flow: PositionFlow = "expense"): PayoutType {
