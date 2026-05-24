@@ -1,8 +1,16 @@
-import type { ExpensePositionType, IncomePositionType, PositionFlow, PositionType, ReservePosition } from "../types";
+import type {
+  ExpensePositionType,
+  IncomePositionType,
+  PositionFlow,
+  PositionTableMode,
+  PositionType,
+  ReservePosition
+} from "../types";
+
+export type { PositionTableMode };
 
 export const INCOME_POSITION_TYPES: IncomePositionType[] = ["incomeMonthly", "incomeYearly", "incomeTemporary"];
 export const EXPENSE_POSITION_TYPES: ExpensePositionType[] = ["fixed", "reserve", "temporary", "savings"];
-export type PositionTableMode = PositionFlow | "reserve" | "savings";
 
 export function isIncomeType(type: PositionType): type is IncomePositionType {
   return INCOME_POSITION_TYPES.includes(type as IncomePositionType);

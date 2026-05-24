@@ -37,6 +37,18 @@ import {
   POSITION_ICONS,
   positionIconSvg
 } from "./lib/positionIcons";
+import {
+  emptyPositionTableView,
+  hasActivePositionTableView,
+  positionTableColumnConfig,
+  positionTableColumnsForMode,
+  positionTableFilterChipLabel,
+  positionTableOperatorLabel,
+  positionTableOperatorsForColumn,
+  positionTableRows,
+  positionTableSelectOptions,
+  positionTableSortLabel
+} from "./lib/positionTableView";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
 import type {
   AppState,
@@ -45,6 +57,9 @@ import type {
   InvestmentDepotKey,
   InvestmentSettings,
   PlanningSettings,
+  PositionTableFilterColumn,
+  PositionTableFilterOperator,
+  PositionTableView,
   ReservePosition,
   ThemeMode
 } from "./types";
@@ -107,6 +122,12 @@ interface ReserveChartModel {
   insight: string;
 }
 
+interface PositionFilterDraft {
+  column: PositionTableFilterColumn;
+  operator: PositionTableFilterOperator;
+  value: string;
+}
+
 let state = loadInitialState();
 let draggedPositionId: string | null = null;
 let exportStatusTimeoutId: number | undefined;
@@ -119,6 +140,8 @@ let reserveChartHighlightId: string | null = null;
 let reserveChartAdjustment: ReserveChartAdjustment = "none";
 let reserveChartStyle: ReserveChartStyle = "bars";
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
+let positionFilterDrafts = createPositionFilterDrafts();
+let positionFilterPopupOpen = false;
 normalizeInvestmentBounds();
 applyTheme();
 
@@ -161,6 +184,11 @@ function bindEvents(): void {
     const target = formControl(event.target);
     if (!target) return;
 
+    if (target.dataset.positionFilterDraft === "value") {
+      updatePositionFilterDraft("value", target.value);
+      return;
+    }
+
     if (target.dataset.setting) {
       updatePlanningSetting(target.dataset.setting as keyof PlanningSettings, target.value);
       renderAll();
@@ -182,6 +210,11 @@ function bindEvents(): void {
   root.addEventListener("change", (event) => {
     const target = formControl(event.target);
     if (!target) return;
+
+    if (target.dataset.positionFilterDraft) {
+      updatePositionFilterDraft(target.dataset.positionFilterDraft as keyof PositionFilterDraft, target.value);
+      return;
+    }
 
     if (target.dataset.positionId && target.dataset.positionField) {
       const value = target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value;
@@ -209,6 +242,9 @@ function bindEvents(): void {
       if (positionIconPicker && !target?.closest("#positionIconPicker")) {
         hidePositionIconPicker();
       }
+      if (positionFilterPopupOpen && !target?.closest("#positionFilterPopup")) {
+        hidePositionFilterPopup();
+      }
       return;
     }
 
@@ -217,12 +253,24 @@ function bindEvents(): void {
     if (action !== "open-position-icon-picker" && action !== "select-position-icon") {
       hidePositionIconPicker();
     }
+    if (positionFilterPopupOpen && action !== "toggle-position-filter" && !button.closest("#positionFilterPopup")) {
+      hidePositionFilterPopup();
+    }
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
     if (action === "show-income-positions") setSelectedPositionMode("income");
     if (action === "show-expense-positions") setSelectedPositionMode("expense");
     if (action === "show-reserve-positions") setSelectedPositionMode("reserve");
     if (action === "show-savings-positions") setSelectedPositionMode("savings");
+    if (action === "toggle-position-filter") togglePositionFilterPopup();
+    if (action === "close-position-filter") hidePositionFilterPopup();
+    if (action === "add-position-filter") addPositionTableFilter();
+    if (action === "remove-position-filter") removePositionTableFilter(button.dataset.filterId || "");
+    if (action === "clear-position-sort") clearPositionTableSort();
+    if (action === "clear-position-table-view") clearCurrentPositionTableView();
+    if (action?.startsWith("sort-position-table-")) {
+      togglePositionTableSort(action.replace("sort-position-table-", "") as PositionTableFilterColumn);
+    }
     if (action === "toggle-result-max-needed") toggleResultMaxNeeded();
     if (action === "set-investment-depot-standard") setInvestmentDepot("standard");
     if (action === "set-investment-depot-retirement") setInvestmentDepot("retirement");
@@ -273,6 +321,7 @@ function bindEvents(): void {
   });
 
   root.addEventListener("dragstart", (event) => {
+    if (hasActivePositionTableView(currentPositionTableView())) return;
     const handle = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-position-drag-id]");
     if (!handle) return;
 
@@ -285,6 +334,7 @@ function bindEvents(): void {
   });
 
   root.addEventListener("dragover", (event) => {
+    if (hasActivePositionTableView(currentPositionTableView())) return;
     const row = (event.target as HTMLElement | null)?.closest<HTMLTableRowElement>("tr[data-position-row]");
     if (!row || !draggedPositionId) return;
     event.preventDefault();
@@ -297,6 +347,7 @@ function bindEvents(): void {
   });
 
   root.addEventListener("drop", (event) => {
+    if (hasActivePositionTableView(currentPositionTableView())) return;
     const row = (event.target as HTMLElement | null)?.closest<HTMLTableRowElement>("tr[data-position-row]");
     if (!row || !draggedPositionId) return;
     event.preventDefault();
@@ -316,6 +367,7 @@ function bindEvents(): void {
       hideThemeSettings();
       hideInvestmentChartPopup();
       hideReserveChartPopup();
+      hidePositionFilterPopup();
     }
   });
   window.addEventListener("resize", drawCurrentInvestmentChart);
@@ -457,16 +509,32 @@ function syncInvestmentProjectionLabels(depot: InvestmentDepotKey): void {
 
 function renderPositions(): void {
   renderPositionModeControls();
+  const basePositions = state.positions.filter((position) => positionTableMode(position) === selectedPositionMode);
+  renderPositionTableControls(basePositions);
   renderPositionTableHead();
   const body = document.querySelector<HTMLTableSectionElement>("#positionsBody");
   if (!body) return;
 
-  const positions = state.positions.filter((position) => positionTableMode(position) === selectedPositionMode);
+  const view = currentPositionTableView();
+  const positions = positionTableRows(state.positions, selectedPositionMode, view);
+  const isFilteredOrSorted = hasActivePositionTableView(view);
+  if (!basePositions.length) {
+    body.innerHTML = `
+      <tr>
+        <td class="position-empty" colspan="${positionTableColumnCount(selectedPositionMode)}">
+          Noch keine ${positionModeEmptyLabel(selectedPositionMode)} angelegt.
+        </td>
+      </tr>
+    `;
+    renderPositionIconPicker();
+    return;
+  }
+
   if (!positions.length) {
     body.innerHTML = `
       <tr>
-        <td class="position-empty" colspan="${selectedPositionMode === "income" ? 14 : 15}">
-          Noch keine ${positionModeEmptyLabel(selectedPositionMode)} angelegt.
+        <td class="position-empty" colspan="${positionTableColumnCount(selectedPositionMode)}">
+          Keine Positionen fuer aktuelle Filter.
         </td>
       </tr>
     `;
@@ -480,7 +548,7 @@ function renderPositions(): void {
       return `
         <tr data-position-row="${position.id}">
           <td class="reorder-cell">
-            <button class="drag-handle" type="button" draggable="true" data-position-drag-id="${position.id}" aria-label="Position verschieben" title="Position verschieben">:::</button>
+            ${positionDragHandle(position.id, isFilteredOrSorted)}
           </td>
           <td class="check-cell"><input type="checkbox" data-position-id="${position.id}" data-position-field="active" ${
             position.active ? "checked" : ""
@@ -620,16 +688,161 @@ function renderPositionModeControls(): void {
   }
 }
 
+function renderPositionTableControls(basePositions: ReservePosition[]): void {
+  const wrapper = document.querySelector<HTMLDivElement>("#positionTableControls");
+  if (!wrapper) return;
+  syncPositionFilterToggle();
+  const view = currentPositionTableView();
+  const draft = normalizedPositionFilterDraft();
+  const columns = positionTableColumnsForMode(selectedPositionMode);
+  const selectedConfig = positionTableColumnConfig(selectedPositionMode, draft.column) ?? columns[0];
+  const operators = positionTableOperatorsForColumn(selectedPositionMode, selectedConfig.column);
+  const options = positionTableSelectOptions(selectedPositionMode, selectedConfig.column, state.positions);
+  const active = hasActivePositionTableView(view);
+
+  wrapper.innerHTML = `
+    <div class="position-table-view-row">
+      <div class="position-view-chips" aria-live="polite">
+        ${view.filters.map(positionFilterChip).join("")}
+        ${view.sort ? positionSortChip(view.sort) : ""}
+      </div>
+      <span class="position-view-count">${positionTableRows(state.positions, selectedPositionMode, view).length} von ${
+        basePositions.length
+      }</span>
+    </div>
+    ${
+      positionFilterPopupOpen
+        ? `
+    <div id="positionFilterPopup" class="position-filter-popup" role="dialog" aria-label="Positionsfilter">
+      <div class="position-filter-popup-head">
+        <strong>Filter</strong>
+        <button class="chart-popup-close" type="button" data-action="close-position-filter" aria-label="Filter schliessen">x</button>
+      </div>
+      <div class="position-filter-builder">
+        <label class="filter-field">
+          <span>Spalte</span>
+          <select data-position-filter-draft="column">
+            ${columns
+              .map(
+                (column) =>
+                  `<option value="${column.column}" ${column.column === selectedConfig.column ? "selected" : ""}>${escapeHtml(
+                    column.label
+                  )}</option>`
+              )
+              .join("")}
+          </select>
+        </label>
+        <label class="filter-field operator">
+          <span>Operator</span>
+          <select data-position-filter-draft="operator">
+            ${operators
+              .map(
+                (operator) =>
+                  `<option value="${operator}" ${operator === draft.operator ? "selected" : ""}>${escapeHtml(
+                    positionTableOperatorLabel(operator)
+                  )}</option>`
+              )
+              .join("")}
+          </select>
+        </label>
+        <label class="filter-field value">
+          <span>Wert</span>
+          ${positionFilterValueControl(selectedConfig.kind, draft.value, options)}
+        </label>
+        <button class="button secondary" type="button" data-action="add-position-filter">Filter setzen</button>
+        <button class="button secondary" type="button" data-action="clear-position-table-view" ${
+          active ? "" : "disabled"
+        }>
+          Zuruecksetzen
+        </button>
+      </div>
+    </div>
+        `
+        : ""
+    }
+  `;
+}
+
+function syncPositionFilterToggle(): void {
+  const button = document.querySelector<HTMLButtonElement>("[data-action='toggle-position-filter']");
+  if (!button) return;
+  button.classList.toggle("active", positionFilterPopupOpen);
+  button.setAttribute("aria-expanded", String(positionFilterPopupOpen));
+}
+
+function positionFilterValueControl(
+  kind: "text" | "select" | "number",
+  value: string,
+  options: Array<{ value: string; label: string }>
+): string {
+  if (kind === "select") {
+    return `
+      <select data-position-filter-draft="value">
+        <option value="">Auswaehlen</option>
+        ${options
+          .map(
+            (option) =>
+              `<option value="${escapeHtml(option.value)}" ${option.value === value ? "selected" : ""}>${escapeHtml(
+                option.label
+              )}</option>`
+          )
+          .join("")}
+      </select>
+    `;
+  }
+
+  if (kind === "number") {
+    return `<input type="number" step="0.01" value="${escapeHtml(value)}" data-position-filter-draft="value" />`;
+  }
+
+  return `<input type="search" value="${escapeHtml(value)}" data-position-filter-draft="value" />`;
+}
+
+function positionFilterChip(filter: PositionTableView["filters"][number]): string {
+  return `
+    <button
+      class="position-view-chip"
+      type="button"
+      data-action="remove-position-filter"
+      data-filter-id="${escapeHtml(filter.id)}"
+      aria-label="Filter entfernen: ${escapeHtml(positionTableFilterChipLabel(selectedPositionMode, filter))}"
+    >
+      <span>${escapeHtml(positionTableFilterChipLabel(selectedPositionMode, filter))}</span>
+      <strong aria-hidden="true">x</strong>
+    </button>
+  `;
+}
+
+function positionSortChip(sort: NonNullable<PositionTableView["sort"]>): string {
+  return `
+    <button
+      class="position-view-chip sort"
+      type="button"
+      data-action="clear-position-sort"
+      aria-label="Sortierung entfernen: ${escapeHtml(positionTableSortLabel(selectedPositionMode, sort))}"
+    >
+      <span>${escapeHtml(positionTableSortLabel(selectedPositionMode, sort))}</span>
+      <strong aria-hidden="true">x</strong>
+    </button>
+  `;
+}
+
 function renderPositionTableHead(): void {
   const head = document.querySelector<HTMLTableSectionElement>("#positionsHead");
   if (!head) return;
   const dateHeaders =
     selectedPositionMode === "savings"
       ? [
-          '<th><span class="split-header">Fix-Start<span>Abgangsjahr</span></span></th>',
-          '<th><span class="split-header">Fix-Ende<span>Anfang Monat</span></span></th>'
+          positionSortableHeader(
+            "payoutYear",
+            '<span class="split-header">Fix-Start<span>Abgangsjahr</span></span>'
+          ),
+          positionSortableHeader(
+            "startMonth",
+            '<span class="split-header">Fix-Ende<span>Anfang Monat</span></span>'
+          )
         ].join("")
-      : "<th>Start</th><th>Ende</th>";
+      : [positionSortableHeader("startMonth", "Start"), positionSortableHeader("endMonth", "Ende")].join("");
   const timingLabel =
     selectedPositionMode === "income" ? "Eingang" : selectedPositionMode === "savings" ? "Transfer" : "Abgang";
   const monthLabel =
@@ -641,25 +854,221 @@ function renderPositionTableHead(): void {
   head.innerHTML = `
     <tr>
       <th class="reorder-col"></th>
-      <th>Aktiv</th>
-      <th>View</th>
-      <th class="label-col">Label</th>
-      <th class="name-col">Name</th>
-      <th>Art</th>
-      <th class="amount-col">Betrag</th>
+      ${positionSortableHeader("active", "Aktiv", "check-col")}
+      ${positionSortableHeader("visible", "View", "check-col")}
+      ${positionSortableHeader("label", "Label", "label-col")}
+      ${positionSortableHeader("name", "Name", "name-col")}
+      ${positionSortableHeader("type", "Art")}
+      ${positionSortableHeader("amount", "Betrag", "amount-col")}
       ${dateHeaders}
-      ${selectedPositionMode === "income" ? "<th>Jahr</th>" : ""}
-      <th>${timingLabel}</th>
-      <th>${monthLabel}</th>
-      <th class="day-col">Tag</th>
+      ${selectedPositionMode === "income" ? positionSortableHeader("payoutYear", "Jahr") : ""}
+      ${positionSortableHeader("payoutType", timingLabel)}
+      ${positionSortableHeader("payoutMonth", monthLabel)}
+      ${positionSortableHeader("payoutDay", "Tag", "day-col")}
       ${
         selectedPositionMode !== "income"
-          ? '<th class="interest-toggle-col">Zins</th><th class="cashback-toggle-col">Cashb.</th>'
+          ? `${positionSortableHeader("interestBearing", "Zins", "interest-toggle-col")}${positionSortableHeader(
+              "cashback",
+              "Cashb.",
+              "cashback-toggle-col"
+            )}`
           : ""
       }
       <th></th>
     </tr>
   `;
+}
+
+function positionSortableHeader(column: PositionTableFilterColumn, label: string, className = ""): string {
+  const view = currentPositionTableView();
+  const direction = view.sort?.column === column ? view.sort.direction : null;
+  const ariaSort = direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none";
+  const indicator = direction === "asc" ? "^" : direction === "desc" ? "v" : "";
+  const classes = ["sortable-col", className].filter(Boolean).join(" ");
+  return `
+    <th class="${classes}" aria-sort="${ariaSort}">
+      <button class="table-sort-button ${direction ? "active" : ""}" type="button" data-action="sort-position-table-${column}">
+        <span>${label}</span>
+        <span class="sort-indicator" aria-hidden="true">${indicator}</span>
+      </button>
+    </th>
+  `;
+}
+
+function positionTableColumnCount(mode: PositionTableMode): number {
+  return mode === "income" ? 14 : 15;
+}
+
+function positionDragHandle(positionId: string, locked: boolean): string {
+  if (locked) {
+    return `
+      <button
+        class="drag-handle disabled"
+        type="button"
+        disabled
+        aria-label="Reihenfolge bei Filter oder Sortierung gesperrt"
+        title="Filter oder Sortierung zuruecksetzen, um zu verschieben"
+      >:::</button>
+    `;
+  }
+  return `<button class="drag-handle" type="button" draggable="true" data-position-drag-id="${positionId}" aria-label="Position verschieben" title="Position verschieben">:::</button>`;
+}
+
+function currentPositionTableView(): PositionTableView {
+  return state.positionTableView[selectedPositionMode] ?? emptyPositionTableView();
+}
+
+function updateCurrentPositionTableView(updater: (view: PositionTableView) => PositionTableView): void {
+  state = {
+    ...state,
+    positionTableView: {
+      ...state.positionTableView,
+      [selectedPositionMode]: updater(currentPositionTableView())
+    }
+  };
+}
+
+function createPositionFilterDrafts(): Record<PositionTableMode, PositionFilterDraft> {
+  return {
+    income: defaultPositionFilterDraft("income"),
+    expense: defaultPositionFilterDraft("expense"),
+    reserve: defaultPositionFilterDraft("reserve"),
+    savings: defaultPositionFilterDraft("savings")
+  };
+}
+
+function defaultPositionFilterDraft(mode: PositionTableMode): PositionFilterDraft {
+  const column = positionTableColumnsForMode(mode).find((config) => config.column === "name")?.column ?? "name";
+  return {
+    column,
+    operator: positionTableOperatorsForColumn(mode, column)[0],
+    value: ""
+  };
+}
+
+function normalizedPositionFilterDraft(): PositionFilterDraft {
+  const draft = positionFilterDrafts[selectedPositionMode] ?? defaultPositionFilterDraft(selectedPositionMode);
+  const config = positionTableColumnConfig(selectedPositionMode, draft.column);
+  const column = config ? draft.column : "name";
+  const operators = positionTableOperatorsForColumn(selectedPositionMode, column);
+  const operator = operators.includes(draft.operator) ? draft.operator : operators[0];
+  const normalized = { column, operator, value: draft.value };
+  positionFilterDrafts = {
+    ...positionFilterDrafts,
+    [selectedPositionMode]: normalized
+  };
+  return normalized;
+}
+
+function updatePositionFilterDraft(field: keyof PositionFilterDraft, value: string): void {
+  const current = normalizedPositionFilterDraft();
+  if (field === "column") {
+    const column = value as PositionTableFilterColumn;
+    const nextColumn = positionTableColumnConfig(selectedPositionMode, column) ? column : current.column;
+    positionFilterDrafts = {
+      ...positionFilterDrafts,
+      [selectedPositionMode]: {
+        column: nextColumn,
+        operator: positionTableOperatorsForColumn(selectedPositionMode, nextColumn)[0],
+        value: ""
+      }
+    };
+    renderPositions();
+    return;
+  }
+
+  if (field === "operator") {
+    const operator = value as PositionTableFilterOperator;
+    const operators = positionTableOperatorsForColumn(selectedPositionMode, current.column);
+    positionFilterDrafts = {
+      ...positionFilterDrafts,
+      [selectedPositionMode]: {
+        ...current,
+        operator: operators.includes(operator) ? operator : operators[0]
+      }
+    };
+    return;
+  }
+
+  positionFilterDrafts = {
+    ...positionFilterDrafts,
+    [selectedPositionMode]: { ...current, value }
+  };
+}
+
+function addPositionTableFilter(): void {
+  const draft = currentPositionFilterDraftFromControls();
+  const value = String(draft.value).trim();
+  if (!value) return;
+  updateCurrentPositionTableView((view) => ({
+    ...view,
+    filters: [...view.filters, { id: createId(), column: draft.column, operator: draft.operator, value }]
+  }));
+  positionFilterDrafts = {
+    ...positionFilterDrafts,
+    [selectedPositionMode]: { ...draft, value: "" }
+  };
+  renderPositions();
+  saveState(state);
+}
+
+function currentPositionFilterDraftFromControls(): PositionFilterDraft {
+  const draft = normalizedPositionFilterDraft();
+  const columnInput = document.querySelector<HTMLSelectElement>('[data-position-filter-draft="column"]');
+  const operatorInput = document.querySelector<HTMLSelectElement>('[data-position-filter-draft="operator"]');
+  const valueInput = document.querySelector<HTMLInputElement | HTMLSelectElement>('[data-position-filter-draft="value"]');
+  const column = (columnInput?.value || draft.column) as PositionTableFilterColumn;
+  const nextColumn = positionTableColumnConfig(selectedPositionMode, column) ? column : draft.column;
+  const operators = positionTableOperatorsForColumn(selectedPositionMode, nextColumn);
+  const operator = (operatorInput?.value || draft.operator) as PositionTableFilterOperator;
+  return {
+    column: nextColumn,
+    operator: operators.includes(operator) ? operator : operators[0],
+    value: valueInput?.value ?? draft.value
+  };
+}
+
+function removePositionTableFilter(filterId: string): void {
+  updateCurrentPositionTableView((view) => ({
+    ...view,
+    filters: view.filters.filter((filter) => filter.id !== filterId)
+  }));
+  renderPositions();
+  saveState(state);
+}
+
+function clearPositionTableSort(): void {
+  updateCurrentPositionTableView((view) => ({ ...view, sort: null }));
+  renderPositions();
+  saveState(state);
+}
+
+function clearCurrentPositionTableView(): void {
+  updateCurrentPositionTableView(() => emptyPositionTableView());
+  renderPositions();
+  saveState(state);
+}
+
+function togglePositionFilterPopup(): void {
+  positionFilterPopupOpen = !positionFilterPopupOpen;
+  renderPositions();
+}
+
+function hidePositionFilterPopup(): void {
+  if (!positionFilterPopupOpen) return;
+  positionFilterPopupOpen = false;
+  renderPositions();
+}
+
+function togglePositionTableSort(column: PositionTableFilterColumn): void {
+  if (!positionTableColumnConfig(selectedPositionMode, column)) return;
+  updateCurrentPositionTableView((view) => {
+    if (view.sort?.column !== column) return { ...view, sort: { column, direction: "asc" } };
+    if (view.sort.direction === "asc") return { ...view, sort: { column, direction: "desc" } };
+    return { ...view, sort: null };
+  });
+  renderPositions();
+  saveState(state);
 }
 
 function positionModeEmptyLabel(mode: PositionTableMode): string {

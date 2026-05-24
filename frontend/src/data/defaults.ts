@@ -1,4 +1,4 @@
-import type { AppState, InvestmentSettings, PlanningSettings, ReservePosition } from "../types";
+import type { AppState, InvestmentSettings, PlanningSettings, PositionTableViewState, ReservePosition } from "../types";
 
 export const MONTHS = [
   "Januar",
@@ -187,11 +187,21 @@ export function defaultInvestmentSettings(): InvestmentSettings {
   };
 }
 
+export function defaultPositionTableViewState(): PositionTableViewState {
+  return {
+    income: { filters: [], sort: null },
+    expense: { filters: [], sort: null },
+    reserve: { filters: [], sort: null },
+    savings: { filters: [], sort: null }
+  };
+}
+
 export function defaultAppState(): AppState {
   return {
     theme: "light",
     settings: defaultPlanningSettings(),
     positions: defaultPositions(),
-    investment: defaultInvestmentSettings()
+    investment: defaultInvestmentSettings(),
+    positionTableView: defaultPositionTableViewState()
   };
 }

@@ -22,6 +22,14 @@ The `Kosten- und Ruecklagenpositionen` table is the base for the yearly planning
 
 The handle at the left side of a row can be used to reorder positions. The order is reflected in the input table and yearly table.
 
+## Filtering and Sorting Positions
+
+Each table section (`Einnahmen`, `Ausgaben`, `Ruecklagen`, `Sparen`) keeps its own filters and sorting. These table view settings are saved and restored when the app is opened again.
+
+Filters and sorting only change the editable position table. The yearly calculation, yearly table, investment planning, and CSV export continue to use all positions.
+
+Active filters and sorting are shown as chips above the table. Removing a chip clears that single filter or sort order; `Zuruecksetzen` clears the current section's full table view. Manual drag reordering is disabled while a filter or sort order is active.
+
 ## Position Types
 
 Income rows:

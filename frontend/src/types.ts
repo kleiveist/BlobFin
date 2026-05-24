@@ -5,6 +5,43 @@ export type PositionType = ExpensePositionType | IncomePositionType;
 export type PayoutType = "none" | "monthly" | "yearly" | "once";
 export type ThemeMode = "light" | "dark";
 export type InvestmentDepotKey = "standard" | "retirement" | "child";
+export type PositionTableMode = PositionFlow | "reserve" | "savings";
+export type PositionTableFilterColumn =
+  | "active"
+  | "visible"
+  | "label"
+  | "name"
+  | "type"
+  | "amount"
+  | "startMonth"
+  | "endMonth"
+  | "payoutYear"
+  | "payoutType"
+  | "payoutMonth"
+  | "payoutDay"
+  | "interestBearing"
+  | "cashback";
+export type PositionTableFilterOperator = "contains" | "eq" | "gte" | "lte";
+export type PositionTableSortDirection = "asc" | "desc";
+
+export interface PositionTableFilter {
+  id: string;
+  column: PositionTableFilterColumn;
+  operator: PositionTableFilterOperator;
+  value: string;
+}
+
+export interface PositionTableSort {
+  column: PositionTableFilterColumn;
+  direction: PositionTableSortDirection;
+}
+
+export interface PositionTableView {
+  filters: PositionTableFilter[];
+  sort: PositionTableSort | null;
+}
+
+export type PositionTableViewState = Record<PositionTableMode, PositionTableView>;
 
 export interface ReservePosition {
   id: string;
@@ -78,6 +115,7 @@ export interface AppState {
   settings: PlanningSettings;
   positions: ReservePosition[];
   investment: InvestmentSettings;
+  positionTableView: PositionTableViewState;
 }
 
 export interface MonthlyReserveRow {

@@ -96,10 +96,18 @@ export function renderAppShell(): string {
             ${toolbarIconButton("import-positions", "Positionen importieren", "upload")}
             ${toolbarIconButton("export-positions", "Positionen exportieren", "download")}
             ${toolbarIconButton("export-year", "Jahrestabelle exportieren", "table")}
+            <button
+              class="button secondary position-filter-toggle"
+              type="button"
+              data-action="toggle-position-filter"
+              aria-controls="positionFilterPopup"
+              aria-expanded="false"
+            >Filter</button>
             <input class="visually-hidden" id="positionsCsvImport" type="file" accept=".csv,text/csv" />
             <span id="exportStatus" class="export-status" aria-live="polite"></span>
           </div>
         </div>
+        <div id="positionTableControls" class="position-table-controls"></div>
         <div class="table-wrap position-table-wrap">
           <table class="position-table">
             <thead id="positionsHead"></thead>

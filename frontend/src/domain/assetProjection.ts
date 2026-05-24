@@ -49,10 +49,11 @@ export function buildAssetProjection(
   const hasPayoutPhase = settings.payoutYears > 0 && settings.payoutEndAge > retirementAge;
   const endAge = hasPayoutPhase ? Math.max(settings.payoutEndAge, retirementAge + 1) : retirementAge;
   const savingMonths = Math.max(0, Math.round((retirementAge - simulationStartAge) * 12));
-  const contributionDisplayYearIndex = firstRecurringContributionYearIndex(
+  const contributionDisplayYearIndex = recurringContributionDisplayYearIndex(
     positions,
     settings,
     simulationStartYear,
+    year,
     savingMonths
   );
   const annualSavingsRate = selectedRecurringInvestmentContributionForProjectionYear(
@@ -198,6 +199,27 @@ function firstRecurringContributionYearIndex(
     if (contribution > 0) return yearIndex;
   }
   return 0;
+}
+
+function recurringContributionDisplayYearIndex(
+  positions: ReservePosition[],
+  settings: InvestmentSettings,
+  baseYear: number,
+  displayYear: number,
+  savingMonths: number
+): number {
+  const projectionYears = Math.max(0, Math.ceil(savingMonths / 12));
+  const displayYearIndex = Math.max(0, displayYear - baseYear);
+  if (displayYearIndex < projectionYears) {
+    const displayYearContribution = selectedRecurringInvestmentContributionForProjectionYear(
+      positions,
+      settings,
+      baseYear,
+      displayYearIndex
+    );
+    if (displayYearContribution > 0) return displayYearIndex;
+  }
+  return firstRecurringContributionYearIndex(positions, settings, baseYear, savingMonths);
 }
 
 function snapshotAtAge(
