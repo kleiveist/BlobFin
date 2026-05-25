@@ -30,6 +30,8 @@ Filters and sorting only change the editable position table. The yearly calculat
 
 Active filters and sorting are shown as chips above the table. Removing a chip clears that single filter or sort order; `Zuruecksetzen` clears the current section's full table view. Manual drag reordering is disabled while a filter or sort order is active.
 
+The label icons in the same table control area are quick filters. With no label selected, all rows in the section are shown. Selecting one or more labels shows rows matching any selected label. `Zuruecksetzen` also clears selected labels.
+
 ## Position Types
 
 Income rows:

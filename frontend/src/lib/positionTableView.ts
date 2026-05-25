@@ -44,7 +44,7 @@ export interface PositionTableSelectOption {
 }
 
 export function emptyPositionTableView(): PositionTableView {
-  return { filters: [], sort: null };
+  return { filters: [], sort: null, selectedLabels: [] };
 }
 
 export function positionTableColumnsForMode(mode: PositionTableMode): PositionTableColumnConfig[] {
@@ -134,7 +134,11 @@ export function positionTableRows(
   view: PositionTableView
 ): ReservePosition[] {
   const baseRows = positions.filter((position) => positionTableMode(position) === mode);
-  const filteredRows = baseRows.filter((position) =>
+  const selectedLabels = new Set(view.selectedLabels.map((label) => normalizePositionIcon(label)));
+  const labelRows = selectedLabels.size
+    ? baseRows.filter((position) => selectedLabels.has(normalizePositionIcon(position.icon)))
+    : baseRows;
+  const filteredRows = labelRows.filter((position) =>
     view.filters.every((filter) => positionMatchesFilter(position, mode, filter))
   );
   if (!view.sort) return filteredRows;
@@ -142,7 +146,11 @@ export function positionTableRows(
 }
 
 export function hasActivePositionTableView(view: PositionTableView): boolean {
-  return view.filters.length > 0 || view.sort !== null;
+  return view.filters.length > 0 || view.sort !== null || view.selectedLabels.length > 0;
+}
+
+export function positionTableLabelOptions(positions: ReservePosition[], mode: PositionTableMode): PositionTableSelectOption[] {
+  return positionLabelOptions(positions, mode);
 }
 
 export function positionTableSelectOptions(

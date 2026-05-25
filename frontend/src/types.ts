@@ -39,6 +39,7 @@ export interface PositionTableSort {
 export interface PositionTableView {
   filters: PositionTableFilter[];
   sort: PositionTableSort | null;
+  selectedLabels: string[];
 }
 
 export type PositionTableViewState = Record<PositionTableMode, PositionTableView>;

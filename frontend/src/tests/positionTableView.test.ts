@@ -27,7 +27,7 @@ function expensePosition(id: string, updates: Partial<ReservePosition> = {}): Re
 }
 
 function view(overrides: Partial<PositionTableView>): PositionTableView {
-  return { filters: [], sort: null, ...overrides };
+  return { filters: [], sort: null, selectedLabels: [], ...overrides };
 }
 
 describe("position table view", () => {
@@ -52,6 +52,51 @@ describe("position table view", () => {
     const rows = positionTableRows(state.positions, "reserve", state.positionTableView.reserve);
 
     expect(rows.map((position) => position.name)).toEqual(["Kfz-Versicherung Ruecklage"]);
+  });
+
+  it("shows all section rows when no label quick filter is active", () => {
+    const positions = [
+      expensePosition("car", { icon: "car" }),
+      expensePosition("home", { icon: "home" })
+    ];
+
+    const rows = positionTableRows(positions, "expense", view({ selectedLabels: [] }));
+
+    expect(rows.map((position) => position.id)).toEqual(["car", "home"]);
+  });
+
+  it("filters rows by one or more active label quick filters", () => {
+    const positions = [
+      expensePosition("car", { icon: "car" }),
+      expensePosition("home", { icon: "home" }),
+      expensePosition("tax", { icon: "tax" })
+    ];
+
+    const carRows = positionTableRows(positions, "expense", view({ selectedLabels: ["car"] }));
+    const multipleRows = positionTableRows(positions, "expense", view({ selectedLabels: ["car", "tax"] }));
+
+    expect(carRows.map((position) => position.id)).toEqual(["car"]);
+    expect(multipleRows.map((position) => position.id)).toEqual(["car", "tax"]);
+  });
+
+  it("combines label quick filters with popup filters and sorting", () => {
+    const positions = [
+      expensePosition("low-car", { icon: "car", amount: 20 }),
+      expensePosition("high-car", { icon: "car", amount: 120 }),
+      expensePosition("high-home", { icon: "home", amount: 200 })
+    ];
+
+    const rows = positionTableRows(
+      positions,
+      "expense",
+      view({
+        selectedLabels: ["car"],
+        filters: [{ id: "amount", column: "amount", operator: "gte", value: "50" }],
+        sort: { column: "amount", direction: "desc" }
+      })
+    );
+
+    expect(rows.map((position) => position.id)).toEqual(["high-car"]);
   });
 
   it("sorts amount, name, month, and checkbox columns while keeping ties stable", () => {
@@ -98,11 +143,12 @@ describe("position table view", () => {
     const state = defaultAppState();
     state.positionTableView.expense = view({
       filters: [{ id: "amount", column: "amount", operator: "gte", value: "100" }],
-      sort: { column: "name", direction: "desc" }
+      sort: { column: "name", direction: "desc" },
+      selectedLabels: ["car"]
     });
 
     state.positionTableView.expense = defaultPositionTableViewState().expense;
 
-    expect(state.positionTableView.expense).toEqual({ filters: [], sort: null });
+    expect(state.positionTableView.expense).toEqual({ filters: [], sort: null, selectedLabels: [] });
   });
 });

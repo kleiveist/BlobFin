@@ -189,10 +189,10 @@ export function defaultInvestmentSettings(): InvestmentSettings {
 
 export function defaultPositionTableViewState(): PositionTableViewState {
   return {
-    income: { filters: [], sort: null },
-    expense: { filters: [], sort: null },
-    reserve: { filters: [], sort: null },
-    savings: { filters: [], sort: null }
+    income: { filters: [], sort: null, selectedLabels: [] },
+    expense: { filters: [], sort: null, selectedLabels: [] },
+    reserve: { filters: [], sort: null, selectedLabels: [] },
+    savings: { filters: [], sort: null, selectedLabels: [] }
   };
 }
 

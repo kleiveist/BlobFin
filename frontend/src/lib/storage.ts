@@ -110,14 +110,18 @@ function normalizePositionTableViewState(value: unknown): PositionTableViewState
 }
 
 function normalizePositionTableView(mode: PositionTableMode, value: unknown): PositionTableView {
-  if (!isRecord(value)) return { filters: [], sort: null };
+  if (!isRecord(value)) return { filters: [], sort: null, selectedLabels: [] };
   const filters = Array.isArray(value.filters)
     ? value.filters
         .map((item) => normalizePositionTableFilter(mode, item))
         .filter((filter): filter is PositionTableFilter => filter !== null)
     : [];
   const sort = normalizePositionTableSort(mode, value.sort);
-  return { filters, sort };
+  return { filters, sort, selectedLabels: normalizeSelectedPositionLabels(value.selectedLabels) };
+}
+
+function normalizeSelectedPositionLabels(value: unknown): string[] {
+  return Array.from(new Set(stringArrayOrDefault(value, []).map((label) => normalizePositionIcon(label))));
 }
 
 function normalizePositionTableFilter(mode: PositionTableMode, value: unknown): PositionTableFilter | null {

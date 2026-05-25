@@ -45,6 +45,7 @@ import {
   positionTableFilterChipLabel,
   positionTableOperatorLabel,
   positionTableOperatorsForColumn,
+  positionTableLabelOptions,
   positionTableRows,
   positionTableSelectOptions,
   positionTableSortLabel
@@ -264,6 +265,7 @@ function bindEvents(): void {
     if (action === "show-savings-positions") setSelectedPositionMode("savings");
     if (action === "toggle-position-filter") togglePositionFilterPopup();
     if (action === "close-position-filter") hidePositionFilterPopup();
+    if (action === "toggle-position-label-filter") togglePositionLabelFilter(button.dataset.positionLabel || "");
     if (action === "add-position-filter") addPositionTableFilter();
     if (action === "remove-position-filter") removePositionTableFilter(button.dataset.filterId || "");
     if (action === "clear-position-sort") clearPositionTableSort();
@@ -698,6 +700,7 @@ function renderPositionTableControls(basePositions: ReservePosition[]): void {
   const selectedConfig = positionTableColumnConfig(selectedPositionMode, draft.column) ?? columns[0];
   const operators = positionTableOperatorsForColumn(selectedPositionMode, selectedConfig.column);
   const options = positionTableSelectOptions(selectedPositionMode, selectedConfig.column, state.positions);
+  const labelOptions = positionTableLabelOptions(state.positions, selectedPositionMode);
   const active = hasActivePositionTableView(view);
 
   wrapper.innerHTML = `
@@ -710,6 +713,7 @@ function renderPositionTableControls(basePositions: ReservePosition[]): void {
         basePositions.length
       }</span>
     </div>
+    ${labelOptions.length ? positionLabelFilterRow(labelOptions, view.selectedLabels) : ""}
     ${
       positionFilterPopupOpen
         ? `
@@ -760,6 +764,35 @@ function renderPositionTableControls(basePositions: ReservePosition[]): void {
         `
         : ""
     }
+  `;
+}
+
+function positionLabelFilterRow(
+  labels: Array<{ value: string; label: string }>,
+  selectedLabels: string[]
+): string {
+  const selected = new Set(selectedLabels.map((label) => normalizePositionIcon(label)));
+  return `
+    <div class="position-label-filter-row" aria-label="Label-Schnellfilter">
+      ${labels
+        .map((label) => {
+          const active = selected.has(label.value);
+          return `
+            <button
+              class="position-label-filter-button ${active ? "active" : ""}"
+              type="button"
+              data-action="toggle-position-label-filter"
+              data-position-label="${escapeHtml(label.value)}"
+              aria-pressed="${active}"
+              aria-label="Label ${escapeHtml(label.label)} ${active ? "deaktivieren" : "aktivieren"}"
+              title="${escapeHtml(label.label)}"
+            >
+              ${positionIconSvg(label.value)}
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
   `;
 }
 
@@ -1045,6 +1078,18 @@ function clearPositionTableSort(): void {
 
 function clearCurrentPositionTableView(): void {
   updateCurrentPositionTableView(() => emptyPositionTableView());
+  renderPositions();
+  saveState(state);
+}
+
+function togglePositionLabelFilter(label: string): void {
+  const normalizedLabel = normalizePositionIcon(label);
+  updateCurrentPositionTableView((view) => {
+    const selected = new Set(view.selectedLabels.map((item) => normalizePositionIcon(item)));
+    if (selected.has(normalizedLabel)) selected.delete(normalizedLabel);
+    else selected.add(normalizedLabel);
+    return { ...view, selectedLabels: Array.from(selected) };
+  });
   renderPositions();
   saveState(state);
 }

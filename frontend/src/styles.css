@@ -560,6 +560,38 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.position-label-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+}
+
+.position-label-filter-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.position-label-filter-button.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.position-label-filter-button .position-icon-svg {
+  width: 20px;
+  height: 20px;
+}
+
 .result-table-heading {
   justify-content: space-between;
   flex-wrap: wrap;

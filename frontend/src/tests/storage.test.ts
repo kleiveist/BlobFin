@@ -42,16 +42,37 @@ describe("storage", () => {
 
     const loaded = loadState(storage);
 
-    expect(loaded.positionTableView.expense).toEqual({ filters: [], sort: null });
-    expect(loaded.positionTableView.income).toEqual({ filters: [], sort: null });
+    expect(loaded.positionTableView.expense).toEqual({ filters: [], sort: null, selectedLabels: [] });
+    expect(loaded.positionTableView.income).toEqual({ filters: [], sort: null, selectedLabels: [] });
   });
 
-  it("persists position table filters and sorting", () => {
+  it("migrates saved table view settings without label quick filters", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const legacyState = {
+      ...state,
+      positionTableView: {
+        ...state.positionTableView,
+        expense: {
+          filters: [{ id: "monthly", column: "payoutType", operator: "eq", value: "monthly" }],
+          sort: { column: "amount", direction: "desc" }
+        }
+      }
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.positionTableView.expense.selectedLabels).toEqual([]);
+  });
+
+  it("persists position table filters, sorting, and label quick filters", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();
     state.positionTableView.expense = {
       filters: [{ id: "monthly", column: "payoutType", operator: "eq", value: "monthly" }],
-      sort: { column: "amount", direction: "desc" }
+      sort: { column: "amount", direction: "desc" },
+      selectedLabels: ["car", "tax"]
     };
 
     saveState(state, storage);
