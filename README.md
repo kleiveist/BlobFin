@@ -1,22 +1,19 @@
 <!-- AUTO-GENERATED:docs-index START -->
 
 ## 📄 Files
-- ⏭️ (keine Markdown-Dateien im Projekt-Root)
+- 📝 [BlobFin Design System](Design.md)
 
 # DOCS
 - 📚 [Docs Home](docs/index.md)
 
 ## 📁 DEF
 - 🗂️ [Overview](docs/def/def.md)
-
-## 📁 DEF
-- 🗂️ [Overview](docs/DEF/DEF.md)
-- 📝 [Architecture](docs/DEF/architecture.md)
-- 📝 [Backend](docs/DEF/backend.md)
-- 📝 [Domain Model](docs/DEF/domain-model.md)
-- 📝 [Frontend](docs/DEF/frontend.md)
-- 📝 [Testing](docs/DEF/testing.md)
-- 📝 [Tooling](docs/DEF/tooling.md)
+- 📝 [Architecture](docs/def/architecture.md)
+- 📝 [Backend](docs/def/backend.md)
+- 📝 [Domain Model](docs/def/domain-model.md)
+- 📝 [Frontend](docs/def/frontend.md)
+- 📝 [Testing](docs/def/testing.md)
+- 📝 [Tooling](docs/def/tooling.md)
 
 ## 📁 Tools Documentation (Current Implemented State)
 - 🗂️ [Overview](docs/tools/tools.md)
@@ -29,13 +26,10 @@
 
 ## 📁 USR
 - 🗂️ [Overview](docs/usr/usr.md)
-
-## 📁 USR
-- 🗂️ [Overview](docs/USR/USR.md)
-- 📝 [Data, Export, And Reset](docs/USR/data-export-reset.md)
-- 📝 [Getting Started](docs/USR/getting-started.md)
-- 📝 [Investment Planning](docs/USR/investment-planning.md)
-- 📝 [Reserve Planning](docs/USR/reserve-planning.md)
+- 📝 [Data, Export, And Reset](docs/usr/data-export-reset.md)
+- 📝 [Getting Started](docs/usr/getting-started.md)
+- 📝 [Investment Planning](docs/usr/investment-planning.md)
+- 📝 [Reserve Planning](docs/usr/reserve-planning.md)
 
 <!-- AUTO-GENERATED:docs-index END -->
 # BlobFin

@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED:backlink START -->
+[← Back](README.md)
+<!-- AUTO-GENERATED:backlink END -->
 # BlobFin Design System
 
 Diese Datei dokumentiert die aktuellen Design-Elemente aus:

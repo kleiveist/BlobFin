@@ -6,6 +6,9 @@
 <!-- AUTO-GENERATED:docs-index START -->
 
 ## 📄 Pages
-- ⏭️ (keine Seiten)
+- 📝 [Data, Export, And Reset](data-export-reset.md)
+- 📝 [Getting Started](getting-started.md)
+- 📝 [Investment Planning](investment-planning.md)
+- 📝 [Reserve Planning](reserve-planning.md)
 
 <!-- AUTO-GENERATED:docs-index END -->

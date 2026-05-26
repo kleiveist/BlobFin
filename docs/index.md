@@ -10,15 +10,12 @@
 
 ## 📁 DEF
 - 🗂️ [Overview](def/def.md)
-
-## 📁 DEF
-- 🗂️ [Overview](DEF/DEF.md)
-- 📝 [Architecture](DEF/architecture.md)
-- 📝 [Backend](DEF/backend.md)
-- 📝 [Domain Model](DEF/domain-model.md)
-- 📝 [Frontend](DEF/frontend.md)
-- 📝 [Testing](DEF/testing.md)
-- 📝 [Tooling](DEF/tooling.md)
+- 📝 [Architecture](def/architecture.md)
+- 📝 [Backend](def/backend.md)
+- 📝 [Domain Model](def/domain-model.md)
+- 📝 [Frontend](def/frontend.md)
+- 📝 [Testing](def/testing.md)
+- 📝 [Tooling](def/tooling.md)
 
 ## 📁 Tools Documentation (Current Implemented State)
 - 🗂️ [Overview](tools/tools.md)
@@ -31,12 +28,9 @@
 
 ## 📁 USR
 - 🗂️ [Overview](usr/usr.md)
-
-## 📁 USR
-- 🗂️ [Overview](USR/USR.md)
-- 📝 [Data, Export, And Reset](USR/data-export-reset.md)
-- 📝 [Getting Started](USR/getting-started.md)
-- 📝 [Investment Planning](USR/investment-planning.md)
-- 📝 [Reserve Planning](USR/reserve-planning.md)
+- 📝 [Data, Export, And Reset](usr/data-export-reset.md)
+- 📝 [Getting Started](usr/getting-started.md)
+- 📝 [Investment Planning](usr/investment-planning.md)
+- 📝 [Reserve Planning](usr/reserve-planning.md)
 
 <!-- AUTO-GENERATED:docs-index END -->

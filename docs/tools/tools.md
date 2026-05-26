@@ -38,14 +38,6 @@ Available commands:
 - `test`
 - `tauri doctor|install|run|build|test|copy`
 
-## Command Documentation
-- [build.md](/home/kleif/Projects/ImoCalc/docs/tools/build.md)
-- [doctor.md](/home/kleif/Projects/ImoCalc/docs/tools/doctor.md)
-- [install.md](/home/kleif/Projects/ImoCalc/docs/tools/install.md)
-- [run-stop.md](/home/kleif/Projects/ImoCalc/docs/tools/run-stop.md)
-- [tauri/tauri.md](/home/kleif/Projects/ImoCalc/docs/tools/tauri/tauri.md)
-- [test.md](/home/kleif/Projects/ImoCalc/docs/tools/test.md)
-- [logging.md](/home/kleif/Projects/ImoCalc/docs/tools/logging.md)
 
 ## Shared Concepts
 
