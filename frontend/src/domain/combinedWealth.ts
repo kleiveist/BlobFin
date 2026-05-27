@@ -108,6 +108,11 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
   return years;
 }
 
+export function combinedWealthHorizonYears(startYear: number, standardEndYear: number, retirementEndYear: number): number {
+  const endYear = Math.max(startYear, standardEndYear, retirementEndYear);
+  return Math.max(1, Math.round(endYear - startYear + 1));
+}
+
 function cashDeltaForYearOffset(input: BuildCombinedWealthSeriesInput, yearOffset: number): number {
   const value = input.yearlyCashDeltas?.[yearOffset] ?? input.yearlyCashDelta;
   return Number.isFinite(value) ? roundMoney(value) : 0;

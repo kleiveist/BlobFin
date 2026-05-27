@@ -2,7 +2,7 @@ import "./styles.css";
 
 import { createId, defaultAppState, defaultInvestmentSettings } from "./data/defaults";
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
-import { buildCombinedWealthSeries } from "./domain/combinedWealth";
+import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/combinedWealth";
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
 import {
   investmentContributionForMonth,
@@ -78,9 +78,11 @@ import type {
 import { drawInvestmentChart } from "./views/investmentChart";
 import { renderAccountYearTableOverview } from "./views/accountYearTables";
 import {
+  realEstatePopupHeading,
   realEstateRepaymentSegments,
   realEstateTrendSegments,
   renderCombinedWealthChart,
+  renderCombinedWealthYearDetail,
   renderRealEstateRepaymentChart,
   renderRealEstateTrendChart
 } from "./views/wealthCharts";
@@ -781,15 +783,10 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
     }
   }
 
-  const lastYear = result.years[result.years.length - 1];
-  setText("realEstateLoanMetric", money(result.startLoanAmount));
-  setText("realEstateMonthlyRateMetric", money(result.monthlyPayment));
   setText("realEstateDerivedEquityMetric", money(result.equityCapital));
   setText("realEstateDerivedMonthlyPaymentMetric", money(result.monthlyPayment));
   setText("realEstateDerivedInitialRepaymentMetric", percent(result.derivedInitialRepaymentPercent));
   setText("realEstateDerivedSpecialRepaymentMetric", money(result.annualSpecialRepayment));
-  setText("realEstatePropertyValueMetric", money(lastYear?.propertyValue ?? 0));
-  setText("realEstatePropertyEquityMetric", money(lastYear?.netPropertyWealth ?? 0));
   setText("realEstateTotalProjectCostMetric", money(result.totalProjectCost));
   setText("realEstateStartDebtMetric", money(result.startLoanAmount));
   setText("realEstateTotalLoanCostMetric", money(result.totalLoanCost));
@@ -961,8 +958,7 @@ function calculateCombinedWealthYears(
 ): CombinedWealthYear[] {
   const standardEndYear = state.investment.birthYear + standardProjection.endAge;
   const retirementEndYear = state.investment.retirementBirthYear + retirementProjection.endAge;
-  const realEstateEndYear = realEstate.years[realEstate.years.length - 1]?.year ?? state.settings.year;
-  const horizonYears = Math.max(1, standardEndYear, retirementEndYear, realEstateEndYear) - state.settings.year + 1;
+  const horizonYears = combinedWealthHorizonYears(state.settings.year, standardEndYear, retirementEndYear);
 
   const cashContribution = combinedCashContribution(horizonYears);
 
@@ -1042,25 +1038,12 @@ function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
 
   const detail = document.querySelector<HTMLDivElement>("#combinedWealthYearDetail");
   if (!detail) return;
-  if (!selected) {
-    detail.innerHTML = "<div class='chart-empty'>Bitte zuerst Module aktivieren und berechnen.</div>";
-    return;
-  }
-
-  detail.innerHTML = `
-    <div class="detail-line"><span>Jahr</span><strong>${intNumber(selected.year)}</strong></div>
-    <div class="detail-line"><span>Cash</span><strong>${money(selected.cashValue)}</strong></div>
-    <div class="detail-line"><span>Depot</span><strong>${money(selected.depotValue)}</strong></div>
-    <div class="detail-line"><span>Entnahmeeffekt</span><strong>${money(selected.withdrawalImpact)}</strong></div>
-    <div class="detail-line"><span>Umgeleitete Cash-Tilgung</span><strong>${money(selected.redirectedCashRepayment)}</strong></div>
-    <div class="detail-line"><span>Umgeleitete Depot-Tilgung</span><strong>${money(selected.redirectedDepotRepayment)}</strong></div>
-    <div class="detail-line"><span>Immobilienwert</span><strong>${money(selected.propertyValue)}</strong></div>
-    <div class="detail-line"><span>Immobilienschuld</span><strong>${money(selected.propertyDebt)}</strong></div>
-    <div class="detail-line"><span>Immobilien-Eigenkapital</span><strong>${money(selected.propertyEquity)}</strong></div>
-    <div class="detail-line"><span>Bruttovermoegen</span><strong>${money(selected.totalGrossAssets)}</strong></div>
-    <div class="detail-line"><span>Gesamtschulden</span><strong>${money(selected.totalDebt)}</strong></div>
-    <div class="detail-line"><span>Nettovermoegen</span><strong>${money(selected.totalNetWealth)}</strong></div>
-  `;
+  detail.innerHTML = renderCombinedWealthYearDetail({
+    selected,
+    finalYear: years[years.length - 1] ?? null,
+    formatMoney: (value) => money(value),
+    formatInt: (value) => intNumber(value)
+  });
 }
 
 function renderPositions(): void {
@@ -3775,8 +3758,9 @@ function showRealEstateChartPopup(
   if (!result || !point || !popup || !card) return;
 
   const initialPropertyValue = Math.max(0, result.years[0]?.propertyValue ?? 0);
+  const principalPaidToDate = realEstatePrincipalPaidToDate(result, point.year);
   const repaymentGroup = chartPopupSection("Tilgung und Kredit", [
-    ...realEstateRepaymentSegments(point, result.totalLoanCost).map((segment) =>
+    ...realEstateRepaymentSegments(point, principalPaidToDate).map((segment) =>
       chartPopupLine(segment.className, segment.label, money(segment.value))
     ),
     chartPopupLine("gross", "Darlehensbetrag inkl. Zinsen", money(result.totalLoanCost))
@@ -3793,8 +3777,8 @@ function showRealEstateChartPopup(
   popup.innerHTML = `
     <div class="chart-popup-head">
       <div>
-        <span>Balkendetails</span>
-        <strong>${title} | Jahr ${intNumber(point.year)}</strong>
+        <span>${title}</span>
+        <strong>${realEstatePopupHeading(point.year - state.investment.birthYear, point.year, intNumber)}</strong>
       </div>
       <button class="chart-popup-close" type="button" data-action="close-investment-chart-popup" aria-label="Popup schliessen">x</button>
     </div>
@@ -3805,6 +3789,10 @@ function showRealEstateChartPopup(
 
   popup.hidden = false;
   positionChartPopup(popup, card, clientX, clientY);
+}
+
+function realEstatePrincipalPaidToDate(result: RealEstateFinancingResult, year: number): number {
+  return result.years.reduce((sum, entry) => sum + (entry.year <= year ? Math.max(0, entry.principalPaid) : 0), 0);
 }
 
 function positionChartPopup(popup: HTMLDivElement, card: HTMLElement, clientX: number, clientY: number): void {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCombinedWealthSeries } from "../domain/combinedWealth";
+import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "../domain/combinedWealth";
 import type { AssetProjection, AssetProjectionPoint, CombinedWealthToggles, RealEstateFinancingYear } from "../types";
 
 const zeroAdditionalRepayment = {
@@ -319,6 +319,70 @@ describe("combined wealth", () => {
     expect(result[0].propertyValue).toBe(300000);
     expect(result[1].propertyValue).toBe(0);
     expect(result[2].propertyValue).toBe(0);
+  });
+
+  it("does not extend the combined horizon with later real estate years", () => {
+    const horizonYears = combinedWealthHorizonYears(2026, 2027, 2027);
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears,
+      cashStartValue: 0,
+      yearlyCashDelta: 0,
+      depotProjection: projection([point(30, "saving", 10000), point(31, "saving", 11000)], 0, 65),
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateYears: [
+        {
+          year: 2026,
+          propertyValue: 300000,
+          loanStart: 200000,
+          interestPaid: 0,
+          interestDue: 0,
+          interestShortfall: 0,
+          monthlyPaymentFromSavings: 0,
+          monthlyPaymentFromWithdrawalGain: 0,
+          monthlyPaymentAvailable: 0,
+          principalFromMonthlyPayment: 0,
+          principalPaid: 0,
+          specialRepayment: 0,
+          additionalRepayment: 0,
+          additionalRepaymentBreakdown: zeroAdditionalRepayment,
+          loanEnd: 198000,
+          propertyEquity: 102000,
+          netPropertyWealth: 102000
+        },
+        {
+          year: 2028,
+          propertyValue: 318000,
+          loanStart: 196000,
+          interestPaid: 0,
+          interestDue: 0,
+          interestShortfall: 0,
+          monthlyPaymentFromSavings: 0,
+          monthlyPaymentFromWithdrawalGain: 0,
+          monthlyPaymentAvailable: 0,
+          principalFromMonthlyPayment: 0,
+          principalPaid: 0,
+          specialRepayment: 0,
+          additionalRepayment: 0,
+          additionalRepaymentBreakdown: zeroAdditionalRepayment,
+          loanEnd: 194000,
+          propertyEquity: 124000,
+          netPropertyWealth: 124000
+        }
+      ],
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeRealEstateFinancing: true,
+        includeRealEstateValueTrend: true
+      }
+    });
+
+    expect(horizonYears).toBe(2);
+    expect(result).toHaveLength(2);
+    expect(result[result.length - 1].year).toBe(2027);
   });
 
   it("models withdrawal impact as negative liquidity effect", () => {

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { renderAppShell } from "../views/templates";
 import {
+  realEstatePopupHeading,
   realEstateRepaymentSegments,
   realEstateTrendSegments,
   renderCombinedWealthChart,
+  renderCombinedWealthYearDetail,
   renderRealEstateRepaymentChart,
   renderRealEstateTrendChart
 } from "../views/wealthCharts";
@@ -93,6 +95,10 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('data-action="toggle-combined-module"');
     expect(html).toContain('aria-pressed="false"');
     expect(html).not.toContain('type="checkbox" data-combined-toggle');
+    expect(html).not.toContain('id="realEstateLoanMetric"');
+    expect(html).not.toContain('id="realEstateMonthlyRateMetric"');
+    expect(html).not.toContain('id="realEstatePropertyValueMetric"');
+    expect(html).not.toContain('id="realEstatePropertyEquityMetric"');
     expect(count(html, 'data-real-estate-field="propertyValueGrowthPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="propertyValueGrowthPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-field="inflationRatePercent"')).toBe(0);
@@ -135,18 +141,34 @@ describe("follow-up ui rendering", () => {
   });
 
   it("exposes real estate popup segment labels", () => {
-    const repaymentSegments = realEstateRepaymentSegments(realEstateYear, 240000);
+    const repaymentSegments = realEstateRepaymentSegments(realEstateYear, realEstateYear.principalPaid);
     const repaymentLabels = repaymentSegments.map((segment) => segment.label);
     const trendLabels = realEstateTrendSegments(realEstateYear, realEstateYear.propertyValue).map(
       (segment) => segment.label
     );
 
     expect(repaymentLabels).toEqual(["Restschuld", "Getilgter Kreditanteil", "Zinsen"]);
-    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(28000);
+    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(8000);
     expect(trendLabels).toEqual(["Ausgangswert", "Wertentwicklung"]);
     expect([...repaymentLabels, "Darlehensbetrag inkl. Zinsen", ...trendLabels, "Immobilienwert"]).toContain(
       "Darlehensbetrag inkl. Zinsen"
     );
+  });
+
+  it("formats real estate popup headings with age and year", () => {
+    expect(realEstatePopupHeading(45, 2026)).toBe("Alter 45 | Jahr 2026");
+  });
+
+  it("renders combined inheritance from the final chart year", () => {
+    const detail = renderCombinedWealthYearDetail({
+      selected: combinedYear,
+      finalYear: { ...combinedYear, year: 2028, totalNetWealth: 155000 },
+      formatMoney: (value) => `${value} EUR`,
+      formatInt: String
+    });
+
+    expect(detail).toContain("Erbe an Nachkommen");
+    expect(detail).toContain("155000 EUR");
   });
 
   it("renders an empty real estate repayment chart without a start loan", () => {
@@ -168,7 +190,7 @@ describe("follow-up ui rendering", () => {
       formatMoney: String
     });
 
-    expect(repayment).toContain("250 Tsd. EUR");
+    expect(repayment).toContain("258 Tsd. EUR");
     expect(repayment).toContain('wealth-column-overlay interest');
   });
 });

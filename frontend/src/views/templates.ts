@@ -402,12 +402,6 @@ export function renderAppShell(): string {
           <section class="real-estate-card real-estate-chart-card">
             <h3>Tilgung und Vermoegen</h3>
             <div id="realEstateValidation" class="validation-box" aria-live="polite"></div>
-            <div class="chart-inline-metrics">
-              ${chartMetric("realEstateLoanMetric", "Startschuld")}
-              ${chartMetric("realEstateMonthlyRateMetric", "Monatsrate")}
-              ${chartMetric("realEstatePropertyValueMetric", "Immobilienwert Ende")}
-              ${chartMetric("realEstatePropertyEquityMetric", "Netto-Immobilienvermoegen Ende")}
-            </div>
             <div id="realEstateRepaymentChart" class="wealth-chart-host"></div>
             <h3>Immobilienwertentwicklung</h3>
             <div id="realEstateTrendChart" class="wealth-chart-host"></div>

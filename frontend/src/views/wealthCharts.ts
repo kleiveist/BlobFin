@@ -32,9 +32,26 @@ export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartIn
   if (!Number.isFinite(loanCostBasis) || loanCostBasis <= 0) {
     return '<div class="chart-empty">Noch kein Start-Kreditvolumen fuer die Tilgung vorhanden.</div>';
   }
+  let principalPaidToDate = 0;
+  const repaymentPoints = input.points.map((point) => {
+    principalPaidToDate += Math.max(0, point.principalPaid);
+    const composition = propertyComposition(point, principalPaidToDate);
+    return {
+      ...composition,
+      year: point.year,
+      selected: input.selectedYear === point.year,
+      financingEnd: input.financingEndYear === point.year,
+      action: "select-real-estate-year",
+      chartKind: "repayment",
+      value: point.loanEnd,
+      valueLabel: input.formatMoney(point.loanEnd),
+      segments: composition.segments
+    };
+  });
   const maxDebt = Math.max(
     loanCostBasis,
-    ...input.points.map((point) => Math.max(0, point.loanStart, point.loanEnd))
+    ...input.points.map((point) => Math.max(0, point.loanStart, point.loanEnd)),
+    ...repaymentPoints.map((point) => point.barTotal)
   );
 
   return renderVerticalChart({
@@ -46,20 +63,7 @@ export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartIn
       { className: "equity", label: "Getilgter Kreditanteil" },
       { className: "interest", label: "Zinsen" }
     ],
-    points: input.points.map((point) => {
-      const composition = propertyComposition(point, loanCostBasis);
-      return {
-        ...composition,
-        year: point.year,
-        selected: input.selectedYear === point.year,
-        financingEnd: input.financingEndYear === point.year,
-        action: "select-real-estate-year",
-        chartKind: "repayment",
-        value: point.loanEnd,
-        valueLabel: input.formatMoney(point.loanEnd),
-        segments: composition.segments
-      };
-    })
+    points: repaymentPoints
   });
 }
 
@@ -125,6 +129,43 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
   });
 }
 
+export function renderCombinedWealthYearDetail(input: {
+  selected: CombinedWealthYear | null;
+  finalYear: CombinedWealthYear | null;
+  formatMoney: (value: number) => string;
+  formatInt: (value: number) => string;
+}): string {
+  if (!input.selected) {
+    return "<div class='chart-empty'>Bitte zuerst Module aktivieren und berechnen.</div>";
+  }
+
+  const finalYear = input.finalYear ?? input.selected;
+
+  return `
+    ${wealthDetailLine("Jahr", input.formatInt(input.selected.year))}
+    ${wealthDetailLine("Cash", input.formatMoney(input.selected.cashValue))}
+    ${wealthDetailLine("Depot", input.formatMoney(input.selected.depotValue))}
+    ${wealthDetailLine("Entnahmeeffekt", input.formatMoney(input.selected.withdrawalImpact))}
+    ${wealthDetailLine("Umgeleitete Cash-Tilgung", input.formatMoney(input.selected.redirectedCashRepayment))}
+    ${wealthDetailLine("Umgeleitete Depot-Tilgung", input.formatMoney(input.selected.redirectedDepotRepayment))}
+    ${wealthDetailLine("Immobilienwert", input.formatMoney(input.selected.propertyValue))}
+    ${wealthDetailLine("Immobilienschuld", input.formatMoney(input.selected.propertyDebt))}
+    ${wealthDetailLine("Immobilien-Eigenkapital", input.formatMoney(input.selected.propertyEquity))}
+    ${wealthDetailLine("Bruttovermoegen", input.formatMoney(input.selected.totalGrossAssets))}
+    ${wealthDetailLine("Gesamtschulden", input.formatMoney(input.selected.totalDebt))}
+    ${wealthDetailLine("Nettovermoegen", input.formatMoney(input.selected.totalNetWealth))}
+    ${wealthDetailLine("Erbe an Nachkommen", input.formatMoney(finalYear.totalNetWealth))}
+  `;
+}
+
+export function realEstatePopupHeading(
+  age: number,
+  year: number,
+  formatInt: (value: number) => string = (value) => String(Math.round(value))
+): string {
+  return `Alter ${formatInt(age)} | Jahr ${formatInt(year)}`;
+}
+
 function renderVerticalChart(input: {
   label: string;
   title?: string;
@@ -161,6 +202,10 @@ function renderVerticalChart(input: {
       </div>
     </div>
   `;
+}
+
+function wealthDetailLine(label: string, value: string): string {
+  return `<div class="detail-line"><span>${label}</span><strong>${value}</strong></div>`;
 }
 
 function renderVerticalBar(
@@ -237,20 +282,24 @@ function heightPercent(value: number, maxValue: number): number {
 
 function propertyComposition(
   point: RealEstateFinancingYear,
-  loanCostBasis: number
+  principalPaidToDate: number
 ): { barTotal: number; segments: VerticalBarSegment[] } {
-  const segments = realEstateRepaymentSegments(point, loanCostBasis);
+  const segments = realEstateRepaymentSegments(point, principalPaidToDate);
   const debt = segments.find((segment) => segment.className === "debt")?.value ?? 0;
-  const barTotal = Math.max(loanCostBasis, debt);
+  const repaidPrincipal = segments.find((segment) => segment.className === "equity")?.value ?? 0;
+  const barTotal = Math.max(debt, debt + repaidPrincipal);
   return {
     barTotal,
     segments
   };
 }
 
-export function realEstateRepaymentSegments(point: RealEstateFinancingYear, loanCostBasis: number): VerticalBarSegment[] {
+export function realEstateRepaymentSegments(
+  point: RealEstateFinancingYear,
+  principalPaidToDate = point.principalPaid
+): VerticalBarSegment[] {
   const debt = Math.max(0, point.loanEnd);
-  const equity = Math.max(0, loanCostBasis - debt);
+  const equity = Math.max(0, principalPaidToDate);
   return [
     { className: "debt", label: "Restschuld", value: debt },
     { className: "equity", label: "Getilgter Kreditanteil", value: equity },
