@@ -22,6 +22,7 @@ export type RepaymentSourceToggleKey =
   | "useLegacySavingsRateAsRepayment"
   | "useNetGainAsRepayment"
   | "onlyUsePositiveValues";
+export type RealEstatePaymentSourceKind = "monthlyPayment" | "specialRepayment";
 export type PositionTableFilterColumn =
   | "active"
   | "visible"
@@ -176,6 +177,9 @@ export interface RealEstateFinancingSettings {
   financingYears: number;
   manualFuturePropertyValue: number | null;
   repaymentSources: RepaymentSourceToggle;
+  monthlyPaymentSourceIds: string[];
+  specialRepaymentSourceIds: string[];
+  includeWithdrawalGainAsPaymentSource: boolean;
 }
 
 export interface RepaymentSourceToggle {
@@ -207,6 +211,12 @@ export interface AdditionalRepaymentYearBreakdown {
   legacySavingsRate: number;
   netGain: number;
   totalAdditionalRepayment: number;
+}
+
+export interface RealEstateFinancingSourceSchedule {
+  monthlyPaymentSavings: number[];
+  withdrawalGainPayments: number[];
+  specialRepayments: number[];
 }
 
 export interface CombinedWealthToggles {
@@ -356,6 +366,12 @@ export interface RealEstateFinancingYear {
   propertyValue: number;
   loanStart: number;
   interestPaid: number;
+  interestDue: number;
+  interestShortfall: number;
+  monthlyPaymentFromSavings: number;
+  monthlyPaymentFromWithdrawalGain: number;
+  monthlyPaymentAvailable: number;
+  principalFromMonthlyPayment: number;
   principalPaid: number;
   specialRepayment: number;
   additionalRepayment: number;
@@ -369,7 +385,12 @@ export interface RealEstateFinancingMonth {
   year: number;
   month: number;
   loanStart: number;
+  interestDue: number;
   interestPaid: number;
+  interestShortfall: number;
+  monthlyPaymentFromSavings: number;
+  monthlyPaymentFromWithdrawalGain: number;
+  monthlyPaymentAvailable: number;
   principalPaid: number;
   specialRepayment: number;
   additionalRepayment: number;
@@ -381,6 +402,8 @@ export interface RealEstateFinancingResult {
   months: RealEstateFinancingMonth[];
   startLoanAmount: number;
   monthlyPayment: number;
+  derivedInitialRepaymentPercent: number;
+  annualSpecialRepayment: number;
   effectivePropertyStartValue: number;
   totalProjectCost: number;
   validationErrors: string[];

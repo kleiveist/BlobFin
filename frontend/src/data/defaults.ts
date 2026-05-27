@@ -261,7 +261,10 @@ export function defaultRealEstateFinancingSettings(): RealEstateFinancingSetting
     inflationRatePercent: 2,
     financingYears: 35,
     manualFuturePropertyValue: null,
-    repaymentSources: defaultRepaymentSourceToggles()
+    repaymentSources: defaultRepaymentSourceToggles(),
+    monthlyPaymentSourceIds: [],
+    specialRepaymentSourceIds: [],
+    includeWithdrawalGainAsPaymentSource: false
   };
 }
 

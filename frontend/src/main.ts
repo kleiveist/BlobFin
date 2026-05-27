@@ -3,7 +3,11 @@ import "./styles.css";
 import { createId, defaultAppState, defaultInvestmentSettings } from "./data/defaults";
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
 import { buildCombinedWealthSeries } from "./domain/combinedWealth";
-import { calculateRealEstateFinancing, linkRealEstateFinancingInput } from "./domain/realEstateCalculator";
+import { calculateRealEstateFinancing } from "./domain/realEstateCalculator";
+import {
+  investmentContributionForMonth,
+  oneTimeInvestmentContributionForMonth
+} from "./domain/investmentContributions";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
 import {
   calculateYearTableFooterValue,
@@ -66,10 +70,10 @@ import type {
   PositionTableFilterColumn,
   PositionTableFilterOperator,
   PositionTableView,
+  RealEstateFinancingSourceSchedule,
   RealEstateFinancingResult,
   RealEstateFinancingSettings,
-  RepaymentSourceToggleKey,
-  RepaymentSourceValues,
+  RealEstatePaymentSourceKind,
   ReservePosition,
   ThemeMode
 } from "./types";
@@ -378,14 +382,22 @@ function bindEvents(): void {
       return;
     }
 
-    if (target.dataset.combinedToggle && target instanceof HTMLInputElement) {
-      updateCombinedToggle(target.dataset.combinedToggle as CombinedToggleKey, target.checked);
+    if (
+      target.dataset.realEstateSourcePosition &&
+      target.dataset.realEstateSourceKind &&
+      target instanceof HTMLInputElement
+    ) {
+      toggleRealEstateSourcePosition(
+        target.dataset.realEstateSourceKind as RealEstatePaymentSourceKind,
+        target.dataset.realEstateSourcePosition,
+        target.checked
+      );
       renderAll();
       return;
     }
 
-    if (target.dataset.repaymentSourceToggle && target instanceof HTMLInputElement) {
-      updateRepaymentSourceToggle(target.dataset.repaymentSourceToggle as RepaymentSourceToggleKey, target.checked);
+    if (target.dataset.combinedToggle && target instanceof HTMLInputElement) {
+      updateCombinedToggle(target.dataset.combinedToggle as CombinedToggleKey, target.checked);
       renderAll();
       return;
     }
@@ -452,6 +464,9 @@ function bindEvents(): void {
     if (action === "set-investment-depot-child") setInvestmentDepot("child");
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
+    if (action === "toggle-real-estate-withdrawal-gain-source") toggleRealEstateWithdrawalGainSource();
+    if (action === "add-real-estate-savings-source-monthlyPayment") addRealEstateSavingsSource("monthlyPayment");
+    if (action === "add-real-estate-savings-source-specialRepayment") addRealEstateSavingsSource("specialRepayment");
     if (action === "show-reserve-chart") showReserveChartPopup();
     if (action === "close-reserve-chart") hideReserveChartPopup();
     if (action?.startsWith("set-reserve-chart-category-")) {
@@ -560,6 +575,7 @@ function renderAll(): void {
   normalizeInvestmentBounds();
   normalizeInvestmentDepotSelections();
   normalizeInvestmentSelectionIds();
+  normalizeRealEstateSourceIds();
   updateModuleVisibility();
   renderPlanningAccounts();
   const allPositions = allPlanningPositions();
@@ -674,13 +690,21 @@ function renderCalculations(
   drawInvestmentChartWithPopup(projection);
   drawInvestmentChartWithPopup(combinedProjection, "#combinedInvestmentChart", "#combinedInvestmentChartPopup");
 
-  const repaymentValues = repaymentSourceValues(reserve, standardProjection);
   const financingStartYear = realEstateFinancingStartYear(
     state.settings.year,
     state.investment.birthYear,
     state.realEstate.financingStartAge
   );
-  const realEstate = calculateRealEstateFinancing(financingStartYear, state.realEstate, repaymentValues);
+  renderRealEstateSourceLists(standardProjection);
+  const realEstate = calculateRealEstateFinancing(
+    financingStartYear,
+    state.realEstate,
+    realEstateSourceSchedule(
+      financingStartYear,
+      state.realEstate.financingYears || state.realEstate.targetTermYears,
+      standardProjection
+    )
+  );
   renderRealEstateCalculations(realEstate);
   const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, realEstate);
   renderCombinedWealthCalculations(combinedYears);
@@ -725,15 +749,13 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   }
 
   const lastYear = result.years[result.years.length - 1];
-  const totalAdditionalMonthly = result.years[0]
-    ? result.years[0].additionalRepaymentBreakdown.totalAdditionalRepayment / 12
-    : 0;
   setText("realEstateLoanMetric", money(result.startLoanAmount));
   setText("realEstateMonthlyRateMetric", money(result.monthlyPayment));
+  setText("realEstateDerivedMonthlyPaymentMetric", money(result.monthlyPayment));
+  setText("realEstateDerivedInitialRepaymentMetric", percent(result.derivedInitialRepaymentPercent));
+  setText("realEstateDerivedSpecialRepaymentMetric", money(result.annualSpecialRepayment));
   setText("realEstatePropertyValueMetric", money(lastYear?.propertyValue ?? 0));
   setText("realEstatePropertyEquityMetric", money(lastYear?.netPropertyWealth ?? 0));
-  setText("additionalRepaymentMonthlyMetric", money(totalAdditionalMonthly));
-  setText("additionalRepaymentAnnualMetric", money(result.years[0]?.additionalRepayment ?? 0));
   setText("realEstateTotalProjectCostMetric", money(result.totalProjectCost));
 
   if (!selectedRealEstateYear && lastYear) {
@@ -771,22 +793,20 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
 
   detail.innerHTML = `
     <div class="detail-line"><span>Jahr</span><strong>${intNumber(selectedYearEntry.year)}</strong></div>
-    <div class="detail-line"><span>Zinsen</span><strong>${money(selectedYearEntry.interestPaid)}</strong></div>
-    <div class="detail-line"><span>Tilgung</span><strong>${money(selectedYearEntry.principalPaid)}</strong></div>
-    <div class="detail-line"><span>Zusaetzliche Tilgung aus freien Mitteln</span><strong>${money(
-      selectedYearEntry.additionalRepayment
+    <div class="detail-line"><span>Zinsbedarf</span><strong>${money(selectedYearEntry.interestDue)}</strong></div>
+    <div class="detail-line"><span>Gezahlte Zinsen</span><strong>${money(selectedYearEntry.interestPaid)}</strong></div>
+    <div class="detail-line"><span>Nicht gedeckte Zinsen</span><strong>${money(selectedYearEntry.interestShortfall)}</strong></div>
+    <div class="detail-line"><span>Monatsraten aus Sparpositionen</span><strong>${money(
+      selectedYearEntry.monthlyPaymentFromSavings
     )}</strong></div>
-    <div class="detail-line"><span>Entnahme als Tilgung</span><strong>${money(
-      selectedYearEntry.additionalRepaymentBreakdown.withdrawalGain
+    <div class="detail-line"><span>Entnahme-Zugewinn als Rate</span><strong>${money(
+      selectedYearEntry.monthlyPaymentFromWithdrawalGain
     )}</strong></div>
-    <div class="detail-line"><span>Depot-Sparrate als Tilgung</span><strong>${money(
-      selectedYearEntry.additionalRepaymentBreakdown.depotSavingsRate
+    <div class="detail-line"><span>Verfuegbare Monatsraten gesamt</span><strong>${money(
+      selectedYearEntry.monthlyPaymentAvailable
     )}</strong></div>
-    <div class="detail-line"><span>Alte Sparrate als Tilgung</span><strong>${money(
-      selectedYearEntry.additionalRepaymentBreakdown.legacySavingsRate
-    )}</strong></div>
-    <div class="detail-line"><span>Netto-Zugewinn als Tilgung</span><strong>${money(
-      selectedYearEntry.additionalRepaymentBreakdown.netGain
+    <div class="detail-line"><span>Tilgung aus Monatsrate</span><strong>${money(
+      selectedYearEntry.principalFromMonthlyPayment
     )}</strong></div>
     <div class="detail-line"><span>Sondertilgung</span><strong>${money(selectedYearEntry.specialRepayment)}</strong></div>
     <div class="detail-line"><span>Restschuld</span><strong>${money(selectedYearEntry.loanEnd)}</strong></div>
@@ -797,32 +817,62 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   `;
 }
 
-function repaymentSourceValues(
-  reserve: ReturnType<typeof calculateReserveSummary>,
-  standardProjection: AssetProjection
-): RepaymentSourceValues {
-  return {
-    withdrawalGain: standardProjection.withdrawalGainMonthlyAtStart,
-    depotSavingsRate: standardProjection.monthlyRate,
-    legacySavingsRate: monthlySavingsRateFromPositions(allPlanningPositions()),
-    netGain: reserve.yearlyRemaining / 12
-  };
-}
-
 function realEstateFinancingStartYear(currentYear: number, birthYear: number, financingStartAge: number): number {
   if (!Number.isFinite(financingStartAge) || financingStartAge <= 0) return currentYear;
   const targetAgeYear = birthYear + Math.floor(financingStartAge);
   return Math.max(currentYear, targetAgeYear);
 }
 
-function monthlySavingsRateFromPositions(positions: ReservePosition[]): number {
-  return positions
-    .filter((position) => position.active && position.type === "savings" && positionFlow(position) === "expense")
-    .reduce((sum, position) => {
-      if (position.payoutType === "monthly") return sum + position.amount;
-      if (position.payoutType === "yearly") return sum + position.amount / 12;
-      return sum;
-    }, 0);
+function realEstateSourceSchedule(
+  startYear: number,
+  financingYears: number,
+  standardProjection: AssetProjection
+): RealEstateFinancingSourceSchedule {
+  const monthCount = Math.max(12, Math.min(80, Math.round(financingYears || 1)) * 12);
+  const positions = allPlanningPositions();
+  const monthlyPositions = selectedRealEstateSourcePositions("monthlyPayment", positions);
+  const specialPositions = selectedRealEstateSourcePositions("specialRepayment", positions);
+  const monthlyPaymentSavings: number[] = [];
+  const withdrawalGainPayments: number[] = [];
+  const specialRepayments: number[] = [];
+  const withdrawalGain = state.realEstate.includeWithdrawalGainAsPaymentSource
+    ? Math.max(0, standardProjection.withdrawalGainMonthlyAtStart)
+    : 0;
+
+  for (let index = 0; index < monthCount; index += 1) {
+    const year = startYear + Math.floor(index / 12);
+    const month = (index % 12) + 1;
+    monthlyPaymentSavings.push(
+      monthlyPositions.reduce((sum, position) => sum + investmentContributionForMonth(position, year, month), 0)
+    );
+    withdrawalGainPayments.push(withdrawalGain);
+    specialRepayments.push(
+      specialPositions.reduce((sum, position) => {
+        return (
+          sum +
+          (position.payoutType === "once"
+            ? oneTimeInvestmentContributionForMonth(position, year, month)
+            : investmentContributionForMonth(position, year, month))
+        );
+      }, 0)
+    );
+  }
+
+  return { monthlyPaymentSavings, withdrawalGainPayments, specialRepayments };
+}
+
+function selectedRealEstateSourcePositions(
+  kind: RealEstatePaymentSourceKind,
+  positions: ReservePosition[] = allPlanningPositions()
+): ReservePosition[] {
+  const selectedIds = new Set(realEstateSourceIds(kind));
+  return positions.filter(
+    (position) =>
+      position.active &&
+      position.type === "savings" &&
+      positionFlow(position) === "expense" &&
+      selectedIds.has(position.id)
+  );
 }
 
 function calculateCombinedWealthYears(
@@ -2230,6 +2280,7 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
   }
 
   const blockedPositionIds = new Set(otherDepots.flatMap((item) => depotInvestmentSettings(item).includedIds));
+  const blockedRealEstateIds = realEstateSelectedSourceIds();
   const visibleSavingsPositions = savingsPositions.filter(
     (position) => !blockedPositionIds.has(position.id) || settings.includedIds.includes(position.id)
   );
@@ -2241,14 +2292,18 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
   list.innerHTML = visibleSavingsPositions
     .map((position) => {
       const checked = settings.includedIds.includes(position.id) ? "checked" : "";
+      const blockedByRealEstate = blockedRealEstateIds.has(position.id);
       const inactive = position.active ? "" : `<span class="muted">(inaktiv)</span>`;
+      const disabled = blockedByRealEstate ? "disabled" : "";
+      const blockedClass = blockedByRealEstate ? "blocked" : "";
+      const subtitle = blockedByRealEstate ? "belegt in Immobilienfinanzierung" : investmentPositionSubtitle(position);
       return `
-        <label class="include-item">
-          <input type="checkbox" data-include-position="${position.id}" ${checked} />
+        <label class="include-item ${blockedClass}">
+          <input type="checkbox" data-include-position="${position.id}" ${checked} ${disabled} />
           <span class="include-icon">${positionIconSvg(normalizePositionIcon(position.icon))}</span>
           <span>
             <span class="include-name">${escapeHtml(position.name)} ${inactive}</span>
-            <span class="include-amount">${escapeHtml(investmentPositionSubtitle(position))}</span>
+            <span class="include-amount">${escapeHtml(subtitle)}</span>
           </span>
         </label>
       `;
@@ -2271,6 +2326,96 @@ function investmentPositionAmountText(position: ReservePosition): string {
     return `${money(position.amount)} jaehrlich (${monthName(position.payoutMonth)})${startText}`;
   }
   return `${money(position.amount)} monatlich${startText}`;
+}
+
+function renderRealEstateSourceLists(standardProjection: AssetProjection): void {
+  renderRealEstateSourceList("monthlyPayment", "#realEstateMonthlyPaymentSourceList");
+  renderRealEstateSourceList("specialRepayment", "#realEstateSpecialRepaymentSourceList");
+
+  const toggle = document.querySelector<HTMLButtonElement>("[data-action='toggle-real-estate-withdrawal-gain-source']");
+  if (toggle) {
+    toggle.classList.toggle("active", state.realEstate.includeWithdrawalGainAsPaymentSource);
+    toggle.setAttribute("aria-pressed", String(state.realEstate.includeWithdrawalGainAsPaymentSource));
+  }
+  setText("realEstateWithdrawalGainSourceAmount", `${money(standardProjection.withdrawalGainMonthlyAtStart)} monatlich`);
+}
+
+function renderRealEstateSourceList(kind: RealEstatePaymentSourceKind, selector: string): void {
+  const host = document.querySelector<HTMLDivElement>(selector);
+  if (!host) return;
+
+  const savingsPositions = allPlanningPositions().filter((position) => {
+    return (
+      position.type === "savings" &&
+      positionFlow(position) === "expense" &&
+      (kind === "specialRepayment" || position.payoutType !== "once")
+    );
+  });
+
+  if (!savingsPositions.length) {
+    host.innerHTML = `
+      <div class="include-empty">Keine passende Sparposition angelegt.</div>
+      <button class="button secondary" type="button" data-action="add-real-estate-savings-source-${kind}">
+        Sparposition anlegen
+      </button>
+    `;
+    return;
+  }
+
+  const selectedIds = new Set(realEstateSourceIds(kind));
+  const blockedByOtherRealEstate = new Set(
+    realEstateSourceIds(kind === "monthlyPayment" ? "specialRepayment" : "monthlyPayment")
+  );
+
+  host.innerHTML = savingsPositions
+    .map((position) => {
+      const blockedDepot = blockedInvestmentDepotForPosition(position.id);
+      const blockedByRealEstate = blockedByOtherRealEstate.has(position.id);
+      const blocked = Boolean(blockedDepot) || blockedByRealEstate;
+      const checked = selectedIds.has(position.id) ? "checked" : "";
+      const disabled = blocked ? "disabled" : "";
+      const inactive = position.active ? "" : `<span class="muted">(inaktiv)</span>`;
+      const blockedText = blockedDepot
+        ? `belegt im ${depotLabel(blockedDepot)}`
+        : blockedByRealEstate
+          ? "bereits in anderer Immobilienquelle"
+          : realEstatePositionSubtitle(position);
+      return `
+        <label class="include-item ${blocked ? "blocked" : ""}">
+          <input
+            type="checkbox"
+            data-real-estate-source-kind="${kind}"
+            data-real-estate-source-position="${position.id}"
+            ${checked}
+            ${disabled}
+          />
+          <span class="include-icon">${positionIconSvg(normalizePositionIcon(position.icon))}</span>
+          <span>
+            <span class="include-name">${escapeHtml(position.name)} ${inactive}</span>
+            <span class="include-amount">${escapeHtml(blockedText)}</span>
+          </span>
+        </label>
+      `;
+    })
+    .join("");
+}
+
+function realEstatePositionSubtitle(position: ReservePosition): string {
+  return `${investmentPositionAmountText(position)} | ${labelForType(position.type)}`;
+}
+
+function realEstateSourceIds(kind: RealEstatePaymentSourceKind): string[] {
+  return kind === "monthlyPayment"
+    ? state.realEstate.monthlyPaymentSourceIds
+    : state.realEstate.specialRepaymentSourceIds;
+}
+
+function realEstateSelectedSourceIds(): Set<string> {
+  return new Set([...state.realEstate.monthlyPaymentSourceIds, ...state.realEstate.specialRepaymentSourceIds]);
+}
+
+function blockedInvestmentDepotForPosition(positionId: string): InvestmentDepotKey | null {
+  return INVESTMENT_DEPOTS.find((depot) => depotInvestmentSettings(depot).includedIds.includes(positionId)) ?? null;
 }
 
 function expenseDateCells(position: ReservePosition): string {
@@ -2431,7 +2576,15 @@ function syncRealEstateInputsFromState(): void {
       if (control) control.value = String(value);
       continue;
     }
-    if (field === "locale" || field === "repaymentSources") continue;
+    if (
+      field === "locale" ||
+      field === "repaymentSources" ||
+      field === "monthlyPaymentSourceIds" ||
+      field === "specialRepaymentSourceIds" ||
+      field === "includeWithdrawalGainAsPaymentSource"
+    ) {
+      continue;
+    }
     if (value === null) {
       const control = document.querySelector<HTMLInputElement>(selector);
       if (control) control.value = "";
@@ -2442,9 +2595,6 @@ function syncRealEstateInputsFromState(): void {
 
   const ranges: Array<RealEstateField> = [
     "interestRatePercent",
-    "initialRepaymentPercent",
-    "monthlyPayment",
-    "specialRepaymentAmount",
     "propertyValueGrowthPercent",
     "inflationRatePercent",
     "financingYears"
@@ -2454,17 +2604,9 @@ function syncRealEstateInputsFromState(): void {
   }
 
   setText("realEstateInterestRatePercentValue", percent(realEstate.interestRatePercent));
-  setText("realEstateInitialRepaymentPercentValue", percent(realEstate.initialRepaymentPercent));
-  setText("realEstateMonthlyPaymentValue", money(realEstate.monthlyPayment));
-  setText("realEstateSpecialRepaymentAmountValue", money(realEstate.specialRepaymentAmount));
   setText("realEstatePropertyValueGrowthPercentValue", percent(realEstate.propertyValueGrowthPercent));
   setText("realEstateInflationRatePercentValue", percent(realEstate.inflationRatePercent));
   setText("realEstateFinancingYearsValue", `${intNumber(realEstate.financingYears)} Jahre`);
-
-  for (const [key, value] of Object.entries(realEstate.repaymentSources) as Array<[RepaymentSourceToggleKey, boolean]>) {
-    const checkbox = document.querySelector<HTMLInputElement>(`[data-repayment-source-toggle="${key}"]`);
-    if (checkbox) checkbox.checked = value;
-  }
 }
 
 function syncRealEstateLocaleLabels(locale: RealEstateFinancingSettings["locale"]): void {
@@ -2483,7 +2625,15 @@ function syncCombinedToggleInputsFromState(): void {
 }
 
 function updateRealEstateField(field: RealEstateField, value: string): void {
-  if (field === "locale" || field === "repaymentSources") return;
+  if (
+    field === "locale" ||
+    field === "repaymentSources" ||
+    field === "monthlyPaymentSourceIds" ||
+    field === "specialRepaymentSourceIds" ||
+    field === "includeWithdrawalGainAsPaymentSource"
+  ) {
+    return;
+  }
   if (field === "specialRepaymentRhythm") {
     if (value === "none" || value === "monthly" || value === "yearly") {
       state.realEstate = {
@@ -2505,7 +2655,7 @@ function updateRealEstateField(field: RealEstateField, value: string): void {
     ...state.realEstate,
     [field]: nullableFields.has(field) && value.trim() === "" ? null : Math.max(0, parsed)
   } as RealEstateFinancingSettings;
-  state.realEstate = linkRealEstateFinancingInput(nextRealEstate, field);
+  state.realEstate = nextRealEstate;
 }
 
 function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
@@ -2515,14 +2665,35 @@ function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
   } as AppState["combinedWealth"];
 }
 
-function updateRepaymentSourceToggle(key: RepaymentSourceToggleKey, checked: boolean): void {
+function toggleRealEstateSourcePosition(kind: RealEstatePaymentSourceKind, id: string, checked: boolean): void {
+  if (checked && blockedInvestmentDepotForPosition(id)) return;
+  const otherKind: RealEstatePaymentSourceKind = kind === "monthlyPayment" ? "specialRepayment" : "monthlyPayment";
+  if (checked && realEstateSourceIds(otherKind).includes(id)) return;
+
+  const currentIds = new Set(realEstateSourceIds(kind));
+  if (checked) currentIds.add(id);
+  else currentIds.delete(id);
+
   state.realEstate = {
     ...state.realEstate,
-    repaymentSources: {
-      ...state.realEstate.repaymentSources,
-      [key]: checked
-    }
+    [kind === "monthlyPayment" ? "monthlyPaymentSourceIds" : "specialRepaymentSourceIds"]: Array.from(currentIds)
   };
+}
+
+function toggleRealEstateWithdrawalGainSource(): void {
+  state.realEstate = {
+    ...state.realEstate,
+    includeWithdrawalGainAsPaymentSource: !state.realEstate.includeWithdrawalGainAsPaymentSource
+  };
+  renderAll();
+}
+
+function addRealEstateSavingsSource(kind: RealEstatePaymentSourceKind): void {
+  setActiveSection("cost_reserve_positions");
+  selectedPositionMode = "savings";
+  const id = addPosition();
+  toggleRealEstateSourcePosition(kind, id, true);
+  renderAll();
 }
 
 function setRealEstateLocale(locale: RealEstateFinancingSettings["locale"]): void {
@@ -2967,17 +3138,18 @@ function finiteNumber(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function addPosition(): void {
+function addPosition(): string {
   const isIncome = selectedPositionMode === "income";
   const isReserve = selectedPositionMode === "reserve";
   const isSavings = selectedPositionMode === "savings";
   const flow = isIncome ? "income" : "expense";
   const name = isIncome ? "Neue Einnahme" : isReserve ? "Neue Ruecklage" : isSavings ? "Neue Sparrate" : "Neue Ausgabe";
   const type = isIncome ? "incomeMonthly" : isReserve ? "reserve" : isSavings ? "savings" : "temporary";
+  const id = createId();
   state.positions = [
     ...state.positions,
     {
-      id: createId(),
+      id,
       flow,
       active: true,
       visible: true,
@@ -3003,6 +3175,8 @@ function addPosition(): void {
     lastInput?.focus();
     lastInput?.select();
   }, 0);
+
+  return id;
 }
 
 function removePosition(id: string): void {
@@ -3013,10 +3187,18 @@ function removePosition(id: string): void {
     retirementIncludedIds: state.investment.retirementIncludedIds.filter((item) => item !== id),
     childIncludedIds: state.investment.childIncludedIds.filter((item) => item !== id)
   };
+  state.realEstate = {
+    ...state.realEstate,
+    monthlyPaymentSourceIds: state.realEstate.monthlyPaymentSourceIds.filter((item) => item !== id),
+    specialRepaymentSourceIds: state.realEstate.specialRepaymentSourceIds.filter((item) => item !== id)
+  };
 }
 
 function toggleInvestmentPosition(id: string, checked: boolean): void {
   const depot = activeInvestmentDepot();
+  if (checked && realEstateSelectedSourceIds().has(id)) {
+    return;
+  }
   if (checked && otherInvestmentDepots(depot).some((item) => depotInvestmentSettings(item).includedIds.includes(id))) {
     return;
   }
@@ -3233,6 +3415,19 @@ async function importPositionsFromFile(file: File | undefined): Promise<void> {
       )
     ),
     retirementIncludedIds: state.investment.retirementIncludedIds.filter((id) =>
+      availablePositions.some(
+        (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
+      )
+    )
+  };
+  state.realEstate = {
+    ...state.realEstate,
+    monthlyPaymentSourceIds: state.realEstate.monthlyPaymentSourceIds.filter((id) =>
+      availablePositions.some(
+        (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
+      )
+    ),
+    specialRepaymentSourceIds: state.realEstate.specialRepaymentSourceIds.filter((id) =>
       availablePositions.some(
         (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
       )
@@ -3814,6 +4009,33 @@ function normalizeInvestmentSelectionIds(): void {
     includedIds: state.investment.includedIds.filter((id) => selectableIds.has(id)),
     retirementIncludedIds: state.investment.retirementIncludedIds.filter((id) => selectableIds.has(id)),
     childIncludedIds: state.investment.childIncludedIds.filter((id) => selectableIds.has(id))
+  };
+}
+
+function normalizeRealEstateSourceIds(): void {
+  const savingsPositions = allPlanningPositions().filter(
+    (position) => position.type === "savings" && positionFlow(position) === "expense"
+  );
+  const monthlySelectableIds = new Set(
+    savingsPositions.filter((position) => position.payoutType !== "once").map((position) => position.id)
+  );
+  const specialSelectableIds = new Set(savingsPositions.map((position) => position.id));
+  const blockedByInvestment = new Set([
+    ...state.investment.includedIds,
+    ...state.investment.retirementIncludedIds,
+    ...state.investment.childIncludedIds
+  ]);
+  const monthlyPaymentSourceIds = state.realEstate.monthlyPaymentSourceIds.filter(
+    (id) => monthlySelectableIds.has(id) && !blockedByInvestment.has(id)
+  );
+  const monthlyIds = new Set(monthlyPaymentSourceIds);
+  const specialRepaymentSourceIds = state.realEstate.specialRepaymentSourceIds.filter(
+    (id) => specialSelectableIds.has(id) && !blockedByInvestment.has(id) && !monthlyIds.has(id)
+  );
+  state.realEstate = {
+    ...state.realEstate,
+    monthlyPaymentSourceIds,
+    specialRepaymentSourceIds
   };
 }
 

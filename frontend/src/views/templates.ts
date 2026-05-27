@@ -356,7 +356,7 @@ export function renderAppShell(): string {
 
           <section class="real-estate-card">
             <h3>Finanzierungsdaten</h3>
-            <p class="planning-account-summary">Hilfetext: Wenn Darlehensbetrag oder Monatsrate leer bleiben, werden sie aus den Annahmen abgeleitet.</p>
+            <p class="planning-account-summary">Hilfetext: Monatsrate, Anfangstilgung und Sondertilgung werden aus echten Sparpositionen abgeleitet.</p>
             <div class="field-grid wide">
               ${realEstateNumberField("equityCapital", "Eigenkapital fuer Immobilie")}
               ${realEstateNumberField("loanAmount", "Darlehensbetrag")}
@@ -364,21 +364,15 @@ export function renderAppShell(): string {
               ${realEstateNumberField("targetTermYears", "Ziel-Laufzeit (Jahre)", { step: 1 })}
               ${realEstateNumberField("financingStartAge", "Finanzierung ab Alter", { step: 1 })}
               ${realEstateNumberField("remainingDebtAfterFixedInterest", "Restschuld nach Zinsbindung")}
-              <label class="field">
-                <span>Sondertilgungsrhythmus</span>
-                <select data-real-estate-field="specialRepaymentRhythm" id="propertyFinancing.specialRepaymentRhythm">
-                  <option value="none">Keine</option>
-                  <option value="monthly">Monatlich</option>
-                  <option value="yearly">Jaehrlich</option>
-                </select>
-              </label>
             </div>
             <div class="real-estate-slider-grid">
               ${realEstateAssumptionControl("interestRatePercent", "Zinssatz", 0, 10, 0.05)}
-              ${realEstateAssumptionControl("initialRepaymentPercent", "Anfangstilgung", 0, 10, 0.05)}
-              ${realEstateAssumptionControl("monthlyPayment", "Monatsrate", 0, 8000, 50)}
-              ${realEstateAssumptionControl("specialRepaymentAmount", "Sondertilgung", 0, 50000, 500)}
               ${realEstateAssumptionControl("financingYears", "Finanzierungszeitraum", 1, 50, 1)}
+            </div>
+            <div class="chart-inline-metrics">
+              ${chartMetric("realEstateDerivedMonthlyPaymentMetric", "Monatsrate")}
+              ${chartMetric("realEstateDerivedInitialRepaymentMetric", "Anfangstilgung")}
+              ${chartMetric("realEstateDerivedSpecialRepaymentMetric", "Sondertilgung p. a.")}
             </div>
           </section>
 
@@ -397,18 +391,23 @@ export function renderAppShell(): string {
           </section>
 
           <section class="real-estate-card">
-            <h3>Tilgung aus freien Mitteln</h3>
-            <p class="planning-account-summary">Aktive Quellen werden als zusaetzliche Tilgung genutzt und im Kombinationspfad als umgeleitete Rate gezeigt.</p>
-            <div class="combined-toggle-grid">
-              ${repaymentSourceToggle("useWithdrawalGainAsRepayment", "Entnahmerate als Tilgung aktivieren")}
-              ${repaymentSourceToggle("useDepotSavingsRateAsRepayment", "Depot-Sparrate als Tilgung einbinden")}
-              ${repaymentSourceToggle("useLegacySavingsRateAsRepayment", "Alte Sparrate als Tilgung einbinden")}
-              ${repaymentSourceToggle("useNetGainAsRepayment", "Netto-Zugewinn als Tilgung einbinden")}
-              ${repaymentSourceToggle("onlyUsePositiveValues", "Nur positive Netto-Werte verwenden")}
+            <h3>Tilgungsquellen</h3>
+            <p class="planning-account-summary">Nur ausgewaehlte Sparpositionen und optionaler Entnahme-Zugewinn koennen die Finanzierung bedienen.</p>
+            <div class="include-special-toggles">
+              <button class="include-transfer-toggle" type="button" data-action="toggle-real-estate-withdrawal-gain-source" aria-pressed="false">
+                <span>Entnahme-Zugewinn</span>
+                <strong id="realEstateWithdrawalGainSourceAmount">-</strong>
+              </button>
             </div>
-            <div class="detail-list repayment-source-preview">
-              ${detailLine("Zusatztilgung monatlich", "additionalRepaymentMonthlyMetric")}
-              ${detailLine("Zusatztilgung jaehrlich", "additionalRepaymentAnnualMetric")}
+            <div class="real-estate-source-grid">
+              <div>
+                <h3>Monatsrate</h3>
+                <div id="realEstateMonthlyPaymentSourceList" class="include-list"></div>
+              </div>
+              <div>
+                <h3>Sondertilgung</h3>
+                <div id="realEstateSpecialRepaymentSourceList" class="include-list"></div>
+              </div>
             </div>
           </section>
 
@@ -643,15 +642,6 @@ function combinedToggle(key: string, label: string): string {
   return `
     <label class="combined-toggle-item">
       <input type="checkbox" data-combined-toggle="${key}" />
-      <span>${label}</span>
-    </label>
-  `;
-}
-
-function repaymentSourceToggle(key: string, label: string): string {
-  return `
-    <label class="combined-toggle-item">
-      <input type="checkbox" data-repayment-source-toggle="${key}" />
       <span>${label}</span>
     </label>
   `;

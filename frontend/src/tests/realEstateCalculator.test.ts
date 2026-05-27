@@ -2,14 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
 import {
-  buildAdditionalRepaymentBreakdown,
   calculateRealEstateFinancing,
+  deriveInitialRepaymentPercentFromPayment,
   deriveLoanAmount,
-  deriveMonthlyPayment,
-  deriveRateLinkedMonthlyPayment,
-  linkRealEstateFinancingInput,
   validateRealEstateSettings
 } from "../domain/realEstateCalculator";
+import type { RealEstateFinancingSourceSchedule } from "../types";
+
+function schedule(
+  monthlyPaymentSavings: number[],
+  specialRepayments: number[] = [],
+  withdrawalGainPayments: number[] = []
+): RealEstateFinancingSourceSchedule {
+  return { monthlyPaymentSavings, specialRepayments, withdrawalGainPayments };
+}
+
+function repeated(value: number, count = 240): number[] {
+  return Array.from({ length: count }, () => value);
+}
 
 describe("real estate calculator", () => {
   it("derives a loan amount from total project cost and equity", () => {
@@ -24,155 +34,114 @@ describe("real estate calculator", () => {
     };
 
     expect(deriveLoanAmount(settings)).toBeGreaterThan(0);
-    expect(deriveMonthlyPayment(settings, deriveLoanAmount(settings))).toBeGreaterThan(0);
   });
 
-  it("supports 0 percent interest and repays debt by principal", () => {
+  it("uses selected monthly savings as the only regular repayment source", () => {
     const state = defaultAppState();
     const settings = {
       ...state.realEstate,
       purchasePrice: 120000,
       loanAmount: 120000,
       interestRatePercent: 0,
-      initialRepaymentPercent: 0,
-      monthlyPayment: 1000,
-      financingYears: 20,
-      specialRepaymentAmount: 0,
-      specialRepaymentRhythm: "none" as const
+      financingYears: 20
     };
 
-    const result = calculateRealEstateFinancing(state.settings.year, settings);
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000)));
 
     expect(result.validationErrors).toEqual([]);
-    expect(result.years[0].interestPaid).toBe(0);
-    expect(result.years[0].principalPaid).toBeCloseTo(12000, 2);
+    expect(result.monthlyPayment).toBe(1000);
+    expect(result.derivedInitialRepaymentPercent).toBeCloseTo(10, 2);
+    expect(result.years[0].monthlyPaymentFromSavings).toBeCloseTo(12000, 2);
+    expect(result.years[0].principalFromMonthlyPayment).toBeCloseTo(12000, 2);
     expect(result.years[0].loanEnd).toBeCloseTo(108000, 2);
   });
 
-  it("applies yearly special repayments and reduces remaining debt", () => {
+  it("derives initial repayment percent from real source payments without extreme values", () => {
     const state = defaultAppState();
     const settings = {
       ...state.realEstate,
-      loanAmount: 200000,
-      interestRatePercent: 3,
-      initialRepaymentPercent: 2,
-      monthlyPayment: 900,
-      financingYears: 30,
-      specialRepaymentAmount: 5000,
-      specialRepaymentRhythm: "yearly" as const
+      loanAmount: 240000,
+      interestRatePercent: 3
     };
 
-    const withoutSpecial = calculateRealEstateFinancing(state.settings.year, {
-      ...settings,
-      specialRepaymentAmount: 0
-    });
-    const withSpecial = calculateRealEstateFinancing(state.settings.year, settings);
-
-    expect(withSpecial.years[0].specialRepayment).toBe(5000);
-    expect(withSpecial.years[4].loanEnd).toBeLessThan(withoutSpecial.years[4].loanEnd);
+    expect(deriveInitialRepaymentPercentFromPayment(settings, 240000, 1000)).toBeCloseTo(2, 2);
   });
 
-  it("marks invalid negative values", () => {
+  it("applies special repayments from the dedicated source schedule", () => {
     const state = defaultAppState();
-    const errors = validateRealEstateSettings({
+    const specialRepayments = repeated(0);
+    specialRepayments[2] = 2000;
+    specialRepayments[11] = 5000;
+    const settings = {
       ...state.realEstate,
-      purchasePrice: 0,
-      interestRatePercent: -1,
-      initialRepaymentPercent: -2,
-      monthlyPayment: -100
-    });
+      loanAmount: 120000,
+      interestRatePercent: 0,
+      financingYears: 5
+    };
 
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors.join(" ")).toContain("Kaufpreis");
+    const result = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000), specialRepayments)
+    );
+
+    expect(result.annualSpecialRepayment).toBe(7000);
+    expect(result.years[0].specialRepayment).toBe(7000);
+    expect(result.years[0].loanEnd).toBeCloseTo(101000, 2);
   });
 
-  it("adds activated free funds as separate additional repayment", () => {
+  it("adds withdrawal gain to the monthly payment only when it is in the source schedule", () => {
     const state = defaultAppState();
     const settings = {
       ...state.realEstate,
       loanAmount: 120000,
       interestRatePercent: 0,
-      monthlyPayment: 1000,
-      financingYears: 5,
-      specialRepaymentAmount: 0,
-      repaymentSources: {
-        ...state.realEstate.repaymentSources,
-        useDepotSavingsRateAsRepayment: true,
-        useNetGainAsRepayment: true
-      }
+      financingYears: 5
     };
 
-    const result = calculateRealEstateFinancing(state.settings.year, settings, {
-      withdrawalGain: 400,
-      depotSavingsRate: 250,
-      legacySavingsRate: 125,
-      netGain: 300
-    });
+    const withoutWithdrawal = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000))
+    );
+    const withWithdrawal = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000), [], repeated(250))
+    );
 
-    expect(result.years[0].additionalRepayment).toBeCloseTo(6600, 2);
-    expect(result.years[0].additionalRepaymentBreakdown.depotSavingsRate).toBeCloseTo(3000, 2);
-    expect(result.years[0].additionalRepaymentBreakdown.netGain).toBeCloseTo(3600, 2);
-    expect(result.years[0].loanEnd).toBeLessThan(108000);
+    expect(withWithdrawal.monthlyPayment).toBe(1250);
+    expect(withWithdrawal.years[0].monthlyPaymentFromWithdrawalGain).toBe(3000);
+    expect(withWithdrawal.years[0].additionalRepaymentBreakdown.withdrawalGain).toBeCloseTo(3000, 2);
+    expect(withWithdrawal.years[0].loanEnd).toBeLessThan(withoutWithdrawal.years[0].loanEnd);
   });
 
-  it("links repayment percent increases to a higher monthly payment", () => {
+  it("does not invent payments to cover interest shortfalls", () => {
     const state = defaultAppState();
     const settings = {
       ...state.realEstate,
-      loanAmount: 240000,
-      interestRatePercent: 3,
-      initialRepaymentPercent: 2,
-      monthlyPayment: 0
+      loanAmount: 120000,
+      interestRatePercent: 12,
+      financingYears: 1
     };
 
-    const linked = linkRealEstateFinancingInput(settings, "initialRepaymentPercent");
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(500, 12)));
 
-    expect(deriveRateLinkedMonthlyPayment(settings)).toBeCloseTo(1000, 2);
-    expect(linked.monthlyPayment).toBeCloseTo(1000, 2);
+    expect(result.years[0].principalFromMonthlyPayment).toBe(0);
+    expect(result.years[0].loanEnd).toBe(120000);
+    expect(result.years[0].interestShortfall).toBeGreaterThan(0);
+    expect(result.validationErrors.join(" ")).toContain("Zinsen nicht vollstaendig");
   });
 
-  it("links monthly payment changes back to initial repayment percent", () => {
+  it("marks invalid required settings", () => {
     const state = defaultAppState();
-    const linked = linkRealEstateFinancingInput(
-      {
-        ...state.realEstate,
-        loanAmount: 240000,
-        interestRatePercent: 3,
-        initialRepaymentPercent: 2,
-        monthlyPayment: 1200
-      },
-      "monthlyPayment"
-    );
-
-    expect(linked.initialRepaymentPercent).toBeCloseTo(3, 2);
-  });
-
-  it("links loan changes to the monthly payment with the same rate ratio", () => {
-    const state = defaultAppState();
-    const linked = linkRealEstateFinancingInput(
-      {
-        ...state.realEstate,
-        loanAmount: 300000,
-        interestRatePercent: 3,
-        initialRepaymentPercent: 2,
-        monthlyPayment: 1000
-      },
-      "loanAmount"
-    );
-
-    expect(linked.monthlyPayment).toBeCloseTo(1250, 2);
-    expect(linked.initialRepaymentPercent).toBe(2);
-  });
-
-  it("keeps repayment sources disabled by default", () => {
-    const state = defaultAppState();
-    const breakdown = buildAdditionalRepaymentBreakdown(state.realEstate, {
-      withdrawalGain: 500,
-      depotSavingsRate: 500,
-      legacySavingsRate: 500,
-      netGain: 500
+    const errors = validateRealEstateSettings({
+      ...state.realEstate,
+      purchasePrice: 0,
+      interestRatePercent: -1
     });
 
-    expect(breakdown.totalAdditionalMonthlyRepayment).toBe(0);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.join(" ")).toContain("Kaufpreis");
   });
 });

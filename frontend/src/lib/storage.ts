@@ -327,7 +327,13 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
     inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent),
     financingYears: numberOrDefault(value.financingYears, fallback.financingYears),
     manualFuturePropertyValue: nullableNumberOrDefault(value.manualFuturePropertyValue, fallback.manualFuturePropertyValue),
-    repaymentSources: normalizeRepaymentSourceToggles(value.repaymentSources)
+    repaymentSources: normalizeRepaymentSourceToggles(value.repaymentSources),
+    monthlyPaymentSourceIds: stringArrayOrDefault(value.monthlyPaymentSourceIds, fallback.monthlyPaymentSourceIds),
+    specialRepaymentSourceIds: stringArrayOrDefault(value.specialRepaymentSourceIds, fallback.specialRepaymentSourceIds),
+    includeWithdrawalGainAsPaymentSource: booleanOrDefault(
+      value.includeWithdrawalGainAsPaymentSource,
+      fallback.includeWithdrawalGainAsPaymentSource
+    )
   };
 }
 

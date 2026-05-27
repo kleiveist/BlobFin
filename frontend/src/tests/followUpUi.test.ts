@@ -21,6 +21,12 @@ const realEstateYear: RealEstateFinancingYear = {
   propertyValue: 300000,
   loanStart: 220000,
   interestPaid: 7000,
+  interestDue: 7000,
+  interestShortfall: 0,
+  monthlyPaymentFromSavings: 12000,
+  monthlyPaymentFromWithdrawalGain: 0,
+  monthlyPaymentAvailable: 12000,
+  principalFromMonthlyPayment: 8000,
   principalPaid: 8000,
   specialRepayment: 0,
   additionalRepayment: 0,
@@ -65,7 +71,11 @@ describe("follow-up ui rendering", () => {
     expect(count(html, 'data-real-estate-field="interestRatePercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="interestRatePercent"')).toBe(1);
     expect(count(html, 'data-real-estate-field="monthlyPayment"')).toBe(0);
-    expect(count(html, 'data-real-estate-range="monthlyPayment"')).toBe(1);
+    expect(count(html, 'data-real-estate-range="monthlyPayment"')).toBe(0);
+    expect(count(html, 'data-real-estate-range="initialRepaymentPercent"')).toBe(0);
+    expect(count(html, 'data-real-estate-range="specialRepaymentAmount"')).toBe(0);
+    expect(html).toContain('id="realEstateMonthlyPaymentSourceList"');
+    expect(html).toContain('id="realEstateSpecialRepaymentSourceList"');
     expect(count(html, 'data-real-estate-field="propertyValueGrowthPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="propertyValueGrowthPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-field="inflationRatePercent"')).toBe(0);

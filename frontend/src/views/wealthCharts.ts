@@ -10,6 +10,7 @@ interface VerticalBarSegment {
   className: string;
   label: string;
   value: number;
+  overlay?: boolean;
 }
 
 export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstateFinancingYear>): string {
@@ -17,13 +18,18 @@ export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstat
     return '<div class="chart-empty">Noch keine Immobilienberechnung verfuegbar.</div>';
   }
 
-  const maxValue = Math.max(1, ...input.points.map((point) => Math.max(0, point.propertyValue)));
+  const startLoanAmount = Math.max(1, input.points[0]?.loanStart ?? 0);
 
   return renderVerticalChart({
     label: "Immobilienfinanzierung je Jahr",
-    maxValue,
+    maxValue: startLoanAmount,
+    legend: [
+      { className: "debt", label: "Restschuld" },
+      { className: "equity", label: "Getilgter Kreditanteil" },
+      { className: "interest", label: "Zinsen" }
+    ],
     points: input.points.map((point) => {
-      const composition = propertyComposition(point);
+      const composition = propertyComposition(point, startLoanAmount);
       return {
         ...composition,
         year: point.year,
@@ -47,6 +53,10 @@ export function renderRealEstateTrendChart(input: ChartRenderInput<RealEstateFin
   return renderVerticalChart({
     label: "Immobilienwertentwicklung je Jahr",
     maxValue,
+    legend: [
+      { className: "property", label: "Ausgangswert" },
+      { className: "growth", label: "Wertentwicklung" }
+    ],
     points: input.points.map((point) => ({
       year: point.year,
       selected: input.selectedYear === point.year,
@@ -83,6 +93,11 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
   return renderVerticalChart({
     label: "Kombiniertes Vermoegen je Jahr",
     maxValue,
+    legend: [
+      { className: "cash", label: "Cash" },
+      { className: "depot", label: "Depot" },
+      { className: "property", label: "Immobilienwert" }
+    ],
     points: input.points.map((point) => ({
       year: point.year,
       selected: input.selectedYear === point.year,
@@ -102,6 +117,7 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
 function renderVerticalChart(input: {
   label: string;
   maxValue: number;
+  legend: Array<{ className: string; label: string }>;
   points: Array<{
     year: number;
     selected: boolean;
@@ -123,6 +139,11 @@ function renderVerticalChart(input: {
         ${input.points.map((point) => renderVerticalBar(point, input.maxValue)).join("")}
       </div>
       <div class="wealth-x-axis" aria-hidden="true">Jahr</div>
+      <div class="wealth-legend">
+        ${input.legend
+          .map((item) => `<span class="legend-item"><span class="legend-dot ${item.className}"></span>${item.label}</span>`)
+          .join("")}
+      </div>
     </div>
   `;
 }
@@ -152,11 +173,23 @@ function renderVerticalBar(
       <span class="wealth-column-value">${point.valueLabel}</span>
       <span class="wealth-column-track">
         <span class="wealth-column-fill" style="height:${barHeight}%">
-          ${point.segments.map((segment) => renderSegment(segment, point.barTotal)).join("")}
+          ${point.segments.filter((segment) => !segment.overlay).map((segment) => renderSegment(segment, point.barTotal)).join("")}
+          ${point.segments.filter((segment) => segment.overlay).map((segment) => renderOverlaySegment(segment, point.barTotal)).join("")}
         </span>
       </span>
       <span class="wealth-column-year">${point.year}</span>
     </button>
+  `;
+}
+
+function renderOverlaySegment(segment: VerticalBarSegment, maxValue: number): string {
+  const height = heightPercent(segment.value, maxValue);
+  return `
+    <span
+      class="wealth-column-overlay ${segment.className}"
+      style="height:${height}%"
+      title="${segment.label}"
+    ></span>
   `;
 }
 
@@ -176,15 +209,15 @@ function heightPercent(value: number, maxValue: number): number {
   return Math.max(0, Math.min(100, (value / maxValue) * 100));
 }
 
-function propertyComposition(point: RealEstateFinancingYear): { barTotal: number; segments: VerticalBarSegment[] } {
-  const propertyValue = Math.max(0, point.propertyValue);
-  const debt = Math.max(0, Math.min(propertyValue, point.loanEnd));
-  const equity = Math.max(0, propertyValue - debt);
+function propertyComposition(point: RealEstateFinancingYear, startLoanAmount: number): { barTotal: number; segments: VerticalBarSegment[] } {
+  const debt = Math.max(0, Math.min(startLoanAmount, point.loanEnd));
+  const equity = Math.max(0, startLoanAmount - debt);
   return {
-    barTotal: propertyValue,
+    barTotal: startLoanAmount,
     segments: [
-      { className: "debt", label: "Kredit / Restschuld", value: debt },
-      { className: "equity", label: "Tilgung / Eigenkapital", value: equity }
+      { className: "debt", label: "Restschuld", value: debt },
+      { className: "equity", label: "Getilgter Kreditanteil", value: equity },
+      { className: "interest", label: "Zinsen", value: Math.max(0, point.interestPaid), overlay: true }
     ]
   };
 }

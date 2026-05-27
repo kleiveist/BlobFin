@@ -2369,6 +2369,12 @@ tfoot th {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
+.real-estate-source-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .assumption-control {
   display: grid;
   grid-template-columns: 1fr;
@@ -2485,7 +2491,7 @@ tfoot th {
   display: grid;
   gap: 8px;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(34px, 1fr);
+  grid-auto-columns: 36px;
   min-height: 208px;
   overflow-x: auto;
   padding: 18px 8px 0;
@@ -2541,6 +2547,7 @@ tfoot th {
   display: flex;
   flex-direction: column-reverse;
   overflow: hidden;
+  position: relative;
   width: 100%;
 }
 
@@ -2580,6 +2587,57 @@ tfoot th {
 }
 
 .wealth-column-segment.growth {
+  background: #ff7a00;
+}
+
+.wealth-column-segment.interest,
+.wealth-column-overlay.interest {
+  background: #ff7a00;
+}
+
+.wealth-column-overlay {
+  border-radius: 4px 4px 1px 1px;
+  bottom: 0;
+  left: 18%;
+  opacity: 0.72;
+  position: absolute;
+  width: 64%;
+}
+
+.wealth-legend {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  font-weight: 750;
+  gap: 12px;
+  grid-column: 2;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.legend-dot.cash {
+  background: #777b82;
+}
+
+.legend-dot.depot {
+  background: #9b94ff;
+}
+
+.legend-dot.property {
+  background: #5f88e8;
+}
+
+.legend-dot.equity {
+  background: #43b20a;
+}
+
+.legend-dot.debt {
+  background: #ff5b63;
+}
+
+.legend-dot.growth,
+.legend-dot.interest {
   background: #ff7a00;
 }
 
@@ -2638,7 +2696,7 @@ tfoot th {
   }
 
   .wealth-plot {
-    grid-auto-columns: minmax(30px, 44px);
+    grid-auto-columns: 32px;
   }
 }
 
