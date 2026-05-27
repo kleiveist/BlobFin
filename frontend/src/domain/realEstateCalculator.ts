@@ -12,6 +12,7 @@ const MAX_FINANCING_YEARS = 80;
 export interface RealEstateFinancingCalculationOptions {
   financingYears?: number;
   projectionYears?: number;
+  maxProjectionYears?: number;
 }
 
 export function validateRealEstateSettings(settings: RealEstateFinancingSettings): string[] {
@@ -92,8 +93,9 @@ export function calculateRealEstateFinancing(
   const projectCost = totalProjectCost(settings);
   const equityCapital = roundMoney(Math.max(0, sourceSchedule.equityCapital));
   const loanAmount = deriveLoanAmount(settings, equityCapital);
-  const financingYears = clampYears(options.financingYears ?? deriveFinancingYearsFromSettings(settings));
-  const projectionYears = clampYears(options.projectionYears ?? financingYears);
+  const targetFinancingYears = clampYears(options.financingYears ?? deriveFinancingYearsFromSettings(settings));
+  const projectionYears = clampYears(options.projectionYears ?? targetFinancingYears);
+  const maxProjectionYears = Math.max(projectionYears, clampYears(options.maxProjectionYears ?? projectionYears));
   const monthlyRate = Math.max(0, settings.interestRatePercent) / 100 / 12;
   const growthRate = Math.max(0, settings.propertyValueGrowthPercent) / 100;
   const startPropertyValue = Math.max(0, settings.purchasePrice + settings.constructionOrRenovationCosts + settings.landCosts);
@@ -105,7 +107,7 @@ export function calculateRealEstateFinancing(
     firstMonthlyPayment
   );
 
-  if (loanAmount > 0 && !hasAnyMonthlyPayment(sourceSchedule, financingYears * 12)) {
+  if (loanAmount > 0 && !hasAnyMonthlyPayment(sourceSchedule, maxProjectionYears * 12)) {
     validationErrors.push("Bitte mindestens eine Sparposition fuer die Monatsrate auswaehlen.");
   }
 
@@ -113,8 +115,10 @@ export function calculateRealEstateFinancing(
   const months: RealEstateFinancingMonth[] = [];
 
   let remainingDebt = loanAmount;
+  let firstPaymentMonthIndex: number | null = null;
+  let lastPaymentMonthIndex: number | null = null;
 
-  for (let yearIndex = 0; yearIndex < projectionYears; yearIndex += 1) {
+  for (let yearIndex = 0; yearIndex < maxProjectionYears; yearIndex += 1) {
     const year = startYear + yearIndex;
     const loanStart = roundMoney(remainingDebt);
     let interestPaidYear = 0;
@@ -132,7 +136,6 @@ export function calculateRealEstateFinancing(
     for (let month = 1; month <= 12; month += 1) {
       const scheduleIndex = yearIndex * 12 + month - 1;
       const monthLoanStart = roundMoney(remainingDebt);
-      const activeFinancingMonth = scheduleIndex < financingYears * 12;
 
       if (remainingDebt <= 0) {
         months.push({
@@ -154,13 +157,9 @@ export function calculateRealEstateFinancing(
         continue;
       }
 
-      const monthlyPaymentFromSavings = activeFinancingMonth ? sourceValue(sourceSchedule.monthlyPaymentSavings, scheduleIndex) : 0;
-      const monthlyPaymentFromWithdrawalGain = activeFinancingMonth
-        ? sourceValue(sourceSchedule.withdrawalGainPayments, scheduleIndex)
-        : 0;
-      const depotSavingsRatePayment = activeFinancingMonth
-        ? sourceValue(sourceSchedule.depotSavingsRatePayments, scheduleIndex)
-        : 0;
+      const monthlyPaymentFromSavings = sourceValue(sourceSchedule.monthlyPaymentSavings, scheduleIndex);
+      const monthlyPaymentFromWithdrawalGain = sourceValue(sourceSchedule.withdrawalGainPayments, scheduleIndex);
+      const depotSavingsRatePayment = sourceValue(sourceSchedule.depotSavingsRatePayments, scheduleIndex);
       const monthlyPaymentAvailable = roundMoney(
         monthlyPaymentFromSavings + monthlyPaymentFromWithdrawalGain + depotSavingsRatePayment
       );
@@ -177,7 +176,7 @@ export function calculateRealEstateFinancing(
       const depotSavingsRateShare =
         monthlyPaymentAvailable > 0 ? roundMoney(usedMonthlyPayment * (depotSavingsRatePayment / monthlyPaymentAvailable)) : 0;
 
-      const specialPaymentAvailable = activeFinancingMonth ? sourceValue(sourceSchedule.specialRepayments, scheduleIndex) : 0;
+      const specialPaymentAvailable = sourceValue(sourceSchedule.specialRepayments, scheduleIndex);
       const specialInterestPayment = roundMoney(Math.min(specialPaymentAvailable, interestShortfall));
       interestPaid = roundMoney(interestPaid + specialInterestPayment);
       interestShortfall = roundMoney(interestShortfall - specialInterestPayment);
@@ -185,6 +184,11 @@ export function calculateRealEstateFinancing(
       const specialRepayment = roundMoney(Math.min(specialPrincipalBudget, remainingDebt));
       remainingDebt = roundMoney(remainingDebt - specialRepayment);
       remainingDebt = roundMoney(remainingDebt + interestShortfall);
+      const totalPaymentUsed = roundMoney(interestPaid + principalPaid + specialRepayment);
+      if (totalPaymentUsed > 0) {
+        firstPaymentMonthIndex ??= scheduleIndex;
+        lastPaymentMonthIndex = scheduleIndex;
+      }
 
       interestDueYear += interestDue;
       interestPaidYear += interestPaid;
@@ -242,11 +246,14 @@ export function calculateRealEstateFinancing(
       propertyEquity,
       netPropertyWealth
     });
+
+    if (yearIndex + 1 >= projectionYears && remainingDebt <= 0) break;
   }
 
   const totalInterestDue = roundMoney(years.reduce((sum, entry) => sum + entry.interestDue, 0));
   const totalInterestPaid = roundMoney(years.reduce((sum, entry) => sum + entry.interestPaid, 0));
   const totalInterestShortfall = roundMoney(years.reduce((sum, entry) => sum + entry.interestShortfall, 0));
+  const financingYears = actualFinancingYears(firstPaymentMonthIndex, lastPaymentMonthIndex, targetFinancingYears);
   const totalLoanCost = fixedTotalLoanCost(loanAmount, monthlyRate, financingYears);
   if (totalInterestShortfall > 0) {
     validationErrors.push(
@@ -269,9 +276,9 @@ export function calculateRealEstateFinancing(
     totalInterestShortfall,
     totalLoanCost,
     financingYears,
-    projectionYears,
-    financingEndYear: startYear + financingYears,
-    projectionEndYear: startYear + projectionYears - 1,
+    projectionYears: years.length,
+    financingEndYear: financingEndYear(startYear, lastPaymentMonthIndex, financingYears),
+    projectionEndYear: years[years.length - 1]?.year ?? startYear,
     validationErrors
   };
 }
@@ -340,6 +347,22 @@ function fixedTotalLoanCost(loanAmount: number, monthlyRate: number, financingYe
   if (loanAmount <= 0) return 0;
   if (monthlyRate <= 0) return roundMoney(loanAmount);
   return roundMoney(loanAmount * (1 + monthlyRate) ** (financingYears * 12));
+}
+
+function actualFinancingYears(
+  firstPaymentMonthIndex: number | null,
+  lastPaymentMonthIndex: number | null,
+  fallbackYears: number
+): number {
+  if (firstPaymentMonthIndex === null || lastPaymentMonthIndex === null || lastPaymentMonthIndex < firstPaymentMonthIndex) {
+    return fallbackYears;
+  }
+  return clampYears(Math.ceil((lastPaymentMonthIndex - firstPaymentMonthIndex + 1) / 12));
+}
+
+function financingEndYear(startYear: number, lastPaymentMonthIndex: number | null, financingYears: number): number {
+  if (lastPaymentMonthIndex === null) return startYear + financingYears - 1;
+  return startYear + Math.floor(lastPaymentMonthIndex / 12);
 }
 
 function deriveFinancingYearsFromSettings(settings: RealEstateFinancingSettings): number {

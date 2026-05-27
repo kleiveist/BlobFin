@@ -189,6 +189,30 @@ describe("follow-up ui rendering", () => {
     expect(paidLoanCostForYear(realEstateYear)).toBe(15000);
   });
 
+  it("does not leave an open loan cost when the real debt is fully repaid", () => {
+    const repaymentSegments = realEstateRepaymentSegments({
+      point: { ...realEstateYear, loanEnd: 0 },
+      totalLoanCost: 240000,
+      paidLoanCostToDate: 180000
+    });
+
+    expect(repaymentSegments.find((segment) => segment.label === "Darlehensbetrag inkl. Zinsen offen")?.value).toBe(0);
+    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(240000);
+  });
+
+  it("keeps the visible open loan cost at least as high as the real debt", () => {
+    const repaymentSegments = realEstateRepaymentSegments({
+      point: { ...realEstateYear, loanEnd: 260000 },
+      totalLoanCost: 240000,
+      paidLoanCostToDate: 15000
+    });
+
+    expect(repaymentSegments.find((segment) => segment.label === "Darlehensbetrag inkl. Zinsen offen")?.value).toBe(
+      260000
+    );
+    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(0);
+  });
+
   it("formats real estate popup headings with age and year", () => {
     expect(realEstatePopupHeading(45, 2026)).toBe("Alter 45 | Jahr 2026");
   });
@@ -216,7 +240,7 @@ describe("follow-up ui rendering", () => {
     expect(repayment).not.toContain("wealth-column-segment equity");
   });
 
-  it("keeps the repayment chart scaled to the loan cost basis when debt grows", () => {
+  it("scales the repayment chart above the loan cost basis when real debt grows", () => {
     const repayment = renderRealEstateRepaymentChart({
       points: [{ ...realEstateYear, loanEnd: 250000, interestDue: 12000 }],
       selectedYear: 2026,
@@ -224,7 +248,7 @@ describe("follow-up ui rendering", () => {
       formatMoney: String
     });
 
-    expect(repayment).toContain("240 Tsd. EUR");
+    expect(repayment).toContain("265 Tsd. EUR");
     expect(repayment).toContain('wealth-column-overlay interest');
   });
 });

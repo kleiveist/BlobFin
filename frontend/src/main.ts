@@ -95,6 +95,7 @@ const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
 const CHILD_DEPOT_MIN_PAYOUT_AGE = 18;
 const CHILD_DEPOT_DEFAULT_PAYOUT_AGE = 18;
 const CHILD_DEPOT_MAX_PAYOUT_AGE = 25;
+const MAX_REAL_ESTATE_PROJECTION_YEARS = 80;
 const INVESTMENT_DEPOTS: InvestmentDepotKey[] = ["standard", "retirement", "child"];
 type NumericInvestmentSetting =
   | "birthYear"
@@ -701,11 +702,8 @@ function renderCalculations(
     state.realEstate.financingStartAge
   );
   const financingYears = currentRealEstateFinancingYears();
-  const realEstateProjectionYears = projectionYearsThroughFinancingEnd(
-    financingStartYear,
-    currentRealEstateProjectionYears(financingStartYear, standardProjection.endAge),
-    financingYears
-  );
+  const realEstateProjectionYears = currentRealEstateProjectionYears(financingStartYear, standardProjection.endAge);
+  const maxRealEstateProjectionYears = currentRealEstateMaximumProjectionYears(financingStartYear);
   const combinedRealEstateProjectionYears = currentCombinedRealEstateProjectionYears(
     financingStartYear,
     standardProjection,
@@ -715,18 +713,27 @@ function renderCalculations(
   const realEstate = calculateRealEstateFinancing(
     financingStartYear,
     state.realEstate,
-    realEstateSourceSchedule(financingStartYear, realEstateProjectionYears, standardProjection),
-    { financingYears, projectionYears: realEstateProjectionYears }
+    realEstateSourceSchedule(financingStartYear, maxRealEstateProjectionYears, standardProjection),
+    {
+      financingYears,
+      projectionYears: realEstateProjectionYears,
+      maxProjectionYears: maxRealEstateProjectionYears
+    }
   );
   renderRealEstateCalculations(realEstate);
   const combinedRealEstate =
-    combinedRealEstateProjectionYears === realEstateProjectionYears
+    combinedRealEstateProjectionYears === realEstateProjectionYears &&
+    combinedRealEstateProjectionYears === maxRealEstateProjectionYears
       ? realEstate
       : calculateRealEstateFinancing(
           financingStartYear,
           state.realEstate,
           realEstateSourceSchedule(financingStartYear, combinedRealEstateProjectionYears, standardProjection),
-          { financingYears, projectionYears: combinedRealEstateProjectionYears }
+          {
+            financingYears,
+            projectionYears: combinedRealEstateProjectionYears,
+            maxProjectionYears: combinedRealEstateProjectionYears
+          }
         );
   const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, combinedRealEstate);
   renderCombinedWealthCalculations(combinedYears);
@@ -778,11 +785,13 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   setText("realEstateTotalProjectCostMetric", money(result.totalProjectCost));
   setText("realEstateStartDebtMetric", money(result.startLoanAmount));
   setText("realEstateTotalLoanCostMetric", money(result.totalLoanCost));
+  const actualFinancingStartYear =
+    realEstateActualPaymentStartYear(result) ?? result.years[0]?.year ?? currentRealEstateFinancingStartYear();
+  const actualFinancingStartAge = Math.max(0, actualFinancingStartYear - state.investment.birthYear);
+  const actualFinancingEndAge = Math.max(actualFinancingStartAge, result.financingEndYear - state.investment.birthYear);
   setText(
     "realEstateFinancingYearsMetric",
-    `${intNumber(currentRealEstateFinancingStartAge())} -> ${intNumber(state.realEstate.financingEndAge)} | ${intNumber(
-      result.financingYears
-    )} Jahre`
+    `${intNumber(actualFinancingStartAge)} -> ${intNumber(actualFinancingEndAge)} | ${intNumber(result.financingYears)} Jahre`
   );
 
   selectedRealEstateYear = defaultRealEstateDetailYear(result.years, selectedRealEstateYear);
@@ -834,11 +843,26 @@ function currentRealEstateFinancingYears(): number {
   return clamp(Math.round(endAge - startAge), 1, 80);
 }
 
+function realEstateActualPaymentStartYear(result: RealEstateFinancingResult): number | null {
+  const firstPaymentMonth = result.months.find((month) => {
+    return month.interestPaid + month.principalPaid + month.specialRepayment > 0;
+  });
+  return firstPaymentMonth?.year ?? null;
+}
+
 function currentRealEstateProjectionYears(startYear: number, investmentEndAge: number): number {
   const investmentEndYear = state.investment.birthYear + Math.floor(investmentEndAge);
   const saleYear = state.realEstate.plannedSaleYear;
   const projectionEndYear = saleYear !== null && saleYear >= startYear ? Math.round(saleYear) : investmentEndYear;
   return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
+}
+
+function currentRealEstateMaximumProjectionYears(startYear: number): number {
+  const saleYear = state.realEstate.plannedSaleYear;
+  if (saleYear !== null && saleYear >= startYear) {
+    return clamp(Math.round(saleYear - startYear + 1), 1, MAX_REAL_ESTATE_PROJECTION_YEARS);
+  }
+  return MAX_REAL_ESTATE_PROJECTION_YEARS;
 }
 
 function currentCombinedRealEstateProjectionYears(
@@ -853,15 +877,6 @@ function currentCombinedRealEstateProjectionYears(
   const projectionEndYear =
     saleYear !== null && saleYear >= startYear ? Math.min(Math.round(saleYear), combinedEndYear) : combinedEndYear;
   return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
-}
-
-function projectionYearsThroughFinancingEnd(startYear: number, projectionYears: number, financingYears: number): number {
-  const financingEndYear = startYear + financingYears;
-  const saleYear = state.realEstate.plannedSaleYear;
-  if (saleYear !== null && saleYear >= startYear && saleYear < financingEndYear) {
-    return projectionYears;
-  }
-  return clamp(Math.max(projectionYears, financingYears + 1), 1, 80);
 }
 
 function realEstateDepotSavingsRateAvailable(standardProjection: AssetProjection): boolean {
@@ -899,6 +914,7 @@ function realEstateSourceSchedule(
     state.realEstate.repaymentSources.useDepotSavingsRateAsRepayment &&
     realEstateDepotSavingsRateAvailable(standardProjection);
   const withdrawalStartYear = realEstateWithdrawalStartYear(standardProjection);
+  const withdrawalEndYear = state.investment.birthYear + Math.floor(standardProjection.endAge);
   const depotSavingsRate = useDepotSavingsRate ? Math.max(0, standardProjection.monthlyRate) : 0;
   const depotSavingsRatePayments: number[] = [];
 
@@ -908,8 +924,9 @@ function realEstateSourceSchedule(
     monthlyPaymentSavings.push(
       monthlyPositions.reduce((sum, position) => sum + investmentContributionForMonth(position, year, month), 0)
     );
-    withdrawalGainPayments.push(withdrawalGain);
-    depotSavingsRatePayments.push(year >= withdrawalStartYear ? depotSavingsRate : 0);
+    const activeWithdrawalYear = year >= withdrawalStartYear && year <= withdrawalEndYear;
+    withdrawalGainPayments.push(activeWithdrawalYear ? withdrawalGain : 0);
+    depotSavingsRatePayments.push(activeWithdrawalYear ? depotSavingsRate : 0);
     specialRepayments.push(
       specialPositions.reduce((sum, position) => {
         return (

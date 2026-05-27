@@ -273,25 +273,24 @@ describe("real estate calculator", () => {
     expect(result.totalLoanCost).toBeGreaterThan(595000);
   });
 
-  it("keeps total loan cost independent from repayment sources", () => {
+  it("shortens the actual financing period when repayment sources pay the debt faster", () => {
     const state = defaultAppState();
-    const settings = projectSettings(595000, {
+    const settings = projectSettings(120000, {
       interestRatePercent: 3.7,
       financingYears: 25
     });
 
-    const noRepayment = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(0, 300)));
-    const lowRepayment = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(500, 300)));
+    const lowRepayment = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(750, 300)));
     const highRepayment = calculateRealEstateFinancing(
       state.settings.year,
       settings,
-      schedule(repeated(5000, 300), repeated(1000, 300), repeated(500, 300), 0, repeated(250, 300))
+      schedule(repeated(1500, 300), repeated(1000, 300), repeated(500, 300), 0, repeated(250, 300))
     );
 
-    expect(noRepayment.totalLoanCost).toBe(lowRepayment.totalLoanCost);
-    expect(lowRepayment.totalLoanCost).toBe(highRepayment.totalLoanCost);
-    expect(noRepayment.years[0].loanEnd).toBeGreaterThan(highRepayment.years[0].loanEnd);
-    expect(noRepayment.totalInterestShortfall).toBeGreaterThan(highRepayment.totalInterestShortfall);
+    expect(highRepayment.financingYears).toBeLessThan(lowRepayment.financingYears);
+    expect(highRepayment.financingEndYear).toBeLessThan(lowRepayment.financingEndYear);
+    expect(highRepayment.totalLoanCost).toBeLessThan(lowRepayment.totalLoanCost);
+    expect(lowRepayment.years[0].loanEnd).toBeGreaterThan(highRepayment.years[0].loanEnd);
   });
 
   it("calculates total loan cost from monthly compounding over the financing period", () => {
@@ -307,7 +306,7 @@ describe("real estate calculator", () => {
     expect(result.totalLoanCost).toBeCloseTo(1498377.73, 2);
   });
 
-  it("changes fixed total loan cost only through loan basis, interest, and financing period", () => {
+  it("changes fixed total loan cost through loan basis, interest, and the actual payoff period", () => {
     const state = defaultAppState();
     const settings = projectSettings(120000, {
       interestRatePercent: 3,
@@ -342,10 +341,10 @@ describe("real estate calculator", () => {
     expect(higherInterest.totalLoanCost).toBeGreaterThan(base.totalLoanCost);
     expect(higherProjectCost.totalLoanCost).toBeGreaterThan(base.totalLoanCost);
     expect(withEquity.totalLoanCost).toBeLessThan(base.totalLoanCost);
-    expect(shorterFinancing.totalLoanCost).toBeLessThan(base.totalLoanCost);
+    expect(shorterFinancing.totalLoanCost).toBe(base.totalLoanCost);
   });
 
-  it("derives the financing period from start and end age", () => {
+  it("derives the financing period from the first payment to the final payment", () => {
     const state = defaultAppState();
     const settings = projectSettings(120000, {
       financingStartAge: 45,
@@ -356,28 +355,56 @@ describe("real estate calculator", () => {
 
     const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 300)));
 
-    expect(result.financingYears).toBe(25);
+    expect(result.financingYears).toBe(10);
+    expect(result.financingEndYear).toBe(state.settings.year + 9);
     expect(result.years).toHaveLength(25);
   });
 
-  it("stops scheduled repayment after the target period and keeps interest running", () => {
+  it("extends projection beyond the target period until the debt is paid", () => {
     const state = defaultAppState();
     const settings = projectSettings(120000, {
-      interestRatePercent: 12,
+      interestRatePercent: 0,
       financingYears: 1
     });
 
     const result = calculateRealEstateFinancing(
       state.settings.year,
       settings,
+      schedule(repeated(1000, 240)),
+      { financingYears: 1, projectionYears: 1, maxProjectionYears: 20 }
+    );
+
+    expect(result.years).toHaveLength(10);
+    expect(result.financingYears).toBe(10);
+    expect(result.financingEndYear).toBe(state.settings.year + 9);
+    expect(result.years[result.years.length - 1]?.loanEnd).toBe(0);
+  });
+
+  it("continues scheduled repayment after the target period while sources still exist", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(120000, {
+      interestRatePercent: 12,
+      financingYears: 1
+    });
+
+    const stoppedSchedule = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000, 12)),
+      { financingYears: 1, projectionYears: 2 }
+    );
+    const continuedSchedule = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
       schedule(repeated(1000, 24)),
       { financingYears: 1, projectionYears: 2 }
     );
 
-    expect(result.years).toHaveLength(2);
-    expect(result.years[1].monthlyPaymentAvailable).toBe(0);
-    expect(result.years[1].interestDue).toBeGreaterThan(0);
-    expect(result.years[1].loanEnd).toBeGreaterThan(result.years[0].loanEnd);
+    expect(continuedSchedule.years).toHaveLength(2);
+    expect(stoppedSchedule.years[1].monthlyPaymentAvailable).toBe(0);
+    expect(continuedSchedule.years[1].monthlyPaymentAvailable).toBe(12000);
+    expect(continuedSchedule.years[1].interestDue).toBeGreaterThan(0);
+    expect(continuedSchedule.years[1].loanEnd).toBeLessThan(stoppedSchedule.years[1].loanEnd);
   });
 
   it("respects a projection horizon before the financing end year", () => {
@@ -395,7 +422,7 @@ describe("real estate calculator", () => {
     );
 
     expect(result.years).toHaveLength(2);
-    expect(result.financingEndYear).toBe(state.settings.year + 5);
+    expect(result.financingEndYear).toBe(state.settings.year + 1);
     expect(result.projectionEndYear).toBe(state.settings.year + 1);
   });
 

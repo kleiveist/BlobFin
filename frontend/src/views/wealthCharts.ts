@@ -310,8 +310,11 @@ function propertyComposition(input: RealEstateRepaymentSegmentInput): {
 
 export function realEstateRepaymentSegments(input: RealEstateRepaymentSegmentInput): VerticalBarSegment[] {
   const totalLoanCost = Math.max(0, input.totalLoanCost);
-  const paidLoanCost = Math.max(0, Math.min(totalLoanCost, input.paidLoanCostToDate));
-  const openLoanCost = Math.max(0, totalLoanCost - paidLoanCost);
+  const currentDebt = Math.max(0, input.point.loanEnd);
+  const paidLoanCostToDate = Math.max(0, input.paidLoanCostToDate);
+  const calculatedOpenLoanCost = Math.max(0, totalLoanCost - Math.min(totalLoanCost, paidLoanCostToDate));
+  const openLoanCost = currentDebt <= 0 ? 0 : Math.max(calculatedOpenLoanCost, currentDebt);
+  const paidLoanCost = Math.max(0, Math.min(totalLoanCost, totalLoanCost - openLoanCost));
   return [
     { className: "debt", label: "Darlehensbetrag inkl. Zinsen offen", value: openLoanCost },
     { className: "equity", label: "Getilgter Kreditanteil", value: paidLoanCost },
