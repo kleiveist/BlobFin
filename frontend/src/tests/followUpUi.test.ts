@@ -90,6 +90,9 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('id="realEstateMonthlyPaymentSourceList"');
     expect(html).toContain('id="realEstateSpecialRepaymentSourceList"');
     expect(html).toContain('data-action="toggle-real-estate-depot-savings-rate-source"');
+    expect(html).toContain('data-action="toggle-combined-module"');
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).not.toContain('type="checkbox" data-combined-toggle');
     expect(count(html, 'data-real-estate-field="propertyValueGrowthPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="propertyValueGrowthPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-field="inflationRatePercent"')).toBe(0);
@@ -102,11 +105,14 @@ describe("follow-up ui rendering", () => {
     const repayment = renderRealEstateRepaymentChart({
       points: [realEstateYear],
       selectedYear: 2026,
+      loanCostBasis: 240000,
+      financingEndYear: 2026,
       formatMoney: String
     });
     const trend = renderRealEstateTrendChart({
       points: [realEstateYear],
       selectedYear: 2026,
+      financingEndYear: 2026,
       formatMoney: String
     });
     const combined = renderCombinedWealthChart({
@@ -118,22 +124,29 @@ describe("follow-up ui rendering", () => {
     expect(repayment).toContain("wealth-vertical-chart");
     expect(repayment).toContain("Restschuld, Tilgung und Zinsen je Jahr");
     expect(repayment).toContain('data-chart-kind="repayment"');
+    expect(repayment).toContain("240 Tsd. EUR");
+    expect(repayment).toContain('data-financing-end="true"');
+    expect(repayment).toContain("financing-end");
     expect(trend).toContain("wealth-vertical-chart");
     expect(trend).toContain('data-chart-kind="trend"');
+    expect(trend).toContain('data-financing-end="true"');
     expect(combined).toContain("wealth-vertical-chart");
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");
   });
 
   it("exposes real estate popup segment labels", () => {
-    const repaymentLabels = realEstateRepaymentSegments(realEstateYear, realEstateYear.loanStart).map(
-      (segment) => segment.label
-    );
+    const repaymentSegments = realEstateRepaymentSegments(realEstateYear, 240000);
+    const repaymentLabels = repaymentSegments.map((segment) => segment.label);
     const trendLabels = realEstateTrendSegments(realEstateYear, realEstateYear.propertyValue).map(
       (segment) => segment.label
     );
 
     expect(repaymentLabels).toEqual(["Restschuld", "Getilgter Kreditanteil", "Zinsen"]);
+    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(28000);
     expect(trendLabels).toEqual(["Ausgangswert", "Wertentwicklung"]);
+    expect([...repaymentLabels, "Darlehensbetrag inkl. Zinsen", ...trendLabels, "Immobilienwert"]).toContain(
+      "Darlehensbetrag inkl. Zinsen"
+    );
   });
 
   it("renders an empty real estate repayment chart without a start loan", () => {
@@ -147,10 +160,11 @@ describe("follow-up ui rendering", () => {
     expect(repayment).not.toContain("wealth-column-segment equity");
   });
 
-  it("scales the repayment chart to debt that grows above the start loan", () => {
+  it("scales the repayment chart to debt that grows above the loan cost basis", () => {
     const repayment = renderRealEstateRepaymentChart({
       points: [{ ...realEstateYear, loanEnd: 250000, interestDue: 12000 }],
       selectedYear: 2026,
+      loanCostBasis: 240000,
       formatMoney: String
     });
 

@@ -468,6 +468,11 @@ function bindEvents(): void {
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "toggle-real-estate-withdrawal-gain-source") toggleRealEstateWithdrawalGainSource();
     if (action === "toggle-real-estate-depot-savings-rate-source") toggleRealEstateDepotSavingsRateSource();
+    if (action === "toggle-combined-module") {
+      toggleCombinedModule(button.dataset.combinedToggle as CombinedToggleKey);
+      renderAll();
+      return;
+    }
     if (action === "add-real-estate-savings-source-equityCapital") addRealEstateSavingsSource("equityCapital");
     if (action === "add-real-estate-savings-source-monthlyPayment") addRealEstateSavingsSource("monthlyPayment");
     if (action === "add-real-estate-savings-source-specialRepayment") addRealEstateSavingsSource("specialRepayment");
@@ -706,7 +711,16 @@ function renderCalculations(
     state.realEstate.financingStartAge
   );
   const financingYears = currentRealEstateFinancingYears();
-  const realEstateProjectionYears = currentRealEstateProjectionYears(financingStartYear, standardProjection.endAge);
+  const realEstateProjectionYears = projectionYearsThroughFinancingEnd(
+    financingStartYear,
+    currentRealEstateProjectionYears(financingStartYear, standardProjection.endAge),
+    financingYears
+  );
+  const combinedRealEstateProjectionYears = currentCombinedRealEstateProjectionYears(
+    financingStartYear,
+    standardProjection,
+    retirementProjection
+  );
   renderRealEstateSourceLists(standardProjection);
   const realEstate = calculateRealEstateFinancing(
     financingStartYear,
@@ -715,7 +729,16 @@ function renderCalculations(
     { financingYears, projectionYears: realEstateProjectionYears }
   );
   renderRealEstateCalculations(realEstate);
-  const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, realEstate);
+  const combinedRealEstate =
+    combinedRealEstateProjectionYears === realEstateProjectionYears
+      ? realEstate
+      : calculateRealEstateFinancing(
+          financingStartYear,
+          state.realEstate,
+          realEstateSourceSchedule(financingStartYear, combinedRealEstateProjectionYears, standardProjection),
+          { financingYears, projectionYears: combinedRealEstateProjectionYears }
+        );
+  const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, combinedRealEstate);
   renderCombinedWealthCalculations(combinedYears);
 }
 
@@ -784,6 +807,8 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
     repaymentHost.innerHTML = renderRealEstateRepaymentChart({
       points: result.years,
       selectedYear: selectedRealEstateYear,
+      loanCostBasis: result.totalLoanCost,
+      financingEndYear: result.financingEndYear,
       formatMoney: (value) => money(value)
     });
   }
@@ -793,6 +818,7 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
     trendHost.innerHTML = renderRealEstateTrendChart({
       points: result.years,
       selectedYear: selectedRealEstateYear,
+      financingEndYear: result.financingEndYear,
       formatMoney: (value) => money(value)
     });
   }
@@ -828,6 +854,29 @@ function currentRealEstateProjectionYears(startYear: number, investmentEndAge: n
   const saleYear = state.realEstate.plannedSaleYear;
   const projectionEndYear = saleYear !== null && saleYear >= startYear ? Math.round(saleYear) : investmentEndYear;
   return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
+}
+
+function currentCombinedRealEstateProjectionYears(
+  startYear: number,
+  standardProjection: AssetProjection,
+  retirementProjection: AssetProjection
+): number {
+  const standardEndYear = state.investment.birthYear + Math.floor(standardProjection.endAge);
+  const retirementEndYear = state.investment.retirementBirthYear + Math.floor(retirementProjection.endAge);
+  const combinedEndYear = Math.max(standardEndYear, retirementEndYear);
+  const saleYear = state.realEstate.plannedSaleYear;
+  const projectionEndYear =
+    saleYear !== null && saleYear >= startYear ? Math.min(Math.round(saleYear), combinedEndYear) : combinedEndYear;
+  return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
+}
+
+function projectionYearsThroughFinancingEnd(startYear: number, projectionYears: number, financingYears: number): number {
+  const financingEndYear = startYear + financingYears;
+  const saleYear = state.realEstate.plannedSaleYear;
+  if (saleYear !== null && saleYear >= startYear && saleYear < financingEndYear) {
+    return projectionYears;
+  }
+  return clamp(Math.max(projectionYears, financingYears + 1), 1, 80);
 }
 
 function realEstateDepotSavingsRateAvailable(standardProjection: AssetProjection): boolean {
@@ -2634,8 +2683,16 @@ function syncRealEstateLocaleLabels(locale: RealEstateFinancingSettings["locale"
 
 function syncCombinedToggleInputsFromState(): void {
   for (const [key, value] of Object.entries(state.combinedWealth) as Array<[CombinedToggleKey, boolean]>) {
-    const checkbox = document.querySelector<HTMLInputElement>(`[data-combined-toggle="${key}"]`);
-    if (checkbox) checkbox.checked = value;
+    const control = document.querySelector<HTMLElement>(`[data-combined-toggle="${key}"]`);
+    if (!control) continue;
+    if (control instanceof HTMLInputElement) {
+      control.checked = value;
+      continue;
+    }
+    control.classList.toggle("active", value);
+    control.setAttribute("aria-pressed", String(value));
+    const status = control.querySelector<HTMLElement>("[data-combined-toggle-status]");
+    if (status) status.textContent = value ? "Aktiv" : "Aus";
   }
 }
 
@@ -2680,6 +2737,11 @@ function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
     ...state.combinedWealth,
     [key]: checked
   } as AppState["combinedWealth"];
+}
+
+function toggleCombinedModule(key: CombinedToggleKey | undefined): void {
+  if (!key || !(key in state.combinedWealth)) return;
+  updateCombinedToggle(key, !state.combinedWealth[key]);
 }
 
 function toggleRealEstateSourcePosition(kind: RealEstatePaymentSourceKind, id: string, checked: boolean): void {
@@ -3713,12 +3775,19 @@ function showRealEstateChartPopup(
   if (!result || !point || !popup || !card) return;
 
   const initialPropertyValue = Math.max(0, result.years[0]?.propertyValue ?? 0);
-  const segments =
-    chartKind === "trend"
-      ? realEstateTrendSegments(point, initialPropertyValue)
-      : realEstateRepaymentSegments(point, result.startLoanAmount);
-  const totalLabel = chartKind === "trend" ? "Immobilienwert" : "Restschuld";
-  const totalValue = chartKind === "trend" ? point.propertyValue : point.loanEnd;
+  const repaymentGroup = chartPopupSection("Tilgung und Kredit", [
+    ...realEstateRepaymentSegments(point, result.totalLoanCost).map((segment) =>
+      chartPopupLine(segment.className, segment.label, money(segment.value))
+    ),
+    chartPopupLine("gross", "Darlehensbetrag inkl. Zinsen", money(result.totalLoanCost))
+  ]);
+  const trendGroup = chartPopupSection("Immobilienwertentwicklung", [
+    ...realEstateTrendSegments(point, initialPropertyValue).map((segment) =>
+      chartPopupLine(segment.className, segment.label, money(segment.value))
+    ),
+    chartPopupTotalLine("Immobilienwert", money(point.propertyValue))
+  ]);
+  const groups = chartKind === "trend" ? [trendGroup, repaymentGroup] : [repaymentGroup, trendGroup];
   const title = chartKind === "trend" ? "Immobilienwertentwicklung" : "Tilgung und Vermoegen";
 
   popup.innerHTML = `
@@ -3730,8 +3799,7 @@ function showRealEstateChartPopup(
       <button class="chart-popup-close" type="button" data-action="close-investment-chart-popup" aria-label="Popup schliessen">x</button>
     </div>
     <div class="chart-popup-list">
-      ${segments.map((segment) => chartPopupLine(segment.className, segment.label, money(segment.value))).join("")}
-      ${chartPopupTotalLine(totalLabel, money(totalValue))}
+      ${groups.join("")}
     </div>
   `;
 
@@ -3764,6 +3832,15 @@ function chartPopupTotalLine(label: string, value: string): string {
     <div class="chart-popup-line chart-popup-total">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function chartPopupSection(title: string, lines: string[]): string {
+  return `
+    <div class="chart-popup-section">
+      <div class="chart-popup-section-title">${escapeHtml(title)}</div>
+      ${lines.join("")}
     </div>
   `;
 }

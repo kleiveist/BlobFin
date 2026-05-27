@@ -93,7 +93,7 @@ export function calculateRealEstateFinancing(
   const equityCapital = roundMoney(Math.max(0, sourceSchedule.equityCapital));
   const loanAmount = deriveLoanAmount(settings, equityCapital);
   const financingYears = clampYears(options.financingYears ?? deriveFinancingYearsFromSettings(settings));
-  const projectionYears = clampYears(Math.max(financingYears, options.projectionYears ?? financingYears));
+  const projectionYears = clampYears(options.projectionYears ?? financingYears);
   const monthlyRate = Math.max(0, settings.interestRatePercent) / 100 / 12;
   const growthRate = Math.max(0, settings.propertyValueGrowthPercent) / 100;
   const startPropertyValue = Math.max(0, settings.purchasePrice + settings.constructionOrRenovationCosts + settings.landCosts);

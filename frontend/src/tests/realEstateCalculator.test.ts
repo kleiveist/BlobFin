@@ -297,6 +297,25 @@ describe("real estate calculator", () => {
     expect(result.years[1].loanEnd).toBeGreaterThan(result.years[0].loanEnd);
   });
 
+  it("respects a projection horizon before the financing end year", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(120000, {
+      interestRatePercent: 3,
+      financingYears: 5
+    });
+
+    const result = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000, 60)),
+      { financingYears: 5, projectionYears: 2 }
+    );
+
+    expect(result.years).toHaveLength(2);
+    expect(result.financingEndYear).toBe(state.settings.year + 5);
+    expect(result.projectionEndYear).toBe(state.settings.year + 1);
+  });
+
   it("marks invalid required settings", () => {
     const state = defaultAppState();
     const errors = validateRealEstateSettings({

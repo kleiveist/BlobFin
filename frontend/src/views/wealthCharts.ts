@@ -6,6 +6,16 @@ interface ChartRenderInput<T> {
   formatMoney: (value: number) => string;
 }
 
+interface RealEstateChartOptions {
+  financingEndYear?: number;
+}
+
+type RealEstateRepaymentChartInput = ChartRenderInput<RealEstateFinancingYear> & RealEstateChartOptions & {
+  loanCostBasis?: number;
+};
+
+type RealEstateTrendChartInput = ChartRenderInput<RealEstateFinancingYear> & RealEstateChartOptions;
+
 export interface VerticalBarSegment {
   className: string;
   label: string;
@@ -13,16 +23,19 @@ export interface VerticalBarSegment {
   overlay?: boolean;
 }
 
-export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstateFinancingYear>): string {
+export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartInput): string {
   if (!input.points.length) {
     return '<div class="chart-empty">Noch keine Immobilienberechnung verfuegbar.</div>';
   }
 
-  const startLoanAmount = input.points[0]?.loanStart ?? 0;
-  if (!Number.isFinite(startLoanAmount) || startLoanAmount <= 0) {
+  const loanCostBasis = positiveBasis(input.loanCostBasis, input.points[0]?.loanStart ?? 0);
+  if (!Number.isFinite(loanCostBasis) || loanCostBasis <= 0) {
     return '<div class="chart-empty">Noch kein Start-Kreditvolumen fuer die Tilgung vorhanden.</div>';
   }
-  const maxDebt = Math.max(startLoanAmount, ...input.points.map((point) => Math.max(0, point.loanStart, point.loanEnd)));
+  const maxDebt = Math.max(
+    loanCostBasis,
+    ...input.points.map((point) => Math.max(0, point.loanStart, point.loanEnd))
+  );
 
   return renderVerticalChart({
     label: "Immobilienfinanzierung je Jahr",
@@ -34,11 +47,12 @@ export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstat
       { className: "interest", label: "Zinsen" }
     ],
     points: input.points.map((point) => {
-      const composition = propertyComposition(point, startLoanAmount);
+      const composition = propertyComposition(point, loanCostBasis);
       return {
         ...composition,
         year: point.year,
         selected: input.selectedYear === point.year,
+        financingEnd: input.financingEndYear === point.year,
         action: "select-real-estate-year",
         chartKind: "repayment",
         value: point.loanEnd,
@@ -49,7 +63,7 @@ export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstat
   });
 }
 
-export function renderRealEstateTrendChart(input: ChartRenderInput<RealEstateFinancingYear>): string {
+export function renderRealEstateTrendChart(input: RealEstateTrendChartInput): string {
   if (!input.points.length) {
     return '<div class="chart-empty">Keine Werte fuer die Immobilienwertentwicklung vorhanden.</div>';
   }
@@ -66,6 +80,7 @@ export function renderRealEstateTrendChart(input: ChartRenderInput<RealEstateFin
     points: input.points.map((point) => ({
       year: point.year,
       selected: input.selectedYear === point.year,
+      financingEnd: input.financingEndYear === point.year,
       action: "select-real-estate-year",
       chartKind: "trend",
       value: point.propertyValue,
@@ -118,6 +133,7 @@ function renderVerticalChart(input: {
   points: Array<{
     year: number;
     selected: boolean;
+    financingEnd?: boolean;
     action: string;
     chartKind?: string;
     value: number;
@@ -151,6 +167,7 @@ function renderVerticalBar(
   point: {
     year: number;
     selected: boolean;
+    financingEnd?: boolean;
     action: string;
     chartKind?: string;
     value: number;
@@ -161,14 +178,22 @@ function renderVerticalBar(
   maxValue: number
 ): string {
   const barHeight = heightPercent(point.barTotal, maxValue);
+  const buttonClasses = [
+    "wealth-column-button",
+    point.selected ? "active" : "",
+    point.financingEnd ? "financing-end" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
   return `
     <button
-      class="wealth-column-button ${point.selected ? "active" : ""}"
+      class="${buttonClasses}"
       type="button"
       role="listitem"
       data-action="${point.action}"
       data-year="${point.year}"
       ${point.chartKind ? `data-chart-kind="${point.chartKind}"` : ""}
+      ${point.financingEnd ? 'data-financing-end="true"' : ""}
       title="${point.year}: ${point.valueLabel}"
     >
       <span class="wealth-column-value">${point.valueLabel}</span>
@@ -210,24 +235,32 @@ function heightPercent(value: number, maxValue: number): number {
   return Math.max(0, Math.min(100, (value / maxValue) * 100));
 }
 
-function propertyComposition(point: RealEstateFinancingYear, startLoanAmount: number): { barTotal: number; segments: VerticalBarSegment[] } {
-  const segments = realEstateRepaymentSegments(point, startLoanAmount);
+function propertyComposition(
+  point: RealEstateFinancingYear,
+  loanCostBasis: number
+): { barTotal: number; segments: VerticalBarSegment[] } {
+  const segments = realEstateRepaymentSegments(point, loanCostBasis);
   const debt = segments.find((segment) => segment.className === "debt")?.value ?? 0;
-  const barTotal = Math.max(startLoanAmount, debt);
+  const barTotal = Math.max(loanCostBasis, debt);
   return {
     barTotal,
     segments
   };
 }
 
-export function realEstateRepaymentSegments(point: RealEstateFinancingYear, startLoanAmount: number): VerticalBarSegment[] {
+export function realEstateRepaymentSegments(point: RealEstateFinancingYear, loanCostBasis: number): VerticalBarSegment[] {
   const debt = Math.max(0, point.loanEnd);
-  const equity = Math.max(0, startLoanAmount - Math.min(startLoanAmount, debt));
+  const equity = Math.max(0, loanCostBasis - debt);
   return [
     { className: "debt", label: "Restschuld", value: debt },
     { className: "equity", label: "Getilgter Kreditanteil", value: equity },
     { className: "interest", label: "Zinsen", value: Math.max(0, point.interestDue), overlay: true }
   ];
+}
+
+function positiveBasis(value: number | undefined, fallback: number): number {
+  const candidate = Number.isFinite(value) ? Number(value) : fallback;
+  return Math.max(0, candidate);
 }
 
 export function realEstateTrendSegments(point: RealEstateFinancingYear, initialPropertyValue: number): VerticalBarSegment[] {

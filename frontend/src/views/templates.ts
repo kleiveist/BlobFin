@@ -424,14 +424,14 @@ export function renderAppShell(): string {
           <section class="combined-wealth-card">
             <h3>Module aktivieren</h3>
             <div class="combined-toggle-grid">
-              ${combinedToggle("includeCashPositions", "Cash-/Kontopositionen")}
-              ${combinedToggle("includeCostReserveAccounts", "Kosten-/Ruecklagenkonten")}
-              ${combinedToggle("includeAnnualTableAccounts", "Jahrestabellenkonten")}
-              ${combinedToggle("includeDepotDevelopment", "Depot-/Investmententwicklung")}
-              ${combinedToggle("includeSharedDepotDevelopment", "Gemeinsame Anlageentwicklung")}
-              ${combinedToggle("includeWithdrawals", "Auszahlungs-/Entnahmeplanung")}
-              ${combinedToggle("includeRealEstateFinancing", "Immobilienfinanzierung")}
-              ${combinedToggle("includeRealEstateValueTrend", "Immobilienwertentwicklung")}
+              ${combinedToggle("includeCashPositions", "Cash-/Kontopositionen", "Beruecksichtigt liquide Konten und laufende Ruecklagen.")}
+              ${combinedToggle("includeCostReserveAccounts", "Kosten-/Ruecklagenkonten", "Fuehrt geplante Kosten- und Reservekonten in der Kombination mit.")}
+              ${combinedToggle("includeAnnualTableAccounts", "Jahrestabellenkonten", "Nimmt jahresbasierte Konten aus den Tabellen in den Pfad auf.")}
+              ${combinedToggle("includeDepotDevelopment", "Depot-/Investmententwicklung", "Zeigt das Standarddepot mit Sparrate, Wachstum und Entnahmen.")}
+              ${combinedToggle("includeSharedDepotDevelopment", "Gemeinsame Anlageentwicklung", "Addiert die gemeinsame Anlageentwicklung zum Standarddepot.")}
+              ${combinedToggle("includeWithdrawals", "Auszahlungs-/Entnahmeplanung", "Spiegelt geplante Entnahmen als Liquiditaetseffekt im Gesamtpfad.")}
+              ${combinedToggle("includeRealEstateFinancing", "Immobilienfinanzierung", "Beruecksichtigt Restschuld und Tilgungsquellen der Immobilie.")}
+              ${combinedToggle("includeRealEstateValueTrend", "Immobilienwertentwicklung", "Fuehrt den Immobilienwert bis zum Endjahr oder Verkaufsjahr fort.")}
             </div>
           </section>
           <section class="combined-wealth-card">
@@ -619,12 +619,21 @@ function realEstateEnglishLabel(key: string, fallback: string): string {
   return labels[key] ?? fallback;
 }
 
-function combinedToggle(key: string, label: string): string {
+function combinedToggle(key: string, label: string, description: string): string {
   return `
-    <label class="combined-toggle-item">
-      <input type="checkbox" data-combined-toggle="${key}" />
-      <span>${label}</span>
-    </label>
+    <button
+      class="combined-toggle-item"
+      type="button"
+      data-action="toggle-combined-module"
+      data-combined-toggle="${key}"
+      aria-pressed="false"
+    >
+      <span class="combined-toggle-copy">
+        <strong>${label}</strong>
+        <small>${description}</small>
+      </span>
+      <span class="combined-toggle-status" data-combined-toggle-status>Aus</span>
+    </button>
   `;
 }
 
