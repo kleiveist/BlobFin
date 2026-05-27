@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { buildCombinedWealthSeries } from "../domain/combinedWealth";
 import type { AssetProjection, AssetProjectionPoint, CombinedWealthToggles, RealEstateFinancingYear } from "../types";
 
+const zeroAdditionalRepayment = {
+  withdrawalGain: 0,
+  depotSavingsRate: 0,
+  legacySavingsRate: 0,
+  netGain: 0,
+  totalAdditionalRepayment: 0
+};
+
 function point(age: number, phase: AssetProjectionPoint["phase"], netBalance: number): AssetProjectionPoint {
   return {
     age,
@@ -88,6 +96,8 @@ describe("combined wealth", () => {
         interestPaid: 0,
         principalPaid: 0,
         specialRepayment: 0,
+        additionalRepayment: 0,
+        additionalRepaymentBreakdown: zeroAdditionalRepayment,
         loanEnd: 205000,
         propertyEquity: 95000,
         netPropertyWealth: 95000
@@ -99,6 +109,8 @@ describe("combined wealth", () => {
         interestPaid: 0,
         principalPaid: 0,
         specialRepayment: 0,
+        additionalRepayment: 0,
+        additionalRepaymentBreakdown: zeroAdditionalRepayment,
         loanEnd: 198000,
         propertyEquity: 108000,
         netPropertyWealth: 108000
@@ -145,6 +157,8 @@ describe("combined wealth", () => {
           interestPaid: 0,
           principalPaid: 0,
           specialRepayment: 0,
+          additionalRepayment: 0,
+          additionalRepaymentBreakdown: zeroAdditionalRepayment,
           loanEnd: 145000,
           propertyEquity: 55000,
           netPropertyWealth: 55000
@@ -208,5 +222,53 @@ describe("combined wealth", () => {
 
     expect(withWithdrawals[2].withdrawalImpact).toBeLessThan(0);
     expect(withWithdrawals[2].totalNetWealth).toBeLessThan(withoutWithdrawals[2].totalNetWealth);
+  });
+
+  it("redirects active repayment sources away from cash and depot", () => {
+    const depot = projection([point(30, "saving", 12000), point(31, "saving", 24000)], 0, 65);
+    const realEstate: RealEstateFinancingYear[] = [
+      {
+        year: 2026,
+        propertyValue: 300000,
+        loanStart: 200000,
+        interestPaid: 0,
+        principalPaid: 0,
+        specialRepayment: 0,
+        additionalRepayment: 6000,
+        additionalRepaymentBreakdown: {
+          withdrawalGain: 1200,
+          depotSavingsRate: 2400,
+          legacySavingsRate: 1200,
+          netGain: 1200,
+          totalAdditionalRepayment: 6000
+        },
+        loanEnd: 194000,
+        propertyEquity: 106000,
+        netPropertyWealth: 106000
+      }
+    ];
+
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 1,
+      cashStartValue: 10000,
+      yearlyCashDelta: 0,
+      depotProjection: depot,
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateYears: realEstate,
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeWithdrawals: false,
+        includeRealEstateFinancing: true
+      }
+    });
+
+    expect(result[0].redirectedCashRepayment).toBe(3600);
+    expect(result[0].redirectedDepotRepayment).toBe(2400);
+    expect(result[0].cashValue).toBe(6400);
+    expect(result[0].depotValue).toBe(9600);
   });
 });

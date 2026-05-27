@@ -2205,7 +2205,7 @@ tfoot th {
 .module-launcher-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .module-card-button {
@@ -2307,6 +2307,38 @@ tfoot th {
   margin: 0;
 }
 
+.year-account-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 560px;
+}
+
+.account-dialog-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(31, 37, 40, 0.35);
+  padding: 16px;
+}
+
+:root[data-theme="dark"] .account-dialog-backdrop {
+  background: rgba(0, 0, 0, 0.52);
+}
+
+.account-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(560px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(31, 37, 40, 0.2);
+  padding: 12px;
+}
+
 .real-estate-grid,
 .combined-wealth-grid {
   display: grid;
@@ -2325,6 +2357,31 @@ tfoot th {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.assumption-control {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.assumption-control-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.assumption-control-row strong {
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.repayment-source-preview {
+  margin-top: 10px;
 }
 
 .validation-box {
@@ -2365,83 +2422,137 @@ tfoot th {
   border: 1px solid var(--row-border);
   border-radius: 8px;
   margin-top: 8px;
-  min-height: 130px;
+  min-height: 260px;
   padding: 10px;
 }
 
-.wealth-bars {
+.wealth-vertical-chart {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+  grid-template-columns: 86px minmax(0, 1fr);
+  min-height: 250px;
 }
 
-.wealth-bar-row {
-  align-items: center;
+.wealth-y-axis {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.74rem;
+  font-weight: 800;
+  grid-template-rows: auto 1fr auto;
+  min-height: 208px;
+  padding-top: 18px;
+  text-align: right;
+}
+
+.wealth-plot {
+  align-items: end;
+  background:
+    linear-gradient(to bottom, transparent 0, transparent calc(50% - 1px), var(--row-border) calc(50% - 1px), var(--row-border) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(to bottom, var(--row-border), var(--row-border) 1px, transparent 1px),
+    linear-gradient(to top, var(--row-border), var(--row-border) 1px, transparent 1px);
+  display: grid;
+  gap: 8px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(34px, 1fr);
+  min-height: 208px;
+  overflow-x: auto;
+  padding: 18px 8px 0;
+}
+
+.wealth-column-button {
+  align-items: stretch;
+  align-self: stretch;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--text);
   cursor: pointer;
   display: grid;
-  gap: 8px;
-  grid-template-columns: 60px 1fr 130px;
-  padding: 6px;
-  text-align: left;
+  gap: 5px;
+  grid-template-rows: 20px minmax(130px, 1fr) 20px;
+  min-width: 34px;
+  padding: 4px;
 }
 
-.wealth-bar-row.static {
-  cursor: default;
-}
-
-.wealth-bar-row.active {
+.wealth-column-button.active {
   border-color: var(--accent);
   background: var(--highlight);
 }
 
-.wealth-bar-year {
+.wealth-column-value {
   color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.wealth-bar-track {
-  background: var(--surface-muted);
-  border-radius: 5px;
-  display: grid;
-  gap: 2px;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
   overflow: hidden;
-  padding: 2px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
 }
 
-.wealth-bar-segment {
-  border-radius: 4px;
+.wealth-column-track {
+  align-items: end;
+  align-self: end;
+  background: var(--surface-muted);
+  border-radius: 6px 6px 2px 2px;
+  display: flex;
+  gap: 2px;
+  height: 100%;
+  min-height: 130px;
+  overflow: hidden;
+  padding: 3px;
+}
+
+.wealth-column-segment {
+  align-self: end;
+  border-radius: 4px 4px 1px 1px;
   display: block;
-  height: 10px;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
-.wealth-bar-segment.property {
+.wealth-column-segment.cash {
+  background: #0f766e;
+}
+
+.wealth-column-segment.depot {
+  background: #2563eb;
+}
+
+.wealth-column-segment.property {
   background: #3b82f6;
 }
 
-.wealth-bar-segment.equity {
+.wealth-column-segment.equity {
   background: #10b981;
 }
 
-.wealth-bar-segment.debt {
+.wealth-column-segment.debt {
   background: #ef4444;
 }
 
-.wealth-bar-segment.net {
+.wealth-column-segment.net {
   background: #16a34a;
 }
 
-.wealth-bar-segment.gross {
+.wealth-column-segment.gross {
   background: #64748b;
 }
 
-.wealth-bar-value {
-  font-size: 0.82rem;
-  font-variant-numeric: tabular-nums;
-  justify-self: end;
+.wealth-column-year {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.wealth-x-axis {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  grid-column: 2;
+  text-align: center;
 }
 
 .wealth-detail-box {
@@ -2477,6 +2588,14 @@ tfoot th {
   .wealth-bar-value {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+
+  .wealth-vertical-chart {
+    grid-template-columns: 66px minmax(0, 1fr);
+  }
+
+  .wealth-plot {
+    grid-auto-columns: minmax(30px, 44px);
   }
 }
 

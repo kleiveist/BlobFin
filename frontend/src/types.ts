@@ -16,6 +16,12 @@ export type AppSectionId =
 export type PlanningAccountType = "cost_reserve" | "annual_table" | "mixed";
 export type RealEstateLocale = "de" | "en";
 export type SpecialRepaymentRhythm = "none" | "monthly" | "yearly";
+export type RepaymentSourceToggleKey =
+  | "useWithdrawalGainAsRepayment"
+  | "useDepotSavingsRateAsRepayment"
+  | "useLegacySavingsRateAsRepayment"
+  | "useNetGainAsRepayment"
+  | "onlyUsePositiveValues";
 export type PositionTableFilterColumn =
   | "active"
   | "visible"
@@ -168,6 +174,38 @@ export interface RealEstateFinancingSettings {
   inflationRatePercent: number;
   financingYears: number;
   manualFuturePropertyValue: number | null;
+  repaymentSources: RepaymentSourceToggle;
+}
+
+export interface RepaymentSourceToggle {
+  useWithdrawalGainAsRepayment: boolean;
+  useDepotSavingsRateAsRepayment: boolean;
+  useLegacySavingsRateAsRepayment: boolean;
+  useNetGainAsRepayment: boolean;
+  onlyUsePositiveValues: boolean;
+}
+
+export interface RepaymentSourceValues {
+  withdrawalGain: number;
+  depotSavingsRate: number;
+  legacySavingsRate: number;
+  netGain: number;
+}
+
+export interface AdditionalRepaymentBreakdown {
+  withdrawalGain: number;
+  depotSavingsRate: number;
+  legacySavingsRate: number;
+  netGain: number;
+  totalAdditionalMonthlyRepayment: number;
+}
+
+export interface AdditionalRepaymentYearBreakdown {
+  withdrawalGain: number;
+  depotSavingsRate: number;
+  legacySavingsRate: number;
+  netGain: number;
+  totalAdditionalRepayment: number;
 }
 
 export interface CombinedWealthToggles {
@@ -186,6 +224,8 @@ export interface CombinedWealthYear {
   cashValue: number;
   depotValue: number;
   withdrawalImpact: number;
+  redirectedCashRepayment: number;
+  redirectedDepotRepayment: number;
   propertyValue: number;
   propertyDebt: number;
   propertyEquity: number;
@@ -317,6 +357,8 @@ export interface RealEstateFinancingYear {
   interestPaid: number;
   principalPaid: number;
   specialRepayment: number;
+  additionalRepayment: number;
+  additionalRepaymentBreakdown: AdditionalRepaymentYearBreakdown;
   loanEnd: number;
   propertyEquity: number;
   netPropertyWealth: number;
@@ -329,6 +371,7 @@ export interface RealEstateFinancingMonth {
   interestPaid: number;
   principalPaid: number;
   specialRepayment: number;
+  additionalRepayment: number;
   loanEnd: number;
 }
 

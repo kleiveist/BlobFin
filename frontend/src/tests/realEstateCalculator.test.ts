@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
-import { calculateRealEstateFinancing, deriveLoanAmount, deriveMonthlyPayment, validateRealEstateSettings } from "../domain/realEstateCalculator";
+import {
+  buildAdditionalRepaymentBreakdown,
+  calculateRealEstateFinancing,
+  deriveLoanAmount,
+  deriveMonthlyPayment,
+  validateRealEstateSettings
+} from "../domain/realEstateCalculator";
 
 describe("real estate calculator", () => {
   it("derives a loan amount from total project cost and equity", () => {
@@ -76,5 +82,46 @@ describe("real estate calculator", () => {
 
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.join(" ")).toContain("Kaufpreis");
+  });
+
+  it("adds activated free funds as separate additional repayment", () => {
+    const state = defaultAppState();
+    const settings = {
+      ...state.realEstate,
+      loanAmount: 120000,
+      interestRatePercent: 0,
+      monthlyPayment: 1000,
+      financingYears: 5,
+      specialRepaymentAmount: 0,
+      repaymentSources: {
+        ...state.realEstate.repaymentSources,
+        useDepotSavingsRateAsRepayment: true,
+        useNetGainAsRepayment: true
+      }
+    };
+
+    const result = calculateRealEstateFinancing(state.settings.year, settings, {
+      withdrawalGain: 400,
+      depotSavingsRate: 250,
+      legacySavingsRate: 125,
+      netGain: 300
+    });
+
+    expect(result.years[0].additionalRepayment).toBeCloseTo(6600, 2);
+    expect(result.years[0].additionalRepaymentBreakdown.depotSavingsRate).toBeCloseTo(3000, 2);
+    expect(result.years[0].additionalRepaymentBreakdown.netGain).toBeCloseTo(3600, 2);
+    expect(result.years[0].loanEnd).toBeLessThan(108000);
+  });
+
+  it("keeps repayment sources disabled by default", () => {
+    const state = defaultAppState();
+    const breakdown = buildAdditionalRepaymentBreakdown(state.realEstate, {
+      withdrawalGain: 500,
+      depotSavingsRate: 500,
+      legacySavingsRate: 500,
+      netGain: 500
+    });
+
+    expect(breakdown.totalAdditionalMonthlyRepayment).toBe(0);
   });
 });

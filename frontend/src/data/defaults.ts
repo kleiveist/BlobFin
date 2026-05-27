@@ -7,6 +7,7 @@ import type {
   PlanningSettings,
   PositionTableViewState,
   RealEstateFinancingSettings,
+  RepaymentSourceToggle,
   ReservePosition
 } from "../types";
 
@@ -258,7 +259,18 @@ export function defaultRealEstateFinancingSettings(): RealEstateFinancingSetting
     propertyValueGrowthPercent: 1.5,
     inflationRatePercent: 2,
     financingYears: 35,
-    manualFuturePropertyValue: null
+    manualFuturePropertyValue: null,
+    repaymentSources: defaultRepaymentSourceToggles()
+  };
+}
+
+export function defaultRepaymentSourceToggles(): RepaymentSourceToggle {
+  return {
+    useWithdrawalGainAsRepayment: false,
+    useDepotSavingsRateAsRepayment: false,
+    useLegacySavingsRateAsRepayment: false,
+    useNetGainAsRepayment: false,
+    onlyUsePositiveValues: true
   };
 }
 

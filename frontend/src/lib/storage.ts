@@ -7,7 +7,8 @@ import {
   defaultPlanningAccounts,
   defaultPlanningSettings,
   defaultPositionTableViewState,
-  defaultRealEstateFinancingSettings
+  defaultRealEstateFinancingSettings,
+  defaultRepaymentSourceToggles
 } from "../data/defaults";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
 import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
@@ -33,6 +34,7 @@ import type {
   PositionTableViewState,
   PositionFlow,
   RealEstateFinancingSettings,
+  RepaymentSourceToggle,
   ReservePosition,
   ThemeMode
 } from "../types";
@@ -249,8 +251,10 @@ function normalizeAppUiState(value: unknown, accounts: PlanningAccount[]): AppUi
 }
 
 function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSectionId {
+  if (value === "grunddaten") {
+    return "cost_reserve_positions";
+  }
   if (
-    value === "grunddaten" ||
     value === "cost_reserve_positions" ||
     value === "year_table" ||
     value === "investment_planning" ||
@@ -321,7 +325,29 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
     propertyValueGrowthPercent: numberOrDefault(value.propertyValueGrowthPercent, fallback.propertyValueGrowthPercent),
     inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent),
     financingYears: numberOrDefault(value.financingYears, fallback.financingYears),
-    manualFuturePropertyValue: nullableNumberOrDefault(value.manualFuturePropertyValue, fallback.manualFuturePropertyValue)
+    manualFuturePropertyValue: nullableNumberOrDefault(value.manualFuturePropertyValue, fallback.manualFuturePropertyValue),
+    repaymentSources: normalizeRepaymentSourceToggles(value.repaymentSources)
+  };
+}
+
+function normalizeRepaymentSourceToggles(value: unknown): RepaymentSourceToggle {
+  const fallback = defaultRepaymentSourceToggles();
+  if (!isRecord(value)) return fallback;
+  return {
+    useWithdrawalGainAsRepayment: booleanOrDefault(
+      value.useWithdrawalGainAsRepayment,
+      fallback.useWithdrawalGainAsRepayment
+    ),
+    useDepotSavingsRateAsRepayment: booleanOrDefault(
+      value.useDepotSavingsRateAsRepayment,
+      fallback.useDepotSavingsRateAsRepayment
+    ),
+    useLegacySavingsRateAsRepayment: booleanOrDefault(
+      value.useLegacySavingsRateAsRepayment,
+      fallback.useLegacySavingsRateAsRepayment
+    ),
+    useNetGainAsRepayment: booleanOrDefault(value.useNetGainAsRepayment, fallback.useNetGainAsRepayment),
+    onlyUsePositiveValues: booleanOrDefault(value.onlyUsePositiveValues, fallback.onlyUsePositiveValues)
   };
 }
 

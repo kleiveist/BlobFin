@@ -6,41 +6,40 @@ interface ChartRenderInput<T> {
   formatMoney: (value: number) => string;
 }
 
+interface VerticalBarSegment {
+  className: string;
+  label: string;
+  value: number;
+}
+
 export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstateFinancingYear>): string {
   if (!input.points.length) {
     return '<div class="chart-empty">Noch keine Immobilienberechnung verfuegbar.</div>';
   }
 
-  const maxValue = Math.max(1, ...input.points.map((point) => Math.max(point.propertyValue, point.loanStart, point.loanEnd)));
-  return `
-    <div class="wealth-bars" role="list" aria-label="Immobilienfinanzierung je Jahr">
-      ${input.points
-        .map((point) => {
-          const isActive = input.selectedYear === point.year;
-          const debtWidth = widthPercent(point.loanEnd, maxValue);
-          const equityWidth = widthPercent(point.propertyEquity, maxValue);
-          const propertyWidth = widthPercent(point.propertyValue, maxValue);
-          return `
-            <button
-              class="wealth-bar-row ${isActive ? "active" : ""}"
-              type="button"
-              role="listitem"
-              data-action="select-real-estate-year"
-              data-year="${point.year}"
-            >
-              <span class="wealth-bar-year">${point.year}</span>
-              <span class="wealth-bar-track">
-                <span class="wealth-bar-segment property" style="width:${propertyWidth}%"></span>
-                <span class="wealth-bar-segment equity" style="width:${equityWidth}%"></span>
-                <span class="wealth-bar-segment debt" style="width:${debtWidth}%"></span>
-              </span>
-              <span class="wealth-bar-value">${input.formatMoney(point.netPropertyWealth)}</span>
-            </button>
-          `;
-        })
-        .join("")}
-    </div>
-  `;
+  const maxValue = Math.max(
+    1,
+    ...input.points.map((point) =>
+      Math.max(point.propertyValue, point.loanStart, point.loanEnd, point.principalPaid + point.additionalRepayment)
+    )
+  );
+
+  return renderVerticalChart({
+    label: "Immobilienfinanzierung je Jahr",
+    maxValue,
+    points: input.points.map((point) => ({
+      year: point.year,
+      selected: input.selectedYear === point.year,
+      action: "select-real-estate-year",
+      value: point.netPropertyWealth,
+      valueLabel: input.formatMoney(point.netPropertyWealth),
+      segments: [
+        { className: "property", label: "Immobilienwert", value: point.propertyValue },
+        { className: "equity", label: "Tilgung plus Eigenkapital", value: point.propertyEquity },
+        { className: "debt", label: "Restschuld", value: point.loanEnd }
+      ]
+    }))
+  });
 }
 
 export function renderRealEstateTrendChart(input: ChartRenderInput<RealEstateFinancingYear>): string {
@@ -48,26 +47,21 @@ export function renderRealEstateTrendChart(input: ChartRenderInput<RealEstateFin
     return '<div class="chart-empty">Keine Werte fuer die Immobilienwertentwicklung vorhanden.</div>';
   }
   const maxValue = Math.max(1, ...input.points.map((point) => Math.max(point.propertyValue, point.netPropertyWealth)));
-  return `
-    <div class="wealth-bars" role="list" aria-label="Immobilienwertentwicklung je Jahr">
-      ${input.points
-        .map((point) => {
-          const valueWidth = widthPercent(point.propertyValue, maxValue);
-          const netWidth = widthPercent(point.netPropertyWealth, maxValue);
-          return `
-            <div class="wealth-bar-row static" role="listitem">
-              <span class="wealth-bar-year">${point.year}</span>
-              <span class="wealth-bar-track">
-                <span class="wealth-bar-segment property" style="width:${valueWidth}%"></span>
-                <span class="wealth-bar-segment net" style="width:${netWidth}%"></span>
-              </span>
-              <span class="wealth-bar-value">${input.formatMoney(point.propertyValue)}</span>
-            </div>
-          `;
-        })
-        .join("")}
-    </div>
-  `;
+  return renderVerticalChart({
+    label: "Immobilienwertentwicklung je Jahr",
+    maxValue,
+    points: input.points.map((point) => ({
+      year: point.year,
+      selected: input.selectedYear === point.year,
+      action: "select-real-estate-year",
+      value: point.propertyValue,
+      valueLabel: input.formatMoney(point.propertyValue),
+      segments: [
+        { className: "property", label: "Immobilienwert", value: point.propertyValue },
+        { className: "net", label: "Netto-Immobilienvermoegen", value: point.netPropertyWealth }
+      ]
+    }))
+  });
 }
 
 export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealthYear>): string {
@@ -77,41 +71,112 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
 
   const maxValue = Math.max(
     1,
-    ...input.points.map((point) => Math.max(point.totalGrossAssets, point.totalNetWealth, Math.abs(point.propertyDebt)))
+    ...input.points.map((point) =>
+      Math.max(
+        point.totalGrossAssets,
+        point.totalNetWealth,
+        point.cashValue,
+        point.depotValue,
+        point.propertyValue,
+        Math.abs(point.totalDebt)
+      )
+    )
   );
 
+  return renderVerticalChart({
+    label: "Kombiniertes Vermoegen je Jahr",
+    maxValue,
+    points: input.points.map((point) => ({
+      year: point.year,
+      selected: input.selectedYear === point.year,
+      action: "select-combined-wealth-year",
+      value: point.totalNetWealth,
+      valueLabel: input.formatMoney(point.totalNetWealth),
+      segments: [
+        { className: "cash", label: "Cash", value: point.cashValue },
+        { className: "depot", label: "Depot", value: point.depotValue },
+        { className: "property", label: "Immobilienwert", value: point.propertyValue },
+        { className: "debt", label: "Immobilienschuld", value: point.totalDebt },
+        { className: "net", label: "Nettovermoegen", value: point.totalNetWealth }
+      ]
+    }))
+  });
+}
+
+function renderVerticalChart(input: {
+  label: string;
+  maxValue: number;
+  points: Array<{
+    year: number;
+    selected: boolean;
+    action: string;
+    value: number;
+    valueLabel: string;
+    segments: VerticalBarSegment[];
+  }>;
+}): string {
   return `
-    <div class="wealth-bars" role="list" aria-label="Kombiniertes Vermoegen je Jahr">
-      ${input.points
-        .map((point) => {
-          const isActive = input.selectedYear === point.year;
-          const grossWidth = widthPercent(point.totalGrossAssets, maxValue);
-          const debtWidth = widthPercent(point.totalDebt, maxValue);
-          const netWidth = widthPercent(point.totalNetWealth, maxValue);
-          return `
-            <button
-              class="wealth-bar-row ${isActive ? "active" : ""}"
-              type="button"
-              role="listitem"
-              data-action="select-combined-wealth-year"
-              data-year="${point.year}"
-            >
-              <span class="wealth-bar-year">${point.year}</span>
-              <span class="wealth-bar-track">
-                <span class="wealth-bar-segment gross" style="width:${grossWidth}%"></span>
-                <span class="wealth-bar-segment debt" style="width:${debtWidth}%"></span>
-                <span class="wealth-bar-segment net" style="width:${netWidth}%"></span>
-              </span>
-              <span class="wealth-bar-value">${input.formatMoney(point.totalNetWealth)}</span>
-            </button>
-          `;
-        })
-        .join("")}
+    <div class="wealth-vertical-chart" aria-label="${input.label}">
+      <div class="wealth-y-axis" aria-hidden="true">
+        <span>${formatAxis(input.maxValue)}</span>
+        <span>${formatAxis(input.maxValue / 2)}</span>
+        <span>0 EUR</span>
+      </div>
+      <div class="wealth-plot" role="list">
+        ${input.points.map((point) => renderVerticalBar(point, input.maxValue)).join("")}
+      </div>
+      <div class="wealth-x-axis" aria-hidden="true">Jahr</div>
     </div>
   `;
 }
 
-function widthPercent(value: number, maxValue: number): number {
+function renderVerticalBar(
+  point: {
+    year: number;
+    selected: boolean;
+    action: string;
+    value: number;
+    valueLabel: string;
+    segments: VerticalBarSegment[];
+  },
+  maxValue: number
+): string {
+  return `
+    <button
+      class="wealth-column-button ${point.selected ? "active" : ""}"
+      type="button"
+      role="listitem"
+      data-action="${point.action}"
+      data-year="${point.year}"
+      title="${point.year}: ${point.valueLabel}"
+    >
+      <span class="wealth-column-value">${point.valueLabel}</span>
+      <span class="wealth-column-track">
+        ${point.segments.map((segment) => renderSegment(segment, maxValue)).join("")}
+      </span>
+      <span class="wealth-column-year">${point.year}</span>
+    </button>
+  `;
+}
+
+function renderSegment(segment: VerticalBarSegment, maxValue: number): string {
+  const height = heightPercent(segment.value, maxValue);
+  return `
+    <span
+      class="wealth-column-segment ${segment.className}"
+      style="height:${height}%"
+      title="${segment.label}"
+    ></span>
+  `;
+}
+
+function heightPercent(value: number, maxValue: number): number {
   if (!Number.isFinite(value) || value <= 0 || maxValue <= 0) return 0;
   return Math.max(0, Math.min(100, (value / maxValue) * 100));
+}
+
+function formatAxis(value: number): string {
+  if (value >= 1000000) return `${Math.round(value / 100000) / 10} Mio. EUR`;
+  if (value >= 1000) return `${Math.round(value / 1000)} Tsd. EUR`;
+  return `${Math.round(value)} EUR`;
 }

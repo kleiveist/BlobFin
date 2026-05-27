@@ -66,7 +66,6 @@ export function renderAppShell(): string {
           <h2>Bereiche</h2>
         </div>
         <div class="module-launcher-grid">
-          ${moduleCardButton("grunddaten", "Grunddaten", "im Settings-Popup bearbeiten")}
           ${moduleCardButton("cost_reserve_positions", "Kosten- und Ruecklagenpositionen", "kontobasiert bearbeiten")}
           ${moduleCardButton("year_table", "Jahrestabelle", "aktives Konto analysieren")}
           ${moduleCardButton("investment_planning", "Investment- und Auszahlungsplanung", "Depot, Entnahme, Annahmen")}
@@ -105,6 +104,7 @@ export function renderAppShell(): string {
         </div>
         <div id="planningAccountCards" class="planning-account-cards"></div>
         <p id="planningAccountSummary" class="planning-account-summary">-</p>
+        <div id="planningAccountDialogHost"></div>
       </section>
 
       <section class="panel" data-module-section="cost_reserve_positions">
@@ -148,6 +148,7 @@ export function renderAppShell(): string {
         <div class="section-heading result-table-heading">
           <h2>Jahrestabelle <span id="activeYearAccountName"></span></h2>
           <div class="result-header-actions">
+            <div id="yearAccountSelector" class="year-account-selector" aria-label="Aktives Konto fuer Jahrestabelle"></div>
             <div class="position-mode-switch result-column-switch" role="group" aria-label="Jahrestabellen-Spalten">
               <button class="position-mode-button" type="button" data-action="toggle-result-max-needed" aria-pressed="false">
                 Max. Bedarf Monatsanfang
@@ -356,14 +357,9 @@ export function renderAppShell(): string {
             <div class="field-grid wide">
               ${realEstateNumberField("equityCapital", "Eigenkapital fuer Immobilie")}
               ${realEstateNumberField("loanAmount", "Darlehensbetrag")}
-              ${realEstateNumberField("interestRatePercent", "Zinssatz in %")}
-              ${realEstateNumberField("initialRepaymentPercent", "Anfangstilgung in %")}
               ${realEstateNumberField("fixedInterestYears", "Zinsbindung (Jahre)", { step: 1 })}
               ${realEstateNumberField("targetTermYears", "Ziel-Laufzeit (Jahre)", { step: 1 })}
-              ${realEstateNumberField("financingYears", "Finanzierungszeitraum (Jahre)", { step: 1 })}
               ${realEstateNumberField("remainingDebtAfterFixedInterest", "Restschuld nach Zinsbindung")}
-              ${realEstateNumberField("specialRepaymentAmount", "Sondertilgungsbetrag")}
-              ${realEstateNumberField("monthlyPayment", "Monatsrate")}
               <label class="field">
                 <span>Sondertilgungsrhythmus</span>
                 <select data-real-estate-field="specialRepaymentRhythm" id="propertyFinancing.specialRepaymentRhythm">
@@ -374,21 +370,11 @@ export function renderAppShell(): string {
               </label>
             </div>
             <div class="real-estate-slider-grid">
-              <label class="range-field">
-                <span>Zinssatz</span>
-                <input type="range" min="0" max="10" step="0.05" data-real-estate-range="interestRatePercent" />
-                <strong id="realEstateInterestRatePercentValue">-</strong>
-              </label>
-              <label class="range-field">
-                <span>Anfangstilgung</span>
-                <input type="range" min="0" max="10" step="0.05" data-real-estate-range="initialRepaymentPercent" />
-                <strong id="realEstateInitialRepaymentPercentValue">-</strong>
-              </label>
-              <label class="range-field">
-                <span>Finanzierungszeitraum</span>
-                <input type="range" min="1" max="50" step="1" data-real-estate-range="financingYears" />
-                <strong id="realEstateFinancingYearsValue">-</strong>
-              </label>
+              ${realEstateAssumptionControl("interestRatePercent", "Zinssatz", 0, 10, 0.05)}
+              ${realEstateAssumptionControl("initialRepaymentPercent", "Anfangstilgung", 0, 10, 0.05)}
+              ${realEstateAssumptionControl("monthlyPayment", "Monatsrate", 0, 8000, 50)}
+              ${realEstateAssumptionControl("specialRepaymentAmount", "Sondertilgung", 0, 50000, 500)}
+              ${realEstateAssumptionControl("financingYears", "Finanzierungszeitraum", 1, 50, 1)}
             </div>
           </section>
 
@@ -402,21 +388,27 @@ export function renderAppShell(): string {
               ${realEstateNumberField("targetMonthlyBurden", "Ziel-Monatsbelastung")}
               ${realEstateNumberField("maxMonthlyBurden", "Maximale Monatsbelastung")}
               ${realEstateNumberField("subsidyAmount", "Foerderung / Zuschuss")}
-              ${realEstateNumberField("propertyValueGrowthPercent", "Immobilienwertsteigerung in %")}
-              ${realEstateNumberField("inflationRatePercent", "Inflation in %")}
               ${realEstateNumberField("manualFuturePropertyValue", "Optionaler Zukunftswert", { nullable: true })}
             </div>
             <div class="real-estate-slider-grid">
-              <label class="range-field">
-                <span>Immobilienwertsteigerung</span>
-                <input type="range" min="0" max="8" step="0.1" data-real-estate-range="propertyValueGrowthPercent" />
-                <strong id="realEstatePropertyValueGrowthPercentValue">-</strong>
-              </label>
-              <label class="range-field">
-                <span>Inflation (optional)</span>
-                <input type="range" min="0" max="10" step="0.1" data-real-estate-range="inflationRatePercent" />
-                <strong id="realEstateInflationRatePercentValue">-</strong>
-              </label>
+              ${realEstateAssumptionControl("propertyValueGrowthPercent", "Immobilienwertsteigerung", 0, 8, 0.1)}
+              ${realEstateAssumptionControl("inflationRatePercent", "Inflation optional", 0, 10, 0.1)}
+            </div>
+          </section>
+
+          <section class="real-estate-card">
+            <h3>Tilgung aus freien Mitteln</h3>
+            <p class="planning-account-summary">Aktive Quellen werden als zusaetzliche Tilgung genutzt und im Kombinationspfad als umgeleitete Rate gezeigt.</p>
+            <div class="combined-toggle-grid">
+              ${repaymentSourceToggle("useWithdrawalGainAsRepayment", "Entnahmerate als Tilgung aktivieren")}
+              ${repaymentSourceToggle("useDepotSavingsRateAsRepayment", "Depot-Sparrate als Tilgung einbinden")}
+              ${repaymentSourceToggle("useLegacySavingsRateAsRepayment", "Alte Sparrate als Tilgung einbinden")}
+              ${repaymentSourceToggle("useNetGainAsRepayment", "Netto-Zugewinn als Tilgung einbinden")}
+              ${repaymentSourceToggle("onlyUsePositiveValues", "Nur positive Netto-Werte verwenden")}
+            </div>
+            <div class="detail-list repayment-source-preview">
+              ${detailLine("Zusatztilgung monatlich", "additionalRepaymentMonthlyMetric")}
+              ${detailLine("Zusatztilgung jaehrlich", "additionalRepaymentAnnualMetric")}
             </div>
           </section>
 
@@ -589,6 +581,37 @@ function realEstateNumberField(
   `;
 }
 
+function realEstateAssumptionControl(
+  key: string,
+  label: string,
+  min: number,
+  max: number,
+  step: number
+): string {
+  const englishLabel = realEstateEnglishLabel(key, label);
+  return `
+    <label class="range-field assumption-control" for="propertyFinancing.${key}">
+      <span data-real-estate-label-key="${key}" data-label-de="${label}" data-label-en="${englishLabel}">${label}</span>
+      <input type="range" min="${min}" max="${max}" step="${step}" data-real-estate-range="${key}" />
+      <div class="assumption-control-row">
+        <input
+          id="propertyFinancing.${key}"
+          type="number"
+          min="${min}"
+          max="${max}"
+          step="${step}"
+          data-real-estate-field="${key}"
+        />
+        <strong id="realEstate${capitalize(key)}Value">-</strong>
+      </div>
+    </label>
+  `;
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function realEstateEnglishLabel(key: string, fallback: string): string {
   const labels: Record<string, string> = {
     purchasePrice: "Property purchase price",
@@ -629,6 +652,15 @@ function combinedToggle(key: string, label: string): string {
   return `
     <label class="combined-toggle-item">
       <input type="checkbox" data-combined-toggle="${key}" />
+      <span>${label}</span>
+    </label>
+  `;
+}
+
+function repaymentSourceToggle(key: string, label: string): string {
+  return `
+    <label class="combined-toggle-item">
+      <input type="checkbox" data-repayment-source-toggle="${key}" />
       <span>${label}</span>
     </label>
   `;

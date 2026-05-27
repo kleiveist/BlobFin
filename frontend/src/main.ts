@@ -68,6 +68,8 @@ import type {
   PositionTableView,
   RealEstateFinancingResult,
   RealEstateFinancingSettings,
+  RepaymentSourceToggleKey,
+  RepaymentSourceValues,
   ReservePosition,
   ThemeMode
 } from "./types";
@@ -143,6 +145,14 @@ interface PositionFilterDraft {
 
 type RealEstateField = keyof RealEstateFinancingSettings;
 type CombinedToggleKey = keyof AppState["combinedWealth"];
+type AccountDialogMode = "create" | "rename";
+type AccountDialogState = {
+  mode: AccountDialogMode;
+  accountId: string | null;
+  name: string;
+  type: PlanningAccount["type"];
+  error: string;
+} | null;
 
 let state = loadInitialState();
 let draggedPositionId: string | null = null;
@@ -160,6 +170,7 @@ let positionFilterDrafts = createPositionFilterDrafts();
 let positionFilterPopupOpen = false;
 let selectedRealEstateYear: number | null = null;
 let selectedCombinedWealthYear: number | null = null;
+let accountDialog: AccountDialogState = null;
 normalizeInvestmentBounds();
 applyTheme();
 
@@ -185,19 +196,20 @@ function sanitizeAppState(appState: AppState): AppState {
     settingsGrunddatenExpanded: true
   };
   const ui = appState.ui ?? fallbackUi;
-  const planningAccounts = appState.planningAccounts.length
+  const fallbackPlanningAccounts: PlanningAccount[] = [
+    {
+      id: "default-account",
+      name: "Standardkonto",
+      type: "mixed",
+      yearlyRows: appState.positions.map((position) => sanitizePosition(position, appState.settings.year))
+    }
+  ];
+  const planningAccounts: PlanningAccount[] = appState.planningAccounts.length
     ? appState.planningAccounts.map((account) => ({
         ...account,
         yearlyRows: account.yearlyRows.map((position) => sanitizePosition(position, appState.settings.year))
       }))
-    : [
-        {
-          id: "default-account",
-          name: "Standardkonto",
-          type: "mixed",
-          yearlyRows: appState.positions.map((position) => sanitizePosition(position, appState.settings.year))
-        }
-      ];
+    : fallbackPlanningAccounts;
   const selectedPlanningAccountId = planningAccounts.some(
     (account) => account.id === ui.selectedPlanningAccountId
   )
@@ -213,7 +225,8 @@ function sanitizeAppState(appState: AppState): AppState {
     ui: {
       ...fallbackUi,
       ...ui,
-      selectedPlanningAccountId
+      selectedPlanningAccountId,
+      activeSection: ui.activeSection === "grunddaten" ? "cost_reserve_positions" : ui.activeSection
     },
     positions
   };
@@ -270,22 +283,11 @@ function syncPositionsFromActivePlanningAccount(): void {
 
 function setActiveSection(section: AppSectionId): void {
   state.ui = { ...state.ui, activeSection: section };
-  if (section === "grunddaten") {
-    const panel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
-    if (panel?.hidden) {
-      panel.hidden = false;
-    }
-  } else {
-    hideThemeSettings();
-  }
+  hideThemeSettings();
 }
 
 function updateModuleVisibility(): void {
   const activeSection = state.ui.activeSection;
-  const settingsPanel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
-  if (settingsPanel) {
-    settingsPanel.hidden = activeSection === "grunddaten" ? false : settingsPanel.hidden;
-  }
   for (const button of document.querySelectorAll<HTMLButtonElement>(".module-card-button[data-section-id]")) {
     const sectionId = button.dataset.sectionId;
     const isActive = sectionId === activeSection;
@@ -305,6 +307,11 @@ function bindEvents(): void {
 
     if (target.dataset.positionFilterDraft === "value") {
       updatePositionFilterDraft("value", target.value);
+      return;
+    }
+
+    if (target.dataset.accountDialogField) {
+      updateAccountDialogDraft(target.dataset.accountDialogField, target.value);
       return;
     }
 
@@ -347,6 +354,11 @@ function bindEvents(): void {
       return;
     }
 
+    if (target.dataset.accountDialogField) {
+      updateAccountDialogDraft(target.dataset.accountDialogField, target.value);
+      return;
+    }
+
     if (target.dataset.realEstateField) {
       updateRealEstateField(target.dataset.realEstateField as RealEstateField, target.value);
       renderAll();
@@ -368,6 +380,12 @@ function bindEvents(): void {
 
     if (target.dataset.combinedToggle && target instanceof HTMLInputElement) {
       updateCombinedToggle(target.dataset.combinedToggle as CombinedToggleKey, target.checked);
+      renderAll();
+      return;
+    }
+
+    if (target.dataset.repaymentSourceToggle && target instanceof HTMLInputElement) {
+      updateRepaymentSourceToggle(target.dataset.repaymentSourceToggle as RepaymentSourceToggleKey, target.checked);
       renderAll();
       return;
     }
@@ -422,6 +440,8 @@ function bindEvents(): void {
     }
     if (action === "add-planning-account") addPlanningAccount();
     if (action === "rename-planning-account") renamePlanningAccount();
+    if (action === "cancel-planning-account-dialog") closePlanningAccountDialog();
+    if (action === "save-planning-account-dialog") savePlanningAccountDialog();
     if (action === "delete-planning-account") deletePlanningAccount();
     if (action?.startsWith("select-planning-account-")) {
       selectPlanningAccount(action.replace("select-planning-account-", ""));
@@ -528,6 +548,7 @@ function bindEvents(): void {
       hideInvestmentChartPopup();
       hideReserveChartPopup();
       hidePositionFilterPopup();
+      closePlanningAccountDialog();
     }
   });
   window.addEventListener("resize", drawCurrentInvestmentChart);
@@ -653,7 +674,8 @@ function renderCalculations(
   drawInvestmentChartWithPopup(projection);
   drawInvestmentChartWithPopup(combinedProjection, "#combinedInvestmentChart", "#combinedInvestmentChartPopup");
 
-  const realEstate = calculateRealEstateFinancing(state.settings.year, state.realEstate);
+  const repaymentValues = repaymentSourceValues(reserve, standardProjection);
+  const realEstate = calculateRealEstateFinancing(state.settings.year, state.realEstate, repaymentValues);
   renderRealEstateCalculations(realEstate);
   const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, realEstate);
   renderCombinedWealthCalculations(combinedYears);
@@ -698,10 +720,15 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   }
 
   const lastYear = result.years[result.years.length - 1];
+  const totalAdditionalMonthly = result.years[0]
+    ? result.years[0].additionalRepaymentBreakdown.totalAdditionalRepayment / 12
+    : 0;
   setText("realEstateLoanMetric", money(result.startLoanAmount));
   setText("realEstateMonthlyRateMetric", money(result.monthlyPayment));
   setText("realEstatePropertyValueMetric", money(lastYear?.propertyValue ?? 0));
   setText("realEstatePropertyEquityMetric", money(lastYear?.netPropertyWealth ?? 0));
+  setText("additionalRepaymentMonthlyMetric", money(totalAdditionalMonthly));
+  setText("additionalRepaymentAnnualMetric", money(result.years[0]?.additionalRepayment ?? 0));
 
   if (!selectedRealEstateYear && lastYear) {
     selectedRealEstateYear = lastYear.year;
@@ -740,6 +767,21 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
     <div class="detail-line"><span>Jahr</span><strong>${intNumber(selectedYearEntry.year)}</strong></div>
     <div class="detail-line"><span>Zinsen</span><strong>${money(selectedYearEntry.interestPaid)}</strong></div>
     <div class="detail-line"><span>Tilgung</span><strong>${money(selectedYearEntry.principalPaid)}</strong></div>
+    <div class="detail-line"><span>Zusaetzliche Tilgung aus freien Mitteln</span><strong>${money(
+      selectedYearEntry.additionalRepayment
+    )}</strong></div>
+    <div class="detail-line"><span>Entnahme als Tilgung</span><strong>${money(
+      selectedYearEntry.additionalRepaymentBreakdown.withdrawalGain
+    )}</strong></div>
+    <div class="detail-line"><span>Depot-Sparrate als Tilgung</span><strong>${money(
+      selectedYearEntry.additionalRepaymentBreakdown.depotSavingsRate
+    )}</strong></div>
+    <div class="detail-line"><span>Alte Sparrate als Tilgung</span><strong>${money(
+      selectedYearEntry.additionalRepaymentBreakdown.legacySavingsRate
+    )}</strong></div>
+    <div class="detail-line"><span>Netto-Zugewinn als Tilgung</span><strong>${money(
+      selectedYearEntry.additionalRepaymentBreakdown.netGain
+    )}</strong></div>
     <div class="detail-line"><span>Sondertilgung</span><strong>${money(selectedYearEntry.specialRepayment)}</strong></div>
     <div class="detail-line"><span>Restschuld</span><strong>${money(selectedYearEntry.loanEnd)}</strong></div>
     <div class="detail-line"><span>Immobilienwert</span><strong>${money(selectedYearEntry.propertyValue)}</strong></div>
@@ -747,6 +789,28 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
       selectedYearEntry.netPropertyWealth
     )}</strong></div>
   `;
+}
+
+function repaymentSourceValues(
+  reserve: ReturnType<typeof calculateReserveSummary>,
+  standardProjection: AssetProjection
+): RepaymentSourceValues {
+  return {
+    withdrawalGain: standardProjection.withdrawalGainMonthlyAtStart,
+    depotSavingsRate: standardProjection.monthlyRate,
+    legacySavingsRate: monthlySavingsRateFromPositions(allPlanningPositions()),
+    netGain: reserve.yearlyRemaining / 12
+  };
+}
+
+function monthlySavingsRateFromPositions(positions: ReservePosition[]): number {
+  return positions
+    .filter((position) => position.active && position.type === "savings" && positionFlow(position) === "expense")
+    .reduce((sum, position) => {
+      if (position.payoutType === "monthly") return sum + position.amount;
+      if (position.payoutType === "yearly") return sum + position.amount / 12;
+      return sum;
+    }, 0);
 }
 
 function calculateCombinedWealthYears(
@@ -833,6 +897,8 @@ function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
     <div class="detail-line"><span>Cash</span><strong>${money(selected.cashValue)}</strong></div>
     <div class="detail-line"><span>Depot</span><strong>${money(selected.depotValue)}</strong></div>
     <div class="detail-line"><span>Entnahmeeffekt</span><strong>${money(selected.withdrawalImpact)}</strong></div>
+    <div class="detail-line"><span>Umgeleitete Cash-Tilgung</span><strong>${money(selected.redirectedCashRepayment)}</strong></div>
+    <div class="detail-line"><span>Umgeleitete Depot-Tilgung</span><strong>${money(selected.redirectedDepotRepayment)}</strong></div>
     <div class="detail-line"><span>Immobilienwert</span><strong>${money(selected.propertyValue)}</strong></div>
     <div class="detail-line"><span>Immobilienschuld</span><strong>${money(selected.propertyDebt)}</strong></div>
     <div class="detail-line"><span>Immobilien-Eigenkapital</span><strong>${money(selected.propertyEquity)}</strong></div>
@@ -938,6 +1004,7 @@ function renderPlanningAccounts(): void {
   const cards = document.querySelector<HTMLDivElement>("#planningAccountCards");
   const summary = document.querySelector<HTMLParagraphElement>("#planningAccountSummary");
   const yearAccountName = document.querySelector<HTMLSpanElement>("#activeYearAccountName");
+  const yearSelector = document.querySelector<HTMLDivElement>("#yearAccountSelector");
   if (!cards || !summary || !yearAccountName) return;
 
   const activeAccount = activePlanningAccount();
@@ -969,40 +1036,140 @@ function renderPlanningAccounts(): void {
     })
     .join("");
 
+  if (yearSelector) {
+    yearSelector.innerHTML = state.planningAccounts.length
+      ? state.planningAccounts
+          .map((account) => {
+            const isActive = account.id === activeAccount.id;
+            return `
+              <button
+                class="position-mode-button ${isActive ? "active" : ""}"
+                type="button"
+                data-action="select-planning-account-${account.id}"
+                aria-pressed="${isActive}"
+              >${escapeHtml(account.name)}</button>
+            `;
+          })
+          .join("")
+      : '<span class="chart-empty">Noch kein Konto vorhanden.</span>';
+  }
+
   summary.textContent = `Konten gesamt: ${state.planningAccounts.length} | mixed: ${totalsByType.mixed} | cost_reserve: ${totalsByType.costReserve} | annual_table: ${totalsByType.annualTable}`;
   yearAccountName.textContent = `(${activeAccount.name})`;
+  renderPlanningAccountDialog();
 }
 
 function addPlanningAccount(): void {
-  const name = window.prompt("Name fuer neues Konto:", `Konto ${state.planningAccounts.length + 1}`)?.trim();
-  if (!name) return;
-  const typeRaw = window
-    .prompt("Typ (cost_reserve | annual_table | mixed):", "mixed")
-    ?.trim()
-    .toLowerCase();
-  const type: PlanningAccount["type"] =
-    typeRaw === "cost_reserve" || typeRaw === "annual_table" || typeRaw === "mixed" ? typeRaw : "mixed";
+  accountDialog = {
+    mode: "create",
+    accountId: null,
+    name: `Konto ${state.planningAccounts.length + 1}`,
+    type: "mixed",
+    error: ""
+  };
+  renderPlanningAccountDialog();
+}
+
+function renamePlanningAccount(): void {
+  const account = activePlanningAccount();
+  accountDialog = {
+    mode: "rename",
+    accountId: account.id,
+    name: account.name,
+    type: account.type,
+    error: ""
+  };
+  renderPlanningAccountDialog();
+}
+
+function updateAccountDialogDraft(field: string, value: string): void {
+  if (!accountDialog) return;
+  if (field === "type") {
+    accountDialog = {
+      ...accountDialog,
+      type: value === "cost_reserve" || value === "annual_table" || value === "mixed" ? value : accountDialog.type,
+      error: ""
+    };
+    return;
+  }
+  if (field === "name") {
+    accountDialog = { ...accountDialog, name: value, error: "" };
+  }
+}
+
+function closePlanningAccountDialog(): void {
+  accountDialog = null;
+  renderPlanningAccountDialog();
+}
+
+function savePlanningAccountDialog(): void {
+  if (!accountDialog) return;
+  const name = accountDialog.name.trim();
+  if (!name) {
+    accountDialog = { ...accountDialog, error: "Bitte einen Kontonamen eingeben." };
+    renderPlanningAccountDialog();
+    return;
+  }
+
+  if (accountDialog.mode === "rename" && accountDialog.accountId) {
+    state.planningAccounts = state.planningAccounts.map((item) =>
+      item.id === accountDialog?.accountId ? { ...item, name, type: accountDialog.type } : item
+    );
+    accountDialog = null;
+    renderAll();
+    return;
+  }
+
   const account: PlanningAccount = {
     id: createId(),
     name,
-    type,
+    type: accountDialog.type,
     yearlyRows: []
   };
   syncActivePlanningAccountFromPositions();
   state.planningAccounts = [...state.planningAccounts, account];
   state.ui = { ...state.ui, selectedPlanningAccountId: account.id };
   state.positions = account.yearlyRows;
+  accountDialog = null;
   renderAll();
 }
 
-function renamePlanningAccount(): void {
-  const account = activePlanningAccount();
-  const name = window.prompt("Neuer Kontoname:", account.name)?.trim();
-  if (!name) return;
-  state.planningAccounts = state.planningAccounts.map((item) =>
-    item.id === account.id ? { ...item, name } : item
-  );
-  renderAll();
+function renderPlanningAccountDialog(): void {
+  const host = document.querySelector<HTMLDivElement>("#planningAccountDialogHost");
+  if (!host) return;
+  if (!accountDialog) {
+    host.innerHTML = "";
+    return;
+  }
+  host.innerHTML = `
+    <div class="account-dialog-backdrop" role="presentation">
+      <div class="account-dialog" role="dialog" aria-modal="true" aria-label="Konto bearbeiten">
+        <div class="settings-popover-head">
+          <strong>${accountDialog.mode === "create" ? "Neues Konto" : "Konto bearbeiten"}</strong>
+          <button class="chart-popup-close" type="button" data-action="cancel-planning-account-dialog" aria-label="Konto-Dialog schliessen">x</button>
+        </div>
+        <div class="field-grid">
+          <label class="field">
+            <span>Kontoname</span>
+            <input type="text" value="${escapeHtml(accountDialog.name)}" data-account-dialog-field="name" />
+          </label>
+          <label class="field">
+            <span>Kontotyp</span>
+            <select data-account-dialog-field="type">
+              <option value="mixed" ${accountDialog.type === "mixed" ? "selected" : ""}>Gemischt</option>
+              <option value="cost_reserve" ${accountDialog.type === "cost_reserve" ? "selected" : ""}>Kosten/Ruecklagen</option>
+              <option value="annual_table" ${accountDialog.type === "annual_table" ? "selected" : ""}>Jahrestabelle</option>
+            </select>
+          </label>
+        </div>
+        ${accountDialog.error ? `<div class="validation-box error">${escapeHtml(accountDialog.error)}</div>` : ""}
+        <div class="button-row">
+          <button class="button secondary" type="button" data-action="cancel-planning-account-dialog">Abbrechen</button>
+          <button class="button" type="button" data-action="save-planning-account-dialog">Speichern</button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function deletePlanningAccount(): void {
@@ -2252,7 +2419,7 @@ function syncRealEstateInputsFromState(): void {
       if (control) control.value = String(value);
       continue;
     }
-    if (field === "locale") continue;
+    if (field === "locale" || field === "repaymentSources") continue;
     if (value === null) {
       const control = document.querySelector<HTMLInputElement>(selector);
       if (control) control.value = "";
@@ -2264,6 +2431,8 @@ function syncRealEstateInputsFromState(): void {
   const ranges: Array<RealEstateField> = [
     "interestRatePercent",
     "initialRepaymentPercent",
+    "monthlyPayment",
+    "specialRepaymentAmount",
     "propertyValueGrowthPercent",
     "inflationRatePercent",
     "financingYears"
@@ -2274,9 +2443,16 @@ function syncRealEstateInputsFromState(): void {
 
   setText("realEstateInterestRatePercentValue", percent(realEstate.interestRatePercent));
   setText("realEstateInitialRepaymentPercentValue", percent(realEstate.initialRepaymentPercent));
+  setText("realEstateMonthlyPaymentValue", money(realEstate.monthlyPayment));
+  setText("realEstateSpecialRepaymentAmountValue", money(realEstate.specialRepaymentAmount));
   setText("realEstatePropertyValueGrowthPercentValue", percent(realEstate.propertyValueGrowthPercent));
   setText("realEstateInflationRatePercentValue", percent(realEstate.inflationRatePercent));
   setText("realEstateFinancingYearsValue", `${intNumber(realEstate.financingYears)} Jahre`);
+
+  for (const [key, value] of Object.entries(realEstate.repaymentSources) as Array<[RepaymentSourceToggleKey, boolean]>) {
+    const checkbox = document.querySelector<HTMLInputElement>(`[data-repayment-source-toggle="${key}"]`);
+    if (checkbox) checkbox.checked = value;
+  }
 }
 
 function syncRealEstateLocaleLabels(locale: RealEstateFinancingSettings["locale"]): void {
@@ -2295,7 +2471,7 @@ function syncCombinedToggleInputsFromState(): void {
 }
 
 function updateRealEstateField(field: RealEstateField, value: string): void {
-  if (field === "locale") return;
+  if (field === "locale" || field === "repaymentSources") return;
   if (field === "specialRepaymentRhythm") {
     if (value === "none" || value === "monthly" || value === "yearly") {
       state.realEstate = {
@@ -2324,6 +2500,16 @@ function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
     ...state.combinedWealth,
     [key]: checked
   } as AppState["combinedWealth"];
+}
+
+function updateRepaymentSourceToggle(key: RepaymentSourceToggleKey, checked: boolean): void {
+  state.realEstate = {
+    ...state.realEstate,
+    repaymentSources: {
+      ...state.realEstate.repaymentSources,
+      [key]: checked
+    }
+  };
 }
 
 function setRealEstateLocale(locale: RealEstateFinancingSettings["locale"]): void {

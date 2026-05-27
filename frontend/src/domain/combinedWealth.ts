@@ -27,15 +27,28 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
   const sharedDepotByYear = projectionNetByYear(input.sharedDepotProjection, input.sharedDepotBirthYear);
 
   let withdrawalImpact = 0;
+  let redirectedCashRepayment = 0;
+  let redirectedDepotRepayment = 0;
 
   for (let yearOffset = 0; yearOffset < input.horizonYears; yearOffset += 1) {
     const year = input.startYear + yearOffset;
+    const realEstate = realEstateByYear.get(year);
+    const allocation = input.toggles.includeRealEstateFinancing ? realEstate?.additionalRepaymentBreakdown : undefined;
+    redirectedCashRepayment = roundMoney(
+      redirectedCashRepayment + (allocation?.withdrawalGain ?? 0) + (allocation?.legacySavingsRate ?? 0) + (allocation?.netGain ?? 0)
+    );
+    redirectedDepotRepayment = roundMoney(redirectedDepotRepayment + (allocation?.depotSavingsRate ?? 0));
+
     const cashValue = input.toggles.includeCashPositions
-      ? roundMoney(input.cashStartValue + input.yearlyCashDelta * yearOffset)
+      ? roundMoney(input.cashStartValue + input.yearlyCashDelta * yearOffset - redirectedCashRepayment)
       : 0;
 
     const depotValue = input.toggles.includeDepotDevelopment
-      ? roundMoney((depotByYear.get(year) ?? 0) + (input.toggles.includeSharedDepotDevelopment ? sharedDepotByYear.get(year) ?? 0 : 0))
+      ? roundMoney(
+          (depotByYear.get(year) ?? 0) +
+            (input.toggles.includeSharedDepotDevelopment ? sharedDepotByYear.get(year) ?? 0 : 0) -
+            redirectedDepotRepayment
+        )
       : 0;
 
     if (input.toggles.includeWithdrawals) {
@@ -46,7 +59,6 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
       withdrawalImpact = 0;
     }
 
-    const realEstate = realEstateByYear.get(year);
     const propertyValue =
       input.toggles.includeRealEstateValueTrend || input.toggles.includeRealEstateFinancing
         ? roundMoney(realEstate?.propertyValue ?? 0)
@@ -56,13 +68,15 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
 
     const totalGrossAssets = roundMoney(Math.max(0, cashValue) + Math.max(0, depotValue) + Math.max(0, propertyValue));
     const totalDebt = roundMoney(Math.max(0, propertyDebt));
-    const totalNetWealth = roundMoney(totalGrossAssets - totalDebt + withdrawalImpact);
+    const totalNetWealth = roundMoney(cashValue + depotValue + Math.max(0, propertyValue) - totalDebt + withdrawalImpact);
 
     years.push({
       year,
       cashValue,
       depotValue,
       withdrawalImpact,
+      redirectedCashRepayment,
+      redirectedDepotRepayment,
       propertyValue,
       propertyDebt,
       propertyEquity,

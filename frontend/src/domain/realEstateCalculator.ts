@@ -1,8 +1,11 @@
 import type {
+  AdditionalRepaymentBreakdown,
+  AdditionalRepaymentYearBreakdown,
   RealEstateFinancingMonth,
   RealEstateFinancingResult,
   RealEstateFinancingSettings,
-  RealEstateFinancingYear
+  RealEstateFinancingYear,
+  RepaymentSourceValues
 } from "../types";
 
 const MAX_FINANCING_YEARS = 80;
@@ -55,7 +58,8 @@ export function deriveMonthlyPayment(settings: RealEstateFinancingSettings, loan
 
 export function calculateRealEstateFinancing(
   startYear: number,
-  settings: RealEstateFinancingSettings
+  settings: RealEstateFinancingSettings,
+  repaymentSourceValues: RepaymentSourceValues = emptyRepaymentSourceValues()
 ): RealEstateFinancingResult {
   const validationErrors = validateRealEstateSettings(settings);
   const projectCost = totalProjectCost(settings);
@@ -65,6 +69,10 @@ export function calculateRealEstateFinancing(
   const monthlyRate = Math.max(0, settings.interestRatePercent) / 100 / 12;
   const growthRate = Math.max(0, settings.propertyValueGrowthPercent) / 100;
   const startPropertyValue = Math.max(0, settings.purchasePrice + settings.constructionOrRenovationCosts + settings.landCosts);
+  const additionalMonthlyRepayment = buildAdditionalRepaymentBreakdown(
+    settings,
+    repaymentSourceValues
+  );
 
   const years: RealEstateFinancingYear[] = [];
   const months: RealEstateFinancingMonth[] = [];
@@ -78,6 +86,8 @@ export function calculateRealEstateFinancing(
     let interestPaidYear = 0;
     let principalPaidYear = 0;
     let specialRepaymentYear = 0;
+    let additionalRepaymentYear = 0;
+    let additionalRepaymentBreakdownYear = emptyYearBreakdown();
 
     for (let month = 1; month <= 12; month += 1) {
       const monthLoanStart = roundMoney(remainingDebt);
@@ -90,6 +100,7 @@ export function calculateRealEstateFinancing(
           interestPaid: 0,
           principalPaid: 0,
           specialRepayment: 0,
+          additionalRepayment: 0,
           loanEnd: 0
         });
         remainingDebt = 0;
@@ -100,6 +111,14 @@ export function calculateRealEstateFinancing(
       const effectivePayment = monthlyRate > 0 ? Math.max(monthlyPayment, interestPaid) : monthlyPayment;
       const principalPaid = roundMoney(Math.min(Math.max(0, effectivePayment - interestPaid), remainingDebt));
       remainingDebt = roundMoney(remainingDebt - principalPaid);
+
+      let additionalRepayment = 0;
+      if (remainingDebt > 0 && additionalMonthlyRepayment.totalAdditionalMonthlyRepayment > 0) {
+        const applied = applyAdditionalRepayment(additionalMonthlyRepayment, remainingDebt);
+        additionalRepayment = applied.totalAdditionalRepayment;
+        additionalRepaymentBreakdownYear = addYearBreakdown(additionalRepaymentBreakdownYear, applied);
+        remainingDebt = roundMoney(remainingDebt - additionalRepayment);
+      }
 
       let specialRepayment = 0;
       if (remainingDebt > 0) {
@@ -114,6 +133,7 @@ export function calculateRealEstateFinancing(
 
       interestPaidYear += interestPaid;
       principalPaidYear += principalPaid;
+      additionalRepaymentYear += additionalRepayment;
       specialRepaymentYear += specialRepayment;
 
       months.push({
@@ -123,6 +143,7 @@ export function calculateRealEstateFinancing(
         interestPaid,
         principalPaid,
         specialRepayment,
+        additionalRepayment,
         loanEnd: roundMoney(remainingDebt)
       });
     }
@@ -152,6 +173,8 @@ export function calculateRealEstateFinancing(
       interestPaid: roundMoney(interestPaidYear),
       principalPaid: roundMoney(principalPaidYear),
       specialRepayment: roundMoney(specialRepaymentYear),
+      additionalRepayment: roundMoney(additionalRepaymentYear),
+      additionalRepaymentBreakdown: roundYearBreakdown(additionalRepaymentBreakdownYear),
       loanEnd,
       propertyEquity,
       netPropertyWealth
@@ -183,6 +206,95 @@ export function calculateRealEstateFinancing(
     effectivePropertyStartValue: startPropertyValue,
     totalProjectCost: projectCost,
     validationErrors
+  };
+}
+
+export function buildAdditionalRepaymentBreakdown(
+  settings: RealEstateFinancingSettings,
+  values: RepaymentSourceValues
+): AdditionalRepaymentBreakdown {
+  const normalize = (value: number): number => {
+    if (!Number.isFinite(value)) return 0;
+    return settings.repaymentSources.onlyUsePositiveValues ? Math.max(0, value) : value;
+  };
+  const withdrawalGain = settings.repaymentSources.useWithdrawalGainAsRepayment
+    ? normalize(values.withdrawalGain)
+    : 0;
+  const depotSavingsRate = settings.repaymentSources.useDepotSavingsRateAsRepayment
+    ? normalize(values.depotSavingsRate)
+    : 0;
+  const legacySavingsRate = settings.repaymentSources.useLegacySavingsRateAsRepayment
+    ? normalize(values.legacySavingsRate)
+    : 0;
+  const netGain = settings.repaymentSources.useNetGainAsRepayment ? normalize(values.netGain) : 0;
+  const totalAdditionalMonthlyRepayment = roundMoney(
+    Math.max(0, withdrawalGain + depotSavingsRate + legacySavingsRate + netGain)
+  );
+  return {
+    withdrawalGain: roundMoney(withdrawalGain),
+    depotSavingsRate: roundMoney(depotSavingsRate),
+    legacySavingsRate: roundMoney(legacySavingsRate),
+    netGain: roundMoney(netGain),
+    totalAdditionalMonthlyRepayment
+  };
+}
+
+function applyAdditionalRepayment(
+  monthly: AdditionalRepaymentBreakdown,
+  remainingDebt: number
+): AdditionalRepaymentYearBreakdown {
+  const requested = Math.max(0, monthly.totalAdditionalMonthlyRepayment);
+  const totalAdditionalRepayment = roundMoney(Math.min(requested, remainingDebt));
+  if (requested <= 0 || totalAdditionalRepayment <= 0) return emptyYearBreakdown();
+  const factor = totalAdditionalRepayment / requested;
+  return {
+    withdrawalGain: roundMoney(Math.max(0, monthly.withdrawalGain) * factor),
+    depotSavingsRate: roundMoney(Math.max(0, monthly.depotSavingsRate) * factor),
+    legacySavingsRate: roundMoney(Math.max(0, monthly.legacySavingsRate) * factor),
+    netGain: roundMoney(Math.max(0, monthly.netGain) * factor),
+    totalAdditionalRepayment
+  };
+}
+
+function emptyRepaymentSourceValues(): RepaymentSourceValues {
+  return {
+    withdrawalGain: 0,
+    depotSavingsRate: 0,
+    legacySavingsRate: 0,
+    netGain: 0
+  };
+}
+
+function emptyYearBreakdown(): AdditionalRepaymentYearBreakdown {
+  return {
+    withdrawalGain: 0,
+    depotSavingsRate: 0,
+    legacySavingsRate: 0,
+    netGain: 0,
+    totalAdditionalRepayment: 0
+  };
+}
+
+function addYearBreakdown(
+  left: AdditionalRepaymentYearBreakdown,
+  right: AdditionalRepaymentYearBreakdown
+): AdditionalRepaymentYearBreakdown {
+  return {
+    withdrawalGain: left.withdrawalGain + right.withdrawalGain,
+    depotSavingsRate: left.depotSavingsRate + right.depotSavingsRate,
+    legacySavingsRate: left.legacySavingsRate + right.legacySavingsRate,
+    netGain: left.netGain + right.netGain,
+    totalAdditionalRepayment: left.totalAdditionalRepayment + right.totalAdditionalRepayment
+  };
+}
+
+function roundYearBreakdown(value: AdditionalRepaymentYearBreakdown): AdditionalRepaymentYearBreakdown {
+  return {
+    withdrawalGain: roundMoney(value.withdrawalGain),
+    depotSavingsRate: roundMoney(value.depotSavingsRate),
+    legacySavingsRate: roundMoney(value.legacySavingsRate),
+    netGain: roundMoney(value.netGain),
+    totalAdditionalRepayment: roundMoney(value.totalAdditionalRepayment)
   };
 }
 
