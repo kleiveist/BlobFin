@@ -675,7 +675,12 @@ function renderCalculations(
   drawInvestmentChartWithPopup(combinedProjection, "#combinedInvestmentChart", "#combinedInvestmentChartPopup");
 
   const repaymentValues = repaymentSourceValues(reserve, standardProjection);
-  const realEstate = calculateRealEstateFinancing(state.settings.year, state.realEstate, repaymentValues);
+  const financingStartYear = realEstateFinancingStartYear(
+    state.settings.year,
+    state.investment.birthYear,
+    state.realEstate.financingStartAge
+  );
+  const realEstate = calculateRealEstateFinancing(financingStartYear, state.realEstate, repaymentValues);
   renderRealEstateCalculations(realEstate);
   const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, realEstate);
   renderCombinedWealthCalculations(combinedYears);
@@ -729,6 +734,7 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   setText("realEstatePropertyEquityMetric", money(lastYear?.netPropertyWealth ?? 0));
   setText("additionalRepaymentMonthlyMetric", money(totalAdditionalMonthly));
   setText("additionalRepaymentAnnualMetric", money(result.years[0]?.additionalRepayment ?? 0));
+  setText("realEstateTotalProjectCostMetric", money(result.totalProjectCost));
 
   if (!selectedRealEstateYear && lastYear) {
     selectedRealEstateYear = lastYear.year;
@@ -801,6 +807,12 @@ function repaymentSourceValues(
     legacySavingsRate: monthlySavingsRateFromPositions(allPlanningPositions()),
     netGain: reserve.yearlyRemaining / 12
   };
+}
+
+function realEstateFinancingStartYear(currentYear: number, birthYear: number, financingStartAge: number): number {
+  if (!Number.isFinite(financingStartAge) || financingStartAge <= 0) return currentYear;
+  const targetAgeYear = birthYear + Math.floor(financingStartAge);
+  return Math.max(currentYear, targetAgeYear);
 }
 
 function monthlySavingsRateFromPositions(positions: ReservePosition[]): number {

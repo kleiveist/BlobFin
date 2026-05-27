@@ -316,6 +316,7 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
       value.remainingDebtAfterFixedInterest,
       fallback.remainingDebtAfterFixedInterest
     ),
+    financingStartAge: numberOrDefault(value.financingStartAge, fallback.financingStartAge),
     plannedSaleYear: nullableNumberOrDefault(value.plannedSaleYear, fallback.plannedSaleYear),
     estimatedSaleValue: nullableNumberOrDefault(value.estimatedSaleValue, fallback.estimatedSaleValue),
     targetFullRepaymentYear: nullableNumberOrDefault(value.targetFullRepaymentYear, fallback.targetFullRepaymentYear),

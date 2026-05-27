@@ -2347,10 +2347,20 @@ tfoot th {
 
 .real-estate-card,
 .combined-wealth-card {
+  --chart-border: var(--border);
+  --chart-field: var(--surface);
+  --chart-muted: var(--muted);
   background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
+}
+
+.chart-inline-metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 10px 0 12px;
 }
 
 .real-estate-slider-grid {
@@ -2519,39 +2529,46 @@ tfoot th {
   background: var(--surface-muted);
   border-radius: 6px 6px 2px 2px;
   display: flex;
-  gap: 2px;
   height: 100%;
   min-height: 130px;
   overflow: hidden;
   padding: 3px;
 }
 
-.wealth-column-segment {
+.wealth-column-fill {
   align-self: end;
   border-radius: 4px 4px 1px 1px;
+  display: flex;
+  flex-direction: column-reverse;
+  overflow: hidden;
+  width: 100%;
+}
+
+.wealth-column-segment {
   display: block;
-  flex: 1 1 0;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: 1px;
+  width: 100%;
 }
 
 .wealth-column-segment.cash {
-  background: #0f766e;
+  background: #777b82;
 }
 
 .wealth-column-segment.depot {
-  background: #2563eb;
+  background: #9b94ff;
 }
 
 .wealth-column-segment.property {
-  background: #3b82f6;
+  background: #5f88e8;
 }
 
 .wealth-column-segment.equity {
-  background: #10b981;
+  background: #43b20a;
 }
 
 .wealth-column-segment.debt {
-  background: #ef4444;
+  background: #ff5b63;
 }
 
 .wealth-column-segment.net {
@@ -2560,6 +2577,10 @@ tfoot th {
 
 .wealth-column-segment.gross {
   background: #64748b;
+}
+
+.wealth-column-segment.growth {
+  background: #ff7a00;
 }
 
 .wealth-column-year {

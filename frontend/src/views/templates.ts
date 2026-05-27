@@ -349,6 +349,9 @@ export function renderAppShell(): string {
               ${realEstateNumberField("movingAndSetupCosts", "Umzug/Einrichtung")}
               ${realEstateNumberField("safetyBuffer", "Sicherheitsbuffer")}
             </div>
+            <div class="chart-inline-metrics">
+              ${chartMetric("realEstateTotalProjectCostMetric", "Gesamtkosten")}
+            </div>
           </section>
 
           <section class="real-estate-card">
@@ -359,6 +362,7 @@ export function renderAppShell(): string {
               ${realEstateNumberField("loanAmount", "Darlehensbetrag")}
               ${realEstateNumberField("fixedInterestYears", "Zinsbindung (Jahre)", { step: 1 })}
               ${realEstateNumberField("targetTermYears", "Ziel-Laufzeit (Jahre)", { step: 1 })}
+              ${realEstateNumberField("financingStartAge", "Finanzierung ab Alter", { step: 1 })}
               ${realEstateNumberField("remainingDebtAfterFixedInterest", "Restschuld nach Zinsbindung")}
               <label class="field">
                 <span>Sondertilgungsrhythmus</span>
@@ -617,6 +621,7 @@ function realEstateEnglishLabel(key: string, fallback: string): string {
     initialRepaymentPercent: "Initial repayment in %",
     fixedInterestYears: "Fixed-interest period (years)",
     targetTermYears: "Target term (years)",
+    financingStartAge: "Financing start age",
     financingYears: "Financing period (years)",
     remainingDebtAfterFixedInterest: "Remaining debt after fixed period",
     specialRepaymentAmount: "Special repayment amount",

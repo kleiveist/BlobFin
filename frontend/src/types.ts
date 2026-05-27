@@ -164,6 +164,7 @@ export interface RealEstateFinancingSettings {
   specialRepaymentAmount: number;
   specialRepaymentRhythm: SpecialRepaymentRhythm;
   remainingDebtAfterFixedInterest: number;
+  financingStartAge: number;
   plannedSaleYear: number | null;
   estimatedSaleValue: number | null;
   targetFullRepaymentYear: number | null;

@@ -20,6 +20,7 @@ export function validateRealEstateSettings(settings: RealEstateFinancingSettings
   if (settings.propertyValueGrowthPercent < 0) errors.push("Immobilienwertsteigerung darf nicht negativ sein.");
   if (settings.equityCapital < 0) errors.push("Eigenkapital darf nicht negativ sein.");
   if (settings.loanAmount < 0) errors.push("Darlehensbetrag darf nicht negativ sein.");
+  if (settings.financingStartAge < 0) errors.push("Finanzierung ab Alter darf nicht negativ sein.");
   if (settings.financingYears <= 0 && settings.targetTermYears <= 0) {
     errors.push("Finanzierungszeitraum oder Ziel-Laufzeit muss groesser als 0 sein.");
   }

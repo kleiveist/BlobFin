@@ -17,28 +17,23 @@ export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstat
     return '<div class="chart-empty">Noch keine Immobilienberechnung verfuegbar.</div>';
   }
 
-  const maxValue = Math.max(
-    1,
-    ...input.points.map((point) =>
-      Math.max(point.propertyValue, point.loanStart, point.loanEnd, point.principalPaid + point.additionalRepayment)
-    )
-  );
+  const maxValue = Math.max(1, ...input.points.map((point) => Math.max(0, point.propertyValue)));
 
   return renderVerticalChart({
     label: "Immobilienfinanzierung je Jahr",
     maxValue,
-    points: input.points.map((point) => ({
-      year: point.year,
-      selected: input.selectedYear === point.year,
-      action: "select-real-estate-year",
-      value: point.netPropertyWealth,
-      valueLabel: input.formatMoney(point.netPropertyWealth),
-      segments: [
-        { className: "property", label: "Immobilienwert", value: point.propertyValue },
-        { className: "equity", label: "Tilgung plus Eigenkapital", value: point.propertyEquity },
-        { className: "debt", label: "Restschuld", value: point.loanEnd }
-      ]
-    }))
+    points: input.points.map((point) => {
+      const composition = propertyComposition(point);
+      return {
+        ...composition,
+        year: point.year,
+        selected: input.selectedYear === point.year,
+        action: "select-real-estate-year",
+        value: point.netPropertyWealth,
+        valueLabel: input.formatMoney(point.netPropertyWealth),
+        segments: composition.segments
+      };
+    })
   });
 }
 
@@ -46,7 +41,9 @@ export function renderRealEstateTrendChart(input: ChartRenderInput<RealEstateFin
   if (!input.points.length) {
     return '<div class="chart-empty">Keine Werte fuer die Immobilienwertentwicklung vorhanden.</div>';
   }
-  const maxValue = Math.max(1, ...input.points.map((point) => Math.max(point.propertyValue, point.netPropertyWealth)));
+  const maxValue = Math.max(1, ...input.points.map((point) => Math.max(0, point.propertyValue)));
+  const initialPropertyValue = Math.max(0, input.points[0]?.propertyValue ?? 0);
+
   return renderVerticalChart({
     label: "Immobilienwertentwicklung je Jahr",
     maxValue,
@@ -56,9 +53,18 @@ export function renderRealEstateTrendChart(input: ChartRenderInput<RealEstateFin
       action: "select-real-estate-year",
       value: point.propertyValue,
       valueLabel: input.formatMoney(point.propertyValue),
+      barTotal: Math.max(0, point.propertyValue),
       segments: [
-        { className: "property", label: "Immobilienwert", value: point.propertyValue },
-        { className: "net", label: "Netto-Immobilienvermoegen", value: point.netPropertyWealth }
+        {
+          className: "property",
+          label: "Ausgangswert",
+          value: Math.max(0, Math.min(point.propertyValue, initialPropertyValue))
+        },
+        {
+          className: "growth",
+          label: "Wertentwicklung",
+          value: Math.max(0, point.propertyValue - initialPropertyValue)
+        }
       ]
     }))
   });
@@ -71,16 +77,7 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
 
   const maxValue = Math.max(
     1,
-    ...input.points.map((point) =>
-      Math.max(
-        point.totalGrossAssets,
-        point.totalNetWealth,
-        point.cashValue,
-        point.depotValue,
-        point.propertyValue,
-        Math.abs(point.totalDebt)
-      )
-    )
+    ...input.points.map((point) => Math.max(0, point.cashValue) + Math.max(0, point.depotValue) + Math.max(0, point.propertyValue))
   );
 
   return renderVerticalChart({
@@ -90,14 +87,13 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
       year: point.year,
       selected: input.selectedYear === point.year,
       action: "select-combined-wealth-year",
-      value: point.totalNetWealth,
-      valueLabel: input.formatMoney(point.totalNetWealth),
+      value: point.totalGrossAssets,
+      valueLabel: input.formatMoney(point.totalGrossAssets),
+      barTotal: Math.max(0, point.cashValue) + Math.max(0, point.depotValue) + Math.max(0, point.propertyValue),
       segments: [
-        { className: "cash", label: "Cash", value: point.cashValue },
-        { className: "depot", label: "Depot", value: point.depotValue },
-        { className: "property", label: "Immobilienwert", value: point.propertyValue },
-        { className: "debt", label: "Immobilienschuld", value: point.totalDebt },
-        { className: "net", label: "Nettovermoegen", value: point.totalNetWealth }
+        { className: "cash", label: "Cash", value: Math.max(0, point.cashValue) },
+        { className: "depot", label: "Depot", value: Math.max(0, point.depotValue) },
+        { className: "property", label: "Immobilienwert", value: Math.max(0, point.propertyValue) }
       ]
     }))
   });
@@ -112,6 +108,7 @@ function renderVerticalChart(input: {
     action: string;
     value: number;
     valueLabel: string;
+    barTotal: number;
     segments: VerticalBarSegment[];
   }>;
 }): string {
@@ -137,10 +134,12 @@ function renderVerticalBar(
     action: string;
     value: number;
     valueLabel: string;
+    barTotal: number;
     segments: VerticalBarSegment[];
   },
   maxValue: number
 ): string {
+  const barHeight = heightPercent(point.barTotal, maxValue);
   return `
     <button
       class="wealth-column-button ${point.selected ? "active" : ""}"
@@ -152,7 +151,9 @@ function renderVerticalBar(
     >
       <span class="wealth-column-value">${point.valueLabel}</span>
       <span class="wealth-column-track">
-        ${point.segments.map((segment) => renderSegment(segment, maxValue)).join("")}
+        <span class="wealth-column-fill" style="height:${barHeight}%">
+          ${point.segments.map((segment) => renderSegment(segment, point.barTotal)).join("")}
+        </span>
       </span>
       <span class="wealth-column-year">${point.year}</span>
     </button>
@@ -173,6 +174,19 @@ function renderSegment(segment: VerticalBarSegment, maxValue: number): string {
 function heightPercent(value: number, maxValue: number): number {
   if (!Number.isFinite(value) || value <= 0 || maxValue <= 0) return 0;
   return Math.max(0, Math.min(100, (value / maxValue) * 100));
+}
+
+function propertyComposition(point: RealEstateFinancingYear): { barTotal: number; segments: VerticalBarSegment[] } {
+  const propertyValue = Math.max(0, point.propertyValue);
+  const debt = Math.max(0, Math.min(propertyValue, point.loanEnd));
+  const equity = Math.max(0, propertyValue - debt);
+  return {
+    barTotal: propertyValue,
+    segments: [
+      { className: "debt", label: "Kredit / Restschuld", value: debt },
+      { className: "equity", label: "Tilgung / Eigenkapital", value: equity }
+    ]
+  };
 }
 
 function formatAxis(value: number): string {
