@@ -9,15 +9,20 @@ import type {
 
 const MAX_FINANCING_YEARS = 80;
 
+export interface RealEstateFinancingCalculationOptions {
+  financingYears?: number;
+  projectionYears?: number;
+}
+
 export function validateRealEstateSettings(settings: RealEstateFinancingSettings): string[] {
   const errors: string[] = [];
   if (settings.purchasePrice <= 0) errors.push("Kaufpreis muss groesser als 0 sein.");
   if (settings.interestRatePercent < 0) errors.push("Zinssatz darf nicht negativ sein.");
   if (settings.propertyValueGrowthPercent < 0) errors.push("Immobilienwertsteigerung darf nicht negativ sein.");
-  if (settings.loanAmount < 0) errors.push("Darlehensbetrag darf nicht negativ sein.");
   if (settings.financingStartAge < 0) errors.push("Finanzierung ab Alter darf nicht negativ sein.");
-  if (settings.financingYears <= 0 && settings.targetTermYears <= 0) {
-    errors.push("Finanzierungszeitraum oder Ziel-Laufzeit muss groesser als 0 sein.");
+  if (settings.financingEndAge <= 0) errors.push("Bezahlt bis Alter muss groesser als 0 sein.");
+  if (settings.financingStartAge > 0 && settings.financingEndAge <= settings.financingStartAge) {
+    errors.push("Bezahlt bis Alter muss nach dem Finanzierungsstart liegen.");
   }
   return errors;
 }
@@ -39,7 +44,6 @@ export function totalProjectCost(settings: RealEstateFinancingSettings): number 
 }
 
 export function deriveLoanAmount(settings: RealEstateFinancingSettings, equityCapital = 0): number {
-  if (settings.loanAmount > 0) return roundMoney(settings.loanAmount);
   return roundMoney(Math.max(0, totalProjectCost(settings) - equityCapital));
 }
 
@@ -81,13 +85,15 @@ export function linkRealEstateFinancingInput(
 export function calculateRealEstateFinancing(
   startYear: number,
   settings: RealEstateFinancingSettings,
-  sourceSchedule: RealEstateFinancingSourceSchedule = emptySourceSchedule()
+  sourceSchedule: RealEstateFinancingSourceSchedule = emptySourceSchedule(),
+  options: RealEstateFinancingCalculationOptions = {}
 ): RealEstateFinancingResult {
   const validationErrors = validateRealEstateSettings(settings);
   const projectCost = totalProjectCost(settings);
   const equityCapital = roundMoney(Math.max(0, sourceSchedule.equityCapital));
   const loanAmount = deriveLoanAmount(settings, equityCapital);
-  const financingYears = clampYears(settings.financingYears || settings.targetTermYears || 0);
+  const financingYears = clampYears(options.financingYears ?? deriveFinancingYearsFromSettings(settings));
+  const projectionYears = clampYears(Math.max(financingYears, options.projectionYears ?? financingYears));
   const monthlyRate = Math.max(0, settings.interestRatePercent) / 100 / 12;
   const growthRate = Math.max(0, settings.propertyValueGrowthPercent) / 100;
   const startPropertyValue = Math.max(0, settings.purchasePrice + settings.constructionOrRenovationCosts + settings.landCosts);
@@ -108,7 +114,7 @@ export function calculateRealEstateFinancing(
 
   let remainingDebt = loanAmount;
 
-  for (let yearIndex = 0; yearIndex < financingYears; yearIndex += 1) {
+  for (let yearIndex = 0; yearIndex < projectionYears; yearIndex += 1) {
     const year = startYear + yearIndex;
     const loanStart = roundMoney(remainingDebt);
     let interestPaidYear = 0;
@@ -125,6 +131,7 @@ export function calculateRealEstateFinancing(
     for (let month = 1; month <= 12; month += 1) {
       const scheduleIndex = yearIndex * 12 + month - 1;
       const monthLoanStart = roundMoney(remainingDebt);
+      const activeFinancingMonth = scheduleIndex < financingYears * 12;
 
       if (remainingDebt <= 0) {
         months.push({
@@ -146,8 +153,10 @@ export function calculateRealEstateFinancing(
         continue;
       }
 
-      const monthlyPaymentFromSavings = sourceValue(sourceSchedule.monthlyPaymentSavings, scheduleIndex);
-      const monthlyPaymentFromWithdrawalGain = sourceValue(sourceSchedule.withdrawalGainPayments, scheduleIndex);
+      const monthlyPaymentFromSavings = activeFinancingMonth ? sourceValue(sourceSchedule.monthlyPaymentSavings, scheduleIndex) : 0;
+      const monthlyPaymentFromWithdrawalGain = activeFinancingMonth
+        ? sourceValue(sourceSchedule.withdrawalGainPayments, scheduleIndex)
+        : 0;
       const monthlyPaymentAvailable = roundMoney(monthlyPaymentFromSavings + monthlyPaymentFromWithdrawalGain);
       const interestDue = roundMoney(remainingDebt * monthlyRate);
       const maximumUsefulPayment = roundMoney(interestDue + remainingDebt);
@@ -160,13 +169,14 @@ export function calculateRealEstateFinancing(
       const withdrawalShare =
         monthlyPaymentAvailable > 0 ? roundMoney(usedMonthlyPayment * (monthlyPaymentFromWithdrawalGain / monthlyPaymentAvailable)) : 0;
 
-      const specialPaymentAvailable = sourceValue(sourceSchedule.specialRepayments, scheduleIndex);
+      const specialPaymentAvailable = activeFinancingMonth ? sourceValue(sourceSchedule.specialRepayments, scheduleIndex) : 0;
       const specialInterestPayment = roundMoney(Math.min(specialPaymentAvailable, interestShortfall));
       interestPaid = roundMoney(interestPaid + specialInterestPayment);
       interestShortfall = roundMoney(interestShortfall - specialInterestPayment);
       const specialPrincipalBudget = interestShortfall > 0 ? 0 : roundMoney(specialPaymentAvailable - specialInterestPayment);
       const specialRepayment = roundMoney(Math.min(specialPrincipalBudget, remainingDebt));
       remainingDebt = roundMoney(remainingDebt - specialRepayment);
+      remainingDebt = roundMoney(remainingDebt + interestShortfall);
 
       interestDueYear += interestDue;
       interestPaidYear += interestPaid;
@@ -175,7 +185,7 @@ export function calculateRealEstateFinancing(
       monthlyPaymentFromWithdrawalGainYear += monthlyPaymentFromWithdrawalGain;
       monthlyPaymentAvailableYear += monthlyPaymentAvailable;
       principalFromMonthlyPaymentYear += principalPaid;
-      principalPaidYear += principalPaid;
+      principalPaidYear += principalPaid + specialRepayment;
       specialRepaymentYear += specialRepayment;
       withdrawalGainPaymentUsedYear += withdrawalShare;
 
@@ -198,7 +208,7 @@ export function calculateRealEstateFinancing(
 
     const propertyValue = projectedPropertyValue(startPropertyValue, growthRate, yearIndex + 1);
     const loanEnd = roundMoney(remainingDebt);
-    const propertyEquity = roundMoney(Math.max(0, propertyValue - loanEnd));
+    const propertyEquity = roundMoney(propertyValue - loanEnd);
     const netPropertyWealth = roundMoney(propertyValue - loanEnd);
 
     years.push({
@@ -222,6 +232,8 @@ export function calculateRealEstateFinancing(
     });
   }
 
+  const totalInterestDue = roundMoney(years.reduce((sum, entry) => sum + entry.interestDue, 0));
+  const totalInterestPaid = roundMoney(years.reduce((sum, entry) => sum + entry.interestPaid, 0));
   const totalInterestShortfall = roundMoney(years.reduce((sum, entry) => sum + entry.interestShortfall, 0));
   if (totalInterestShortfall > 0) {
     validationErrors.push(
@@ -239,6 +251,14 @@ export function calculateRealEstateFinancing(
     annualSpecialRepayment: roundMoney(firstYearSpecialRepayment),
     effectivePropertyStartValue: startPropertyValue,
     totalProjectCost: projectCost,
+    totalInterestDue,
+    totalInterestPaid,
+    totalInterestShortfall,
+    totalLoanCost: roundMoney(loanAmount + totalInterestDue),
+    financingYears,
+    projectionYears,
+    financingEndYear: startYear + financingYears,
+    projectionEndYear: startYear + projectionYears - 1,
     validationErrors
   };
 }
@@ -297,6 +317,13 @@ function hasAnyMonthlyPayment(schedule: RealEstateFinancingSourceSchedule, month
 
 function projectedPropertyValue(startPropertyValue: number, growthRate: number, yearIndex: number): number {
   return roundMoney(startPropertyValue * (1 + growthRate) ** yearIndex);
+}
+
+function deriveFinancingYearsFromSettings(settings: RealEstateFinancingSettings): number {
+  if (settings.financingStartAge > 0 && settings.financingEndAge > settings.financingStartAge) {
+    return settings.financingEndAge - settings.financingStartAge;
+  }
+  return settings.financingYears || settings.targetTermYears || 1;
 }
 
 function clampYears(value: number): number {

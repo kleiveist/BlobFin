@@ -695,15 +695,14 @@ function renderCalculations(
     state.investment.birthYear,
     state.realEstate.financingStartAge
   );
+  const financingYears = currentRealEstateFinancingYears();
+  const realEstateProjectionYears = currentRealEstateProjectionYears(financingStartYear, standardProjection.endAge);
   renderRealEstateSourceLists(standardProjection);
   const realEstate = calculateRealEstateFinancing(
     financingStartYear,
     state.realEstate,
-    realEstateSourceSchedule(
-      financingStartYear,
-      state.realEstate.financingYears || state.realEstate.targetTermYears,
-      standardProjection
-    )
+    realEstateSourceSchedule(financingStartYear, realEstateProjectionYears, standardProjection),
+    { financingYears, projectionYears: realEstateProjectionYears }
   );
   renderRealEstateCalculations(realEstate);
   const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, realEstate);
@@ -758,6 +757,14 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   setText("realEstatePropertyValueMetric", money(lastYear?.propertyValue ?? 0));
   setText("realEstatePropertyEquityMetric", money(lastYear?.netPropertyWealth ?? 0));
   setText("realEstateTotalProjectCostMetric", money(result.totalProjectCost));
+  setText("realEstateStartDebtMetric", money(result.startLoanAmount));
+  setText("realEstateTotalLoanCostMetric", money(result.totalLoanCost));
+  setText(
+    "realEstateFinancingYearsMetric",
+    `${intNumber(currentRealEstateFinancingStartAge())} -> ${intNumber(state.realEstate.financingEndAge)} | ${intNumber(
+      result.financingYears
+    )} Jahre`
+  );
 
   selectedRealEstateYear = defaultRealEstateDetailYear(result.years, selectedRealEstateYear);
   const selectedYearEntry = result.years.find((entry) => entry.year === selectedRealEstateYear) ?? lastYear ?? null;
@@ -827,12 +834,34 @@ function currentRealEstateFinancingStartYear(): number {
   return realEstateFinancingStartYear(state.settings.year, state.investment.birthYear, state.realEstate.financingStartAge);
 }
 
+function currentRealEstateFinancingStartAge(): number {
+  const currentAge = Math.max(0, state.settings.year - state.investment.birthYear);
+  if (Number.isFinite(state.realEstate.financingStartAge) && state.realEstate.financingStartAge > 0) {
+    return Math.max(currentAge, Math.floor(state.realEstate.financingStartAge));
+  }
+  return currentAge;
+}
+
+function currentRealEstateFinancingYears(): number {
+  const startAge = currentRealEstateFinancingStartAge();
+  const endAge = Math.floor(state.realEstate.financingEndAge);
+  if (!Number.isFinite(endAge)) return 1;
+  return clamp(Math.round(endAge - startAge), 1, 80);
+}
+
+function currentRealEstateProjectionYears(startYear: number, investmentEndAge: number): number {
+  const investmentEndYear = state.investment.birthYear + Math.floor(investmentEndAge);
+  const saleYear = state.realEstate.plannedSaleYear;
+  const projectionEndYear = saleYear !== null && saleYear >= startYear ? Math.round(saleYear) : investmentEndYear;
+  return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
+}
+
 function realEstateSourceSchedule(
   startYear: number,
-  financingYears: number,
+  projectionYears: number,
   standardProjection: AssetProjection
 ): RealEstateFinancingSourceSchedule {
-  const monthCount = Math.max(12, Math.min(80, Math.round(financingYears || 1)) * 12);
+  const monthCount = Math.max(12, Math.min(80, Math.round(projectionYears || 1)) * 12);
   const positions = allPlanningPositions();
   const equityPositions = selectedRealEstateSourcePositions("equityCapital", positions);
   const monthlyPositions = selectedRealEstateSourcePositions("monthlyPayment", positions);
@@ -2576,20 +2605,12 @@ function syncRealEstateInputsFromState(): void {
     setInputValue(selector, value as number | string);
   }
 
-  const ranges: Array<RealEstateField> = [
-    "interestRatePercent",
-    "propertyValueGrowthPercent",
-    "inflationRatePercent",
-    "financingYears"
-  ];
+  const ranges: Array<RealEstateField> = ["interestRatePercent"];
   for (const field of ranges) {
     setInputValue(`[data-real-estate-range="${field}"]`, state.realEstate[field] as number);
   }
 
   setText("realEstateInterestRatePercentValue", percent(realEstate.interestRatePercent));
-  setText("realEstatePropertyValueGrowthPercentValue", percent(realEstate.propertyValueGrowthPercent));
-  setText("realEstateInflationRatePercentValue", percent(realEstate.inflationRatePercent));
-  setText("realEstateFinancingYearsValue", `${intNumber(realEstate.financingYears)} Jahre`);
 }
 
 function syncRealEstateLocaleLabels(locale: RealEstateFinancingSettings["locale"]): void {

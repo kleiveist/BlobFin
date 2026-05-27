@@ -284,6 +284,9 @@ function fallbackPlanningAccount(positions: ReservePosition[]): PlanningAccount 
 function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinancingSettings {
   const fallback = defaultRealEstateFinancingSettings();
   if (!isRecord(value)) return fallback;
+  const financingStartAge = numberOrDefault(value.financingStartAge, fallback.financingStartAge);
+  const financingYears = numberOrDefault(value.financingYears, fallback.financingYears);
+  const legacyEndAge = financingStartAge > 0 ? financingStartAge + financingYears : fallback.financingEndAge;
   return {
     locale: value.locale === "en" ? "en" : "de",
     purchasePrice: numberOrDefault(value.purchasePrice, fallback.purchasePrice),
@@ -316,7 +319,8 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
       value.remainingDebtAfterFixedInterest,
       fallback.remainingDebtAfterFixedInterest
     ),
-    financingStartAge: numberOrDefault(value.financingStartAge, fallback.financingStartAge),
+    financingStartAge,
+    financingEndAge: numberOrDefault(value.financingEndAge, legacyEndAge),
     plannedSaleYear: nullableNumberOrDefault(value.plannedSaleYear, fallback.plannedSaleYear),
     estimatedSaleValue: nullableNumberOrDefault(value.estimatedSaleValue, fallback.estimatedSaleValue),
     targetFullRepaymentYear: nullableNumberOrDefault(value.targetFullRepaymentYear, fallback.targetFullRepaymentYear),
@@ -325,7 +329,7 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
     subsidyAmount: numberOrDefault(value.subsidyAmount, fallback.subsidyAmount),
     propertyValueGrowthPercent: numberOrDefault(value.propertyValueGrowthPercent, fallback.propertyValueGrowthPercent),
     inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent),
-    financingYears: numberOrDefault(value.financingYears, fallback.financingYears),
+    financingYears,
     manualFuturePropertyValue: nullableNumberOrDefault(value.manualFuturePropertyValue, fallback.manualFuturePropertyValue),
     repaymentSources: normalizeRepaymentSourceToggles(value.repaymentSources),
     equityCapitalSourceIds: stringArrayOrDefault(value.equityCapitalSourceIds, fallback.equityCapitalSourceIds),

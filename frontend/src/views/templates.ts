@@ -345,6 +345,8 @@ export function renderAppShell(): string {
             </div>
             <div class="chart-inline-metrics">
               ${chartMetric("realEstateTotalProjectCostMetric", "Gesamtkosten")}
+              ${chartMetric("realEstateStartDebtMetric", "Startschuld")}
+              ${chartMetric("realEstateTotalLoanCostMetric", "Darlehensbetrag inkl. Zinsen")}
             </div>
           </section>
 
@@ -352,15 +354,15 @@ export function renderAppShell(): string {
             <h3>Finanzierungsdaten</h3>
             <p class="planning-account-summary">Hilfetext: Eigenkapital, Monatsrate, Anfangstilgung und Sondertilgung werden aus echten Sparpositionen abgeleitet.</p>
             <div class="field-grid wide">
-              ${realEstateNumberField("loanAmount", "Darlehensbetrag")}
-              ${realEstateNumberField("targetTermYears", "Ziel-Laufzeit (Jahre)", { step: 1 })}
               ${realEstateNumberField("financingStartAge", "Finanzierung ab Alter", { step: 1 })}
+              ${realEstateNumberField("financingEndAge", "Bezahlt bis Alter", { step: 1 })}
+              ${realEstateNumberField("plannedSaleYear", "Verkaufsjahr", { step: 1, nullable: true })}
             </div>
             <div class="real-estate-slider-grid">
               ${realEstateAssumptionControl("interestRatePercent", "Zinssatz", 0, 10, 0.05)}
-              ${realEstateAssumptionControl("financingYears", "Finanzierungszeitraum", 1, 50, 1)}
             </div>
             <div class="chart-inline-metrics">
+              ${chartMetric("realEstateFinancingYearsMetric", "Finanzierungszeitraum")}
               ${chartMetric("realEstateDerivedEquityMetric", "Eigenkapital")}
               ${chartMetric("realEstateDerivedMonthlyPaymentMetric", "Monatsrate")}
               ${chartMetric("realEstateDerivedInitialRepaymentMetric", "Anfangstilgung")}
@@ -397,7 +399,7 @@ export function renderAppShell(): string {
             <h3>Tilgung und Vermoegen</h3>
             <div id="realEstateValidation" class="validation-box" aria-live="polite"></div>
             <div class="chart-inline-metrics">
-              ${chartMetric("realEstateLoanMetric", "Start-Darlehen")}
+              ${chartMetric("realEstateLoanMetric", "Startschuld")}
               ${chartMetric("realEstateMonthlyRateMetric", "Monatsrate")}
               ${chartMetric("realEstatePropertyValueMetric", "Immobilienwert Ende")}
               ${chartMetric("realEstatePropertyEquityMetric", "Netto-Immobilienvermoegen Ende")}
@@ -602,7 +604,9 @@ function realEstateEnglishLabel(key: string, fallback: string): string {
     initialRepaymentPercent: "Initial repayment in %",
     targetTermYears: "Target term (years)",
     financingStartAge: "Financing start age",
+    financingEndAge: "Paid off by age",
     financingYears: "Financing period (years)",
+    plannedSaleYear: "Sale year",
     specialRepaymentAmount: "Special repayment amount",
     monthlyPayment: "Monthly payment",
     propertyValueGrowthPercent: "Property value growth in %",

@@ -166,6 +166,7 @@ export interface RealEstateFinancingSettings {
   specialRepaymentRhythm: SpecialRepaymentRhythm;
   remainingDebtAfterFixedInterest: number;
   financingStartAge: number;
+  financingEndAge: number;
   plannedSaleYear: number | null;
   estimatedSaleValue: number | null;
   targetFullRepaymentYear: number | null;
@@ -409,5 +410,13 @@ export interface RealEstateFinancingResult {
   annualSpecialRepayment: number;
   effectivePropertyStartValue: number;
   totalProjectCost: number;
+  totalInterestDue: number;
+  totalInterestPaid: number;
+  totalInterestShortfall: number;
+  totalLoanCost: number;
+  financingYears: number;
+  projectionYears: number;
+  financingEndYear: number;
+  projectionEndYear: number;
   validationErrors: string[];
 }

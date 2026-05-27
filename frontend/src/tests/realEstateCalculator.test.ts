@@ -8,7 +8,7 @@ import {
   deriveLoanAmount,
   validateRealEstateSettings
 } from "../domain/realEstateCalculator";
-import type { RealEstateFinancingSourceSchedule } from "../types";
+import type { RealEstateFinancingSettings, RealEstateFinancingSourceSchedule } from "../types";
 
 function schedule(
   monthlyPaymentSavings: number[],
@@ -21,6 +21,29 @@ function schedule(
 
 function repeated(value: number, count = 240): number[] {
   return Array.from({ length: count }, () => value);
+}
+
+function projectSettings(
+  projectCost: number,
+  overrides: Partial<RealEstateFinancingSettings> = {}
+): RealEstateFinancingSettings {
+  const state = defaultAppState();
+  return {
+    ...state.realEstate,
+    purchasePrice: projectCost,
+    constructionOrRenovationCosts: 0,
+    landCosts: 0,
+    additionalPurchaseCosts: 0,
+    notaryCosts: 0,
+    landRegistryCosts: 0,
+    brokerCosts: 0,
+    transferTax: 0,
+    modernizationReserve: 0,
+    movingAndSetupCosts: 0,
+    safetyBuffer: 0,
+    loanAmount: 0,
+    ...overrides
+  };
 }
 
 describe("real estate calculator", () => {
@@ -81,13 +104,10 @@ describe("real estate calculator", () => {
 
   it("uses selected monthly savings as the only regular repayment source", () => {
     const state = defaultAppState();
-    const settings = {
-      ...state.realEstate,
-      purchasePrice: 120000,
-      loanAmount: 120000,
+    const settings = projectSettings(120000, {
       interestRatePercent: 0,
       financingYears: 20
-    };
+    });
 
     const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000)));
 
@@ -115,12 +135,10 @@ describe("real estate calculator", () => {
     const specialRepayments = repeated(0);
     specialRepayments[2] = 2000;
     specialRepayments[11] = 5000;
-    const settings = {
-      ...state.realEstate,
-      loanAmount: 120000,
+    const settings = projectSettings(120000, {
       interestRatePercent: 0,
       financingYears: 5
-    };
+    });
 
     const result = calculateRealEstateFinancing(
       state.settings.year,
@@ -135,12 +153,10 @@ describe("real estate calculator", () => {
 
   it("adds withdrawal gain to the monthly payment only when it is in the source schedule", () => {
     const state = defaultAppState();
-    const settings = {
-      ...state.realEstate,
-      loanAmount: 120000,
+    const settings = projectSettings(120000, {
       interestRatePercent: 0,
       financingYears: 5
-    };
+    });
 
     const withoutWithdrawal = calculateRealEstateFinancing(
       state.settings.year,
@@ -161,19 +177,84 @@ describe("real estate calculator", () => {
 
   it("does not invent payments to cover interest shortfalls", () => {
     const state = defaultAppState();
-    const settings = {
-      ...state.realEstate,
-      loanAmount: 120000,
+    const settings = projectSettings(120000, {
       interestRatePercent: 12,
       financingYears: 1
-    };
+    });
 
     const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(500, 12)));
 
     expect(result.years[0].principalFromMonthlyPayment).toBe(0);
-    expect(result.years[0].loanEnd).toBe(120000);
+    expect(result.years[0].loanEnd).toBeGreaterThan(120000);
     expect(result.years[0].interestShortfall).toBeGreaterThan(0);
     expect(result.validationErrors.join(" ")).toContain("Zinsen nicht vollstaendig");
+  });
+
+  it("uses payments above interest demand for principal repayment", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(120000, {
+      interestRatePercent: 3.7,
+      financingYears: 1
+    });
+
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 12)));
+
+    expect(result.years[0].interestShortfall).toBe(0);
+    expect(result.years[0].principalFromMonthlyPayment).toBeGreaterThan(0);
+    expect(result.years[0].loanEnd).toBeLessThan(120000);
+  });
+
+  it("capitalizes uncovered interest when no repayment is available", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(595000, {
+      interestRatePercent: 3.7,
+      financingYears: 1
+    });
+
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(0, 12)));
+
+    expect(result.startLoanAmount).toBe(595000);
+    expect(result.years[0].interestDue).toBeGreaterThan(0);
+    expect(result.years[0].interestPaid).toBe(0);
+    expect(result.years[0].interestShortfall).toBeGreaterThan(0);
+    expect(result.years[0].loanEnd).toBeGreaterThan(595000);
+    expect(result.years[0].netPropertyWealth).toBeLessThan(0);
+    expect(result.totalLoanCost).toBeGreaterThan(595000);
+  });
+
+  it("derives the financing period from start and end age", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(120000, {
+      financingStartAge: 45,
+      financingEndAge: 70,
+      financingYears: 99,
+      interestRatePercent: 0
+    });
+
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 300)));
+
+    expect(result.financingYears).toBe(25);
+    expect(result.years).toHaveLength(25);
+  });
+
+  it("stops scheduled repayment after the target period and keeps interest running", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(120000, {
+      interestRatePercent: 12,
+      financingYears: 1
+    });
+
+    const result = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000, 24)),
+      { financingYears: 1, projectionYears: 2 }
+    );
+
+    expect(result.years).toHaveLength(2);
+    expect(result.years[1].monthlyPaymentAvailable).toBe(0);
+    expect(result.years[1].interestDue).toBeGreaterThan(0);
+    expect(result.years[1].loanEnd).toBeGreaterThan(result.years[0].loanEnd);
   });
 
   it("marks invalid required settings", () => {
@@ -190,12 +271,10 @@ describe("real estate calculator", () => {
 
   it("defaults the real estate detail year to the first active credit year", () => {
     const state = defaultAppState();
-    const settings = {
-      ...state.realEstate,
-      loanAmount: 24000,
+    const settings = projectSettings(24000, {
       interestRatePercent: 0,
       financingYears: 3
-    };
+    });
     const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(2000, 36)));
 
     expect(defaultRealEstateDetailYear(result.years, null)).toBe(state.settings.year);
@@ -204,13 +283,9 @@ describe("real estate calculator", () => {
 
   it("falls back to the first calculated year when no active credit exists", () => {
     const state = defaultAppState();
-    const settings = {
-      ...state.realEstate,
-      loanAmount: 0,
-      purchasePrice: 0,
-      equityCapital: 0,
+    const settings = projectSettings(0, {
       financingYears: 3
-    };
+    });
     const result = calculateRealEstateFinancing(state.settings.year, settings, schedule([]));
 
     expect(defaultRealEstateDetailYear(result.years, null)).toBe(state.settings.year);

@@ -251,6 +251,7 @@ export function defaultRealEstateFinancingSettings(): RealEstateFinancingSetting
     specialRepaymentRhythm: "yearly",
     remainingDebtAfterFixedInterest: 0,
     financingStartAge: 0,
+    financingEndAge: 70,
     plannedSaleYear: null,
     estimatedSaleValue: null,
     targetFullRepaymentYear: null,

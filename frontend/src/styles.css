@@ -2566,6 +2566,13 @@ tfoot th {
   min-height: 250px;
 }
 
+.wealth-chart-title {
+  color: var(--text);
+  font-size: 0.98rem;
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .real-estate-chart-card .wealth-vertical-chart {
   min-height: 345px;
 }

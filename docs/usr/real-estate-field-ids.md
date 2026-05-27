@@ -19,17 +19,9 @@ Diese IDs sind fuer Persistenz, Import/Export und spaetere AI-Chat-Integration v
 
 ## Finanzierungsdaten
 
-- `propertyFinancing.equityCapital`
-- `propertyFinancing.loanAmount`
 - `propertyFinancing.interestRatePercent`
-- `propertyFinancing.initialRepaymentPercent`
-- `propertyFinancing.monthlyPayment`
-- `propertyFinancing.fixedInterestYears`
-- `propertyFinancing.targetTermYears`
-- `propertyFinancing.financingYears`
-- `propertyFinancing.specialRepaymentAmount`
-- `propertyFinancing.specialRepaymentRhythm`
-- `propertyFinancing.remainingDebtAfterFixedInterest`
+- `propertyFinancing.financingStartAge`
+- `propertyFinancing.financingEndAge`
 
 ## Strategie und Annahmen
 

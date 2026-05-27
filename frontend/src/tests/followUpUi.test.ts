@@ -72,8 +72,12 @@ describe("follow-up ui rendering", () => {
 
     expect(html).not.toContain("Strategie und Annahmen");
     expect(html).not.toContain('data-real-estate-field="equityCapital"');
+    expect(html).not.toContain('data-real-estate-field="loanAmount"');
+    expect(html).not.toContain('data-real-estate-field="targetTermYears"');
     expect(html).not.toContain('data-real-estate-field="subsidyAmount"');
     expect(html).not.toContain('data-real-estate-field="remainingDebtAfterFixedInterest"');
+    expect(count(html, 'data-real-estate-field="financingEndAge"')).toBe(1);
+    expect(count(html, 'data-real-estate-field="plannedSaleYear"')).toBe(1);
     expect(count(html, 'data-real-estate-field="interestRatePercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="interestRatePercent"')).toBe(1);
     expect(count(html, 'data-real-estate-field="monthlyPayment"')).toBe(0);
@@ -107,6 +111,7 @@ describe("follow-up ui rendering", () => {
     });
 
     expect(repayment).toContain("wealth-vertical-chart");
+    expect(repayment).toContain("Restschuld, Tilgung und Zinsen je Jahr");
     expect(trend).toContain("wealth-vertical-chart");
     expect(combined).toContain("wealth-vertical-chart");
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");
@@ -121,6 +126,17 @@ describe("follow-up ui rendering", () => {
 
     expect(repayment).toContain("Noch kein Start-Kreditvolumen");
     expect(repayment).not.toContain("wealth-column-segment equity");
+  });
+
+  it("scales the repayment chart to debt that grows above the start loan", () => {
+    const repayment = renderRealEstateRepaymentChart({
+      points: [{ ...realEstateYear, loanEnd: 250000, interestDue: 12000 }],
+      selectedYear: 2026,
+      formatMoney: String
+    });
+
+    expect(repayment).toContain("250 Tsd. EUR");
+    expect(repayment).toContain('wealth-column-overlay interest');
   });
 });
 

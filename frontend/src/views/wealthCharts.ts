@@ -22,10 +22,12 @@ export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstat
   if (!Number.isFinite(startLoanAmount) || startLoanAmount <= 0) {
     return '<div class="chart-empty">Noch kein Start-Kreditvolumen fuer die Tilgung vorhanden.</div>';
   }
+  const maxDebt = Math.max(startLoanAmount, ...input.points.map((point) => Math.max(0, point.loanStart, point.loanEnd)));
 
   return renderVerticalChart({
     label: "Immobilienfinanzierung je Jahr",
-    maxValue: startLoanAmount,
+    title: "Restschuld, Tilgung und Zinsen je Jahr",
+    maxValue: maxDebt,
     legend: [
       { className: "debt", label: "Restschuld" },
       { className: "equity", label: "Getilgter Kreditanteil" },
@@ -38,8 +40,8 @@ export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstat
         year: point.year,
         selected: input.selectedYear === point.year,
         action: "select-real-estate-year",
-        value: point.netPropertyWealth,
-        valueLabel: input.formatMoney(point.netPropertyWealth),
+        value: point.loanEnd,
+        valueLabel: input.formatMoney(point.loanEnd),
         segments: composition.segments
       };
     })
@@ -119,6 +121,7 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
 
 function renderVerticalChart(input: {
   label: string;
+  title?: string;
   maxValue: number;
   legend: Array<{ className: string; label: string }>;
   points: Array<{
@@ -133,6 +136,7 @@ function renderVerticalChart(input: {
 }): string {
   return `
     <div class="wealth-vertical-chart" aria-label="${input.label}">
+      ${input.title ? `<h3 class="wealth-chart-title">${input.title}</h3>` : ""}
       <div class="wealth-y-axis" aria-hidden="true">
         <span>${formatAxis(input.maxValue)}</span>
         <span>${formatAxis(input.maxValue / 2)}</span>
@@ -213,14 +217,15 @@ function heightPercent(value: number, maxValue: number): number {
 }
 
 function propertyComposition(point: RealEstateFinancingYear, startLoanAmount: number): { barTotal: number; segments: VerticalBarSegment[] } {
-  const debt = Math.max(0, Math.min(startLoanAmount, point.loanEnd));
-  const equity = Math.max(0, startLoanAmount - debt);
+  const debt = Math.max(0, point.loanEnd);
+  const equity = Math.max(0, startLoanAmount - Math.min(startLoanAmount, debt));
+  const barTotal = Math.max(startLoanAmount, debt);
   return {
-    barTotal: startLoanAmount,
+    barTotal,
     segments: [
       { className: "debt", label: "Restschuld", value: debt },
       { className: "equity", label: "Getilgter Kreditanteil", value: equity },
-      { className: "interest", label: "Zinsen", value: Math.max(0, point.interestPaid), overlay: true }
+      { className: "interest", label: "Zinsen", value: Math.max(0, point.interestDue), overlay: true }
     ]
   };
 }
