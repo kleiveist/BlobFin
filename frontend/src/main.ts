@@ -717,7 +717,7 @@ function renderCalculations(
       maxProjectionYears: maxRealEstateProjectionYears
     }
   );
-  renderRealEstateCalculations(realEstate);
+  renderRealEstateCalculations(realEstate, realEstateProjectionYears);
   const combinedRealEstate =
     combinedRealEstateProjectionYears === realEstateProjectionYears &&
     combinedRealEstateProjectionYears === maxRealEstateProjectionYears
@@ -761,7 +761,7 @@ function syncInvestmentProjectionLabels(depot: InvestmentDepotKey): void {
   setText("detailBequestReserveLabel", isChild ? "Reserve zum Auszahlungsalter" : "Reserve/Erbe zum Endalter");
 }
 
-function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
+function renderRealEstateCalculations(result: RealEstateFinancingResult, chartProjectionYears: number): void {
   latestRealEstateResult = result;
   const validation = document.querySelector<HTMLDivElement>("#realEstateValidation");
   if (validation) {
@@ -795,12 +795,13 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
     `${intNumber(actualFinancingStartAge)} -> ${intNumber(actualFinancingEndAge)} | ${intNumber(result.financingYears)} Jahre`
   );
 
-  selectedRealEstateYear = defaultRealEstateDetailYear(result.years, selectedRealEstateYear);
+  const chartYears = result.years.slice(0, Math.max(1, chartProjectionYears));
+  selectedRealEstateYear = defaultRealEstateDetailYear(chartYears, selectedRealEstateYear);
 
   const repaymentHost = document.querySelector<HTMLDivElement>("#realEstateRepaymentChart");
   if (repaymentHost) {
     repaymentHost.innerHTML = renderRealEstateRepaymentChart({
-      points: result.years,
+      points: chartYears,
       selectedYear: selectedRealEstateYear,
       loanCostBasis: result.totalLoanCost,
       financingEndYear: result.financingEndYear,
@@ -811,7 +812,7 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   const trendHost = document.querySelector<HTMLDivElement>("#realEstateTrendChart");
   if (trendHost) {
     trendHost.innerHTML = renderRealEstateTrendChart({
-      points: result.years,
+      points: chartYears,
       selectedYear: selectedRealEstateYear,
       financingEndYear: result.financingEndYear,
       formatMoney: (value) => money(value)

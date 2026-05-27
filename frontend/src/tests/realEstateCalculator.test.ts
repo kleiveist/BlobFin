@@ -345,11 +345,39 @@ describe("real estate calculator", () => {
       interestRatePercent: 0
     });
 
-    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 300)));
+    const result = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000, 300)),
+      { projectionYears: 10, maxProjectionYears: 99 }
+    );
 
     expect(result.financingYears).toBe(10);
     expect(result.financingEndYear).toBe(state.settings.year + 9);
     expect(result.years).toHaveLength(10);
+  });
+
+  it("keeps paid-off property years through the requested chart horizon", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(24000, {
+      interestRatePercent: 0,
+      financingYears: 10
+    });
+
+    const result = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(2000, 120)),
+      { projectionYears: 5, maxProjectionYears: 80 }
+    );
+
+    expect(result.years).toHaveLength(5);
+    expect(result.financingYears).toBe(1);
+    expect(result.financingEndYear).toBe(state.settings.year);
+    expect(result.years[result.years.length - 1]?.loanEnd).toBe(0);
+    expect(result.years[result.years.length - 1]?.loanCostRemaining).toBe(0);
+    expect(result.years[result.years.length - 1]?.loanCostPaidToDate).toBe(result.totalLoanCost);
+    expect(result.years[result.years.length - 1]?.propertyValue).toBeGreaterThan(result.years[0].propertyValue);
   });
 
   it("extends projection beyond the target period until the debt is paid", () => {
