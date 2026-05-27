@@ -13,9 +13,10 @@ import type { RealEstateFinancingSourceSchedule } from "../types";
 function schedule(
   monthlyPaymentSavings: number[],
   specialRepayments: number[] = [],
-  withdrawalGainPayments: number[] = []
+  withdrawalGainPayments: number[] = [],
+  equityCapital = 0
 ): RealEstateFinancingSourceSchedule {
-  return { monthlyPaymentSavings, specialRepayments, withdrawalGainPayments };
+  return { equityCapital, monthlyPaymentSavings, specialRepayments, withdrawalGainPayments };
 }
 
 function repeated(value: number, count = 240): number[] {
@@ -23,7 +24,7 @@ function repeated(value: number, count = 240): number[] {
 }
 
 describe("real estate calculator", () => {
-  it("derives a loan amount from total project cost and equity", () => {
+  it("derives a loan amount from total project cost and sourced equity", () => {
     const state = defaultAppState();
     const settings = {
       ...state.realEstate,
@@ -34,7 +35,8 @@ describe("real estate calculator", () => {
       subsidyAmount: 5000
     };
 
-    expect(deriveLoanAmount(settings)).toBeGreaterThan(0);
+    expect(deriveLoanAmount(settings)).toBe(370000);
+    expect(deriveLoanAmount(settings, 60000)).toBe(310000);
   });
 
   it("ignores removed strategy fields when deriving loan amount and yearly values", () => {
@@ -67,9 +69,11 @@ describe("real estate calculator", () => {
       maxMonthlyBurden: 1
     };
 
-    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 36)));
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 36), [], [], 50000));
 
-    expect(deriveLoanAmount(settings)).toBe(250000);
+    expect(deriveLoanAmount(settings)).toBe(300000);
+    expect(deriveLoanAmount(settings, 50000)).toBe(250000);
+    expect(result.equityCapital).toBe(50000);
     expect(result.years[0].propertyValue).toBe(300000);
     expect(result.years[0].loanEnd).toBe(238000);
     expect(result.validationErrors.join(" ")).not.toContain("Ziel-Monatsbelastung");

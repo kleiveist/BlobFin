@@ -328,6 +328,7 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
     financingYears: numberOrDefault(value.financingYears, fallback.financingYears),
     manualFuturePropertyValue: nullableNumberOrDefault(value.manualFuturePropertyValue, fallback.manualFuturePropertyValue),
     repaymentSources: normalizeRepaymentSourceToggles(value.repaymentSources),
+    equityCapitalSourceIds: stringArrayOrDefault(value.equityCapitalSourceIds, fallback.equityCapitalSourceIds),
     monthlyPaymentSourceIds: stringArrayOrDefault(value.monthlyPaymentSourceIds, fallback.monthlyPaymentSourceIds),
     specialRepaymentSourceIds: stringArrayOrDefault(value.specialRepaymentSourceIds, fallback.specialRepaymentSourceIds),
     includeWithdrawalGainAsPaymentSource: booleanOrDefault(

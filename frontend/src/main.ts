@@ -464,6 +464,7 @@ function bindEvents(): void {
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "toggle-real-estate-withdrawal-gain-source") toggleRealEstateWithdrawalGainSource();
+    if (action === "add-real-estate-savings-source-equityCapital") addRealEstateSavingsSource("equityCapital");
     if (action === "add-real-estate-savings-source-monthlyPayment") addRealEstateSavingsSource("monthlyPayment");
     if (action === "add-real-estate-savings-source-specialRepayment") addRealEstateSavingsSource("specialRepayment");
     if (action === "show-reserve-chart") showReserveChartPopup();
@@ -750,6 +751,7 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   const lastYear = result.years[result.years.length - 1];
   setText("realEstateLoanMetric", money(result.startLoanAmount));
   setText("realEstateMonthlyRateMetric", money(result.monthlyPayment));
+  setText("realEstateDerivedEquityMetric", money(result.equityCapital));
   setText("realEstateDerivedMonthlyPaymentMetric", money(result.monthlyPayment));
   setText("realEstateDerivedInitialRepaymentMetric", percent(result.derivedInitialRepaymentPercent));
   setText("realEstateDerivedSpecialRepaymentMetric", money(result.annualSpecialRepayment));
@@ -821,6 +823,10 @@ function realEstateFinancingStartYear(currentYear: number, birthYear: number, fi
   return Math.max(currentYear, targetAgeYear);
 }
 
+function currentRealEstateFinancingStartYear(): number {
+  return realEstateFinancingStartYear(state.settings.year, state.investment.birthYear, state.realEstate.financingStartAge);
+}
+
 function realEstateSourceSchedule(
   startYear: number,
   financingYears: number,
@@ -828,8 +834,12 @@ function realEstateSourceSchedule(
 ): RealEstateFinancingSourceSchedule {
   const monthCount = Math.max(12, Math.min(80, Math.round(financingYears || 1)) * 12);
   const positions = allPlanningPositions();
+  const equityPositions = selectedRealEstateSourcePositions("equityCapital", positions);
   const monthlyPositions = selectedRealEstateSourcePositions("monthlyPayment", positions);
   const specialPositions = selectedRealEstateSourcePositions("specialRepayment", positions);
+  const equityCapital = equityPositions.reduce((sum, position) => {
+    return sum + (position.payoutType === "once" && position.payoutYear <= startYear ? Number(position.amount) : 0);
+  }, 0);
   const monthlyPaymentSavings: number[] = [];
   const withdrawalGainPayments: number[] = [];
   const specialRepayments: number[] = [];
@@ -856,7 +866,7 @@ function realEstateSourceSchedule(
     );
   }
 
-  return { monthlyPaymentSavings, withdrawalGainPayments, specialRepayments };
+  return { equityCapital, monthlyPaymentSavings, withdrawalGainPayments, specialRepayments };
 }
 
 function selectedRealEstateSourcePositions(
@@ -883,13 +893,14 @@ function calculateCombinedWealthYears(
   const realEstateEndYear = realEstate.years[realEstate.years.length - 1]?.year ?? state.settings.year;
   const horizonYears = Math.max(1, standardEndYear, retirementEndYear, realEstateEndYear) - state.settings.year + 1;
 
-  const cashContribution = combinedCashContribution();
+  const cashContribution = combinedCashContribution(horizonYears);
 
   return buildCombinedWealthSeries({
     startYear: state.settings.year,
     horizonYears,
     cashStartValue: cashContribution.cashStartValue,
     yearlyCashDelta: cashContribution.yearlyCashDelta,
+    yearlyCashDeltas: cashContribution.yearlyCashDeltas,
     depotProjection: standardProjection,
     sharedDepotProjection: retirementProjection,
     depotBirthYear: state.investment.birthYear,
@@ -899,9 +910,14 @@ function calculateCombinedWealthYears(
   });
 }
 
-function combinedCashContribution(): { cashStartValue: number; yearlyCashDelta: number } {
+function combinedCashContribution(horizonYears: number): {
+  cashStartValue: number;
+  yearlyCashDelta: number;
+  yearlyCashDeltas: number[];
+} {
   let cashStartValue = 0;
   let yearlyCashDelta = 0;
+  const yearlyCashDeltas = Array.from({ length: Math.max(1, horizonYears) }, () => 0);
 
   for (const account of state.planningAccounts) {
     const include =
@@ -911,16 +927,24 @@ function combinedCashContribution(): { cashStartValue: number; yearlyCashDelta: 
           ? state.combinedWealth.includeAnnualTableAccounts
           : state.combinedWealth.includeCostReserveAccounts || state.combinedWealth.includeAnnualTableAccounts;
     if (!include) continue;
-    const summary = calculateReserveSummary(state.settings, account.yearlyRows);
-    cashStartValue += summary.yearEndBalance;
-    yearlyCashDelta += summary.yearlyRemaining;
+    for (let yearOffset = 0; yearOffset < yearlyCashDeltas.length; yearOffset += 1) {
+      const summary = calculateReserveSummary(
+        { ...state.settings, year: state.settings.year + yearOffset },
+        account.yearlyRows
+      );
+      if (yearOffset === 0) {
+        cashStartValue += summary.yearEndBalance;
+        yearlyCashDelta += summary.yearlyRemaining;
+      }
+      yearlyCashDeltas[yearOffset] += summary.yearlyRemaining;
+    }
   }
 
   if (!Number.isFinite(cashStartValue) || !Number.isFinite(yearlyCashDelta)) {
-    return { cashStartValue: reserveFallbackValue(), yearlyCashDelta: 0 };
+    return { cashStartValue: reserveFallbackValue(), yearlyCashDelta: 0, yearlyCashDeltas };
   }
 
-  return { cashStartValue, yearlyCashDelta };
+  return { cashStartValue, yearlyCashDelta, yearlyCashDeltas };
 }
 
 function reserveFallbackValue(): number {
@@ -2263,6 +2287,7 @@ function investmentPositionAmountText(position: ReservePosition): string {
 }
 
 function renderRealEstateSourceLists(standardProjection: AssetProjection): void {
+  renderRealEstateSourceList("equityCapital", "#realEstateEquityCapitalSourceList");
   renderRealEstateSourceList("monthlyPayment", "#realEstateMonthlyPaymentSourceList");
   renderRealEstateSourceList("specialRepayment", "#realEstateSpecialRepaymentSourceList");
 
@@ -2282,7 +2307,9 @@ function renderRealEstateSourceList(kind: RealEstatePaymentSourceKind, selector:
     return (
       position.type === "savings" &&
       positionFlow(position) === "expense" &&
-      (kind === "specialRepayment" || position.payoutType !== "once")
+      (kind === "equityCapital"
+        ? position.payoutType === "once"
+        : kind === "specialRepayment" || position.payoutType !== "once")
     );
   });
 
@@ -2297,15 +2324,18 @@ function renderRealEstateSourceList(kind: RealEstatePaymentSourceKind, selector:
   }
 
   const selectedIds = new Set(realEstateSourceIds(kind));
-  const blockedByOtherRealEstate = new Set(
-    realEstateSourceIds(kind === "monthlyPayment" ? "specialRepayment" : "monthlyPayment")
-  );
+  const financingStartYear = currentRealEstateFinancingStartYear();
+  const blockedByOtherRealEstate = otherRealEstateSourceKinds(kind).reduce((blockedIds, otherKind) => {
+    for (const id of realEstateSourceIds(otherKind)) blockedIds.add(id);
+    return blockedIds;
+  }, new Set<string>());
 
   host.innerHTML = savingsPositions
     .map((position) => {
       const blockedDepot = blockedInvestmentDepotForPosition(position.id);
       const blockedByRealEstate = blockedByOtherRealEstate.has(position.id);
-      const blocked = Boolean(blockedDepot) || blockedByRealEstate;
+      const blockedByTiming = kind === "equityCapital" && position.payoutYear > financingStartYear;
+      const blocked = Boolean(blockedDepot) || blockedByRealEstate || blockedByTiming;
       const checked = selectedIds.has(position.id) ? "checked" : "";
       const disabled = blocked ? "disabled" : "";
       const inactive = position.active ? "" : `<span class="muted">(inaktiv)</span>`;
@@ -2313,7 +2343,9 @@ function renderRealEstateSourceList(kind: RealEstatePaymentSourceKind, selector:
         ? `belegt im ${depotLabel(blockedDepot)}`
         : blockedByRealEstate
           ? "bereits in anderer Immobilienquelle"
-          : realEstatePositionSubtitle(position);
+          : blockedByTiming
+            ? `erst nach Finanzierungsstart ${financingStartYear} verfuegbar`
+            : realEstatePositionSubtitle(position);
       return `
         <label class="include-item ${blocked ? "blocked" : ""}">
           <input
@@ -2339,13 +2371,29 @@ function realEstatePositionSubtitle(position: ReservePosition): string {
 }
 
 function realEstateSourceIds(kind: RealEstatePaymentSourceKind): string[] {
-  return kind === "monthlyPayment"
-    ? state.realEstate.monthlyPaymentSourceIds
-    : state.realEstate.specialRepaymentSourceIds;
+  if (kind === "equityCapital") return state.realEstate.equityCapitalSourceIds;
+  if (kind === "monthlyPayment") return state.realEstate.monthlyPaymentSourceIds;
+  return state.realEstate.specialRepaymentSourceIds;
 }
 
 function realEstateSelectedSourceIds(): Set<string> {
-  return new Set([...state.realEstate.monthlyPaymentSourceIds, ...state.realEstate.specialRepaymentSourceIds]);
+  return new Set([
+    ...state.realEstate.equityCapitalSourceIds,
+    ...state.realEstate.monthlyPaymentSourceIds,
+    ...state.realEstate.specialRepaymentSourceIds
+  ]);
+}
+
+function otherRealEstateSourceKinds(kind: RealEstatePaymentSourceKind): RealEstatePaymentSourceKind[] {
+  return (["equityCapital", "monthlyPayment", "specialRepayment"] as RealEstatePaymentSourceKind[]).filter(
+    (item) => item !== kind
+  );
+}
+
+function realEstateSourceField(kind: RealEstatePaymentSourceKind): keyof RealEstateFinancingSettings {
+  if (kind === "equityCapital") return "equityCapitalSourceIds";
+  if (kind === "monthlyPayment") return "monthlyPaymentSourceIds";
+  return "specialRepaymentSourceIds";
 }
 
 function blockedInvestmentDepotForPosition(positionId: string): InvestmentDepotKey | null {
@@ -2513,6 +2561,7 @@ function syncRealEstateInputsFromState(): void {
     if (
       field === "locale" ||
       field === "repaymentSources" ||
+      field === "equityCapitalSourceIds" ||
       field === "monthlyPaymentSourceIds" ||
       field === "specialRepaymentSourceIds" ||
       field === "includeWithdrawalGainAsPaymentSource"
@@ -2562,6 +2611,7 @@ function updateRealEstateField(field: RealEstateField, value: string): void {
   if (
     field === "locale" ||
     field === "repaymentSources" ||
+    field === "equityCapitalSourceIds" ||
     field === "monthlyPaymentSourceIds" ||
     field === "specialRepaymentSourceIds" ||
     field === "includeWithdrawalGainAsPaymentSource"
@@ -2602,8 +2652,7 @@ function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
 
 function toggleRealEstateSourcePosition(kind: RealEstatePaymentSourceKind, id: string, checked: boolean): void {
   if (checked && blockedInvestmentDepotForPosition(id)) return;
-  const otherKind: RealEstatePaymentSourceKind = kind === "monthlyPayment" ? "specialRepayment" : "monthlyPayment";
-  if (checked && realEstateSourceIds(otherKind).includes(id)) return;
+  if (checked && otherRealEstateSourceKinds(kind).some((otherKind) => realEstateSourceIds(otherKind).includes(id))) return;
 
   const currentIds = new Set(realEstateSourceIds(kind));
   if (checked) currentIds.add(id);
@@ -2611,7 +2660,7 @@ function toggleRealEstateSourcePosition(kind: RealEstatePaymentSourceKind, id: s
 
   state.realEstate = {
     ...state.realEstate,
-    [kind === "monthlyPayment" ? "monthlyPaymentSourceIds" : "specialRepaymentSourceIds"]: Array.from(currentIds)
+    [realEstateSourceField(kind)]: Array.from(currentIds)
   };
   resetRealEstateDetailSelection();
 }
@@ -2629,6 +2678,24 @@ function addRealEstateSavingsSource(kind: RealEstatePaymentSourceKind): void {
   setActiveSection("cost_reserve_positions");
   selectedPositionMode = "savings";
   const id = addPosition();
+  if (kind === "equityCapital") {
+    const financingStartYear = currentRealEstateFinancingStartYear();
+    state.positions = state.positions.map((position) =>
+      position.id === id
+        ? sanitizePosition(
+            {
+              ...position,
+              name: "Eigenkapital Immobilie",
+              payoutType: "once",
+              payoutYear: financingStartYear,
+              payoutMonth: 1,
+              payoutDay: 1
+            },
+            state.settings.year
+          )
+        : position
+    );
+  }
   toggleRealEstateSourcePosition(kind, id, true);
   renderAll();
 }
@@ -3130,6 +3197,7 @@ function removePosition(id: string): void {
   };
   state.realEstate = {
     ...state.realEstate,
+    equityCapitalSourceIds: state.realEstate.equityCapitalSourceIds.filter((item) => item !== id),
     monthlyPaymentSourceIds: state.realEstate.monthlyPaymentSourceIds.filter((item) => item !== id),
     specialRepaymentSourceIds: state.realEstate.specialRepaymentSourceIds.filter((item) => item !== id)
   };
@@ -3363,6 +3431,11 @@ async function importPositionsFromFile(file: File | undefined): Promise<void> {
   };
   state.realEstate = {
     ...state.realEstate,
+    equityCapitalSourceIds: state.realEstate.equityCapitalSourceIds.filter((id) =>
+      availablePositions.some(
+        (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
+      )
+    ),
     monthlyPaymentSourceIds: state.realEstate.monthlyPaymentSourceIds.filter((id) =>
       availablePositions.some(
         (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
@@ -3951,6 +4024,12 @@ function normalizeRealEstateSourceIds(): void {
   const savingsPositions = allPlanningPositions().filter(
     (position) => position.type === "savings" && positionFlow(position) === "expense"
   );
+  const financingStartYear = currentRealEstateFinancingStartYear();
+  const equitySelectableIds = new Set(
+    savingsPositions
+      .filter((position) => position.payoutType === "once" && position.payoutYear <= financingStartYear)
+      .map((position) => position.id)
+  );
   const monthlySelectableIds = new Set(
     savingsPositions.filter((position) => position.payoutType !== "once").map((position) => position.id)
   );
@@ -3960,15 +4039,20 @@ function normalizeRealEstateSourceIds(): void {
     ...state.investment.retirementIncludedIds,
     ...state.investment.childIncludedIds
   ]);
+  const equityCapitalSourceIds = state.realEstate.equityCapitalSourceIds.filter(
+    (id) => equitySelectableIds.has(id) && !blockedByInvestment.has(id)
+  );
+  const equityIds = new Set(equityCapitalSourceIds);
   const monthlyPaymentSourceIds = state.realEstate.monthlyPaymentSourceIds.filter(
-    (id) => monthlySelectableIds.has(id) && !blockedByInvestment.has(id)
+    (id) => monthlySelectableIds.has(id) && !blockedByInvestment.has(id) && !equityIds.has(id)
   );
   const monthlyIds = new Set(monthlyPaymentSourceIds);
   const specialRepaymentSourceIds = state.realEstate.specialRepaymentSourceIds.filter(
-    (id) => specialSelectableIds.has(id) && !blockedByInvestment.has(id) && !monthlyIds.has(id)
+    (id) => specialSelectableIds.has(id) && !blockedByInvestment.has(id) && !equityIds.has(id) && !monthlyIds.has(id)
   );
   state.realEstate = {
     ...state.realEstate,
+    equityCapitalSourceIds,
     monthlyPaymentSourceIds,
     specialRepaymentSourceIds
   };

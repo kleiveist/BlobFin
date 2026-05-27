@@ -262,6 +262,7 @@ export function defaultRealEstateFinancingSettings(): RealEstateFinancingSetting
     financingYears: 35,
     manualFuturePropertyValue: null,
     repaymentSources: defaultRepaymentSourceToggles(),
+    equityCapitalSourceIds: [],
     monthlyPaymentSourceIds: [],
     specialRepaymentSourceIds: [],
     includeWithdrawalGainAsPaymentSource: false

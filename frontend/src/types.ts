@@ -22,7 +22,7 @@ export type RepaymentSourceToggleKey =
   | "useLegacySavingsRateAsRepayment"
   | "useNetGainAsRepayment"
   | "onlyUsePositiveValues";
-export type RealEstatePaymentSourceKind = "monthlyPayment" | "specialRepayment";
+export type RealEstatePaymentSourceKind = "equityCapital" | "monthlyPayment" | "specialRepayment";
 export type PositionTableFilterColumn =
   | "active"
   | "visible"
@@ -177,6 +177,7 @@ export interface RealEstateFinancingSettings {
   financingYears: number;
   manualFuturePropertyValue: number | null;
   repaymentSources: RepaymentSourceToggle;
+  equityCapitalSourceIds: string[];
   monthlyPaymentSourceIds: string[];
   specialRepaymentSourceIds: string[];
   includeWithdrawalGainAsPaymentSource: boolean;
@@ -214,6 +215,7 @@ export interface AdditionalRepaymentYearBreakdown {
 }
 
 export interface RealEstateFinancingSourceSchedule {
+  equityCapital: number;
   monthlyPaymentSavings: number[];
   withdrawalGainPayments: number[];
   specialRepayments: number[];
@@ -401,6 +403,7 @@ export interface RealEstateFinancingResult {
   years: RealEstateFinancingYear[];
   months: RealEstateFinancingMonth[];
   startLoanAmount: number;
+  equityCapital: number;
   monthlyPayment: number;
   derivedInitialRepaymentPercent: number;
   annualSpecialRepayment: number;

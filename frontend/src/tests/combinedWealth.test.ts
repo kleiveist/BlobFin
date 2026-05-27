@@ -295,4 +295,66 @@ describe("combined wealth", () => {
     expect(result[0].cashValue).toBe(6400);
     expect(result[0].depotValue).toBe(9600);
   });
+
+  it("covers negative cash years from the standard depot and floors cash at zero", () => {
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 2,
+      cashStartValue: 0,
+      yearlyCashDelta: -3000,
+      depotProjection: projection([point(30, "saving", 10000), point(31, "saving", 12000)], 0, 65),
+      sharedDepotProjection: projection([point(30, "saving", 5000), point(31, "saving", 5000)], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateYears: [],
+      toggles: defaultToggles
+    });
+
+    expect(result[0].cashValue).toBe(0);
+    expect(result[0].depotValue).toBe(15000);
+    expect(result[1].cashValue).toBe(0);
+    expect(result[1].depotValue).toBe(14000);
+  });
+
+  it("uses year-specific cash deficits before drawing from the standard depot", () => {
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 3,
+      cashStartValue: 10000,
+      yearlyCashDelta: 0,
+      yearlyCashDeltas: [0, -12000, 0],
+      depotProjection: projection([point(30, "saving", 5000), point(31, "saving", 5000), point(32, "saving", 5000)], 0, 65),
+      sharedDepotProjection: projection([point(30, "saving", 5000), point(31, "saving", 5000), point(32, "saving", 5000)], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateYears: [],
+      toggles: defaultToggles
+    });
+
+    expect(result[0].cashValue).toBe(10000);
+    expect(result[1].cashValue).toBe(0);
+    expect(result[1].depotValue).toBe(8000);
+    expect(result[2].cashValue).toBe(0);
+    expect(result[2].depotValue).toBe(8000);
+  });
+
+  it("keeps an uncovered cash deficit visible when the standard depot is insufficient", () => {
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 2,
+      cashStartValue: -7000,
+      yearlyCashDelta: 0,
+      depotProjection: projection([point(30, "saving", 5000), point(31, "saving", 6000)], 0, 65),
+      sharedDepotProjection: projection([point(30, "saving", 5000), point(31, "saving", 5000)], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateYears: [],
+      toggles: defaultToggles
+    });
+
+    expect(result[0].cashValue).toBe(-2000);
+    expect(result[0].depotValue).toBe(5000);
+    expect(result[1].cashValue).toBe(-1000);
+    expect(result[1].depotValue).toBe(5000);
+  });
 });

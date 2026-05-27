@@ -14,7 +14,6 @@ export function validateRealEstateSettings(settings: RealEstateFinancingSettings
   if (settings.purchasePrice <= 0) errors.push("Kaufpreis muss groesser als 0 sein.");
   if (settings.interestRatePercent < 0) errors.push("Zinssatz darf nicht negativ sein.");
   if (settings.propertyValueGrowthPercent < 0) errors.push("Immobilienwertsteigerung darf nicht negativ sein.");
-  if (settings.equityCapital < 0) errors.push("Eigenkapital darf nicht negativ sein.");
   if (settings.loanAmount < 0) errors.push("Darlehensbetrag darf nicht negativ sein.");
   if (settings.financingStartAge < 0) errors.push("Finanzierung ab Alter darf nicht negativ sein.");
   if (settings.financingYears <= 0 && settings.targetTermYears <= 0) {
@@ -39,9 +38,9 @@ export function totalProjectCost(settings: RealEstateFinancingSettings): number 
   );
 }
 
-export function deriveLoanAmount(settings: RealEstateFinancingSettings): number {
+export function deriveLoanAmount(settings: RealEstateFinancingSettings, equityCapital = 0): number {
   if (settings.loanAmount > 0) return roundMoney(settings.loanAmount);
-  return roundMoney(Math.max(0, totalProjectCost(settings) - settings.equityCapital));
+  return roundMoney(Math.max(0, totalProjectCost(settings) - equityCapital));
 }
 
 export function deriveMonthlyPayment(settings: RealEstateFinancingSettings, loanAmount: number): number {
@@ -86,7 +85,8 @@ export function calculateRealEstateFinancing(
 ): RealEstateFinancingResult {
   const validationErrors = validateRealEstateSettings(settings);
   const projectCost = totalProjectCost(settings);
-  const loanAmount = deriveLoanAmount(settings);
+  const equityCapital = roundMoney(Math.max(0, sourceSchedule.equityCapital));
+  const loanAmount = deriveLoanAmount(settings, equityCapital);
   const financingYears = clampYears(settings.financingYears || settings.targetTermYears || 0);
   const monthlyRate = Math.max(0, settings.interestRatePercent) / 100 / 12;
   const growthRate = Math.max(0, settings.propertyValueGrowthPercent) / 100;
@@ -233,6 +233,7 @@ export function calculateRealEstateFinancing(
     years,
     months,
     startLoanAmount: loanAmount,
+    equityCapital,
     monthlyPayment: roundMoney(firstMonthlyPayment),
     derivedInitialRepaymentPercent,
     annualSpecialRepayment: roundMoney(firstYearSpecialRepayment),
@@ -263,6 +264,7 @@ function withdrawalGainYearBreakdown(withdrawalGain: number): AdditionalRepaymen
 
 function emptySourceSchedule(): RealEstateFinancingSourceSchedule {
   return {
+    equityCapital: 0,
     monthlyPaymentSavings: [],
     withdrawalGainPayments: [],
     specialRepayments: []

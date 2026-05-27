@@ -350,9 +350,8 @@ export function renderAppShell(): string {
 
           <section class="real-estate-card">
             <h3>Finanzierungsdaten</h3>
-            <p class="planning-account-summary">Hilfetext: Monatsrate, Anfangstilgung und Sondertilgung werden aus echten Sparpositionen abgeleitet.</p>
+            <p class="planning-account-summary">Hilfetext: Eigenkapital, Monatsrate, Anfangstilgung und Sondertilgung werden aus echten Sparpositionen abgeleitet.</p>
             <div class="field-grid wide">
-              ${realEstateNumberField("equityCapital", "Eigenkapital fuer Immobilie")}
               ${realEstateNumberField("loanAmount", "Darlehensbetrag")}
               ${realEstateNumberField("targetTermYears", "Ziel-Laufzeit (Jahre)", { step: 1 })}
               ${realEstateNumberField("financingStartAge", "Finanzierung ab Alter", { step: 1 })}
@@ -362,6 +361,7 @@ export function renderAppShell(): string {
               ${realEstateAssumptionControl("financingYears", "Finanzierungszeitraum", 1, 50, 1)}
             </div>
             <div class="chart-inline-metrics">
+              ${chartMetric("realEstateDerivedEquityMetric", "Eigenkapital")}
               ${chartMetric("realEstateDerivedMonthlyPaymentMetric", "Monatsrate")}
               ${chartMetric("realEstateDerivedInitialRepaymentMetric", "Anfangstilgung")}
               ${chartMetric("realEstateDerivedSpecialRepaymentMetric", "Sondertilgung p. a.")}
@@ -378,6 +378,10 @@ export function renderAppShell(): string {
               </button>
             </div>
             <div class="real-estate-source-grid">
+              <div>
+                <h3>Eigenkapital</h3>
+                <div id="realEstateEquityCapitalSourceList" class="include-list"></div>
+              </div>
               <div>
                 <h3>Monatsrate</h3>
                 <div id="realEstateMonthlyPaymentSourceList" class="include-list"></div>

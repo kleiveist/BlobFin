@@ -10,6 +10,7 @@ interface BuildCombinedWealthSeriesInput {
   horizonYears: number;
   cashStartValue: number;
   yearlyCashDelta: number;
+  yearlyCashDeltas?: number[];
   depotProjection: AssetProjection;
   sharedDepotProjection: AssetProjection;
   depotBirthYear: number;
@@ -29,9 +30,14 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
   let withdrawalImpact = 0;
   let redirectedCashRepayment = 0;
   let redirectedDepotRepayment = 0;
+  let standardDepotCashDrawdown = 0;
+  let cumulativeCashValue = input.cashStartValue;
 
   for (let yearOffset = 0; yearOffset < input.horizonYears; yearOffset += 1) {
     const year = input.startYear + yearOffset;
+    if (yearOffset > 0) {
+      cumulativeCashValue = roundMoney(cumulativeCashValue + cashDeltaForYearOffset(input, yearOffset));
+    }
     const realEstate = realEstateByYear.get(year);
     const allocation = input.toggles.includeRealEstateFinancing ? realEstate?.additionalRepaymentBreakdown : undefined;
     redirectedCashRepayment = roundMoney(
@@ -39,15 +45,28 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
     );
     redirectedDepotRepayment = roundMoney(redirectedDepotRepayment + (allocation?.depotSavingsRate ?? 0));
 
-    const cashValue = input.toggles.includeCashPositions
-      ? roundMoney(input.cashStartValue + input.yearlyCashDelta * yearOffset - redirectedCashRepayment)
+    const rawCashValue = input.toggles.includeCashPositions
+      ? roundMoney(cumulativeCashValue - redirectedCashRepayment)
       : 0;
+    const standardDepotBeforeCashDrawdown = roundMoney(
+      (depotByYear.get(year) ?? 0) - redirectedDepotRepayment - standardDepotCashDrawdown
+    );
+    const cashDeficit = Math.max(0, -rawCashValue);
+    const cashDrawdown = input.toggles.includeDepotDevelopment
+      ? roundMoney(Math.min(cashDeficit, Math.max(0, standardDepotBeforeCashDrawdown)))
+      : 0;
+    standardDepotCashDrawdown = roundMoney(standardDepotCashDrawdown + cashDrawdown);
+    const cashValue = input.toggles.includeCashPositions ? roundMoney(rawCashValue + cashDrawdown) : 0;
+    if (input.toggles.includeCashPositions && cashDrawdown > 0) {
+      cumulativeCashValue = roundMoney(cumulativeCashValue + cashDrawdown);
+    }
 
     const depotValue = input.toggles.includeDepotDevelopment
       ? roundMoney(
-          (depotByYear.get(year) ?? 0) +
-            (input.toggles.includeSharedDepotDevelopment ? sharedDepotByYear.get(year) ?? 0 : 0) -
-            redirectedDepotRepayment
+          (depotByYear.get(year) ?? 0) -
+            redirectedDepotRepayment -
+            standardDepotCashDrawdown +
+            (input.toggles.includeSharedDepotDevelopment ? sharedDepotByYear.get(year) ?? 0 : 0)
         )
       : 0;
 
@@ -87,6 +106,11 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
   }
 
   return years;
+}
+
+function cashDeltaForYearOffset(input: BuildCombinedWealthSeriesInput, yearOffset: number): number {
+  const value = input.yearlyCashDeltas?.[yearOffset] ?? input.yearlyCashDelta;
+  return Number.isFinite(value) ? roundMoney(value) : 0;
 }
 
 function projectionNetByYear(projection: AssetProjection, birthYear: number): Map<number, number> {

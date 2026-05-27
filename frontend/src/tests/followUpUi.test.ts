@@ -71,6 +71,7 @@ describe("follow-up ui rendering", () => {
     const html = renderAppShell();
 
     expect(html).not.toContain("Strategie und Annahmen");
+    expect(html).not.toContain('data-real-estate-field="equityCapital"');
     expect(html).not.toContain('data-real-estate-field="subsidyAmount"');
     expect(html).not.toContain('data-real-estate-field="remainingDebtAfterFixedInterest"');
     expect(count(html, 'data-real-estate-field="interestRatePercent"')).toBe(0);
@@ -79,6 +80,7 @@ describe("follow-up ui rendering", () => {
     expect(count(html, 'data-real-estate-range="monthlyPayment"')).toBe(0);
     expect(count(html, 'data-real-estate-range="initialRepaymentPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="specialRepaymentAmount"')).toBe(0);
+    expect(html).toContain('id="realEstateEquityCapitalSourceList"');
     expect(html).toContain('id="realEstateMonthlyPaymentSourceList"');
     expect(html).toContain('id="realEstateSpecialRepaymentSourceList"');
     expect(count(html, 'data-real-estate-field="propertyValueGrowthPercent"')).toBe(0);
