@@ -2069,6 +2069,23 @@ tfoot th {
   background: var(--chart-red);
 }
 
+.chart-popup-dot.debt {
+  background: #ff5b63;
+}
+
+.chart-popup-dot.equity {
+  background: #43b20a;
+}
+
+.chart-popup-dot.interest,
+.chart-popup-dot.growth {
+  background: #ff7a00;
+}
+
+.chart-popup-dot.property {
+  background: #5f88e8;
+}
+
 .investment-legend {
   display: flex;
   align-items: center;
@@ -2557,6 +2574,15 @@ tfoot th {
 
 .real-estate-chart-card .wealth-chart-host {
   min-height: 360px;
+}
+
+.real-estate-chart-card {
+  --chart-border: var(--border);
+  --chart-field: var(--surface);
+  --chart-text: var(--text);
+  --chart-muted: var(--muted);
+  position: relative;
+  overflow: hidden;
 }
 
 .wealth-vertical-chart {

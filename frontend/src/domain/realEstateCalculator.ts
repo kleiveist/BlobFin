@@ -127,6 +127,7 @@ export function calculateRealEstateFinancing(
     let principalPaidYear = 0;
     let specialRepaymentYear = 0;
     let withdrawalGainPaymentUsedYear = 0;
+    let depotSavingsRatePaymentUsedYear = 0;
 
     for (let month = 1; month <= 12; month += 1) {
       const scheduleIndex = yearIndex * 12 + month - 1;
@@ -157,7 +158,12 @@ export function calculateRealEstateFinancing(
       const monthlyPaymentFromWithdrawalGain = activeFinancingMonth
         ? sourceValue(sourceSchedule.withdrawalGainPayments, scheduleIndex)
         : 0;
-      const monthlyPaymentAvailable = roundMoney(monthlyPaymentFromSavings + monthlyPaymentFromWithdrawalGain);
+      const depotSavingsRatePayment = activeFinancingMonth
+        ? sourceValue(sourceSchedule.depotSavingsRatePayments, scheduleIndex)
+        : 0;
+      const monthlyPaymentAvailable = roundMoney(
+        monthlyPaymentFromSavings + monthlyPaymentFromWithdrawalGain + depotSavingsRatePayment
+      );
       const interestDue = roundMoney(remainingDebt * monthlyRate);
       const maximumUsefulPayment = roundMoney(interestDue + remainingDebt);
       const usedMonthlyPayment = roundMoney(Math.min(monthlyPaymentAvailable, maximumUsefulPayment));
@@ -168,6 +174,8 @@ export function calculateRealEstateFinancing(
       remainingDebt = roundMoney(remainingDebt - principalPaid);
       const withdrawalShare =
         monthlyPaymentAvailable > 0 ? roundMoney(usedMonthlyPayment * (monthlyPaymentFromWithdrawalGain / monthlyPaymentAvailable)) : 0;
+      const depotSavingsRateShare =
+        monthlyPaymentAvailable > 0 ? roundMoney(usedMonthlyPayment * (depotSavingsRatePayment / monthlyPaymentAvailable)) : 0;
 
       const specialPaymentAvailable = activeFinancingMonth ? sourceValue(sourceSchedule.specialRepayments, scheduleIndex) : 0;
       const specialInterestPayment = roundMoney(Math.min(specialPaymentAvailable, interestShortfall));
@@ -188,6 +196,7 @@ export function calculateRealEstateFinancing(
       principalPaidYear += principalPaid + specialRepayment;
       specialRepaymentYear += specialRepayment;
       withdrawalGainPaymentUsedYear += withdrawalShare;
+      depotSavingsRatePaymentUsedYear += depotSavingsRateShare;
 
       months.push({
         year,
@@ -201,7 +210,7 @@ export function calculateRealEstateFinancing(
         monthlyPaymentAvailable,
         principalPaid,
         specialRepayment,
-        additionalRepayment: withdrawalShare,
+        additionalRepayment: roundMoney(withdrawalShare + depotSavingsRateShare),
         loanEnd: roundMoney(remainingDebt)
       });
     }
@@ -224,8 +233,11 @@ export function calculateRealEstateFinancing(
       principalFromMonthlyPayment: roundMoney(principalFromMonthlyPaymentYear),
       principalPaid: roundMoney(principalPaidYear),
       specialRepayment: roundMoney(specialRepaymentYear),
-      additionalRepayment: roundMoney(withdrawalGainPaymentUsedYear),
-      additionalRepaymentBreakdown: withdrawalGainYearBreakdown(withdrawalGainPaymentUsedYear),
+      additionalRepayment: roundMoney(withdrawalGainPaymentUsedYear + depotSavingsRatePaymentUsedYear),
+      additionalRepaymentBreakdown: additionalRepaymentYearBreakdown(
+        withdrawalGainPaymentUsedYear,
+        depotSavingsRatePaymentUsedYear
+      ),
       loanEnd,
       propertyEquity,
       netPropertyWealth
@@ -272,13 +284,13 @@ export function defaultRealEstateDetailYear(
   return firstActiveCreditYear?.year ?? years[0]?.year ?? null;
 }
 
-function withdrawalGainYearBreakdown(withdrawalGain: number): AdditionalRepaymentYearBreakdown {
+function additionalRepaymentYearBreakdown(withdrawalGain: number, depotSavingsRate: number): AdditionalRepaymentYearBreakdown {
   return {
     withdrawalGain: roundMoney(withdrawalGain),
-    depotSavingsRate: 0,
+    depotSavingsRate: roundMoney(depotSavingsRate),
     legacySavingsRate: 0,
     netGain: 0,
-    totalAdditionalRepayment: roundMoney(withdrawalGain)
+    totalAdditionalRepayment: roundMoney(withdrawalGain + depotSavingsRate)
   };
 }
 
@@ -292,7 +304,11 @@ function emptySourceSchedule(): RealEstateFinancingSourceSchedule {
 }
 
 function sourceMonthlyPayment(schedule: RealEstateFinancingSourceSchedule, index: number): number {
-  return roundMoney(sourceValue(schedule.monthlyPaymentSavings, index) + sourceValue(schedule.withdrawalGainPayments, index));
+  return roundMoney(
+    sourceValue(schedule.monthlyPaymentSavings, index) +
+      sourceValue(schedule.withdrawalGainPayments, index) +
+      sourceValue(schedule.depotSavingsRatePayments, index)
+  );
 }
 
 function sourceValue(values: number[] | undefined, index: number): number {

@@ -78,6 +78,8 @@ import type {
 import { drawInvestmentChart } from "./views/investmentChart";
 import { renderAccountYearTableOverview } from "./views/accountYearTables";
 import {
+  realEstateRepaymentSegments,
+  realEstateTrendSegments,
   renderCombinedWealthChart,
   renderRealEstateRepaymentChart,
   renderRealEstateTrendChart
@@ -172,6 +174,7 @@ let positionIconPicker: { positionId: string; top: number; left: number } | null
 let positionFilterDrafts = createPositionFilterDrafts();
 let positionFilterPopupOpen = false;
 let selectedRealEstateYear: number | null = null;
+let latestRealEstateResult: RealEstateFinancingResult | null = null;
 let selectedCombinedWealthYear: number | null = null;
 let accountDialog: AccountDialogState = null;
 normalizeInvestmentBounds();
@@ -464,6 +467,7 @@ function bindEvents(): void {
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "toggle-real-estate-withdrawal-gain-source") toggleRealEstateWithdrawalGainSource();
+    if (action === "toggle-real-estate-depot-savings-rate-source") toggleRealEstateDepotSavingsRateSource();
     if (action === "add-real-estate-savings-source-equityCapital") addRealEstateSavingsSource("equityCapital");
     if (action === "add-real-estate-savings-source-monthlyPayment") addRealEstateSavingsSource("monthlyPayment");
     if (action === "add-real-estate-savings-source-specialRepayment") addRealEstateSavingsSource("specialRepayment");
@@ -496,7 +500,13 @@ function bindEvents(): void {
     if (action === "set-theme-dark") setThemeMode("dark");
     if (action === "set-real-estate-locale-de") setRealEstateLocale("de");
     if (action === "set-real-estate-locale-en") setRealEstateLocale("en");
-    if (action === "select-real-estate-year") setSelectedRealEstateYear(numberValue(button.dataset.year || ""));
+    if (action === "select-real-estate-year") {
+      const year = numberValue(button.dataset.year || "");
+      const chartKind = button.dataset.chartKind === "trend" ? "trend" : "repayment";
+      setSelectedRealEstateYear(year);
+      showRealEstateChartPopup(year, chartKind, event.clientX, event.clientY);
+      return;
+    }
     if (action === "select-combined-wealth-year") setSelectedCombinedWealthYear(numberValue(button.dataset.year || ""));
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
     if (action === "export-positions") {
@@ -736,6 +746,7 @@ function syncInvestmentProjectionLabels(depot: InvestmentDepotKey): void {
 }
 
 function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
+  latestRealEstateResult = result;
   const validation = document.querySelector<HTMLDivElement>("#realEstateValidation");
   if (validation) {
     if (result.validationErrors.length) {
@@ -767,7 +778,6 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   );
 
   selectedRealEstateYear = defaultRealEstateDetailYear(result.years, selectedRealEstateYear);
-  const selectedYearEntry = result.years.find((entry) => entry.year === selectedRealEstateYear) ?? lastYear ?? null;
 
   const repaymentHost = document.querySelector<HTMLDivElement>("#realEstateRepaymentChart");
   if (repaymentHost) {
@@ -786,42 +796,6 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
       formatMoney: (value) => money(value)
     });
   }
-
-  const detail = document.querySelector<HTMLDivElement>("#realEstateYearDetail");
-  if (!detail) return;
-  if (!selectedYearEntry) {
-    detail.innerHTML = "<div class='chart-empty'>Noch keine Jahresdetails verfuegbar.</div>";
-    return;
-  }
-  if (result.startLoanAmount <= 0) {
-    detail.innerHTML = "<div class='chart-empty'>Noch kein Start-Kreditvolumen fuer Jahresdetails vorhanden.</div>";
-    return;
-  }
-
-  detail.innerHTML = `
-    <div class="detail-line"><span>Jahr</span><strong>${intNumber(selectedYearEntry.year)}</strong></div>
-    <div class="detail-line"><span>Zinsbedarf</span><strong>${money(selectedYearEntry.interestDue)}</strong></div>
-    <div class="detail-line"><span>Gezahlte Zinsen</span><strong>${money(selectedYearEntry.interestPaid)}</strong></div>
-    <div class="detail-line"><span>Nicht gedeckte Zinsen</span><strong>${money(selectedYearEntry.interestShortfall)}</strong></div>
-    <div class="detail-line"><span>Monatsraten aus Sparpositionen</span><strong>${money(
-      selectedYearEntry.monthlyPaymentFromSavings
-    )}</strong></div>
-    <div class="detail-line"><span>Entnahme-Zugewinn als Rate</span><strong>${money(
-      selectedYearEntry.monthlyPaymentFromWithdrawalGain
-    )}</strong></div>
-    <div class="detail-line"><span>Verfuegbare Monatsraten gesamt</span><strong>${money(
-      selectedYearEntry.monthlyPaymentAvailable
-    )}</strong></div>
-    <div class="detail-line"><span>Tilgung aus Monatsrate</span><strong>${money(
-      selectedYearEntry.principalFromMonthlyPayment
-    )}</strong></div>
-    <div class="detail-line"><span>Sondertilgung</span><strong>${money(selectedYearEntry.specialRepayment)}</strong></div>
-    <div class="detail-line"><span>Restschuld</span><strong>${money(selectedYearEntry.loanEnd)}</strong></div>
-    <div class="detail-line"><span>Immobilienwert</span><strong>${money(selectedYearEntry.propertyValue)}</strong></div>
-    <div class="detail-line"><span>Netto-Immobilienvermoegen</span><strong>${money(
-      selectedYearEntry.netPropertyWealth
-    )}</strong></div>
-  `;
 }
 
 function realEstateFinancingStartYear(currentYear: number, birthYear: number, financingStartAge: number): number {
@@ -856,6 +830,18 @@ function currentRealEstateProjectionYears(startYear: number, investmentEndAge: n
   return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
 }
 
+function realEstateDepotSavingsRateAvailable(standardProjection: AssetProjection): boolean {
+  return (
+    state.realEstate.includeWithdrawalGainAsPaymentSource &&
+    standardProjection.monthlyRate > 0 &&
+    standardProjection.percentageWithdrawalMonthlyAtStart > standardProjection.monthlyRate
+  );
+}
+
+function realEstateWithdrawalStartYear(standardProjection: AssetProjection): number {
+  return state.investment.birthYear + Math.floor(standardProjection.percentageWithdrawalStartAge);
+}
+
 function realEstateSourceSchedule(
   startYear: number,
   projectionYears: number,
@@ -875,6 +861,12 @@ function realEstateSourceSchedule(
   const withdrawalGain = state.realEstate.includeWithdrawalGainAsPaymentSource
     ? Math.max(0, standardProjection.withdrawalGainMonthlyAtStart)
     : 0;
+  const useDepotSavingsRate =
+    state.realEstate.repaymentSources.useDepotSavingsRateAsRepayment &&
+    realEstateDepotSavingsRateAvailable(standardProjection);
+  const withdrawalStartYear = realEstateWithdrawalStartYear(standardProjection);
+  const depotSavingsRate = useDepotSavingsRate ? Math.max(0, standardProjection.monthlyRate) : 0;
+  const depotSavingsRatePayments: number[] = [];
 
   for (let index = 0; index < monthCount; index += 1) {
     const year = startYear + Math.floor(index / 12);
@@ -883,6 +875,7 @@ function realEstateSourceSchedule(
       monthlyPositions.reduce((sum, position) => sum + investmentContributionForMonth(position, year, month), 0)
     );
     withdrawalGainPayments.push(withdrawalGain);
+    depotSavingsRatePayments.push(year >= withdrawalStartYear ? depotSavingsRate : 0);
     specialRepayments.push(
       specialPositions.reduce((sum, position) => {
         return (
@@ -895,7 +888,7 @@ function realEstateSourceSchedule(
     );
   }
 
-  return { equityCapital, monthlyPaymentSavings, withdrawalGainPayments, specialRepayments };
+  return { equityCapital, monthlyPaymentSavings, withdrawalGainPayments, depotSavingsRatePayments, specialRepayments };
 }
 
 function selectedRealEstateSourcePositions(
@@ -2326,6 +2319,24 @@ function renderRealEstateSourceLists(standardProjection: AssetProjection): void 
     toggle.setAttribute("aria-pressed", String(state.realEstate.includeWithdrawalGainAsPaymentSource));
   }
   setText("realEstateWithdrawalGainSourceAmount", `${money(standardProjection.withdrawalGainMonthlyAtStart)} monatlich`);
+
+  const savingsRateToggle = document.querySelector<HTMLButtonElement>(
+    "[data-action='toggle-real-estate-depot-savings-rate-source']"
+  );
+  const savingsRateAvailable = realEstateDepotSavingsRateAvailable(standardProjection);
+  const savingsRateActive = state.realEstate.repaymentSources.useDepotSavingsRateAsRepayment && savingsRateAvailable;
+  if (savingsRateToggle) {
+    savingsRateToggle.classList.toggle("active", savingsRateActive);
+    savingsRateToggle.classList.toggle("blocked", !savingsRateAvailable);
+    savingsRateToggle.disabled = !savingsRateAvailable;
+    savingsRateToggle.setAttribute("aria-pressed", String(savingsRateActive));
+  }
+  setText(
+    "realEstateDepotSavingsRateSourceAmount",
+    savingsRateAvailable
+      ? `${money(standardProjection.monthlyRate)} monatlich ab ${intNumber(realEstateWithdrawalStartYear(standardProjection))}`
+      : "nicht verfuegbar"
+  );
 }
 
 function renderRealEstateSourceList(kind: RealEstatePaymentSourceKind, selector: string): void {
@@ -2690,6 +2701,18 @@ function toggleRealEstateWithdrawalGainSource(): void {
   state.realEstate = {
     ...state.realEstate,
     includeWithdrawalGainAsPaymentSource: !state.realEstate.includeWithdrawalGainAsPaymentSource
+  };
+  resetRealEstateDetailSelection();
+  renderAll();
+}
+
+function toggleRealEstateDepotSavingsRateSource(): void {
+  state.realEstate = {
+    ...state.realEstate,
+    repaymentSources: {
+      ...state.realEstate.repaymentSources,
+      useDepotSavingsRateAsRepayment: !state.realEstate.repaymentSources.useDepotSavingsRateAsRepayment
+    }
   };
   resetRealEstateDetailSelection();
   renderAll();
@@ -3674,9 +3697,51 @@ function showInvestmentChartPopup(
   `;
 
   popup.hidden = false;
+  positionChartPopup(popup, card, clientX, clientY);
+}
+
+function showRealEstateChartPopup(
+  year: number,
+  chartKind: "repayment" | "trend",
+  clientX: number,
+  clientY: number
+): void {
+  const result = latestRealEstateResult;
+  const point = result?.years.find((entry) => entry.year === year);
+  const popup = document.querySelector<HTMLDivElement>("#realEstateChartPopup");
+  const card = popup?.closest<HTMLElement>(".real-estate-chart-card");
+  if (!result || !point || !popup || !card) return;
+
+  const initialPropertyValue = Math.max(0, result.years[0]?.propertyValue ?? 0);
+  const segments =
+    chartKind === "trend"
+      ? realEstateTrendSegments(point, initialPropertyValue)
+      : realEstateRepaymentSegments(point, result.startLoanAmount);
+  const totalLabel = chartKind === "trend" ? "Immobilienwert" : "Restschuld";
+  const totalValue = chartKind === "trend" ? point.propertyValue : point.loanEnd;
+  const title = chartKind === "trend" ? "Immobilienwertentwicklung" : "Tilgung und Vermoegen";
+
+  popup.innerHTML = `
+    <div class="chart-popup-head">
+      <div>
+        <span>Balkendetails</span>
+        <strong>${title} | Jahr ${intNumber(point.year)}</strong>
+      </div>
+      <button class="chart-popup-close" type="button" data-action="close-investment-chart-popup" aria-label="Popup schliessen">x</button>
+    </div>
+    <div class="chart-popup-list">
+      ${segments.map((segment) => chartPopupLine(segment.className, segment.label, money(segment.value))).join("")}
+      ${chartPopupTotalLine(totalLabel, money(totalValue))}
+    </div>
+  `;
+
+  popup.hidden = false;
+  positionChartPopup(popup, card, clientX, clientY);
+}
+
+function positionChartPopup(popup: HTMLDivElement, card: HTMLElement, clientX: number, clientY: number): void {
   popup.style.left = "12px";
   popup.style.top = "12px";
-
   const cardRect = card.getBoundingClientRect();
   const popupRect = popup.getBoundingClientRect();
   const left = clamp(clientX - cardRect.left + 14, 12, Math.max(12, cardRect.width - popupRect.width - 12));
@@ -3704,7 +3769,9 @@ function chartPopupTotalLine(label: string, value: string): string {
 }
 
 function hideInvestmentChartPopup(): void {
-  for (const popup of document.querySelectorAll<HTMLDivElement>("#investmentChartPopup, #combinedInvestmentChartPopup")) {
+  for (const popup of document.querySelectorAll<HTMLDivElement>(
+    "#investmentChartPopup, #combinedInvestmentChartPopup, #realEstateChartPopup"
+  )) {
     popup.hidden = true;
   }
 }

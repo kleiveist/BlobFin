@@ -219,6 +219,7 @@ export interface RealEstateFinancingSourceSchedule {
   equityCapital: number;
   monthlyPaymentSavings: number[];
   withdrawalGainPayments: number[];
+  depotSavingsRatePayments?: number[];
   specialRepayments: number[];
 }
 

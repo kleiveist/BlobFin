@@ -6,7 +6,7 @@ interface ChartRenderInput<T> {
   formatMoney: (value: number) => string;
 }
 
-interface VerticalBarSegment {
+export interface VerticalBarSegment {
   className: string;
   label: string;
   value: number;
@@ -40,6 +40,7 @@ export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstat
         year: point.year,
         selected: input.selectedYear === point.year,
         action: "select-real-estate-year",
+        chartKind: "repayment",
         value: point.loanEnd,
         valueLabel: input.formatMoney(point.loanEnd),
         segments: composition.segments
@@ -66,21 +67,11 @@ export function renderRealEstateTrendChart(input: ChartRenderInput<RealEstateFin
       year: point.year,
       selected: input.selectedYear === point.year,
       action: "select-real-estate-year",
+      chartKind: "trend",
       value: point.propertyValue,
       valueLabel: input.formatMoney(point.propertyValue),
       barTotal: Math.max(0, point.propertyValue),
-      segments: [
-        {
-          className: "property",
-          label: "Ausgangswert",
-          value: Math.max(0, Math.min(point.propertyValue, initialPropertyValue))
-        },
-        {
-          className: "growth",
-          label: "Wertentwicklung",
-          value: Math.max(0, point.propertyValue - initialPropertyValue)
-        }
-      ]
+      segments: realEstateTrendSegments(point, initialPropertyValue)
     }))
   });
 }
@@ -128,6 +119,7 @@ function renderVerticalChart(input: {
     year: number;
     selected: boolean;
     action: string;
+    chartKind?: string;
     value: number;
     valueLabel: string;
     barTotal: number;
@@ -160,6 +152,7 @@ function renderVerticalBar(
     year: number;
     selected: boolean;
     action: string;
+    chartKind?: string;
     value: number;
     valueLabel: string;
     barTotal: number;
@@ -175,6 +168,7 @@ function renderVerticalBar(
       role="listitem"
       data-action="${point.action}"
       data-year="${point.year}"
+      ${point.chartKind ? `data-chart-kind="${point.chartKind}"` : ""}
       title="${point.year}: ${point.valueLabel}"
     >
       <span class="wealth-column-value">${point.valueLabel}</span>
@@ -217,17 +211,38 @@ function heightPercent(value: number, maxValue: number): number {
 }
 
 function propertyComposition(point: RealEstateFinancingYear, startLoanAmount: number): { barTotal: number; segments: VerticalBarSegment[] } {
-  const debt = Math.max(0, point.loanEnd);
-  const equity = Math.max(0, startLoanAmount - Math.min(startLoanAmount, debt));
+  const segments = realEstateRepaymentSegments(point, startLoanAmount);
+  const debt = segments.find((segment) => segment.className === "debt")?.value ?? 0;
   const barTotal = Math.max(startLoanAmount, debt);
   return {
     barTotal,
-    segments: [
-      { className: "debt", label: "Restschuld", value: debt },
-      { className: "equity", label: "Getilgter Kreditanteil", value: equity },
-      { className: "interest", label: "Zinsen", value: Math.max(0, point.interestDue), overlay: true }
-    ]
+    segments
   };
+}
+
+export function realEstateRepaymentSegments(point: RealEstateFinancingYear, startLoanAmount: number): VerticalBarSegment[] {
+  const debt = Math.max(0, point.loanEnd);
+  const equity = Math.max(0, startLoanAmount - Math.min(startLoanAmount, debt));
+  return [
+    { className: "debt", label: "Restschuld", value: debt },
+    { className: "equity", label: "Getilgter Kreditanteil", value: equity },
+    { className: "interest", label: "Zinsen", value: Math.max(0, point.interestDue), overlay: true }
+  ];
+}
+
+export function realEstateTrendSegments(point: RealEstateFinancingYear, initialPropertyValue: number): VerticalBarSegment[] {
+  return [
+    {
+      className: "property",
+      label: "Ausgangswert",
+      value: Math.max(0, Math.min(point.propertyValue, initialPropertyValue))
+    },
+    {
+      className: "growth",
+      label: "Wertentwicklung",
+      value: Math.max(0, point.propertyValue - initialPropertyValue)
+    }
+  ];
 }
 
 function formatAxis(value: number): string {

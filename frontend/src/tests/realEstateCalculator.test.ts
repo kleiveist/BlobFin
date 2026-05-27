@@ -14,9 +14,10 @@ function schedule(
   monthlyPaymentSavings: number[],
   specialRepayments: number[] = [],
   withdrawalGainPayments: number[] = [],
-  equityCapital = 0
+  equityCapital = 0,
+  depotSavingsRatePayments?: number[]
 ): RealEstateFinancingSourceSchedule {
-  return { equityCapital, monthlyPaymentSavings, specialRepayments, withdrawalGainPayments };
+  return { equityCapital, monthlyPaymentSavings, specialRepayments, withdrawalGainPayments, depotSavingsRatePayments };
 }
 
 function repeated(value: number, count = 240): number[] {
@@ -173,6 +174,45 @@ describe("real estate calculator", () => {
     expect(withWithdrawal.years[0].monthlyPaymentFromWithdrawalGain).toBe(3000);
     expect(withWithdrawal.years[0].additionalRepaymentBreakdown.withdrawalGain).toBeCloseTo(3000, 2);
     expect(withWithdrawal.years[0].loanEnd).toBeLessThan(withoutWithdrawal.years[0].loanEnd);
+  });
+
+  it("tracks redirected depot savings rates separately from withdrawal gain", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(120000, {
+      interestRatePercent: 0,
+      financingYears: 5
+    });
+
+    const result = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000), [], repeated(250), 0, repeated(500))
+    );
+
+    expect(result.monthlyPayment).toBe(1750);
+    expect(result.years[0].monthlyPaymentAvailable).toBe(21000);
+    expect(result.years[0].additionalRepaymentBreakdown.withdrawalGain).toBeCloseTo(3000, 2);
+    expect(result.years[0].additionalRepaymentBreakdown.depotSavingsRate).toBeCloseTo(6000, 2);
+    expect(result.years[0].additionalRepaymentBreakdown.totalAdditionalRepayment).toBeCloseTo(9000, 2);
+  });
+
+  it("keeps redirected depot savings at zero before its schedule starts", () => {
+    const state = defaultAppState();
+    const depotSavingsRatePayments = [...repeated(0, 12), ...repeated(500, 12)];
+    const settings = projectSettings(120000, {
+      interestRatePercent: 0,
+      financingYears: 2
+    });
+
+    const result = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000, 24), [], repeated(250, 24), 0, depotSavingsRatePayments),
+      { financingYears: 2, projectionYears: 2 }
+    );
+
+    expect(result.years[0].additionalRepaymentBreakdown.depotSavingsRate).toBe(0);
+    expect(result.years[1].additionalRepaymentBreakdown.depotSavingsRate).toBeCloseTo(6000, 2);
   });
 
   it("does not invent payments to cover interest shortfalls", () => {

@@ -378,6 +378,10 @@ export function renderAppShell(): string {
                 <span>Entnahme-Zugewinn</span>
                 <strong id="realEstateWithdrawalGainSourceAmount">-</strong>
               </button>
+              <button class="include-transfer-toggle" type="button" data-action="toggle-real-estate-depot-savings-rate-source" aria-pressed="false">
+                <span>Depot-Sparrate mit tilgen</span>
+                <strong id="realEstateDepotSavingsRateSourceAmount">-</strong>
+              </button>
             </div>
             <div class="real-estate-source-grid">
               <div>
@@ -405,9 +409,9 @@ export function renderAppShell(): string {
               ${chartMetric("realEstatePropertyEquityMetric", "Netto-Immobilienvermoegen Ende")}
             </div>
             <div id="realEstateRepaymentChart" class="wealth-chart-host"></div>
-            <div id="realEstateYearDetail" class="wealth-detail-box"></div>
             <h3>Immobilienwertentwicklung</h3>
             <div id="realEstateTrendChart" class="wealth-chart-host"></div>
+            <div id="realEstateChartPopup" class="investment-chart-popup" role="dialog" aria-label="Immobilien-Balkendetails" hidden></div>
           </section>
         </div>
       </section>

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { renderAppShell } from "../views/templates";
 import {
+  realEstateRepaymentSegments,
+  realEstateTrendSegments,
   renderCombinedWealthChart,
   renderRealEstateRepaymentChart,
   renderRealEstateTrendChart
@@ -87,10 +89,13 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('id="realEstateEquityCapitalSourceList"');
     expect(html).toContain('id="realEstateMonthlyPaymentSourceList"');
     expect(html).toContain('id="realEstateSpecialRepaymentSourceList"');
+    expect(html).toContain('data-action="toggle-real-estate-depot-savings-rate-source"');
     expect(count(html, 'data-real-estate-field="propertyValueGrowthPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="propertyValueGrowthPercent"')).toBe(0);
     expect(count(html, 'data-real-estate-field="inflationRatePercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="inflationRatePercent"')).toBe(0);
+    expect(html).toContain('id="realEstateChartPopup"');
+    expect(html).not.toContain('id="realEstateYearDetail"');
   });
 
   it("renders wealth charts as vertical column charts", () => {
@@ -112,9 +117,23 @@ describe("follow-up ui rendering", () => {
 
     expect(repayment).toContain("wealth-vertical-chart");
     expect(repayment).toContain("Restschuld, Tilgung und Zinsen je Jahr");
+    expect(repayment).toContain('data-chart-kind="repayment"');
     expect(trend).toContain("wealth-vertical-chart");
+    expect(trend).toContain('data-chart-kind="trend"');
     expect(combined).toContain("wealth-vertical-chart");
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");
+  });
+
+  it("exposes real estate popup segment labels", () => {
+    const repaymentLabels = realEstateRepaymentSegments(realEstateYear, realEstateYear.loanStart).map(
+      (segment) => segment.label
+    );
+    const trendLabels = realEstateTrendSegments(realEstateYear, realEstateYear.propertyValue).map(
+      (segment) => segment.label
+    );
+
+    expect(repaymentLabels).toEqual(["Restschuld", "Getilgter Kreditanteil", "Zinsen"]);
+    expect(trendLabels).toEqual(["Ausgangswert", "Wertentwicklung"]);
   });
 
   it("renders an empty real estate repayment chart without a start loan", () => {
