@@ -390,10 +390,6 @@ export function renderAppShell(): string {
               ${realEstateNumberField("subsidyAmount", "Foerderung / Zuschuss")}
               ${realEstateNumberField("manualFuturePropertyValue", "Optionaler Zukunftswert", { nullable: true })}
             </div>
-            <div class="real-estate-slider-grid">
-              ${realEstateAssumptionControl("propertyValueGrowthPercent", "Immobilienwertsteigerung", 0, 8, 0.1)}
-              ${realEstateAssumptionControl("inflationRatePercent", "Inflation optional", 0, 10, 0.1)}
-            </div>
           </section>
 
           <section class="real-estate-card">

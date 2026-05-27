@@ -3,7 +3,7 @@ import "./styles.css";
 import { createId, defaultAppState, defaultInvestmentSettings } from "./data/defaults";
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
 import { buildCombinedWealthSeries } from "./domain/combinedWealth";
-import { calculateRealEstateFinancing } from "./domain/realEstateCalculator";
+import { calculateRealEstateFinancing, linkRealEstateFinancingInput } from "./domain/realEstateCalculator";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
 import {
   calculateYearTableFooterValue,
@@ -2489,10 +2489,11 @@ function updateRealEstateField(field: RealEstateField, value: string): void {
     "manualFuturePropertyValue"
   ]);
   const parsed = numberValue(value);
-  state.realEstate = {
+  const nextRealEstate = {
     ...state.realEstate,
     [field]: nullableFields.has(field) && value.trim() === "" ? null : Math.max(0, parsed)
   } as RealEstateFinancingSettings;
+  state.realEstate = linkRealEstateFinancingInput(nextRealEstate, field);
 }
 
 function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {

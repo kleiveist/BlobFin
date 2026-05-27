@@ -66,6 +66,10 @@ describe("follow-up ui rendering", () => {
     expect(count(html, 'data-real-estate-range="interestRatePercent"')).toBe(1);
     expect(count(html, 'data-real-estate-field="monthlyPayment"')).toBe(0);
     expect(count(html, 'data-real-estate-range="monthlyPayment"')).toBe(1);
+    expect(count(html, 'data-real-estate-field="propertyValueGrowthPercent"')).toBe(0);
+    expect(count(html, 'data-real-estate-range="propertyValueGrowthPercent"')).toBe(0);
+    expect(count(html, 'data-real-estate-field="inflationRatePercent"')).toBe(0);
+    expect(count(html, 'data-real-estate-range="inflationRatePercent"')).toBe(0);
   });
 
   it("renders wealth charts as vertical column charts", () => {

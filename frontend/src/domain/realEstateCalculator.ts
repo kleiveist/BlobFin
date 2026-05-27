@@ -56,6 +56,59 @@ export function deriveMonthlyPayment(settings: RealEstateFinancingSettings, loan
   return roundMoney((loanAmount * annualRatePercent) / 100 / 12);
 }
 
+const RATE_LINKED_MONTHLY_PAYMENT_FIELDS = new Set<keyof RealEstateFinancingSettings>([
+  "purchasePrice",
+  "constructionOrRenovationCosts",
+  "landCosts",
+  "additionalPurchaseCosts",
+  "notaryCosts",
+  "landRegistryCosts",
+  "brokerCosts",
+  "transferTax",
+  "modernizationReserve",
+  "movingAndSetupCosts",
+  "safetyBuffer",
+  "equityCapital",
+  "loanAmount",
+  "interestRatePercent",
+  "initialRepaymentPercent",
+  "subsidyAmount"
+]);
+
+export function deriveRateLinkedMonthlyPayment(settings: RealEstateFinancingSettings): number {
+  const loanAmount = deriveLoanAmount(settings);
+  const annualRatePercent = Math.max(0, settings.interestRatePercent + settings.initialRepaymentPercent);
+  return roundMoney((loanAmount * annualRatePercent) / 100 / 12);
+}
+
+export function deriveInitialRepaymentPercentFromMonthlyPayment(settings: RealEstateFinancingSettings): number {
+  const loanAmount = deriveLoanAmount(settings);
+  if (loanAmount <= 0 || settings.monthlyPayment <= 0) return 0;
+  const totalAnnualRatePercent = (settings.monthlyPayment * 12 / loanAmount) * 100;
+  return roundMoney(Math.max(0, totalAnnualRatePercent - settings.interestRatePercent));
+}
+
+export function linkRealEstateFinancingInput(
+  settings: RealEstateFinancingSettings,
+  changedField: keyof RealEstateFinancingSettings
+): RealEstateFinancingSettings {
+  if (changedField === "monthlyPayment") {
+    return {
+      ...settings,
+      initialRepaymentPercent: deriveInitialRepaymentPercentFromMonthlyPayment(settings)
+    };
+  }
+
+  if (RATE_LINKED_MONTHLY_PAYMENT_FIELDS.has(changedField)) {
+    return {
+      ...settings,
+      monthlyPayment: deriveRateLinkedMonthlyPayment(settings)
+    };
+  }
+
+  return settings;
+}
+
 export function calculateRealEstateFinancing(
   startYear: number,
   settings: RealEstateFinancingSettings,

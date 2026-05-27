@@ -6,6 +6,8 @@ import {
   calculateRealEstateFinancing,
   deriveLoanAmount,
   deriveMonthlyPayment,
+  deriveRateLinkedMonthlyPayment,
+  linkRealEstateFinancingInput,
   validateRealEstateSettings
 } from "../domain/realEstateCalculator";
 
@@ -111,6 +113,55 @@ describe("real estate calculator", () => {
     expect(result.years[0].additionalRepaymentBreakdown.depotSavingsRate).toBeCloseTo(3000, 2);
     expect(result.years[0].additionalRepaymentBreakdown.netGain).toBeCloseTo(3600, 2);
     expect(result.years[0].loanEnd).toBeLessThan(108000);
+  });
+
+  it("links repayment percent increases to a higher monthly payment", () => {
+    const state = defaultAppState();
+    const settings = {
+      ...state.realEstate,
+      loanAmount: 240000,
+      interestRatePercent: 3,
+      initialRepaymentPercent: 2,
+      monthlyPayment: 0
+    };
+
+    const linked = linkRealEstateFinancingInput(settings, "initialRepaymentPercent");
+
+    expect(deriveRateLinkedMonthlyPayment(settings)).toBeCloseTo(1000, 2);
+    expect(linked.monthlyPayment).toBeCloseTo(1000, 2);
+  });
+
+  it("links monthly payment changes back to initial repayment percent", () => {
+    const state = defaultAppState();
+    const linked = linkRealEstateFinancingInput(
+      {
+        ...state.realEstate,
+        loanAmount: 240000,
+        interestRatePercent: 3,
+        initialRepaymentPercent: 2,
+        monthlyPayment: 1200
+      },
+      "monthlyPayment"
+    );
+
+    expect(linked.initialRepaymentPercent).toBeCloseTo(3, 2);
+  });
+
+  it("links loan changes to the monthly payment with the same rate ratio", () => {
+    const state = defaultAppState();
+    const linked = linkRealEstateFinancingInput(
+      {
+        ...state.realEstate,
+        loanAmount: 300000,
+        interestRatePercent: 3,
+        initialRepaymentPercent: 2,
+        monthlyPayment: 1000
+      },
+      "loanAmount"
+    );
+
+    expect(linked.monthlyPayment).toBeCloseTo(1250, 2);
+    expect(linked.initialRepaymentPercent).toBe(2);
   });
 
   it("keeps repayment sources disabled by default", () => {
