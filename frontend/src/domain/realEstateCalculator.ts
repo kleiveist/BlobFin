@@ -247,6 +247,7 @@ export function calculateRealEstateFinancing(
   const totalInterestDue = roundMoney(years.reduce((sum, entry) => sum + entry.interestDue, 0));
   const totalInterestPaid = roundMoney(years.reduce((sum, entry) => sum + entry.interestPaid, 0));
   const totalInterestShortfall = roundMoney(years.reduce((sum, entry) => sum + entry.interestShortfall, 0));
+  const totalLoanCost = fixedTotalLoanCost(loanAmount, monthlyRate, financingYears);
   if (totalInterestShortfall > 0) {
     validationErrors.push(
       `Die ausgewaehlten Zahlungsquellen decken die Zinsen nicht vollstaendig (${totalInterestShortfall.toFixed(2)} EUR fehlen).`
@@ -266,7 +267,7 @@ export function calculateRealEstateFinancing(
     totalInterestDue,
     totalInterestPaid,
     totalInterestShortfall,
-    totalLoanCost: roundMoney(loanAmount + totalInterestDue),
+    totalLoanCost,
     financingYears,
     projectionYears,
     financingEndYear: startYear + financingYears,
@@ -333,6 +334,12 @@ function hasAnyMonthlyPayment(schedule: RealEstateFinancingSourceSchedule, month
 
 function projectedPropertyValue(startPropertyValue: number, growthRate: number, yearIndex: number): number {
   return roundMoney(startPropertyValue * (1 + growthRate) ** yearIndex);
+}
+
+function fixedTotalLoanCost(loanAmount: number, monthlyRate: number, financingYears: number): number {
+  if (loanAmount <= 0) return 0;
+  if (monthlyRate <= 0) return roundMoney(loanAmount);
+  return roundMoney(loanAmount * (1 + monthlyRate) ** (financingYears * 12));
 }
 
 function deriveFinancingYearsFromSettings(settings: RealEstateFinancingSettings): number {

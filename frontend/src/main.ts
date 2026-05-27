@@ -78,6 +78,7 @@ import type {
 import { drawInvestmentChart } from "./views/investmentChart";
 import { renderAccountYearTableOverview } from "./views/accountYearTables";
 import {
+  paidLoanCostForYear,
   realEstatePopupHeading,
   realEstateRepaymentSegments,
   realEstateTrendSegments,
@@ -621,19 +622,6 @@ function renderCalculations(
   const combinedProjection = combineAssetProjections(standardProjection, retirementProjection);
   syncInvestmentProjectionLabels(activeDepot);
 
-  setText("maxNeeded", money(reserve.maxRow.maxNeeded));
-  setText("maxNeededHint", reserve.maxRow.month);
-  setText("yearEndBalance", money(reserve.yearEndBalance));
-  setText("totalInterest", money(reserve.totalInterest));
-  setText("totalCashback", money(reserve.totalCashback));
-  setText("minMonthlyRemaining", money(reserve.minRemainingRow.monthlyRemaining));
-  setText("minMonthlyRemainingHint", `${reserve.minRemainingRow.month}, Einnahmen minus Ausgaben`);
-  setText("yearlyRemaining", money(reserve.yearlyRemaining));
-  setText("yearlyRemainingHint", `${money(reserve.totalPlannedIncome)} Einnahmen | ${money(reserve.totalPlannedOutflow)} Ausgaben`);
-
-  setText("investmentNetWealthTop", money(combinedProjection.wealthAtRetirement));
-  setText("investmentMonthlyPensionTop", money(combinedProjection.monthlyPension));
-  setText("investmentRealWealthTop", money(combinedProjection.realWealthAtRetirement));
   setText("monthlyRateMetric", money(projection.monthlyRate));
   setText("monthlySavingsRateMetric", `${money(projection.monthlyRate)} monatlich`);
   setText("annualSavingsRateMetric", money(projection.annualSavingsRate));
@@ -3758,11 +3746,13 @@ function showRealEstateChartPopup(
   if (!result || !point || !popup || !card) return;
 
   const initialPropertyValue = Math.max(0, result.years[0]?.propertyValue ?? 0);
-  const principalPaidToDate = realEstatePrincipalPaidToDate(result, point.year);
+  const paidLoanCostToDate = realEstatePaidLoanCostToDate(result, point.year);
   const repaymentGroup = chartPopupSection("Tilgung und Kredit", [
-    ...realEstateRepaymentSegments(point, principalPaidToDate).map((segment) =>
-      chartPopupLine(segment.className, segment.label, money(segment.value))
-    ),
+    ...realEstateRepaymentSegments({
+      point,
+      totalLoanCost: result.totalLoanCost,
+      paidLoanCostToDate
+    }).map((segment) => chartPopupLine(segment.className, segment.label, money(segment.value))),
     chartPopupLine("gross", "Darlehensbetrag inkl. Zinsen", money(result.totalLoanCost))
   ]);
   const trendGroup = chartPopupSection("Immobilienwertentwicklung", [
@@ -3791,8 +3781,8 @@ function showRealEstateChartPopup(
   positionChartPopup(popup, card, clientX, clientY);
 }
 
-function realEstatePrincipalPaidToDate(result: RealEstateFinancingResult, year: number): number {
-  return result.years.reduce((sum, entry) => sum + (entry.year <= year ? Math.max(0, entry.principalPaid) : 0), 0);
+function realEstatePaidLoanCostToDate(result: RealEstateFinancingResult, year: number): number {
+  return result.years.reduce((sum, entry) => sum + (entry.year <= year ? paidLoanCostForYear(entry) : 0), 0);
 }
 
 function positionChartPopup(popup: HTMLDivElement, card: HTMLElement, clientX: number, clientY: number): void {

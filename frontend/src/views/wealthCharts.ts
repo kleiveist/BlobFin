@@ -23,6 +23,12 @@ export interface VerticalBarSegment {
   overlay?: boolean;
 }
 
+export interface RealEstateRepaymentSegmentInput {
+  point: RealEstateFinancingYear;
+  totalLoanCost: number;
+  paidLoanCostToDate: number;
+}
+
 export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartInput): string {
   if (!input.points.length) {
     return '<div class="chart-empty">Noch keine Immobilienberechnung verfuegbar.</div>';
@@ -32,10 +38,14 @@ export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartIn
   if (!Number.isFinite(loanCostBasis) || loanCostBasis <= 0) {
     return '<div class="chart-empty">Noch kein Start-Kreditvolumen fuer die Tilgung vorhanden.</div>';
   }
-  let principalPaidToDate = 0;
+  let paidLoanCostToDate = 0;
   const repaymentPoints = input.points.map((point) => {
-    principalPaidToDate += Math.max(0, point.principalPaid);
-    const composition = propertyComposition(point, principalPaidToDate);
+    paidLoanCostToDate += paidLoanCostForYear(point);
+    const composition = propertyComposition({
+      point,
+      totalLoanCost: loanCostBasis,
+      paidLoanCostToDate
+    });
     return {
       ...composition,
       year: point.year,
@@ -43,8 +53,8 @@ export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartIn
       financingEnd: input.financingEndYear === point.year,
       action: "select-real-estate-year",
       chartKind: "repayment",
-      value: point.loanEnd,
-      valueLabel: input.formatMoney(point.loanEnd),
+      value: composition.openLoanCost,
+      valueLabel: input.formatMoney(composition.openLoanCost),
       segments: composition.segments
     };
   });
@@ -56,10 +66,10 @@ export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartIn
 
   return renderVerticalChart({
     label: "Immobilienfinanzierung je Jahr",
-    title: "Restschuld, Tilgung und Zinsen je Jahr",
+    title: "Darlehensbetrag inkl. Zinsen, Tilgung und Zinsen je Jahr",
     maxValue: maxDebt,
     legend: [
-      { className: "debt", label: "Restschuld" },
+      { className: "debt", label: "Darlehensbetrag inkl. Zinsen offen" },
       { className: "equity", label: "Getilgter Kreditanteil" },
       { className: "interest", label: "Zinsen" }
     ],
@@ -183,6 +193,8 @@ function renderVerticalChart(input: {
     segments: VerticalBarSegment[];
   }>;
 }): string {
+  const columnCount = Math.max(1, input.points.length);
+
   return `
     <div class="wealth-vertical-chart" aria-label="${input.label}">
       ${input.title ? `<h3 class="wealth-chart-title">${input.title}</h3>` : ""}
@@ -191,7 +203,7 @@ function renderVerticalChart(input: {
         <span>${formatAxis(input.maxValue / 2)}</span>
         <span>0 EUR</span>
       </div>
-      <div class="wealth-plot" role="list">
+      <div class="wealth-plot" role="list" style="--wealth-chart-count:${columnCount};">
         ${input.points.map((point) => renderVerticalBar(point, input.maxValue)).join("")}
       </div>
       <div class="wealth-x-axis" aria-hidden="true">Jahr</div>
@@ -280,31 +292,35 @@ function heightPercent(value: number, maxValue: number): number {
   return Math.max(0, Math.min(100, (value / maxValue) * 100));
 }
 
-function propertyComposition(
-  point: RealEstateFinancingYear,
-  principalPaidToDate: number
-): { barTotal: number; segments: VerticalBarSegment[] } {
-  const segments = realEstateRepaymentSegments(point, principalPaidToDate);
-  const debt = segments.find((segment) => segment.className === "debt")?.value ?? 0;
-  const repaidPrincipal = segments.find((segment) => segment.className === "equity")?.value ?? 0;
-  const barTotal = Math.max(debt, debt + repaidPrincipal);
+function propertyComposition(input: RealEstateRepaymentSegmentInput): {
+  barTotal: number;
+  openLoanCost: number;
+  segments: VerticalBarSegment[];
+} {
+  const segments = realEstateRepaymentSegments(input);
+  const openLoanCost = segments.find((segment) => segment.className === "debt")?.value ?? 0;
+  const paidLoanCost = segments.find((segment) => segment.className === "equity")?.value ?? 0;
+  const barTotal = Math.max(input.totalLoanCost, openLoanCost + paidLoanCost);
   return {
     barTotal,
+    openLoanCost,
     segments
   };
 }
 
-export function realEstateRepaymentSegments(
-  point: RealEstateFinancingYear,
-  principalPaidToDate = point.principalPaid
-): VerticalBarSegment[] {
-  const debt = Math.max(0, point.loanEnd);
-  const equity = Math.max(0, principalPaidToDate);
+export function realEstateRepaymentSegments(input: RealEstateRepaymentSegmentInput): VerticalBarSegment[] {
+  const totalLoanCost = Math.max(0, input.totalLoanCost);
+  const paidLoanCost = Math.max(0, Math.min(totalLoanCost, input.paidLoanCostToDate));
+  const openLoanCost = Math.max(0, totalLoanCost - paidLoanCost);
   return [
-    { className: "debt", label: "Restschuld", value: debt },
-    { className: "equity", label: "Getilgter Kreditanteil", value: equity },
-    { className: "interest", label: "Zinsen", value: Math.max(0, point.interestDue), overlay: true }
+    { className: "debt", label: "Darlehensbetrag inkl. Zinsen offen", value: openLoanCost },
+    { className: "equity", label: "Getilgter Kreditanteil", value: paidLoanCost },
+    { className: "interest", label: "Zinsen", value: Math.max(0, input.point.interestDue), overlay: true }
   ];
+}
+
+export function paidLoanCostForYear(point: RealEstateFinancingYear): number {
+  return Math.max(0, point.interestPaid) + Math.max(0, point.principalPaid);
 }
 
 function positiveBasis(value: number | undefined, fallback: number): number {

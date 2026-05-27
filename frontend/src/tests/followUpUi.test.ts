@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { renderAppShell } from "../views/templates";
 import {
+  paidLoanCostForYear,
   realEstatePopupHeading,
   realEstateRepaymentSegments,
   realEstateTrendSegments,
@@ -71,6 +72,16 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('id="resultHead"');
   });
 
+  it("does not render the top Ergebnis metric panel", () => {
+    const html = renderAppShell();
+
+    expect(html).not.toContain('class="panel summary-panel"');
+    expect(html).not.toContain('id="maxNeeded"');
+    expect(html).not.toContain('id="investmentNetWealthTop"');
+    expect(html).not.toContain("Max. benoetigter Kontostand");
+    expect(html).not.toContain("Vermoegen fuer Auszahlung");
+  });
+
   it("renders real estate assumption fields as one control each", () => {
     const html = renderAppShell();
 
@@ -128,8 +139,9 @@ describe("follow-up ui rendering", () => {
     });
 
     expect(repayment).toContain("wealth-vertical-chart");
-    expect(repayment).toContain("Restschuld, Tilgung und Zinsen je Jahr");
+    expect(repayment).toContain("Darlehensbetrag inkl. Zinsen, Tilgung und Zinsen je Jahr");
     expect(repayment).toContain('data-chart-kind="repayment"');
+    expect(repayment).toContain('style="--wealth-chart-count:1;"');
     expect(repayment).toContain("240 Tsd. EUR");
     expect(repayment).toContain('data-financing-end="true"');
     expect(repayment).toContain("financing-end");
@@ -140,19 +152,41 @@ describe("follow-up ui rendering", () => {
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");
   });
 
+  it("sets the vertical chart column count for responsive fitting", () => {
+    const chart = renderCombinedWealthChart({
+      points: [combinedYear, { ...combinedYear, year: 2027 }],
+      selectedYear: 2026,
+      formatMoney: String
+    });
+
+    expect(chart).toContain('style="--wealth-chart-count:2;"');
+  });
+
   it("exposes real estate popup segment labels", () => {
-    const repaymentSegments = realEstateRepaymentSegments(realEstateYear, realEstateYear.principalPaid);
+    const repaymentSegments = realEstateRepaymentSegments({
+      point: realEstateYear,
+      totalLoanCost: 240000,
+      paidLoanCostToDate: paidLoanCostForYear(realEstateYear)
+    });
     const repaymentLabels = repaymentSegments.map((segment) => segment.label);
     const trendLabels = realEstateTrendSegments(realEstateYear, realEstateYear.propertyValue).map(
       (segment) => segment.label
     );
 
-    expect(repaymentLabels).toEqual(["Restschuld", "Getilgter Kreditanteil", "Zinsen"]);
-    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(8000);
+    expect(repaymentLabels).toEqual(["Darlehensbetrag inkl. Zinsen offen", "Getilgter Kreditanteil", "Zinsen"]);
+    expect(repaymentLabels).not.toContain("Restschuld");
+    expect(repaymentSegments.find((segment) => segment.label === "Darlehensbetrag inkl. Zinsen offen")?.value).toBe(
+      225000
+    );
+    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(15000);
     expect(trendLabels).toEqual(["Ausgangswert", "Wertentwicklung"]);
     expect([...repaymentLabels, "Darlehensbetrag inkl. Zinsen", ...trendLabels, "Immobilienwert"]).toContain(
       "Darlehensbetrag inkl. Zinsen"
     );
+  });
+
+  it("adds yearly interest and principal to the paid loan cost", () => {
+    expect(paidLoanCostForYear(realEstateYear)).toBe(15000);
   });
 
   it("formats real estate popup headings with age and year", () => {
@@ -182,7 +216,7 @@ describe("follow-up ui rendering", () => {
     expect(repayment).not.toContain("wealth-column-segment equity");
   });
 
-  it("scales the repayment chart to debt that grows above the loan cost basis", () => {
+  it("keeps the repayment chart scaled to the loan cost basis when debt grows", () => {
     const repayment = renderRealEstateRepaymentChart({
       points: [{ ...realEstateYear, loanEnd: 250000, interestDue: 12000 }],
       selectedYear: 2026,
@@ -190,7 +224,7 @@ describe("follow-up ui rendering", () => {
       formatMoney: String
     });
 
-    expect(repayment).toContain("258 Tsd. EUR");
+    expect(repayment).toContain("240 Tsd. EUR");
     expect(repayment).toContain('wealth-column-overlay interest');
   });
 });

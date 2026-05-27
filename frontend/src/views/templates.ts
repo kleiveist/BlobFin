@@ -74,25 +74,6 @@ export function renderAppShell(): string {
         </div>
       </section>
 
-      <section class="workspace-grid">
-        <section class="panel summary-panel">
-          <div class="section-heading">
-            <h2>Ergebnis</h2>
-          </div>
-          <div class="summary-grid">
-            ${metric("maxNeeded", "Max. benoetigter Kontostand", "monatlicher Spitzenbedarf", true)}
-            ${metric("yearEndBalance", "Dauerhafter Bestand Jahresende", "ohne temporaere Durchlaufbetraege", false)}
-            ${metric("totalInterest", "Zinsen pro Jahr", "vereinfachte Tages-/Monatslogik", false)}
-            ${metric("totalCashback", "Cashback pro Jahr", "nur Positionen mit Cashback", false)}
-            ${metric("minMonthlyRemaining", "Niedrigster Monatsrest", "Einnahmen minus Ausgaben", true)}
-            ${metric("yearlyRemaining", "Rest im Jahr", "Einnahmen minus Ausgaben", false)}
-            ${metric("investmentNetWealthTop", "Vermoegen fuer Auszahlung", "Steuer erst bei Entnahme", true)}
-            ${metric("investmentMonthlyPensionTop", "Monatliche Rente netto", "vereinfachte Entnahme", true)}
-            ${metric("investmentRealWealthTop", "Reales Vermoegen", "inflationsbereinigt", false)}
-          </div>
-        </section>
-      </section>
-
       <section class="panel account-panel" data-module-section="cost_reserve_positions">
         <div class="section-heading">
           <h2>Konto-Module</h2>
@@ -424,7 +405,7 @@ export function renderAppShell(): string {
               ${combinedToggle("includeDepotDevelopment", "Depot-/Investmententwicklung", "Zeigt das Standarddepot mit Sparrate, Wachstum und Entnahmen.")}
               ${combinedToggle("includeSharedDepotDevelopment", "Gemeinsame Anlageentwicklung", "Addiert die gemeinsame Anlageentwicklung zum Standarddepot.")}
               ${combinedToggle("includeWithdrawals", "Auszahlungs-/Entnahmeplanung", "Spiegelt geplante Entnahmen als Liquiditaetseffekt im Gesamtpfad.")}
-              ${combinedToggle("includeRealEstateFinancing", "Immobilienfinanzierung", "Beruecksichtigt Restschuld und Tilgungsquellen der Immobilie.")}
+              ${combinedToggle("includeRealEstateFinancing", "Immobilienfinanzierung", "Beruecksichtigt Darlehen und Tilgungsquellen der Immobilie.")}
               ${combinedToggle("includeRealEstateValueTrend", "Immobilienwertentwicklung", "Fuehrt den Immobilienwert bis zum Endjahr oder Verkaufsjahr fort.")}
             </div>
           </section>
@@ -701,16 +682,6 @@ function withdrawalGainMetric(): string {
         </div>
       </div>
     </div>
-  `;
-}
-
-function metric(id: string, label: string, hint: string, strong: boolean): string {
-  return `
-    <article class="metric ${strong ? "strong" : ""}">
-      <span>${label}</span>
-      <strong id="${id}">-</strong>
-      <small id="${id}Hint">${hint}</small>
-    </article>
   `;
 }
 

@@ -24,6 +24,17 @@ function repeated(value: number, count = 240): number[] {
   return Array.from({ length: count }, () => value);
 }
 
+function expectedFixedTotalLoanCost(loanAmount: number, interestRatePercent: number, financingYears: number): number {
+  const monthlyRate = Math.max(0, interestRatePercent) / 100 / 12;
+  if (loanAmount <= 0) return 0;
+  if (monthlyRate <= 0) return roundTestMoney(loanAmount);
+  return roundTestMoney(loanAmount * (1 + monthlyRate) ** (financingYears * 12));
+}
+
+function roundTestMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function projectSettings(
   projectCost: number,
   overrides: Partial<RealEstateFinancingSettings> = {}
@@ -260,6 +271,78 @@ describe("real estate calculator", () => {
     expect(result.years[0].loanEnd).toBeGreaterThan(595000);
     expect(result.years[0].netPropertyWealth).toBeLessThan(0);
     expect(result.totalLoanCost).toBeGreaterThan(595000);
+  });
+
+  it("keeps total loan cost independent from repayment sources", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(595000, {
+      interestRatePercent: 3.7,
+      financingYears: 25
+    });
+
+    const noRepayment = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(0, 300)));
+    const lowRepayment = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(500, 300)));
+    const highRepayment = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(5000, 300), repeated(1000, 300), repeated(500, 300), 0, repeated(250, 300))
+    );
+
+    expect(noRepayment.totalLoanCost).toBe(lowRepayment.totalLoanCost);
+    expect(lowRepayment.totalLoanCost).toBe(highRepayment.totalLoanCost);
+    expect(noRepayment.years[0].loanEnd).toBeGreaterThan(highRepayment.years[0].loanEnd);
+    expect(noRepayment.totalInterestShortfall).toBeGreaterThan(highRepayment.totalInterestShortfall);
+  });
+
+  it("calculates total loan cost from monthly compounding over the financing period", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(595000, {
+      interestRatePercent: 3.7,
+      financingYears: 25
+    });
+
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 300)));
+
+    expect(result.totalLoanCost).toBe(expectedFixedTotalLoanCost(595000, 3.7, 25));
+    expect(result.totalLoanCost).toBeCloseTo(1498377.73, 2);
+  });
+
+  it("changes fixed total loan cost only through loan basis, interest, and financing period", () => {
+    const state = defaultAppState();
+    const settings = projectSettings(120000, {
+      interestRatePercent: 3,
+      financingStartAge: 45,
+      financingEndAge: 70
+    });
+
+    const base = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 300)));
+    const higherInterest = calculateRealEstateFinancing(
+      state.settings.year,
+      { ...settings, interestRatePercent: 4 },
+      schedule(repeated(1000, 300))
+    );
+    const higherProjectCost = calculateRealEstateFinancing(
+      state.settings.year,
+      { ...settings, purchasePrice: 140000 },
+      schedule(repeated(1000, 300))
+    );
+    const withEquity = calculateRealEstateFinancing(
+      state.settings.year,
+      settings,
+      schedule(repeated(1000, 300), [], [], 20000)
+    );
+    const shorterFinancing = calculateRealEstateFinancing(
+      state.settings.year,
+      { ...settings, financingEndAge: 65 },
+      schedule(repeated(1000, 300))
+    );
+
+    expect(base.startLoanAmount).toBe(120000);
+    expect(withEquity.startLoanAmount).toBe(100000);
+    expect(higherInterest.totalLoanCost).toBeGreaterThan(base.totalLoanCost);
+    expect(higherProjectCost.totalLoanCost).toBeGreaterThan(base.totalLoanCost);
+    expect(withEquity.totalLoanCost).toBeLessThan(base.totalLoanCost);
+    expect(shorterFinancing.totalLoanCost).toBeLessThan(base.totalLoanCost);
   });
 
   it("derives the financing period from start and end age", () => {

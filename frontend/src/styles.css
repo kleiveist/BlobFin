@@ -1125,42 +1125,6 @@ button:focus-visible {
   font-weight: 750;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 10px;
-}
-
-.metric {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--metric-bg);
-  padding: 12px;
-}
-
-.metric.strong {
-  border-color: #a7cfc3;
-  background: var(--metric-strong-bg);
-}
-
-.metric span {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
-}
-
-.metric strong {
-  font-size: clamp(1.05rem, 1.8vw, 1.55rem);
-  overflow-wrap: anywhere;
-}
-
-.metric small {
-  color: var(--muted);
-}
-
 .table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -2266,7 +2230,6 @@ tfoot th {
     padding-right: 12px;
   }
 
-  .summary-grid,
   .reserve-chart-summary,
   .field-grid,
   .field-grid.wide,
@@ -2490,6 +2453,7 @@ tfoot th {
   background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: 8px;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -2655,6 +2619,8 @@ tfoot th {
   border-radius: 8px;
   margin-top: 8px;
   min-height: 260px;
+  min-width: 0;
+  overflow: hidden;
   padding: 10px;
 }
 
@@ -2685,7 +2651,8 @@ tfoot th {
   margin: 0;
 }
 
-.real-estate-chart-card .wealth-vertical-chart {
+.real-estate-chart-card .wealth-vertical-chart,
+.combined-wealth-card .wealth-vertical-chart {
   min-height: 345px;
 }
 
@@ -2701,7 +2668,9 @@ tfoot th {
 }
 
 .real-estate-chart-card .wealth-y-axis,
-.real-estate-chart-card .wealth-plot {
+.real-estate-chart-card .wealth-plot,
+.combined-wealth-card .wealth-y-axis,
+.combined-wealth-card .wealth-plot {
   min-height: 300px;
 }
 
@@ -2712,11 +2681,10 @@ tfoot th {
     linear-gradient(to bottom, var(--row-border), var(--row-border) 1px, transparent 1px),
     linear-gradient(to top, var(--row-border), var(--row-border) 1px, transparent 1px);
   display: grid;
-  gap: 8px;
-  grid-auto-flow: column;
-  grid-auto-columns: 36px;
+  gap: 4px;
+  grid-template-columns: repeat(var(--wealth-chart-count, 1), minmax(0, 1fr));
   min-height: 208px;
-  overflow-x: auto;
+  overflow: hidden;
   padding: 18px 8px 0;
 }
 
@@ -2739,8 +2707,8 @@ tfoot th {
   display: grid;
   gap: 5px;
   grid-template-rows: 20px minmax(130px, 1fr) 20px;
-  min-width: 34px;
-  padding: 4px;
+  min-width: 0;
+  padding: 4px 2px;
 }
 
 .wealth-column-button.active {
@@ -2782,6 +2750,7 @@ tfoot th {
   display: flex;
   height: 100%;
   min-height: 130px;
+  min-width: 0;
   overflow: hidden;
   padding: 3px;
 }
@@ -2890,7 +2859,11 @@ tfoot th {
   color: var(--muted);
   font-size: 0.74rem;
   font-weight: 800;
+  min-width: 0;
+  overflow: hidden;
   text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .wealth-x-axis {
@@ -2945,7 +2918,20 @@ tfoot th {
   }
 
   .wealth-plot {
-    grid-auto-columns: 32px;
+    gap: 2px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .wealth-column-button {
+    gap: 4px;
+    padding-left: 1px;
+    padding-right: 1px;
+  }
+
+  .wealth-column-track {
+    padding-left: 2px;
+    padding-right: 2px;
   }
 }
 
