@@ -20,9 +20,6 @@ export function validateRealEstateSettings(settings: RealEstateFinancingSettings
   if (settings.financingYears <= 0 && settings.targetTermYears <= 0) {
     errors.push("Finanzierungszeitraum oder Ziel-Laufzeit muss groesser als 0 sein.");
   }
-  if (settings.maxMonthlyBurden > 0 && settings.targetMonthlyBurden > settings.maxMonthlyBurden) {
-    errors.push("Ziel-Monatsbelastung darf die maximale Monatsbelastung nicht ueberschreiten.");
-  }
   return errors;
 }
 
@@ -44,7 +41,7 @@ export function totalProjectCost(settings: RealEstateFinancingSettings): number 
 
 export function deriveLoanAmount(settings: RealEstateFinancingSettings): number {
   if (settings.loanAmount > 0) return roundMoney(settings.loanAmount);
-  return roundMoney(Math.max(0, totalProjectCost(settings) - settings.equityCapital - settings.subsidyAmount));
+  return roundMoney(Math.max(0, totalProjectCost(settings) - settings.equityCapital));
 }
 
 export function deriveMonthlyPayment(settings: RealEstateFinancingSettings, loanAmount: number): number {
@@ -110,7 +107,6 @@ export function calculateRealEstateFinancing(
   const months: RealEstateFinancingMonth[] = [];
 
   let remainingDebt = loanAmount;
-  let soldProperty = false;
 
   for (let yearIndex = 0; yearIndex < financingYears; yearIndex += 1) {
     const year = startYear + yearIndex;
@@ -130,7 +126,7 @@ export function calculateRealEstateFinancing(
       const scheduleIndex = yearIndex * 12 + month - 1;
       const monthLoanStart = roundMoney(remainingDebt);
 
-      if (remainingDebt <= 0 || soldProperty) {
+      if (remainingDebt <= 0) {
         months.push({
           year,
           month,
@@ -200,23 +196,10 @@ export function calculateRealEstateFinancing(
       });
     }
 
-    let propertyValue = 0;
-    const debtBeforeSaleClearance = remainingDebt;
-    let isSaleYear = false;
-    if (!soldProperty) {
-      propertyValue = projectedPropertyValue(startPropertyValue, growthRate, yearIndex + 1, financingYears, settings);
-      if (settings.plannedSaleYear !== null && year === settings.plannedSaleYear) {
-        isSaleYear = true;
-        if (settings.estimatedSaleValue !== null && settings.estimatedSaleValue > 0) {
-          propertyValue = roundMoney(settings.estimatedSaleValue);
-        }
-      }
-    }
-
-    const effectiveDebtForYear = isSaleYear ? debtBeforeSaleClearance : remainingDebt;
-    const loanEnd = roundMoney(isSaleYear ? 0 : soldProperty ? 0 : remainingDebt);
-    const propertyEquity = roundMoney(Math.max(0, propertyValue - effectiveDebtForYear));
-    const netPropertyWealth = roundMoney(propertyValue - effectiveDebtForYear);
+    const propertyValue = projectedPropertyValue(startPropertyValue, growthRate, yearIndex + 1);
+    const loanEnd = roundMoney(remainingDebt);
+    const propertyEquity = roundMoney(Math.max(0, propertyValue - loanEnd));
+    const netPropertyWealth = roundMoney(propertyValue - loanEnd);
 
     years.push({
       year,
@@ -237,23 +220,6 @@ export function calculateRealEstateFinancing(
       propertyEquity,
       netPropertyWealth
     });
-
-    if (isSaleYear) {
-      soldProperty = true;
-      remainingDebt = 0;
-    } else if (soldProperty) {
-      remainingDebt = 0;
-    }
-  }
-
-  if (settings.remainingDebtAfterFixedInterest > 0 && settings.fixedInterestYears > 0) {
-    const fixingYear = startYear + settings.fixedInterestYears - 1;
-    const match = years.find((entry) => entry.year === fixingYear);
-    if (match) {
-      match.loanEnd = roundMoney(settings.remainingDebtAfterFixedInterest);
-      match.propertyEquity = roundMoney(Math.max(0, match.propertyValue - match.loanEnd));
-      match.netPropertyWealth = roundMoney(match.propertyValue - match.loanEnd);
-    }
   }
 
   const totalInterestShortfall = roundMoney(years.reduce((sum, entry) => sum + entry.interestShortfall, 0));
@@ -274,6 +240,15 @@ export function calculateRealEstateFinancing(
     totalProjectCost: projectCost,
     validationErrors
   };
+}
+
+export function defaultRealEstateDetailYear(
+  years: RealEstateFinancingYear[],
+  selectedYear: number | null
+): number | null {
+  if (selectedYear !== null && years.some((entry) => entry.year === selectedYear)) return selectedYear;
+  const firstActiveCreditYear = years.find((entry) => entry.loanStart > 0 || entry.loanEnd > 0 || entry.interestDue > 0);
+  return firstActiveCreditYear?.year ?? years[0]?.year ?? null;
 }
 
 function withdrawalGainYearBreakdown(withdrawalGain: number): AdditionalRepaymentYearBreakdown {
@@ -318,19 +293,8 @@ function hasAnyMonthlyPayment(schedule: RealEstateFinancingSourceSchedule, month
   return false;
 }
 
-function projectedPropertyValue(
-  startPropertyValue: number,
-  growthRate: number,
-  yearIndex: number,
-  financingYears: number,
-  settings: RealEstateFinancingSettings
-): number {
-  const baseValue = roundMoney(startPropertyValue * (1 + growthRate) ** yearIndex);
-  const manualValue = settings.manualFuturePropertyValue;
-  if (manualValue === null || manualValue <= 0 || financingYears <= 0) return baseValue;
-
-  const interpolationWeight = Math.min(1, Math.max(0, yearIndex / financingYears));
-  return roundMoney(baseValue + (manualValue - baseValue) * interpolationWeight);
+function projectedPropertyValue(startPropertyValue: number, growthRate: number, yearIndex: number): number {
+  return roundMoney(startPropertyValue * (1 + growthRate) ** yearIndex);
 }
 
 function clampYears(value: number): number {

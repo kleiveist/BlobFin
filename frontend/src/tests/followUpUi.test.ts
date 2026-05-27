@@ -70,6 +70,9 @@ describe("follow-up ui rendering", () => {
   it("renders real estate assumption fields as one control each", () => {
     const html = renderAppShell();
 
+    expect(html).not.toContain("Strategie und Annahmen");
+    expect(html).not.toContain('data-real-estate-field="subsidyAmount"');
+    expect(html).not.toContain('data-real-estate-field="remainingDebtAfterFixedInterest"');
     expect(count(html, 'data-real-estate-field="interestRatePercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="interestRatePercent"')).toBe(1);
     expect(count(html, 'data-real-estate-field="monthlyPayment"')).toBe(0);
@@ -105,6 +108,17 @@ describe("follow-up ui rendering", () => {
     expect(trend).toContain("wealth-vertical-chart");
     expect(combined).toContain("wealth-vertical-chart");
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");
+  });
+
+  it("renders an empty real estate repayment chart without a start loan", () => {
+    const repayment = renderRealEstateRepaymentChart({
+      points: [{ ...realEstateYear, loanStart: 0, loanEnd: 0, principalPaid: 0, netPropertyWealth: 300000 }],
+      selectedYear: 2026,
+      formatMoney: String
+    });
+
+    expect(repayment).toContain("Noch kein Start-Kreditvolumen");
+    expect(repayment).not.toContain("wealth-column-segment equity");
   });
 });
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultAppState } from "../data/defaults";
 import {
   calculateRealEstateFinancing,
+  defaultRealEstateDetailYear,
   deriveInitialRepaymentPercentFromPayment,
   deriveLoanAmount,
   validateRealEstateSettings
@@ -34,6 +35,44 @@ describe("real estate calculator", () => {
     };
 
     expect(deriveLoanAmount(settings)).toBeGreaterThan(0);
+  });
+
+  it("ignores removed strategy fields when deriving loan amount and yearly values", () => {
+    const state = defaultAppState();
+    const settings = {
+      ...state.realEstate,
+      purchasePrice: 300000,
+      constructionOrRenovationCosts: 0,
+      landCosts: 0,
+      additionalPurchaseCosts: 0,
+      notaryCosts: 0,
+      landRegistryCosts: 0,
+      brokerCosts: 0,
+      transferTax: 0,
+      modernizationReserve: 0,
+      movingAndSetupCosts: 0,
+      safetyBuffer: 0,
+      equityCapital: 50000,
+      loanAmount: 0,
+      subsidyAmount: 100000,
+      interestRatePercent: 0,
+      propertyValueGrowthPercent: 0,
+      financingYears: 3,
+      plannedSaleYear: state.settings.year,
+      estimatedSaleValue: 1,
+      manualFuturePropertyValue: 999999,
+      fixedInterestYears: 1,
+      remainingDebtAfterFixedInterest: 99999,
+      targetMonthlyBurden: 5000,
+      maxMonthlyBurden: 1
+    };
+
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 36)));
+
+    expect(deriveLoanAmount(settings)).toBe(250000);
+    expect(result.years[0].propertyValue).toBe(300000);
+    expect(result.years[0].loanEnd).toBe(238000);
+    expect(result.validationErrors.join(" ")).not.toContain("Ziel-Monatsbelastung");
   });
 
   it("uses selected monthly savings as the only regular repayment source", () => {
@@ -143,5 +182,33 @@ describe("real estate calculator", () => {
 
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.join(" ")).toContain("Kaufpreis");
+  });
+
+  it("defaults the real estate detail year to the first active credit year", () => {
+    const state = defaultAppState();
+    const settings = {
+      ...state.realEstate,
+      loanAmount: 24000,
+      interestRatePercent: 0,
+      financingYears: 3
+    };
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(2000, 36)));
+
+    expect(defaultRealEstateDetailYear(result.years, null)).toBe(state.settings.year);
+    expect(defaultRealEstateDetailYear(result.years, state.settings.year + 2)).toBe(state.settings.year + 2);
+  });
+
+  it("falls back to the first calculated year when no active credit exists", () => {
+    const state = defaultAppState();
+    const settings = {
+      ...state.realEstate,
+      loanAmount: 0,
+      purchasePrice: 0,
+      equityCapital: 0,
+      financingYears: 3
+    };
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule([]));
+
+    expect(defaultRealEstateDetailYear(result.years, null)).toBe(state.settings.year);
   });
 });

@@ -2555,11 +2555,19 @@ tfoot th {
   padding: 10px;
 }
 
+.real-estate-chart-card .wealth-chart-host {
+  min-height: 360px;
+}
+
 .wealth-vertical-chart {
   display: grid;
   gap: 8px;
   grid-template-columns: 86px minmax(0, 1fr);
   min-height: 250px;
+}
+
+.real-estate-chart-card .wealth-vertical-chart {
+  min-height: 345px;
 }
 
 .wealth-y-axis {
@@ -2571,6 +2579,11 @@ tfoot th {
   min-height: 208px;
   padding-top: 18px;
   text-align: right;
+}
+
+.real-estate-chart-card .wealth-y-axis,
+.real-estate-chart-card .wealth-plot {
+  min-height: 300px;
 }
 
 .wealth-plot {
@@ -2586,6 +2599,14 @@ tfoot th {
   min-height: 208px;
   overflow-x: auto;
   padding: 18px 8px 0;
+}
+
+.real-estate-chart-card .wealth-column-button {
+  grid-template-rows: 22px minmax(220px, 1fr) 20px;
+}
+
+.real-estate-chart-card .wealth-column-track {
+  min-height: 220px;
 }
 
 .wealth-column-button {

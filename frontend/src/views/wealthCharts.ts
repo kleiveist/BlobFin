@@ -18,7 +18,10 @@ export function renderRealEstateRepaymentChart(input: ChartRenderInput<RealEstat
     return '<div class="chart-empty">Noch keine Immobilienberechnung verfuegbar.</div>';
   }
 
-  const startLoanAmount = Math.max(1, input.points[0]?.loanStart ?? 0);
+  const startLoanAmount = input.points[0]?.loanStart ?? 0;
+  if (!Number.isFinite(startLoanAmount) || startLoanAmount <= 0) {
+    return '<div class="chart-empty">Noch kein Start-Kreditvolumen fuer die Tilgung vorhanden.</div>';
+  }
 
   return renderVerticalChart({
     label: "Immobilienfinanzierung je Jahr",

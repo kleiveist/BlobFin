@@ -354,10 +354,8 @@ export function renderAppShell(): string {
             <div class="field-grid wide">
               ${realEstateNumberField("equityCapital", "Eigenkapital fuer Immobilie")}
               ${realEstateNumberField("loanAmount", "Darlehensbetrag")}
-              ${realEstateNumberField("fixedInterestYears", "Zinsbindung (Jahre)", { step: 1 })}
               ${realEstateNumberField("targetTermYears", "Ziel-Laufzeit (Jahre)", { step: 1 })}
               ${realEstateNumberField("financingStartAge", "Finanzierung ab Alter", { step: 1 })}
-              ${realEstateNumberField("remainingDebtAfterFixedInterest", "Restschuld nach Zinsbindung")}
             </div>
             <div class="real-estate-slider-grid">
               ${realEstateAssumptionControl("interestRatePercent", "Zinssatz", 0, 10, 0.05)}
@@ -367,20 +365,6 @@ export function renderAppShell(): string {
               ${chartMetric("realEstateDerivedMonthlyPaymentMetric", "Monatsrate")}
               ${chartMetric("realEstateDerivedInitialRepaymentMetric", "Anfangstilgung")}
               ${chartMetric("realEstateDerivedSpecialRepaymentMetric", "Sondertilgung p. a.")}
-            </div>
-          </section>
-
-          <section class="real-estate-card">
-            <h3>Strategie und Annahmen</h3>
-            <p class="planning-account-summary">Hilfetext: Werte sind Schaetzungen und keine Garantie fuer die spaetere Marktentwicklung.</p>
-            <div class="field-grid wide">
-              ${realEstateNumberField("plannedSaleYear", "Geplanter Verkaufszeitpunkt (optional)", { step: 1, nullable: true })}
-              ${realEstateNumberField("estimatedSaleValue", "Geschaetzter Verkaufswert (optional)", { nullable: true })}
-              ${realEstateNumberField("targetFullRepaymentYear", "Zieljahr vollstaendige Tilgung (optional)", { step: 1, nullable: true })}
-              ${realEstateNumberField("targetMonthlyBurden", "Ziel-Monatsbelastung")}
-              ${realEstateNumberField("maxMonthlyBurden", "Maximale Monatsbelastung")}
-              ${realEstateNumberField("subsidyAmount", "Foerderung / Zuschuss")}
-              ${realEstateNumberField("manualFuturePropertyValue", "Optionaler Zukunftswert", { nullable: true })}
             </div>
           </section>
 
@@ -612,22 +596,13 @@ function realEstateEnglishLabel(key: string, fallback: string): string {
     loanAmount: "Loan amount",
     interestRatePercent: "Interest rate in %",
     initialRepaymentPercent: "Initial repayment in %",
-    fixedInterestYears: "Fixed-interest period (years)",
     targetTermYears: "Target term (years)",
     financingStartAge: "Financing start age",
     financingYears: "Financing period (years)",
-    remainingDebtAfterFixedInterest: "Remaining debt after fixed period",
     specialRepaymentAmount: "Special repayment amount",
     monthlyPayment: "Monthly payment",
-    plannedSaleYear: "Planned sale year (optional)",
-    estimatedSaleValue: "Estimated sale value (optional)",
-    targetFullRepaymentYear: "Target full repayment year (optional)",
-    targetMonthlyBurden: "Target monthly burden",
-    maxMonthlyBurden: "Maximum monthly burden",
-    subsidyAmount: "Subsidy amount",
     propertyValueGrowthPercent: "Property value growth in %",
-    inflationRatePercent: "Inflation in %",
-    manualFuturePropertyValue: "Optional future value"
+    inflationRatePercent: "Inflation in %"
   };
   return labels[key] ?? fallback;
 }

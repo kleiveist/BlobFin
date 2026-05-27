@@ -3,7 +3,7 @@ import "./styles.css";
 import { createId, defaultAppState, defaultInvestmentSettings } from "./data/defaults";
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
 import { buildCombinedWealthSeries } from "./domain/combinedWealth";
-import { calculateRealEstateFinancing } from "./domain/realEstateCalculator";
+import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
 import {
   investmentContributionForMonth,
   oneTimeInvestmentContributionForMonth
@@ -757,12 +757,7 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   setText("realEstatePropertyEquityMetric", money(lastYear?.netPropertyWealth ?? 0));
   setText("realEstateTotalProjectCostMetric", money(result.totalProjectCost));
 
-  if (!selectedRealEstateYear && lastYear) {
-    selectedRealEstateYear = lastYear.year;
-  }
-  if (selectedRealEstateYear && !result.years.some((entry) => entry.year === selectedRealEstateYear)) {
-    selectedRealEstateYear = lastYear?.year ?? null;
-  }
+  selectedRealEstateYear = defaultRealEstateDetailYear(result.years, selectedRealEstateYear);
   const selectedYearEntry = result.years.find((entry) => entry.year === selectedRealEstateYear) ?? lastYear ?? null;
 
   const repaymentHost = document.querySelector<HTMLDivElement>("#realEstateRepaymentChart");
@@ -787,6 +782,10 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   if (!detail) return;
   if (!selectedYearEntry) {
     detail.innerHTML = "<div class='chart-empty'>Noch keine Jahresdetails verfuegbar.</div>";
+    return;
+  }
+  if (result.startLoanAmount <= 0) {
+    detail.innerHTML = "<div class='chart-empty'>Noch kein Start-Kreditvolumen fuer Jahresdetails vorhanden.</div>";
     return;
   }
 
@@ -2591,6 +2590,7 @@ function updateRealEstateField(field: RealEstateField, value: string): void {
     [field]: nullableFields.has(field) && value.trim() === "" ? null : Math.max(0, parsed)
   } as RealEstateFinancingSettings;
   state.realEstate = nextRealEstate;
+  resetRealEstateDetailSelection();
 }
 
 function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
@@ -2613,6 +2613,7 @@ function toggleRealEstateSourcePosition(kind: RealEstatePaymentSourceKind, id: s
     ...state.realEstate,
     [kind === "monthlyPayment" ? "monthlyPaymentSourceIds" : "specialRepaymentSourceIds"]: Array.from(currentIds)
   };
+  resetRealEstateDetailSelection();
 }
 
 function toggleRealEstateWithdrawalGainSource(): void {
@@ -2620,6 +2621,7 @@ function toggleRealEstateWithdrawalGainSource(): void {
     ...state.realEstate,
     includeWithdrawalGainAsPaymentSource: !state.realEstate.includeWithdrawalGainAsPaymentSource
   };
+  resetRealEstateDetailSelection();
   renderAll();
 }
 
@@ -2639,6 +2641,10 @@ function setRealEstateLocale(locale: RealEstateFinancingSettings["locale"]): voi
 function setSelectedRealEstateYear(year: number): void {
   selectedRealEstateYear = Number.isFinite(year) && year > 0 ? year : null;
   renderAll();
+}
+
+function resetRealEstateDetailSelection(): void {
+  selectedRealEstateYear = null;
 }
 
 function setSelectedCombinedWealthYear(year: number): void {
