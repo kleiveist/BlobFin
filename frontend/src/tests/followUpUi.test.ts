@@ -63,6 +63,8 @@ describe("follow-up ui rendering", () => {
     const html = renderAppShell();
 
     expect(html).toContain('id="yearAccountSelector"');
+    expect(html).toContain('id="accountYearTableOverview"');
+    expect(html).not.toContain('id="resultHead"');
   });
 
   it("renders real estate assumption fields as one control each", () => {

@@ -10,7 +10,6 @@ import {
 } from "./domain/investmentContributions";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
 import {
-  calculateYearTableFooterValue,
   calculatePlannedIncomeForSingleMonth,
   calculatePlannedOutflowForSingleMonth,
   calculateReserveSummary
@@ -22,7 +21,6 @@ import {
   intNumber,
   labelForPayout,
   labelForType,
-  makeHeaderLabel,
   monthName,
   money,
   numberValue,
@@ -78,6 +76,7 @@ import type {
   ThemeMode
 } from "./types";
 import { drawInvestmentChart } from "./views/investmentChart";
+import { renderAccountYearTableOverview } from "./views/accountYearTables";
 import {
   renderCombinedWealthChart,
   renderRealEstateRepaymentChart,
@@ -684,7 +683,7 @@ function renderCalculations(
   );
   setText("detailSelectedMonthlyRate", money(projection.monthlyRate));
 
-  renderResultTable(activeReserve);
+  renderAccountYearTables();
   renderReserveChartPopup(activeReserve);
   hideInvestmentChartPopup();
   drawInvestmentChartWithPopup(projection);
@@ -1117,7 +1116,7 @@ function renderPlanningAccounts(): void {
   }
 
   summary.textContent = `Konten gesamt: ${state.planningAccounts.length} | mixed: ${totalsByType.mixed} | cost_reserve: ${totalsByType.costReserve} | annual_table: ${totalsByType.annualTable}`;
-  yearAccountName.textContent = `(${activeAccount.name})`;
+  yearAccountName.textContent = `(aktiv: ${activeAccount.name})`;
   renderPlanningAccountDialog();
 }
 
@@ -1786,84 +1785,20 @@ function addPositionButtonLabel(mode: PositionTableMode): string {
   return "Ausgabe hinzufuegen";
 }
 
-function renderResultTable(summary: ReturnType<typeof calculateReserveSummary>): void {
-  const head = document.querySelector<HTMLTableSectionElement>("#resultHead");
-  const body = document.querySelector<HTMLTableSectionElement>("#resultBody");
-  const foot = document.querySelector<HTMLTableSectionElement>("#resultFoot");
-  if (!head || !body || !foot) return;
-
-  const maxNeededHead = showResultMaxNeeded
-    ? '<th class="result-max-needed-col"><span class="split-header">Max. Bedarf<span>Monatsanfang</span></span></th>'
-    : "";
-  const maxNeededFoot = showResultMaxNeeded
-    ? `<th class="result-max-needed-col">${money(summary.maxRow.maxNeeded)}</th>`
-    : "";
+function renderAccountYearTables(): void {
+  const host = document.querySelector<HTMLDivElement>("#accountYearTableOverview");
   const toggleButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-result-max-needed']");
   if (toggleButton) {
     toggleButton.classList.toggle("active", showResultMaxNeeded);
     toggleButton.setAttribute("aria-pressed", String(showResultMaxNeeded));
   }
-
-  head.innerHTML = `
-    <tr>
-      <th class="month-col">Monat</th>
-      ${summary.visiblePositions.map((position) => `<th>${positionHeaderLabel(position)}</th>`).join("")}
-      <th class="result-compact-col">Einnahmen</th>
-      <th class="result-compact-col">Ausgaben</th>
-      <th>Netto uebrig</th>
-      ${maxNeededHead}
-      <th class="result-permanent-col"><span class="split-header">Dauerhafter<span>Bestand</span></span></th>
-      <th class="result-interest-col"><span class="split-header">ca.<span>Monatszins</span></span></th>
-      <th>Cashback</th>
-    </tr>
-  `;
-
-  body.innerHTML = summary.rows
-    .map((row) => {
-      return `
-        <tr>
-          <td>${row.month}</td>
-          ${summary.visiblePositions.map((position) => `<td>${money(row.values[position.id] || 0)}</td>`).join("")}
-          <td class="positive result-compact-col">${money(row.plannedIncome)}</td>
-          <td class="result-compact-col">${money(row.plannedOutflow)}</td>
-          <td class="${amountClass(row.monthlyRemaining)}">${money(row.monthlyRemaining)}</td>
-          ${showResultMaxNeeded ? `<td class="result-max-needed-col">${money(row.maxNeeded)}</td>` : ""}
-          <td class="result-permanent-col">${money(row.permanentAfterMonthlyOutflows)}</td>
-          <td class="positive result-interest-col">${money(row.monthlyInterest)}</td>
-          <td class="positive">${money(row.monthlyCashback)}</td>
-        </tr>
-      `;
-    })
-    .join("");
-
-  foot.innerHTML = `
-    <tr>
-      <th>Summe / Maximum</th>
-      ${summary.visiblePositions
-        .map((position) => `<th>${money(positionFooterValue(position, summary))}</th>`)
-        .join("")}
-      <th class="positive result-compact-col">${money(summary.totalPlannedIncome)}</th>
-      <th class="result-compact-col">${money(summary.totalPlannedOutflow)}</th>
-      <th class="${amountClass(summary.yearlyRemaining)}">${money(summary.yearlyRemaining)}</th>
-      ${maxNeededFoot}
-      <th class="result-permanent-col">${money(summary.yearEndBalance)}</th>
-      <th class="positive result-interest-col">${money(summary.totalInterest)}</th>
-      <th class="positive">${money(summary.totalCashback)}</th>
-    </tr>
-  `;
-}
-
-function positionFooterValue(position: ReservePosition, summary: ReturnType<typeof calculateReserveSummary>): number {
-  return calculateYearTableFooterValue(position, summary.rows, state.settings.year);
-}
-
-function positionHeaderLabel(position: ReservePosition): string {
-  return `
-    <span class="result-position-heading">
-      ${positionIconSvg(normalizePositionIcon(position.icon))}
-      <span>${makeHeaderLabel(position.name)}</span>
-    </span>
-  `;
+  if (!host) return;
+  host.innerHTML = renderAccountYearTableOverview({
+    accounts: state.planningAccounts,
+    settings: state.settings,
+    activeAccountId: state.ui.selectedPlanningAccountId,
+    showMaxNeeded: showResultMaxNeeded
+  });
 }
 
 function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSummary>): void {
@@ -3529,12 +3464,6 @@ function setText(id: string, value: string): void {
 
 function setRangeLabel(key: keyof InvestmentSettings, value: string): void {
   setText(`${key}Value`, value);
-}
-
-function amountClass(value: number): string {
-  if (value < 0) return "negative";
-  if (value > 0) return "positive";
-  return "";
 }
 
 function setInputValue(selector: string, value: number | string | string[]): void {

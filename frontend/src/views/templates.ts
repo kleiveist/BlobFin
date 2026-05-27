@@ -122,7 +122,7 @@ export function renderAppShell(): string {
             <button class="button" id="addPositionButton" type="button" data-action="add-position">Ausgabe hinzufuegen</button>
             ${toolbarIconButton("import-positions", "Positionen importieren", "upload")}
             ${toolbarIconButton("export-positions", "Positionen exportieren", "download")}
-            ${toolbarIconButton("export-year", "Jahrestabelle exportieren", "table")}
+            ${toolbarIconButton("export-year", "Aktive Jahrestabelle exportieren", "table")}
             <button
               class="button secondary position-filter-toggle"
               type="button"
@@ -146,9 +146,9 @@ export function renderAppShell(): string {
 
       <section class="panel result-panel" data-module-section="year_table">
         <div class="section-heading result-table-heading">
-          <h2>Jahrestabelle <span id="activeYearAccountName"></span></h2>
+          <h2>Jahrestabellen pro Konto <span id="activeYearAccountName"></span></h2>
           <div class="result-header-actions">
-            <div id="yearAccountSelector" class="year-account-selector" aria-label="Aktives Konto fuer Jahrestabelle"></div>
+            <div id="yearAccountSelector" class="year-account-selector" aria-label="Aktives Konto fuer Grafik Bearbeitung Export"></div>
             <div class="position-mode-switch result-column-switch" role="group" aria-label="Jahrestabellen-Spalten">
               <button class="position-mode-button" type="button" data-action="toggle-result-max-needed" aria-pressed="false">
                 Max. Bedarf Monatsanfang
@@ -158,13 +158,7 @@ export function renderAppShell(): string {
           </div>
         </div>
         <div id="reserveChartPopup" class="reserve-chart-popup" role="dialog" aria-label="Einnahmen Ausgaben Sparrate Grafik" hidden></div>
-        <div class="table-wrap result-table-wrap">
-          <table>
-            <thead id="resultHead"></thead>
-            <tbody id="resultBody"></tbody>
-            <tfoot id="resultFoot"></tfoot>
-          </table>
-        </div>
+        <div id="accountYearTableOverview" class="account-year-table-overview"></div>
       </section>
 
       <section class="panel investment-panel" data-module-section="investment_planning">

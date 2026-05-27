@@ -614,6 +614,97 @@ button:focus-visible {
   position: relative;
 }
 
+.account-year-table-overview {
+  display: grid;
+  gap: 14px;
+}
+
+.account-year-table-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  padding: 14px;
+}
+
+.account-year-table-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.account-year-table-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-year-table-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.account-year-table-title h3 {
+  margin: 0;
+}
+
+.account-year-table-head p,
+.account-year-table-active-note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.account-year-table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 34px;
+}
+
+.account-year-table-badge {
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  text-transform: uppercase;
+}
+
+.account-year-table-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.account-year-table-metric {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.account-year-table-metric span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.account-year-table-metric strong {
+  font-size: 1rem;
+}
+
+.account-year-table-wrap {
+  background: var(--table-bg);
+}
+
 .reserve-chart-popup {
   position: relative;
   z-index: 7;
@@ -2682,6 +2773,10 @@ tfoot th {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .account-year-table-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .wealth-bar-row {
     grid-template-columns: 56px 1fr;
   }
@@ -2702,6 +2797,19 @@ tfoot th {
 
 @media (max-width: 680px) {
   .module-launcher-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-year-table-card {
+    padding: 10px;
+  }
+
+  .account-year-table-actions,
+  .account-year-table-actions .button {
+    width: 100%;
+  }
+
+  .account-year-table-metrics {
     grid-template-columns: 1fr;
   }
 }
