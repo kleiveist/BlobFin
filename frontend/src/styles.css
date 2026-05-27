@@ -68,7 +68,7 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
   line-height: 1.45;
 }
 
@@ -2194,6 +2194,294 @@ tfoot th {
 
   .investment-statistics {
     margin: 0 16px 16px;
+    grid-template-columns: 1fr;
+  }
+}
+
+.module-launcher {
+  padding: 14px;
+}
+
+.module-launcher-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.module-card-button {
+  align-items: flex-start;
+  background: linear-gradient(160deg, var(--surface-soft), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-height: 88px;
+  padding: 12px;
+  text-align: left;
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.module-card-button strong {
+  font-size: 0.93rem;
+}
+
+.module-card-button small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.module-card-button:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.module-card-button.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.workspace-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings-popover-subhead {
+  border-top: 1px solid var(--row-border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.settings-accordion-toggle {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-weight: 800;
+  justify-content: space-between;
+  padding: 9px 10px;
+  width: 100%;
+}
+
+.settings-accordion-content {
+  padding-top: 10px;
+}
+
+.account-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.planning-account-cards {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.planning-account-card {
+  align-items: flex-start;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+}
+
+.planning-account-card small {
+  color: var(--muted);
+}
+
+.planning-account-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.planning-account-summary {
+  color: var(--muted);
+  margin: 0;
+}
+
+.real-estate-grid,
+.combined-wealth-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.real-estate-card,
+.combined-wealth-card {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.real-estate-slider-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.validation-box {
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+  min-height: 34px;
+  padding: 8px;
+}
+
+.validation-box.error {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.combined-toggle-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.combined-toggle-item {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr;
+  padding: 8px 10px;
+}
+
+.wealth-chart-host {
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  margin-top: 8px;
+  min-height: 130px;
+  padding: 10px;
+}
+
+.wealth-bars {
+  display: grid;
+  gap: 6px;
+}
+
+.wealth-bar-row {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 60px 1fr 130px;
+  padding: 6px;
+  text-align: left;
+}
+
+.wealth-bar-row.static {
+  cursor: default;
+}
+
+.wealth-bar-row.active {
+  border-color: var(--accent);
+  background: var(--highlight);
+}
+
+.wealth-bar-year {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.wealth-bar-track {
+  background: var(--surface-muted);
+  border-radius: 5px;
+  display: grid;
+  gap: 2px;
+  overflow: hidden;
+  padding: 2px;
+}
+
+.wealth-bar-segment {
+  border-radius: 4px;
+  display: block;
+  height: 10px;
+}
+
+.wealth-bar-segment.property {
+  background: #3b82f6;
+}
+
+.wealth-bar-segment.equity {
+  background: #10b981;
+}
+
+.wealth-bar-segment.debt {
+  background: #ef4444;
+}
+
+.wealth-bar-segment.net {
+  background: #16a34a;
+}
+
+.wealth-bar-segment.gross {
+  background: #64748b;
+}
+
+.wealth-bar-value {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  justify-self: end;
+}
+
+.wealth-detail-box {
+  background: var(--surface-soft);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  margin-top: 8px;
+  min-height: 60px;
+  padding: 10px;
+}
+
+.chart-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 12px;
+}
+
+@media (max-width: 1220px) {
+  .module-launcher-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .module-launcher-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wealth-bar-row {
+    grid-template-columns: 56px 1fr;
+  }
+
+  .wealth-bar-value {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 680px) {
+  .module-launcher-grid {
     grid-template-columns: 1fr;
   }
 }

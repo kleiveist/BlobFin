@@ -2,6 +2,8 @@ import "./styles.css";
 
 import { createId, defaultAppState, defaultInvestmentSettings } from "./data/defaults";
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
+import { buildCombinedWealthSeries } from "./domain/combinedWealth";
+import { calculateRealEstateFinancing } from "./domain/realEstateCalculator";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
 import {
   calculateYearTableFooterValue,
@@ -52,19 +54,29 @@ import {
 } from "./lib/positionTableView";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
 import type {
+  AppSectionId,
   AppState,
   AssetProjection,
   AssetProjectionPoint,
+  CombinedWealthYear,
   InvestmentDepotKey,
   InvestmentSettings,
+  PlanningAccount,
   PlanningSettings,
   PositionTableFilterColumn,
   PositionTableFilterOperator,
   PositionTableView,
+  RealEstateFinancingResult,
+  RealEstateFinancingSettings,
   ReservePosition,
   ThemeMode
 } from "./types";
 import { drawInvestmentChart } from "./views/investmentChart";
+import {
+  renderCombinedWealthChart,
+  renderRealEstateRepaymentChart,
+  renderRealEstateTrendChart
+} from "./views/wealthCharts";
 import { monthSelect, payoutSelect, positionIconSelect, positionTypeSelect, renderAppShell } from "./views/templates";
 
 const root = requireRootElement();
@@ -129,6 +141,9 @@ interface PositionFilterDraft {
   value: string;
 }
 
+type RealEstateField = keyof RealEstateFinancingSettings;
+type CombinedToggleKey = keyof AppState["combinedWealth"];
+
 let state = loadInitialState();
 let draggedPositionId: string | null = null;
 let exportStatusTimeoutId: number | undefined;
@@ -143,6 +158,8 @@ let reserveChartStyle: ReserveChartStyle = "bars";
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 let positionFilterDrafts = createPositionFilterDrafts();
 let positionFilterPopupOpen = false;
+let selectedRealEstateYear: number | null = null;
+let selectedCombinedWealthYear: number | null = null;
 normalizeInvestmentBounds();
 applyTheme();
 
@@ -162,9 +179,43 @@ function loadInitialState(): AppState {
 }
 
 function sanitizeAppState(appState: AppState): AppState {
+  const fallbackUi = {
+    activeSection: "cost_reserve_positions" as AppSectionId,
+    selectedPlanningAccountId: "default-account",
+    settingsGrunddatenExpanded: true
+  };
+  const ui = appState.ui ?? fallbackUi;
+  const planningAccounts = appState.planningAccounts.length
+    ? appState.planningAccounts.map((account) => ({
+        ...account,
+        yearlyRows: account.yearlyRows.map((position) => sanitizePosition(position, appState.settings.year))
+      }))
+    : [
+        {
+          id: "default-account",
+          name: "Standardkonto",
+          type: "mixed",
+          yearlyRows: appState.positions.map((position) => sanitizePosition(position, appState.settings.year))
+        }
+      ];
+  const selectedPlanningAccountId = planningAccounts.some(
+    (account) => account.id === ui.selectedPlanningAccountId
+  )
+    ? ui.selectedPlanningAccountId
+    : planningAccounts[0].id;
+  const positions =
+    planningAccounts.find((account) => account.id === selectedPlanningAccountId)?.yearlyRows ??
+    appState.positions.map((position) => sanitizePosition(position, appState.settings.year));
+
   return {
     ...appState,
-    positions: appState.positions.map((position) => sanitizePosition(position, appState.settings.year))
+    planningAccounts,
+    ui: {
+      ...fallbackUi,
+      ...ui,
+      selectedPlanningAccountId
+    },
+    positions
   };
 }
 
@@ -178,6 +229,73 @@ function requireRootElement(): HTMLDivElement {
 
 function renderShell(): void {
   root.innerHTML = renderAppShell();
+}
+
+function activePlanningAccount(): PlanningAccount {
+  if (!state.planningAccounts.length) {
+    state.planningAccounts = [
+      {
+        id: "default-account",
+        name: "Standardkonto",
+        type: "mixed",
+        yearlyRows: state.positions
+      }
+    ];
+  }
+  const account =
+    state.planningAccounts.find((item) => item.id === state.ui.selectedPlanningAccountId) ?? state.planningAccounts[0];
+  if (!account) {
+    throw new Error("No planning account available.");
+  }
+  if (state.ui.selectedPlanningAccountId !== account.id) {
+    state.ui = { ...state.ui, selectedPlanningAccountId: account.id };
+  }
+  return account;
+}
+
+function allPlanningPositions(): ReservePosition[] {
+  return state.planningAccounts.flatMap((account) => account.yearlyRows);
+}
+
+function syncActivePlanningAccountFromPositions(): void {
+  const account = activePlanningAccount();
+  state.planningAccounts = state.planningAccounts.map((item) =>
+    item.id === account.id ? { ...item, yearlyRows: state.positions } : item
+  );
+}
+
+function syncPositionsFromActivePlanningAccount(): void {
+  state.positions = activePlanningAccount().yearlyRows;
+}
+
+function setActiveSection(section: AppSectionId): void {
+  state.ui = { ...state.ui, activeSection: section };
+  if (section === "grunddaten") {
+    const panel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
+    if (panel?.hidden) {
+      panel.hidden = false;
+    }
+  } else {
+    hideThemeSettings();
+  }
+}
+
+function updateModuleVisibility(): void {
+  const activeSection = state.ui.activeSection;
+  const settingsPanel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
+  if (settingsPanel) {
+    settingsPanel.hidden = activeSection === "grunddaten" ? false : settingsPanel.hidden;
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".module-card-button[data-section-id]")) {
+    const sectionId = button.dataset.sectionId;
+    const isActive = sectionId === activeSection;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  }
+  for (const section of document.querySelectorAll<HTMLElement>("[data-module-section]")) {
+    const sectionId = section.dataset.moduleSection as AppSectionId | undefined;
+    section.hidden = sectionId !== activeSection;
+  }
 }
 
 function bindEvents(): void {
@@ -202,6 +320,18 @@ function bindEvents(): void {
       return;
     }
 
+    if (target.dataset.realEstateField) {
+      updateRealEstateField(target.dataset.realEstateField as RealEstateField, target.value);
+      renderAll();
+      return;
+    }
+
+    if (target.dataset.realEstateRange) {
+      updateRealEstateField(target.dataset.realEstateRange as RealEstateField, target.value);
+      renderAll();
+      return;
+    }
+
     if (target.dataset.retirementAge) {
       updateRetirementAge(target.value);
       renderAll();
@@ -217,6 +347,12 @@ function bindEvents(): void {
       return;
     }
 
+    if (target.dataset.realEstateField) {
+      updateRealEstateField(target.dataset.realEstateField as RealEstateField, target.value);
+      renderAll();
+      return;
+    }
+
     if (target.dataset.positionId && target.dataset.positionField) {
       const value = target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value;
       updatePosition(target.dataset.positionId, target.dataset.positionField as keyof ReservePosition, value);
@@ -226,6 +362,12 @@ function bindEvents(): void {
 
     if (target.dataset.includePosition && target instanceof HTMLInputElement) {
       toggleInvestmentPosition(target.dataset.includePosition, target.checked);
+      renderAll();
+      return;
+    }
+
+    if (target.dataset.combinedToggle && target instanceof HTMLInputElement) {
+      updateCombinedToggle(target.dataset.combinedToggle as CombinedToggleKey, target.checked);
       renderAll();
       return;
     }
@@ -273,6 +415,17 @@ function bindEvents(): void {
     if (action?.startsWith("sort-position-table-")) {
       togglePositionTableSort(action.replace("sort-position-table-", "") as PositionTableFilterColumn);
     }
+    if (action?.startsWith("open-section-")) {
+      setActiveSection(action.replace("open-section-", "") as AppSectionId);
+      renderAll();
+      return;
+    }
+    if (action === "add-planning-account") addPlanningAccount();
+    if (action === "rename-planning-account") renamePlanningAccount();
+    if (action === "delete-planning-account") deletePlanningAccount();
+    if (action?.startsWith("select-planning-account-")) {
+      selectPlanningAccount(action.replace("select-planning-account-", ""));
+    }
     if (action === "toggle-result-max-needed") toggleResultMaxNeeded();
     if (action === "set-investment-depot-standard") setInvestmentDepot("standard");
     if (action === "set-investment-depot-retirement") setInvestmentDepot("retirement");
@@ -297,6 +450,7 @@ function bindEvents(): void {
     }
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
     if (action === "toggle-theme-settings") toggleThemeSettings();
+    if (action === "toggle-settings-grunddaten") toggleSettingsGrunddaten();
     if (action === "close-theme-settings") hideThemeSettings();
     if (action === "open-position-icon-picker") showPositionIconPicker(button);
     if (action === "close-position-icon-picker") hidePositionIconPicker();
@@ -305,6 +459,10 @@ function bindEvents(): void {
     }
     if (action === "set-theme-light") setThemeMode("light");
     if (action === "set-theme-dark") setThemeMode("dark");
+    if (action === "set-real-estate-locale-de") setRealEstateLocale("de");
+    if (action === "set-real-estate-locale-en") setRealEstateLocale("en");
+    if (action === "select-real-estate-year") setSelectedRealEstateYear(numberValue(button.dataset.year || ""));
+    if (action === "select-combined-wealth-year") setSelectedCombinedWealthYear(numberValue(button.dataset.year || ""));
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
     if (action === "export-positions") {
       void exportCsvFile(
@@ -376,17 +534,30 @@ function bindEvents(): void {
 }
 
 function renderAll(): void {
+  syncActivePlanningAccountFromPositions();
+  syncPositionsFromActivePlanningAccount();
   normalizeInvestmentBounds();
   normalizeInvestmentDepotSelections();
-  const reserve = calculateReserveSummary(state.settings, state.positions);
+  normalizeInvestmentSelectionIds();
+  updateModuleVisibility();
+  renderPlanningAccounts();
+  const allPositions = allPlanningPositions();
+  const reserve = calculateReserveSummary(state.settings, allPositions);
+  const activeReserve = calculateReserveSummary(state.settings, state.positions);
   renderPositions();
   renderInvestmentIncludeList(reserve);
-  renderCalculations(reserve);
+  renderCalculations(reserve, activeReserve);
+  syncRealEstateInputsFromState();
+  syncCombinedToggleInputsFromState();
   syncInvestmentInputsFromState();
+  syncSettingsAccordionState();
   saveState(state);
 }
 
-function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>): void {
+function renderCalculations(
+  reserve: ReturnType<typeof calculateReserveSummary>,
+  activeReserve: ReturnType<typeof calculateReserveSummary>
+): void {
   const standardProjection = buildDepotAssetProjection(reserve, "standard");
   const retirementProjection = buildDepotAssetProjection(reserve, "retirement");
   const childProjection = buildDepotAssetProjection(reserve, "child");
@@ -476,11 +647,16 @@ function renderCalculations(reserve: ReturnType<typeof calculateReserveSummary>)
   );
   setText("detailSelectedMonthlyRate", money(projection.monthlyRate));
 
-  renderResultTable(reserve);
-  renderReserveChartPopup(reserve);
+  renderResultTable(activeReserve);
+  renderReserveChartPopup(activeReserve);
   hideInvestmentChartPopup();
   drawInvestmentChartWithPopup(projection);
   drawInvestmentChartWithPopup(combinedProjection, "#combinedInvestmentChart", "#combinedInvestmentChartPopup");
+
+  const realEstate = calculateRealEstateFinancing(state.settings.year, state.realEstate);
+  renderRealEstateCalculations(realEstate);
+  const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, realEstate);
+  renderCombinedWealthCalculations(combinedYears);
 }
 
 function syncInvestmentProjectionLabels(depot: InvestmentDepotKey): void {
@@ -507,6 +683,163 @@ function syncInvestmentProjectionLabels(depot: InvestmentDepotKey): void {
     isChild ? "Monatliche Auszahlung real" : "Monatliche gleichmaessige Entnahme real"
   );
   setText("detailBequestReserveLabel", isChild ? "Reserve zum Auszahlungsalter" : "Reserve/Erbe zum Endalter");
+}
+
+function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
+  const validation = document.querySelector<HTMLDivElement>("#realEstateValidation");
+  if (validation) {
+    if (result.validationErrors.length) {
+      validation.classList.add("error");
+      validation.innerHTML = result.validationErrors.map((item) => `<div>${escapeHtml(item)}</div>`).join("");
+    } else {
+      validation.classList.remove("error");
+      validation.textContent = "Eingaben sind plausibel. Tilgungsplan wurde aktualisiert.";
+    }
+  }
+
+  const lastYear = result.years[result.years.length - 1];
+  setText("realEstateLoanMetric", money(result.startLoanAmount));
+  setText("realEstateMonthlyRateMetric", money(result.monthlyPayment));
+  setText("realEstatePropertyValueMetric", money(lastYear?.propertyValue ?? 0));
+  setText("realEstatePropertyEquityMetric", money(lastYear?.netPropertyWealth ?? 0));
+
+  if (!selectedRealEstateYear && lastYear) {
+    selectedRealEstateYear = lastYear.year;
+  }
+  if (selectedRealEstateYear && !result.years.some((entry) => entry.year === selectedRealEstateYear)) {
+    selectedRealEstateYear = lastYear?.year ?? null;
+  }
+  const selectedYearEntry = result.years.find((entry) => entry.year === selectedRealEstateYear) ?? lastYear ?? null;
+
+  const repaymentHost = document.querySelector<HTMLDivElement>("#realEstateRepaymentChart");
+  if (repaymentHost) {
+    repaymentHost.innerHTML = renderRealEstateRepaymentChart({
+      points: result.years,
+      selectedYear: selectedRealEstateYear,
+      formatMoney: (value) => money(value)
+    });
+  }
+
+  const trendHost = document.querySelector<HTMLDivElement>("#realEstateTrendChart");
+  if (trendHost) {
+    trendHost.innerHTML = renderRealEstateTrendChart({
+      points: result.years,
+      selectedYear: selectedRealEstateYear,
+      formatMoney: (value) => money(value)
+    });
+  }
+
+  const detail = document.querySelector<HTMLDivElement>("#realEstateYearDetail");
+  if (!detail) return;
+  if (!selectedYearEntry) {
+    detail.innerHTML = "<div class='chart-empty'>Noch keine Jahresdetails verfuegbar.</div>";
+    return;
+  }
+
+  detail.innerHTML = `
+    <div class="detail-line"><span>Jahr</span><strong>${intNumber(selectedYearEntry.year)}</strong></div>
+    <div class="detail-line"><span>Zinsen</span><strong>${money(selectedYearEntry.interestPaid)}</strong></div>
+    <div class="detail-line"><span>Tilgung</span><strong>${money(selectedYearEntry.principalPaid)}</strong></div>
+    <div class="detail-line"><span>Sondertilgung</span><strong>${money(selectedYearEntry.specialRepayment)}</strong></div>
+    <div class="detail-line"><span>Restschuld</span><strong>${money(selectedYearEntry.loanEnd)}</strong></div>
+    <div class="detail-line"><span>Immobilienwert</span><strong>${money(selectedYearEntry.propertyValue)}</strong></div>
+    <div class="detail-line"><span>Netto-Immobilienvermoegen</span><strong>${money(
+      selectedYearEntry.netPropertyWealth
+    )}</strong></div>
+  `;
+}
+
+function calculateCombinedWealthYears(
+  standardProjection: AssetProjection,
+  retirementProjection: AssetProjection,
+  realEstate: RealEstateFinancingResult
+): CombinedWealthYear[] {
+  const standardEndYear = state.investment.birthYear + standardProjection.endAge;
+  const retirementEndYear = state.investment.retirementBirthYear + retirementProjection.endAge;
+  const realEstateEndYear = realEstate.years[realEstate.years.length - 1]?.year ?? state.settings.year;
+  const horizonYears = Math.max(1, standardEndYear, retirementEndYear, realEstateEndYear) - state.settings.year + 1;
+
+  const cashContribution = combinedCashContribution();
+
+  return buildCombinedWealthSeries({
+    startYear: state.settings.year,
+    horizonYears,
+    cashStartValue: cashContribution.cashStartValue,
+    yearlyCashDelta: cashContribution.yearlyCashDelta,
+    depotProjection: standardProjection,
+    sharedDepotProjection: retirementProjection,
+    depotBirthYear: state.investment.birthYear,
+    sharedDepotBirthYear: state.investment.retirementBirthYear,
+    realEstateYears: realEstate.years,
+    toggles: state.combinedWealth
+  });
+}
+
+function combinedCashContribution(): { cashStartValue: number; yearlyCashDelta: number } {
+  let cashStartValue = 0;
+  let yearlyCashDelta = 0;
+
+  for (const account of state.planningAccounts) {
+    const include =
+      account.type === "cost_reserve"
+        ? state.combinedWealth.includeCostReserveAccounts
+        : account.type === "annual_table"
+          ? state.combinedWealth.includeAnnualTableAccounts
+          : state.combinedWealth.includeCostReserveAccounts || state.combinedWealth.includeAnnualTableAccounts;
+    if (!include) continue;
+    const summary = calculateReserveSummary(state.settings, account.yearlyRows);
+    cashStartValue += summary.yearEndBalance;
+    yearlyCashDelta += summary.yearlyRemaining;
+  }
+
+  if (!Number.isFinite(cashStartValue) || !Number.isFinite(yearlyCashDelta)) {
+    return { cashStartValue: reserveFallbackValue(), yearlyCashDelta: 0 };
+  }
+
+  return { cashStartValue, yearlyCashDelta };
+}
+
+function reserveFallbackValue(): number {
+  return calculateReserveSummary(state.settings, state.positions).yearEndBalance;
+}
+
+function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
+  if (!selectedCombinedWealthYear && years.length) {
+    selectedCombinedWealthYear = years[years.length - 1].year;
+  }
+  if (selectedCombinedWealthYear && !years.some((entry) => entry.year === selectedCombinedWealthYear)) {
+    selectedCombinedWealthYear = years[years.length - 1]?.year ?? null;
+  }
+  const selected = years.find((entry) => entry.year === selectedCombinedWealthYear) ?? years[years.length - 1] ?? null;
+
+  const chartHost = document.querySelector<HTMLDivElement>("#combinedWealthChart");
+  if (chartHost) {
+    chartHost.innerHTML = renderCombinedWealthChart({
+      points: years,
+      selectedYear: selectedCombinedWealthYear,
+      formatMoney: (value) => money(value)
+    });
+  }
+
+  const detail = document.querySelector<HTMLDivElement>("#combinedWealthYearDetail");
+  if (!detail) return;
+  if (!selected) {
+    detail.innerHTML = "<div class='chart-empty'>Bitte zuerst Module aktivieren und berechnen.</div>";
+    return;
+  }
+
+  detail.innerHTML = `
+    <div class="detail-line"><span>Jahr</span><strong>${intNumber(selected.year)}</strong></div>
+    <div class="detail-line"><span>Cash</span><strong>${money(selected.cashValue)}</strong></div>
+    <div class="detail-line"><span>Depot</span><strong>${money(selected.depotValue)}</strong></div>
+    <div class="detail-line"><span>Entnahmeeffekt</span><strong>${money(selected.withdrawalImpact)}</strong></div>
+    <div class="detail-line"><span>Immobilienwert</span><strong>${money(selected.propertyValue)}</strong></div>
+    <div class="detail-line"><span>Immobilienschuld</span><strong>${money(selected.propertyDebt)}</strong></div>
+    <div class="detail-line"><span>Immobilien-Eigenkapital</span><strong>${money(selected.propertyEquity)}</strong></div>
+    <div class="detail-line"><span>Bruttovermoegen</span><strong>${money(selected.totalGrossAssets)}</strong></div>
+    <div class="detail-line"><span>Gesamtschulden</span><strong>${money(selected.totalDebt)}</strong></div>
+    <div class="detail-line"><span>Nettovermoegen</span><strong>${money(selected.totalNetWealth)}</strong></div>
+  `;
 }
 
 function renderPositions(): void {
@@ -599,6 +932,100 @@ function renderPositions(): void {
     });
   }
   renderPositionIconPicker();
+}
+
+function renderPlanningAccounts(): void {
+  const cards = document.querySelector<HTMLDivElement>("#planningAccountCards");
+  const summary = document.querySelector<HTMLParagraphElement>("#planningAccountSummary");
+  const yearAccountName = document.querySelector<HTMLSpanElement>("#activeYearAccountName");
+  if (!cards || !summary || !yearAccountName) return;
+
+  const activeAccount = activePlanningAccount();
+  const totalsByType = state.planningAccounts.reduce(
+    (accumulator, account) => {
+      if (account.type === "cost_reserve") accumulator.costReserve += 1;
+      else if (account.type === "annual_table") accumulator.annualTable += 1;
+      else accumulator.mixed += 1;
+      return accumulator;
+    },
+    { costReserve: 0, annualTable: 0, mixed: 0 }
+  );
+
+  cards.innerHTML = state.planningAccounts
+    .map((account) => {
+      const isActive = account.id === activeAccount.id;
+      return `
+        <button
+          class="planning-account-card ${isActive ? "active" : ""}"
+          type="button"
+          data-action="select-planning-account-${account.id}"
+          aria-pressed="${isActive}"
+        >
+          <strong>${escapeHtml(account.name)}</strong>
+          <small>${escapeHtml(account.type)}</small>
+          <small>${intNumber(account.yearlyRows.length)} Positionen</small>
+        </button>
+      `;
+    })
+    .join("");
+
+  summary.textContent = `Konten gesamt: ${state.planningAccounts.length} | mixed: ${totalsByType.mixed} | cost_reserve: ${totalsByType.costReserve} | annual_table: ${totalsByType.annualTable}`;
+  yearAccountName.textContent = `(${activeAccount.name})`;
+}
+
+function addPlanningAccount(): void {
+  const name = window.prompt("Name fuer neues Konto:", `Konto ${state.planningAccounts.length + 1}`)?.trim();
+  if (!name) return;
+  const typeRaw = window
+    .prompt("Typ (cost_reserve | annual_table | mixed):", "mixed")
+    ?.trim()
+    .toLowerCase();
+  const type: PlanningAccount["type"] =
+    typeRaw === "cost_reserve" || typeRaw === "annual_table" || typeRaw === "mixed" ? typeRaw : "mixed";
+  const account: PlanningAccount = {
+    id: createId(),
+    name,
+    type,
+    yearlyRows: []
+  };
+  syncActivePlanningAccountFromPositions();
+  state.planningAccounts = [...state.planningAccounts, account];
+  state.ui = { ...state.ui, selectedPlanningAccountId: account.id };
+  state.positions = account.yearlyRows;
+  renderAll();
+}
+
+function renamePlanningAccount(): void {
+  const account = activePlanningAccount();
+  const name = window.prompt("Neuer Kontoname:", account.name)?.trim();
+  if (!name) return;
+  state.planningAccounts = state.planningAccounts.map((item) =>
+    item.id === account.id ? { ...item, name } : item
+  );
+  renderAll();
+}
+
+function deletePlanningAccount(): void {
+  if (state.planningAccounts.length <= 1) {
+    window.alert("Mindestens ein Konto muss bestehen bleiben.");
+    return;
+  }
+  const account = activePlanningAccount();
+  const confirmed = window.confirm(`Konto '${account.name}' wirklich loeschen?`);
+  if (!confirmed) return;
+  state.planningAccounts = state.planningAccounts.filter((item) => item.id !== account.id);
+  state.ui = { ...state.ui, selectedPlanningAccountId: state.planningAccounts[0].id };
+  syncPositionsFromActivePlanningAccount();
+  renderAll();
+}
+
+function selectPlanningAccount(accountId: string): void {
+  if (!accountId || accountId === state.ui.selectedPlanningAccountId) return;
+  if (!state.planningAccounts.some((account) => account.id === accountId)) return;
+  syncActivePlanningAccountFromPositions();
+  state.ui = { ...state.ui, selectedPlanningAccountId: accountId };
+  syncPositionsFromActivePlanningAccount();
+  renderAll();
 }
 
 function showPositionIconPicker(button: HTMLButtonElement): void {
@@ -1615,7 +2042,7 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
       : `${money(summary.totalCashback)} jaehrlich aus Jahrestabelle`
   );
 
-  const savingsPositions = state.positions.filter(
+  const savingsPositions = allPlanningPositions().filter(
     (position) => position.type === "savings" && positionFlow(position) === "expense"
   );
   if (!savingsPositions.length) {
@@ -1725,6 +2152,8 @@ function syncAllInputsFromState(): void {
   for (const key of Object.keys(state.settings) as Array<keyof PlanningSettings>) {
     setInputValue(`[data-setting="${key}"]`, state.settings[key]);
   }
+  syncRealEstateInputsFromState();
+  syncCombinedToggleInputsFromState();
   syncInvestmentInputsFromState();
   syncThemeControls();
 }
@@ -1803,6 +2232,126 @@ function syncInvestmentDepotTabs(): void {
         ? "Anlageentwicklung Altersvorsorgedepot"
         : "Anlageentwicklung Depot"
   );
+}
+
+function syncRealEstateInputsFromState(): void {
+  const realEstate = state.realEstate;
+  syncRealEstateLocaleLabels(realEstate.locale);
+  for (const locale of ["de", "en"] as const) {
+    const button = document.querySelector<HTMLButtonElement>(`[data-action="set-real-estate-locale-${locale}"]`);
+    if (!button) continue;
+    const active = realEstate.locale === locale;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+
+  for (const [field, value] of Object.entries(realEstate)) {
+    const selector = `[data-real-estate-field="${field}"]`;
+    if (field === "specialRepaymentRhythm") {
+      const control = document.querySelector<HTMLSelectElement>(selector);
+      if (control) control.value = String(value);
+      continue;
+    }
+    if (field === "locale") continue;
+    if (value === null) {
+      const control = document.querySelector<HTMLInputElement>(selector);
+      if (control) control.value = "";
+      continue;
+    }
+    setInputValue(selector, value as number | string);
+  }
+
+  const ranges: Array<RealEstateField> = [
+    "interestRatePercent",
+    "initialRepaymentPercent",
+    "propertyValueGrowthPercent",
+    "inflationRatePercent",
+    "financingYears"
+  ];
+  for (const field of ranges) {
+    setInputValue(`[data-real-estate-range="${field}"]`, state.realEstate[field] as number);
+  }
+
+  setText("realEstateInterestRatePercentValue", percent(realEstate.interestRatePercent));
+  setText("realEstateInitialRepaymentPercentValue", percent(realEstate.initialRepaymentPercent));
+  setText("realEstatePropertyValueGrowthPercentValue", percent(realEstate.propertyValueGrowthPercent));
+  setText("realEstateInflationRatePercentValue", percent(realEstate.inflationRatePercent));
+  setText("realEstateFinancingYearsValue", `${intNumber(realEstate.financingYears)} Jahre`);
+}
+
+function syncRealEstateLocaleLabels(locale: RealEstateFinancingSettings["locale"]): void {
+  for (const label of document.querySelectorAll<HTMLElement>("[data-real-estate-label-key]")) {
+    const de = label.dataset.labelDe ?? label.textContent ?? "";
+    const en = label.dataset.labelEn ?? de;
+    label.textContent = locale === "en" ? en : de;
+  }
+}
+
+function syncCombinedToggleInputsFromState(): void {
+  for (const [key, value] of Object.entries(state.combinedWealth) as Array<[CombinedToggleKey, boolean]>) {
+    const checkbox = document.querySelector<HTMLInputElement>(`[data-combined-toggle="${key}"]`);
+    if (checkbox) checkbox.checked = value;
+  }
+}
+
+function updateRealEstateField(field: RealEstateField, value: string): void {
+  if (field === "locale") return;
+  if (field === "specialRepaymentRhythm") {
+    if (value === "none" || value === "monthly" || value === "yearly") {
+      state.realEstate = {
+        ...state.realEstate,
+        specialRepaymentRhythm: value as RealEstateFinancingSettings["specialRepaymentRhythm"]
+      };
+    }
+    return;
+  }
+
+  const nullableFields = new Set<RealEstateField>([
+    "plannedSaleYear",
+    "estimatedSaleValue",
+    "targetFullRepaymentYear",
+    "manualFuturePropertyValue"
+  ]);
+  const parsed = numberValue(value);
+  state.realEstate = {
+    ...state.realEstate,
+    [field]: nullableFields.has(field) && value.trim() === "" ? null : Math.max(0, parsed)
+  } as RealEstateFinancingSettings;
+}
+
+function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
+  state.combinedWealth = {
+    ...state.combinedWealth,
+    [key]: checked
+  } as AppState["combinedWealth"];
+}
+
+function setRealEstateLocale(locale: RealEstateFinancingSettings["locale"]): void {
+  state.realEstate = { ...state.realEstate, locale };
+  renderAll();
+}
+
+function setSelectedRealEstateYear(year: number): void {
+  selectedRealEstateYear = Number.isFinite(year) && year > 0 ? year : null;
+  renderAll();
+}
+
+function setSelectedCombinedWealthYear(year: number): void {
+  selectedCombinedWealthYear = Number.isFinite(year) && year > 0 ? year : null;
+  renderAll();
+}
+
+function toggleSettingsGrunddaten(): void {
+  state.ui = { ...state.ui, settingsGrunddatenExpanded: !state.ui.settingsGrunddatenExpanded };
+  syncSettingsAccordionState();
+  saveState(state);
+}
+
+function syncSettingsAccordionState(): void {
+  const content = document.querySelector<HTMLDivElement>("#grunddatenSettingsContent");
+  const button = document.querySelector<HTMLButtonElement>("[data-action='toggle-settings-grunddaten']");
+  if (content) content.hidden = !state.ui.settingsGrunddatenExpanded;
+  if (button) button.setAttribute("aria-expanded", String(state.ui.settingsGrunddatenExpanded));
 }
 
 function updatePlanningSetting(field: keyof PlanningSettings, value: string): void {
@@ -2407,6 +2956,8 @@ function resetState(): void {
   if (!confirmed) return;
   state = resetStoredState();
   state.investment = defaultInvestmentSettings();
+  selectedRealEstateYear = null;
+  selectedCombinedWealthYear = null;
   applyTheme();
   syncAllInputsFromState();
   hideThemeSettings();
@@ -2433,13 +2984,20 @@ function toggleThemeSettings(): void {
   const panel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
   if (!panel) return;
   panel.hidden = !panel.hidden;
+  if (!panel.hidden) {
+    syncSettingsAccordionState();
+  }
   syncThemeControls();
 }
 
 function hideThemeSettings(): void {
   const panel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
   if (panel) panel.hidden = true;
+  if (state.ui.activeSection === "grunddaten") {
+    state.ui = { ...state.ui, activeSection: "cost_reserve_positions" };
+  }
   syncThemeControls();
+  updateModuleVisibility();
 }
 
 function syncThemeControls(): void {
@@ -2453,6 +3011,7 @@ function syncThemeControls(): void {
     option.classList.toggle("active", isActive);
     option.setAttribute("aria-pressed", String(isActive));
   }
+  syncSettingsAccordionState();
 }
 
 async function importPositionsFromFile(file: File | undefined): Promise<void> {
@@ -2465,15 +3024,17 @@ async function importPositionsFromFile(file: File | undefined): Promise<void> {
   }
 
   state.positions = imported;
+  syncActivePlanningAccountFromPositions();
+  const availablePositions = allPlanningPositions();
   state.investment = {
     ...state.investment,
     includedIds: state.investment.includedIds.filter((id) =>
-      imported.some(
+      availablePositions.some(
         (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
       )
     ),
     retirementIncludedIds: state.investment.retirementIncludedIds.filter((id) =>
-      imported.some(
+      availablePositions.some(
         (position) => position.id === id && position.type === "savings" && positionFlow(position) === "expense"
       )
     )
@@ -2618,7 +3179,7 @@ function setDetailLineHidden(id: string, hidden: boolean): void {
 }
 
 function drawCurrentInvestmentChart(): void {
-  const reserve = calculateReserveSummary(state.settings, state.positions);
+  const reserve = calculateReserveSummary(state.settings, allPlanningPositions());
   const projection = buildDepotAssetProjection(reserve, activeInvestmentDepot());
   const combinedProjection = combineAssetProjections(
     buildDepotAssetProjection(reserve, "standard"),
@@ -2752,7 +3313,7 @@ function investmentPositionsForProjection(
       virtualInvestmentPosition(CASHBACK_INVESTMENT_POSITION_ID, "Cashback aus Jahrestabelle", summary.totalCashback)
     );
   }
-  return [...state.positions, ...virtualPositions];
+  return [...allPlanningPositions(), ...virtualPositions];
 }
 
 function investmentSettingsForProjection(
@@ -3040,6 +3601,20 @@ function normalizeInvestmentDepotSelections(): void {
       state.investment.includeAccountCashback || state.investment.retirementIncludeAccountCashback
         ? false
         : state.investment.childIncludeAccountCashback
+  };
+}
+
+function normalizeInvestmentSelectionIds(): void {
+  const selectableIds = new Set(
+    allPlanningPositions()
+      .filter((position) => position.type === "savings" && positionFlow(position) === "expense")
+      .map((position) => position.id)
+  );
+  state.investment = {
+    ...state.investment,
+    includedIds: state.investment.includedIds.filter((id) => selectableIds.has(id)),
+    retirementIncludedIds: state.investment.retirementIncludedIds.filter((id) => selectableIds.has(id)),
+    childIncludedIds: state.investment.childIncludedIds.filter((id) => selectableIds.has(id))
   };
 }
 

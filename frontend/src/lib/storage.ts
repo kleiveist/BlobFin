@@ -1,9 +1,13 @@
 import {
   createId,
+  defaultAppUiState,
   defaultAppState,
+  defaultCombinedWealthToggles,
   defaultInvestmentSettings,
+  defaultPlanningAccounts,
   defaultPlanningSettings,
-  defaultPositionTableViewState
+  defaultPositionTableViewState,
+  defaultRealEstateFinancingSettings
 } from "../data/defaults";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
 import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
@@ -15,15 +19,20 @@ import {
   positionTableOperatorsForColumn
 } from "./positionTableView";
 import type {
+  AppSectionId,
   AppState,
+  AppUiState,
+  CombinedWealthToggles,
   InvestmentDepotKey,
   InvestmentSettings,
+  PlanningAccount,
   PlanningSettings,
   PositionTableFilter,
   PositionTableMode,
   PositionTableView,
   PositionTableViewState,
   PositionFlow,
+  RealEstateFinancingSettings,
   ReservePosition,
   ThemeMode
 } from "../types";
@@ -59,14 +68,21 @@ function normalizeState(value: unknown): AppState {
   const fallback = defaultAppState();
   if (!isRecord(value)) return fallback;
   const settings = normalizePlanningSettings(value.settings);
-  const positions = migrateMonthlyNetIncomePosition(
+  const legacyPositions = migrateMonthlyNetIncomePosition(
     settings,
     normalizePositions(value.positions, fallback.positions, settings.year)
   );
+  const planningAccounts = normalizePlanningAccounts(value.planningAccounts, legacyPositions, settings.year);
+  const ui = normalizeAppUiState(value.ui, planningAccounts);
+  const positions = positionsForPlanningAccount(planningAccounts, ui.selectedPlanningAccountId, legacyPositions);
 
   return {
     theme: normalizeThemeMode(value.theme, fallback.theme),
     settings: { ...settings, monthlyNetIncome: 0 },
+    planningAccounts,
+    ui,
+    realEstate: normalizeRealEstateFinancingSettings(value.realEstate),
+    combinedWealth: normalizeCombinedWealthToggles(value.combinedWealth),
     positions,
     investment: normalizeInvestmentSettings(value.investment),
     positionTableView: normalizePositionTableViewState(value.positionTableView)
@@ -84,14 +100,21 @@ function normalizeLegacyState(value: unknown): AppState {
     cashbackRatePercent: numberOrDefault(value.cashbackRate, fallback.settings.cashbackRatePercent),
     emergencyFund: 0
   };
-  const positions = migrateMonthlyNetIncomePosition(
+  const legacyPositions = migrateMonthlyNetIncomePosition(
     settings,
     normalizePositions(value.positions, fallback.positions, settings.year)
   );
+  const planningAccounts = normalizePlanningAccounts(undefined, legacyPositions, settings.year);
+  const ui = normalizeAppUiState(undefined, planningAccounts);
+  const positions = positionsForPlanningAccount(planningAccounts, ui.selectedPlanningAccountId, legacyPositions);
 
   return {
     theme: normalizeThemeMode(value.theme, fallback.theme),
     settings: { ...settings, monthlyNetIncome: 0 },
+    planningAccounts,
+    ui,
+    realEstate: defaultRealEstateFinancingSettings(),
+    combinedWealth: defaultCombinedWealthToggles(),
     positions,
     investment: normalizeLegacyInvestmentSettings(value.investmentSettings),
     positionTableView: defaultPositionTableViewState()
@@ -164,6 +187,170 @@ function normalizePlanningSettings(value: unknown): PlanningSettings {
     cashbackRatePercent: numberOrDefault(value.cashbackRatePercent, fallback.cashbackRatePercent),
     emergencyFund: 0
   };
+}
+
+function normalizePlanningAccounts(
+  value: unknown,
+  fallbackPositions: ReservePosition[],
+  fallbackYear: number
+): PlanningAccount[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return [fallbackPlanningAccount(fallbackPositions)];
+  }
+
+  const accounts = value
+    .map((item) => normalizePlanningAccount(item, fallbackYear))
+    .filter((account): account is PlanningAccount => account !== null);
+
+  if (accounts.length === 0) {
+    return [fallbackPlanningAccount(fallbackPositions)];
+  }
+  return accounts;
+}
+
+function normalizePlanningAccount(value: unknown, fallbackYear: number): PlanningAccount | null {
+  if (!isRecord(value)) return null;
+  const sourceRows = value.yearlyRows ?? value.positions;
+  const yearlyRows =
+    Array.isArray(sourceRows) && sourceRows.length === 0
+      ? []
+      : normalizePositions(sourceRows, defaultPlanningAccounts()[0].yearlyRows, fallbackYear);
+  return {
+    id: String(value.id || createId()),
+    name: String(value.name || "Konto"),
+    type: normalizePlanningAccountType(value.type),
+    yearlyRows,
+    metadata: isRecord(value.metadata) ? value.metadata : undefined
+  };
+}
+
+function normalizePlanningAccountType(value: unknown): PlanningAccount["type"] {
+  if (value === "cost_reserve" || value === "annual_table" || value === "mixed") return value;
+  return "mixed";
+}
+
+function normalizeAppUiState(value: unknown, accounts: PlanningAccount[]): AppUiState {
+  const fallback = defaultAppUiState();
+  const firstAccountId = accounts[0]?.id ?? fallback.selectedPlanningAccountId;
+  if (!isRecord(value)) {
+    return { ...fallback, selectedPlanningAccountId: firstAccountId };
+  }
+
+  const selectedPlanningAccountId = String(value.selectedPlanningAccountId || firstAccountId);
+  const accountExists = accounts.some((account) => account.id === selectedPlanningAccountId);
+  return {
+    activeSection: normalizeAppSectionId(value.activeSection, fallback.activeSection),
+    selectedPlanningAccountId: accountExists ? selectedPlanningAccountId : firstAccountId,
+    settingsGrunddatenExpanded: booleanOrDefault(
+      value.settingsGrunddatenExpanded,
+      fallback.settingsGrunddatenExpanded
+    )
+  };
+}
+
+function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSectionId {
+  if (
+    value === "grunddaten" ||
+    value === "cost_reserve_positions" ||
+    value === "year_table" ||
+    value === "investment_planning" ||
+    value === "real_estate_financing" ||
+    value === "combined_wealth"
+  ) {
+    return value;
+  }
+  return fallback;
+}
+
+function positionsForPlanningAccount(
+  accounts: PlanningAccount[],
+  selectedPlanningAccountId: string,
+  fallbackPositions: ReservePosition[]
+): ReservePosition[] {
+  return accounts.find((account) => account.id === selectedPlanningAccountId)?.yearlyRows ?? fallbackPositions;
+}
+
+function fallbackPlanningAccount(positions: ReservePosition[]): PlanningAccount {
+  return {
+    ...defaultPlanningAccounts()[0],
+    yearlyRows: positions
+  };
+}
+
+function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinancingSettings {
+  const fallback = defaultRealEstateFinancingSettings();
+  if (!isRecord(value)) return fallback;
+  return {
+    locale: value.locale === "en" ? "en" : "de",
+    purchasePrice: numberOrDefault(value.purchasePrice, fallback.purchasePrice),
+    constructionOrRenovationCosts: numberOrDefault(
+      value.constructionOrRenovationCosts,
+      fallback.constructionOrRenovationCosts
+    ),
+    landCosts: numberOrDefault(value.landCosts, fallback.landCosts),
+    additionalPurchaseCosts: numberOrDefault(value.additionalPurchaseCosts, fallback.additionalPurchaseCosts),
+    notaryCosts: numberOrDefault(value.notaryCosts, fallback.notaryCosts),
+    landRegistryCosts: numberOrDefault(value.landRegistryCosts, fallback.landRegistryCosts),
+    brokerCosts: numberOrDefault(value.brokerCosts, fallback.brokerCosts),
+    transferTax: numberOrDefault(value.transferTax, fallback.transferTax),
+    modernizationReserve: numberOrDefault(value.modernizationReserve, fallback.modernizationReserve),
+    movingAndSetupCosts: numberOrDefault(value.movingAndSetupCosts, fallback.movingAndSetupCosts),
+    safetyBuffer: numberOrDefault(value.safetyBuffer, fallback.safetyBuffer),
+    equityCapital: numberOrDefault(value.equityCapital, fallback.equityCapital),
+    loanAmount: numberOrDefault(value.loanAmount, fallback.loanAmount),
+    interestRatePercent: numberOrDefault(value.interestRatePercent, fallback.interestRatePercent),
+    initialRepaymentPercent: numberOrDefault(value.initialRepaymentPercent, fallback.initialRepaymentPercent),
+    monthlyPayment: numberOrDefault(value.monthlyPayment, fallback.monthlyPayment),
+    fixedInterestYears: numberOrDefault(value.fixedInterestYears, fallback.fixedInterestYears),
+    targetTermYears: numberOrDefault(value.targetTermYears, fallback.targetTermYears),
+    specialRepaymentAmount: numberOrDefault(value.specialRepaymentAmount, fallback.specialRepaymentAmount),
+    specialRepaymentRhythm: normalizeSpecialRepaymentRhythm(
+      value.specialRepaymentRhythm,
+      fallback.specialRepaymentRhythm
+    ),
+    remainingDebtAfterFixedInterest: numberOrDefault(
+      value.remainingDebtAfterFixedInterest,
+      fallback.remainingDebtAfterFixedInterest
+    ),
+    plannedSaleYear: nullableNumberOrDefault(value.plannedSaleYear, fallback.plannedSaleYear),
+    estimatedSaleValue: nullableNumberOrDefault(value.estimatedSaleValue, fallback.estimatedSaleValue),
+    targetFullRepaymentYear: nullableNumberOrDefault(value.targetFullRepaymentYear, fallback.targetFullRepaymentYear),
+    targetMonthlyBurden: numberOrDefault(value.targetMonthlyBurden, fallback.targetMonthlyBurden),
+    maxMonthlyBurden: numberOrDefault(value.maxMonthlyBurden, fallback.maxMonthlyBurden),
+    subsidyAmount: numberOrDefault(value.subsidyAmount, fallback.subsidyAmount),
+    propertyValueGrowthPercent: numberOrDefault(value.propertyValueGrowthPercent, fallback.propertyValueGrowthPercent),
+    inflationRatePercent: numberOrDefault(value.inflationRatePercent, fallback.inflationRatePercent),
+    financingYears: numberOrDefault(value.financingYears, fallback.financingYears),
+    manualFuturePropertyValue: nullableNumberOrDefault(value.manualFuturePropertyValue, fallback.manualFuturePropertyValue)
+  };
+}
+
+function normalizeCombinedWealthToggles(value: unknown): CombinedWealthToggles {
+  const fallback = defaultCombinedWealthToggles();
+  if (!isRecord(value)) return fallback;
+  return {
+    includeCashPositions: booleanOrDefault(value.includeCashPositions, fallback.includeCashPositions),
+    includeCostReserveAccounts: booleanOrDefault(
+      value.includeCostReserveAccounts,
+      fallback.includeCostReserveAccounts
+    ),
+    includeAnnualTableAccounts: booleanOrDefault(value.includeAnnualTableAccounts, fallback.includeAnnualTableAccounts),
+    includeDepotDevelopment: booleanOrDefault(value.includeDepotDevelopment, fallback.includeDepotDevelopment),
+    includeSharedDepotDevelopment: booleanOrDefault(
+      value.includeSharedDepotDevelopment,
+      fallback.includeSharedDepotDevelopment
+    ),
+    includeWithdrawals: booleanOrDefault(value.includeWithdrawals, fallback.includeWithdrawals),
+    includeRealEstateFinancing: booleanOrDefault(value.includeRealEstateFinancing, fallback.includeRealEstateFinancing),
+    includeRealEstateValueTrend: booleanOrDefault(value.includeRealEstateValueTrend, fallback.includeRealEstateValueTrend)
+  };
+}
+
+function normalizeSpecialRepaymentRhythm(
+  value: unknown,
+  fallback: RealEstateFinancingSettings["specialRepaymentRhythm"]
+): RealEstateFinancingSettings["specialRepaymentRhythm"] {
+  return value === "none" || value === "monthly" || value === "yearly" ? value : fallback;
 }
 
 function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
@@ -437,6 +624,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function numberOrDefault(value: unknown, fallback: number): number {
   const parsed = Number(String(value ?? "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function nullableNumberOrDefault(value: unknown, fallback: number | null): number | null {
+  if (value === null || value === undefined || value === "") return fallback;
+  const parsed = Number(String(value).replace(",", "."));
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 

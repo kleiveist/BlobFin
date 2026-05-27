@@ -80,4 +80,19 @@ describe("storage", () => {
 
     expect(loaded.positionTableView.expense).toEqual(state.positionTableView.expense);
   });
+
+  it("migrates legacy positions into a default planning account", () => {
+    const storage = new MemoryStorage();
+    const legacyState = {
+      ...defaultAppState(),
+      planningAccounts: undefined
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.planningAccounts.length).toBeGreaterThan(0);
+    expect(loaded.planningAccounts[0].yearlyRows.length).toBeGreaterThan(0);
+    expect(loaded.positions).toEqual(loaded.planningAccounts[0].yearlyRows);
+  });
 });

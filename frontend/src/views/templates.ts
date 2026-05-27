@@ -9,7 +9,7 @@ export function renderAppShell(): string {
     <header class="app-header">
       <div>
         <p class="eyebrow">BlobFin Planung</p>
-        <h1>Jahreskalkulator fuer Ruecklagen und Investment</h1>
+        <h1>Modularer Finanzplaner fuer Konten, Investment und Immobilien</h1>
       </div>
       <div class="header-actions">
         <div class="app-settings">
@@ -26,11 +26,22 @@ export function renderAppShell(): string {
               <path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.3 4.8c.1-.4.1-.7.1-1s0-.6-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1L16 3.4h-4l-.4 2.6a7 7 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7.7 7.7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.5-2.2-1.5Z" />
             </svg>
           </button>
-          <div id="themeSettingsPanel" class="settings-popover" role="dialog" aria-label="Darstellung" hidden>
+          <div id="themeSettingsPanel" class="settings-popover" role="dialog" aria-label="Darstellung und Grunddaten" hidden>
             <div class="settings-popover-head">
-              <strong>Darstellung</strong>
+              <strong>Settings</strong>
               <button class="chart-popup-close" type="button" data-action="close-theme-settings" aria-label="Einstellungen schliessen">x</button>
             </div>
+            <button class="settings-accordion-toggle" type="button" data-action="toggle-settings-grunddaten" aria-expanded="true" aria-controls="grunddatenSettingsContent">
+              Grunddaten
+            </button>
+            <div id="grunddatenSettingsContent" class="settings-accordion-content">
+              <div class="field-grid settings-field-grid">
+                ${numberField("year", "Jahr", "setting", "year", { min: 2000, max: 2100, step: 1 })}
+                ${numberField("interestRatePercent", "Jahreszins Konto in %", "setting", "interestRatePercent", { min: 0, step: 0.01 })}
+                ${numberField("cashbackRatePercent", "Cashback in %", "setting", "cashbackRatePercent", { min: 0, step: 0.01 })}
+              </div>
+            </div>
+            <div class="settings-popover-subhead"><strong>Darstellung</strong></div>
             <div class="theme-options" role="radiogroup" aria-label="Farbmodus">
               <button class="theme-option" type="button" data-action="set-theme-light" aria-pressed="false">
                 <span class="theme-swatch light"></span>
@@ -50,18 +61,21 @@ export function renderAppShell(): string {
     </header>
 
     <main class="app-main">
-      <section class="workspace-grid">
-        <form class="panel settings-panel" autocomplete="off">
-          <div class="section-heading">
-            <h2>Grunddaten</h2>
-          </div>
-          <div class="field-grid settings-field-grid">
-            ${numberField("year", "Jahr", "setting", "year", { min: 2000, max: 2100, step: 1 })}
-            ${numberField("interestRatePercent", "Jahreszins Konto in %", "setting", "interestRatePercent", { min: 0, step: 0.01 })}
-            ${numberField("cashbackRatePercent", "Cashback in %", "setting", "cashbackRatePercent", { min: 0, step: 0.01 })}
-          </div>
-        </form>
+      <section class="module-launcher panel" aria-label="Hauptbereiche">
+        <div class="section-heading">
+          <h2>Bereiche</h2>
+        </div>
+        <div class="module-launcher-grid">
+          ${moduleCardButton("grunddaten", "Grunddaten", "im Settings-Popup bearbeiten")}
+          ${moduleCardButton("cost_reserve_positions", "Kosten- und Ruecklagenpositionen", "kontobasiert bearbeiten")}
+          ${moduleCardButton("year_table", "Jahrestabelle", "aktives Konto analysieren")}
+          ${moduleCardButton("investment_planning", "Investment- und Auszahlungsplanung", "Depot, Entnahme, Annahmen")}
+          ${moduleCardButton("real_estate_financing", "Immobilienfinanzierung", "Kredit, Tilgung, Wertentwicklung")}
+          ${moduleCardButton("combined_wealth", "Vermoegensvarianten / Kombination", "Module zusammenfuehren")}
+        </div>
+      </section>
 
+      <section class="workspace-grid">
         <section class="panel summary-panel">
           <div class="section-heading">
             <h2>Ergebnis</h2>
@@ -80,7 +94,20 @@ export function renderAppShell(): string {
         </section>
       </section>
 
-      <section class="panel">
+      <section class="panel account-panel" data-module-section="cost_reserve_positions">
+        <div class="section-heading">
+          <h2>Konto-Module</h2>
+          <div class="button-row">
+            <button class="button" type="button" data-action="add-planning-account">Konto hinzufuegen</button>
+            <button class="button secondary" type="button" data-action="rename-planning-account">Umbenennen</button>
+            <button class="button danger" type="button" data-action="delete-planning-account">Loeschen</button>
+          </div>
+        </div>
+        <div id="planningAccountCards" class="planning-account-cards"></div>
+        <p id="planningAccountSummary" class="planning-account-summary">-</p>
+      </section>
+
+      <section class="panel" data-module-section="cost_reserve_positions">
         <div class="toolbar">
           <div class="section-heading position-toolbar-heading">
             <h2>Kosten- und Ruecklagenpositionen</h2>
@@ -117,9 +144,9 @@ export function renderAppShell(): string {
         <div id="positionIconPicker" class="position-icon-picker" role="dialog" aria-label="Positionslabel auswaehlen" hidden></div>
       </section>
 
-      <section class="panel result-panel">
+      <section class="panel result-panel" data-module-section="year_table">
         <div class="section-heading result-table-heading">
-          <h2>Jahrestabelle</h2>
+          <h2>Jahrestabelle <span id="activeYearAccountName"></span></h2>
           <div class="result-header-actions">
             <div class="position-mode-switch result-column-switch" role="group" aria-label="Jahrestabellen-Spalten">
               <button class="position-mode-button" type="button" data-action="toggle-result-max-needed" aria-pressed="false">
@@ -139,7 +166,7 @@ export function renderAppShell(): string {
         </div>
       </section>
 
-      <section class="panel investment-panel">
+      <section class="panel investment-panel" data-module-section="investment_planning">
         <div class="section-heading investment-heading">
           <h2>Investment- und Auszahlungsplanung</h2>
           <div class="position-mode-switch investment-depot-switch" role="tablist" aria-label="Depot-Auswahl">
@@ -294,6 +321,147 @@ export function renderAppShell(): string {
           </div>
         </div>
       </section>
+
+      <section class="panel real-estate-panel" data-module-section="real_estate_financing">
+        <div class="section-heading">
+          <h2>Immobilienfinanzierung</h2>
+          <div class="button-row">
+            <button class="button secondary" type="button" data-action="set-real-estate-locale-de">DE</button>
+            <button class="button secondary" type="button" data-action="set-real-estate-locale-en">EN</button>
+          </div>
+        </div>
+
+        <div class="real-estate-grid">
+          <section class="real-estate-card">
+            <h3>Immobilien-Eckdaten</h3>
+            <p class="planning-account-summary">Hilfetext: Kaufpreis ist Pflicht. Kaufnebenkosten beeinflussen den effektiven Kapitalbedarf.</p>
+            <div class="field-grid wide">
+              ${realEstateNumberField("purchasePrice", "Kaufpreis Immobilie")}
+              ${realEstateNumberField("constructionOrRenovationCosts", "Bau-/Renovierungskosten")}
+              ${realEstateNumberField("landCosts", "Grundstueckskosten")}
+              ${realEstateNumberField("additionalPurchaseCosts", "Kaufnebenkosten")}
+              ${realEstateNumberField("notaryCosts", "Notarkosten")}
+              ${realEstateNumberField("landRegistryCosts", "Grundbuchkosten")}
+              ${realEstateNumberField("brokerCosts", "Maklerkosten")}
+              ${realEstateNumberField("transferTax", "Grunderwerbsteuer")}
+              ${realEstateNumberField("modernizationReserve", "Modernisierungsreserve")}
+              ${realEstateNumberField("movingAndSetupCosts", "Umzug/Einrichtung")}
+              ${realEstateNumberField("safetyBuffer", "Sicherheitsbuffer")}
+            </div>
+          </section>
+
+          <section class="real-estate-card">
+            <h3>Finanzierungsdaten</h3>
+            <p class="planning-account-summary">Hilfetext: Wenn Darlehensbetrag oder Monatsrate leer bleiben, werden sie aus den Annahmen abgeleitet.</p>
+            <div class="field-grid wide">
+              ${realEstateNumberField("equityCapital", "Eigenkapital fuer Immobilie")}
+              ${realEstateNumberField("loanAmount", "Darlehensbetrag")}
+              ${realEstateNumberField("interestRatePercent", "Zinssatz in %")}
+              ${realEstateNumberField("initialRepaymentPercent", "Anfangstilgung in %")}
+              ${realEstateNumberField("fixedInterestYears", "Zinsbindung (Jahre)", { step: 1 })}
+              ${realEstateNumberField("targetTermYears", "Ziel-Laufzeit (Jahre)", { step: 1 })}
+              ${realEstateNumberField("financingYears", "Finanzierungszeitraum (Jahre)", { step: 1 })}
+              ${realEstateNumberField("remainingDebtAfterFixedInterest", "Restschuld nach Zinsbindung")}
+              ${realEstateNumberField("specialRepaymentAmount", "Sondertilgungsbetrag")}
+              ${realEstateNumberField("monthlyPayment", "Monatsrate")}
+              <label class="field">
+                <span>Sondertilgungsrhythmus</span>
+                <select data-real-estate-field="specialRepaymentRhythm" id="propertyFinancing.specialRepaymentRhythm">
+                  <option value="none">Keine</option>
+                  <option value="monthly">Monatlich</option>
+                  <option value="yearly">Jaehrlich</option>
+                </select>
+              </label>
+            </div>
+            <div class="real-estate-slider-grid">
+              <label class="range-field">
+                <span>Zinssatz</span>
+                <input type="range" min="0" max="10" step="0.05" data-real-estate-range="interestRatePercent" />
+                <strong id="realEstateInterestRatePercentValue">-</strong>
+              </label>
+              <label class="range-field">
+                <span>Anfangstilgung</span>
+                <input type="range" min="0" max="10" step="0.05" data-real-estate-range="initialRepaymentPercent" />
+                <strong id="realEstateInitialRepaymentPercentValue">-</strong>
+              </label>
+              <label class="range-field">
+                <span>Finanzierungszeitraum</span>
+                <input type="range" min="1" max="50" step="1" data-real-estate-range="financingYears" />
+                <strong id="realEstateFinancingYearsValue">-</strong>
+              </label>
+            </div>
+          </section>
+
+          <section class="real-estate-card">
+            <h3>Strategie und Annahmen</h3>
+            <p class="planning-account-summary">Hilfetext: Werte sind Schaetzungen und keine Garantie fuer die spaetere Marktentwicklung.</p>
+            <div class="field-grid wide">
+              ${realEstateNumberField("plannedSaleYear", "Geplanter Verkaufszeitpunkt (optional)", { step: 1, nullable: true })}
+              ${realEstateNumberField("estimatedSaleValue", "Geschaetzter Verkaufswert (optional)", { nullable: true })}
+              ${realEstateNumberField("targetFullRepaymentYear", "Zieljahr vollstaendige Tilgung (optional)", { step: 1, nullable: true })}
+              ${realEstateNumberField("targetMonthlyBurden", "Ziel-Monatsbelastung")}
+              ${realEstateNumberField("maxMonthlyBurden", "Maximale Monatsbelastung")}
+              ${realEstateNumberField("subsidyAmount", "Foerderung / Zuschuss")}
+              ${realEstateNumberField("propertyValueGrowthPercent", "Immobilienwertsteigerung in %")}
+              ${realEstateNumberField("inflationRatePercent", "Inflation in %")}
+              ${realEstateNumberField("manualFuturePropertyValue", "Optionaler Zukunftswert", { nullable: true })}
+            </div>
+            <div class="real-estate-slider-grid">
+              <label class="range-field">
+                <span>Immobilienwertsteigerung</span>
+                <input type="range" min="0" max="8" step="0.1" data-real-estate-range="propertyValueGrowthPercent" />
+                <strong id="realEstatePropertyValueGrowthPercentValue">-</strong>
+              </label>
+              <label class="range-field">
+                <span>Inflation (optional)</span>
+                <input type="range" min="0" max="10" step="0.1" data-real-estate-range="inflationRatePercent" />
+                <strong id="realEstateInflationRatePercentValue">-</strong>
+              </label>
+            </div>
+          </section>
+
+          <section class="real-estate-card real-estate-chart-card">
+            <h3>Tilgung und Vermoegen</h3>
+            <div id="realEstateValidation" class="validation-box" aria-live="polite"></div>
+            <div class="chart-inline-metrics">
+              ${chartMetric("realEstateLoanMetric", "Start-Darlehen")}
+              ${chartMetric("realEstateMonthlyRateMetric", "Monatsrate")}
+              ${chartMetric("realEstatePropertyValueMetric", "Immobilienwert Ende")}
+              ${chartMetric("realEstatePropertyEquityMetric", "Netto-Immobilienvermoegen Ende")}
+            </div>
+            <div id="realEstateRepaymentChart" class="wealth-chart-host"></div>
+            <div id="realEstateYearDetail" class="wealth-detail-box"></div>
+            <h3>Immobilienwertentwicklung</h3>
+            <div id="realEstateTrendChart" class="wealth-chart-host"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel combined-wealth-panel" data-module-section="combined_wealth">
+        <div class="section-heading">
+          <h2>Vermoegensvarianten / Kombination</h2>
+        </div>
+        <div class="combined-wealth-grid">
+          <section class="combined-wealth-card">
+            <h3>Module aktivieren</h3>
+            <div class="combined-toggle-grid">
+              ${combinedToggle("includeCashPositions", "Cash-/Kontopositionen")}
+              ${combinedToggle("includeCostReserveAccounts", "Kosten-/Ruecklagenkonten")}
+              ${combinedToggle("includeAnnualTableAccounts", "Jahrestabellenkonten")}
+              ${combinedToggle("includeDepotDevelopment", "Depot-/Investmententwicklung")}
+              ${combinedToggle("includeSharedDepotDevelopment", "Gemeinsame Anlageentwicklung")}
+              ${combinedToggle("includeWithdrawals", "Auszahlungs-/Entnahmeplanung")}
+              ${combinedToggle("includeRealEstateFinancing", "Immobilienfinanzierung")}
+              ${combinedToggle("includeRealEstateValueTrend", "Immobilienwertentwicklung")}
+            </div>
+          </section>
+          <section class="combined-wealth-card">
+            <h3>Kombinierter Vermoegenspfad</h3>
+            <div id="combinedWealthChart" class="wealth-chart-host"></div>
+            <div id="combinedWealthYearDetail" class="wealth-detail-box"></div>
+          </section>
+        </div>
+      </section>
     </main>
   `;
 }
@@ -382,6 +550,87 @@ export function monthSelect(id: string, field: keyof ReservePosition, value: num
         return `<option value="${month}" ${Number(value) === month ? "selected" : ""}>${name}</option>`;
       }).join("")}
     </select>
+  `;
+}
+
+function moduleCardButton(id: string, label: string, subtitle: string): string {
+  return `
+    <button
+      class="module-card-button"
+      type="button"
+      data-action="open-section-${id}"
+      data-section-id="${id}"
+      aria-pressed="false"
+    >
+      <strong>${label}</strong>
+      <small>${subtitle}</small>
+    </button>
+  `;
+}
+
+function realEstateNumberField(
+  key: string,
+  label: string,
+  options: { step?: number; nullable?: boolean } = {}
+): string {
+  const englishLabel = realEstateEnglishLabel(key, label);
+  return `
+    <label class="field" for="propertyFinancing.${key}">
+      <span data-real-estate-label-key="${key}" data-label-de="${label}" data-label-en="${englishLabel}">${label}</span>
+      <input
+        id="propertyFinancing.${key}"
+        type="number"
+        min="0"
+        step="${options.step ?? 0.01}"
+        data-real-estate-field="${key}"
+        ${options.nullable ? 'placeholder="optional"' : ""}
+      />
+    </label>
+  `;
+}
+
+function realEstateEnglishLabel(key: string, fallback: string): string {
+  const labels: Record<string, string> = {
+    purchasePrice: "Property purchase price",
+    constructionOrRenovationCosts: "Construction/renovation costs",
+    landCosts: "Land costs",
+    additionalPurchaseCosts: "Additional purchase costs",
+    notaryCosts: "Notary costs",
+    landRegistryCosts: "Land registry costs",
+    brokerCosts: "Broker costs",
+    transferTax: "Transfer tax",
+    modernizationReserve: "Modernization reserve",
+    movingAndSetupCosts: "Moving/setup costs",
+    safetyBuffer: "Safety buffer",
+    equityCapital: "Equity capital",
+    loanAmount: "Loan amount",
+    interestRatePercent: "Interest rate in %",
+    initialRepaymentPercent: "Initial repayment in %",
+    fixedInterestYears: "Fixed-interest period (years)",
+    targetTermYears: "Target term (years)",
+    financingYears: "Financing period (years)",
+    remainingDebtAfterFixedInterest: "Remaining debt after fixed period",
+    specialRepaymentAmount: "Special repayment amount",
+    monthlyPayment: "Monthly payment",
+    plannedSaleYear: "Planned sale year (optional)",
+    estimatedSaleValue: "Estimated sale value (optional)",
+    targetFullRepaymentYear: "Target full repayment year (optional)",
+    targetMonthlyBurden: "Target monthly burden",
+    maxMonthlyBurden: "Maximum monthly burden",
+    subsidyAmount: "Subsidy amount",
+    propertyValueGrowthPercent: "Property value growth in %",
+    inflationRatePercent: "Inflation in %",
+    manualFuturePropertyValue: "Optional future value"
+  };
+  return labels[key] ?? fallback;
+}
+
+function combinedToggle(key: string, label: string): string {
+  return `
+    <label class="combined-toggle-item">
+      <input type="checkbox" data-combined-toggle="${key}" />
+      <span>${label}</span>
+    </label>
   `;
 }
 

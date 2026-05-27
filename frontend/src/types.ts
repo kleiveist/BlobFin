@@ -6,6 +6,16 @@ export type PayoutType = "none" | "monthly" | "yearly" | "once";
 export type ThemeMode = "light" | "dark";
 export type InvestmentDepotKey = "standard" | "retirement" | "child";
 export type PositionTableMode = PositionFlow | "reserve" | "savings";
+export type AppSectionId =
+  | "grunddaten"
+  | "cost_reserve_positions"
+  | "year_table"
+  | "investment_planning"
+  | "real_estate_financing"
+  | "combined_wealth";
+export type PlanningAccountType = "cost_reserve" | "annual_table" | "mixed";
+export type RealEstateLocale = "de" | "en";
+export type SpecialRepaymentRhythm = "none" | "monthly" | "yearly";
 export type PositionTableFilterColumn =
   | "active"
   | "visible"
@@ -71,6 +81,20 @@ export interface PlanningSettings {
   emergencyFund: number;
 }
 
+export interface PlanningAccount {
+  id: string;
+  name: string;
+  type: PlanningAccountType;
+  yearlyRows: ReservePosition[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface AppUiState {
+  activeSection: AppSectionId;
+  selectedPlanningAccountId: string;
+  settingsGrunddatenExpanded: boolean;
+}
+
 export interface InvestmentSettings {
   activeDepot: InvestmentDepotKey;
   includedIds: string[];
@@ -111,9 +135,72 @@ export interface InvestmentSettings {
   childBequestReservePercent: number;
 }
 
+export interface RealEstateFinancingSettings {
+  locale: RealEstateLocale;
+  purchasePrice: number;
+  constructionOrRenovationCosts: number;
+  landCosts: number;
+  additionalPurchaseCosts: number;
+  notaryCosts: number;
+  landRegistryCosts: number;
+  brokerCosts: number;
+  transferTax: number;
+  modernizationReserve: number;
+  movingAndSetupCosts: number;
+  safetyBuffer: number;
+  equityCapital: number;
+  loanAmount: number;
+  interestRatePercent: number;
+  initialRepaymentPercent: number;
+  monthlyPayment: number;
+  fixedInterestYears: number;
+  targetTermYears: number;
+  specialRepaymentAmount: number;
+  specialRepaymentRhythm: SpecialRepaymentRhythm;
+  remainingDebtAfterFixedInterest: number;
+  plannedSaleYear: number | null;
+  estimatedSaleValue: number | null;
+  targetFullRepaymentYear: number | null;
+  targetMonthlyBurden: number;
+  maxMonthlyBurden: number;
+  subsidyAmount: number;
+  propertyValueGrowthPercent: number;
+  inflationRatePercent: number;
+  financingYears: number;
+  manualFuturePropertyValue: number | null;
+}
+
+export interface CombinedWealthToggles {
+  includeCashPositions: boolean;
+  includeCostReserveAccounts: boolean;
+  includeAnnualTableAccounts: boolean;
+  includeDepotDevelopment: boolean;
+  includeSharedDepotDevelopment: boolean;
+  includeWithdrawals: boolean;
+  includeRealEstateFinancing: boolean;
+  includeRealEstateValueTrend: boolean;
+}
+
+export interface CombinedWealthYear {
+  year: number;
+  cashValue: number;
+  depotValue: number;
+  withdrawalImpact: number;
+  propertyValue: number;
+  propertyDebt: number;
+  propertyEquity: number;
+  totalGrossAssets: number;
+  totalDebt: number;
+  totalNetWealth: number;
+}
+
 export interface AppState {
   theme: ThemeMode;
   settings: PlanningSettings;
+  planningAccounts: PlanningAccount[];
+  ui: AppUiState;
+  realEstate: RealEstateFinancingSettings;
+  combinedWealth: CombinedWealthToggles;
   positions: ReservePosition[];
   investment: InvestmentSettings;
   positionTableView: PositionTableViewState;
@@ -221,4 +308,36 @@ export interface AssetProjection {
   inflationFactorAtRetirement: number;
   wealthAtRetirement: number;
   realWealthAtRetirement: number;
+}
+
+export interface RealEstateFinancingYear {
+  year: number;
+  propertyValue: number;
+  loanStart: number;
+  interestPaid: number;
+  principalPaid: number;
+  specialRepayment: number;
+  loanEnd: number;
+  propertyEquity: number;
+  netPropertyWealth: number;
+}
+
+export interface RealEstateFinancingMonth {
+  year: number;
+  month: number;
+  loanStart: number;
+  interestPaid: number;
+  principalPaid: number;
+  specialRepayment: number;
+  loanEnd: number;
+}
+
+export interface RealEstateFinancingResult {
+  years: RealEstateFinancingYear[];
+  months: RealEstateFinancingMonth[];
+  startLoanAmount: number;
+  monthlyPayment: number;
+  effectivePropertyStartValue: number;
+  totalProjectCost: number;
+  validationErrors: string[];
 }

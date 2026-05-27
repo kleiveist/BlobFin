@@ -1,4 +1,14 @@
-import type { AppState, InvestmentSettings, PlanningSettings, PositionTableViewState, ReservePosition } from "../types";
+import type {
+  AppState,
+  AppUiState,
+  CombinedWealthToggles,
+  InvestmentSettings,
+  PlanningAccount,
+  PlanningSettings,
+  PositionTableViewState,
+  RealEstateFinancingSettings,
+  ReservePosition
+} from "../types";
 
 export const MONTHS = [
   "Januar",
@@ -196,11 +206,85 @@ export function defaultPositionTableViewState(): PositionTableViewState {
   };
 }
 
+export function defaultAppUiState(): AppUiState {
+  return {
+    activeSection: "cost_reserve_positions",
+    selectedPlanningAccountId: "default-account",
+    settingsGrunddatenExpanded: true
+  };
+}
+
+export function defaultPlanningAccounts(): PlanningAccount[] {
+  return [
+    {
+      id: "default-account",
+      name: "Standardkonto",
+      type: "mixed",
+      yearlyRows: defaultPositions()
+    }
+  ];
+}
+
+export function defaultRealEstateFinancingSettings(): RealEstateFinancingSettings {
+  return {
+    locale: "de",
+    purchasePrice: 360000,
+    constructionOrRenovationCosts: 0,
+    landCosts: 0,
+    additionalPurchaseCosts: 0,
+    notaryCosts: 5000,
+    landRegistryCosts: 2000,
+    brokerCosts: 12000,
+    transferTax: 18000,
+    modernizationReserve: 10000,
+    movingAndSetupCosts: 8000,
+    safetyBuffer: 5000,
+    equityCapital: 90000,
+    loanAmount: 0,
+    interestRatePercent: 3.5,
+    initialRepaymentPercent: 2,
+    monthlyPayment: 0,
+    fixedInterestYears: 15,
+    targetTermYears: 35,
+    specialRepaymentAmount: 0,
+    specialRepaymentRhythm: "yearly",
+    remainingDebtAfterFixedInterest: 0,
+    plannedSaleYear: null,
+    estimatedSaleValue: null,
+    targetFullRepaymentYear: null,
+    targetMonthlyBurden: 1600,
+    maxMonthlyBurden: 2200,
+    subsidyAmount: 0,
+    propertyValueGrowthPercent: 1.5,
+    inflationRatePercent: 2,
+    financingYears: 35,
+    manualFuturePropertyValue: null
+  };
+}
+
+export function defaultCombinedWealthToggles(): CombinedWealthToggles {
+  return {
+    includeCashPositions: true,
+    includeCostReserveAccounts: true,
+    includeAnnualTableAccounts: true,
+    includeDepotDevelopment: true,
+    includeSharedDepotDevelopment: true,
+    includeWithdrawals: true,
+    includeRealEstateFinancing: true,
+    includeRealEstateValueTrend: true
+  };
+}
+
 export function defaultAppState(): AppState {
+  const planningAccounts = defaultPlanningAccounts();
   return {
     theme: "light",
     settings: defaultPlanningSettings(),
-    positions: defaultPositions(),
+    planningAccounts,
+    ui: defaultAppUiState(),
+    realEstate: defaultRealEstateFinancingSettings(),
+    combinedWealth: defaultCombinedWealthToggles(),
+    positions: planningAccounts[0].yearlyRows,
     investment: defaultInvestmentSettings(),
     positionTableView: defaultPositionTableViewState()
   };

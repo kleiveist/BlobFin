@@ -20,6 +20,7 @@ CONSOLE_TAIL_LINES = 12
 REPORT_TAIL_LINES = 80
 FRONTEND_PORT = 5173
 BACKEND_PORT = 8000
+BACKEND_RUNTIME_IMPORTS = "import jsonschema, pytest, uvicorn"
 
 
 @dataclass(slots=True)
@@ -91,6 +92,92 @@ def _expand_suites(value: str) -> list[str]:
     if value == "all":
         return ["schema", "api", "frontend", "e2e"]
     return [value]
+
+
+def _needs_backend_runtime(selected_suites: list[str]) -> bool:
+    return bool({"schema", "api", "e2e"}.intersection(selected_suites))
+
+
+def _probe_backend_runtime() -> tuple[bool, str, list[str] | None]:
+    backend_python = ROOT / "backend" / ".venv" / "bin" / "python"
+    if not backend_python.exists():
+        return False, f"backend venv python missing at {backend_python}", None
+
+    command = [str(backend_python), "-c", BACKEND_RUNTIME_IMPORTS]
+    completed = _run(command, cwd=ROOT)
+    if completed.returncode == 0:
+        return True, "backend runtime imports succeeded", command
+
+    details = _tail_text(((completed.stderr or "") + "\n" + (completed.stdout or "")).strip(), CONSOLE_TAIL_LINES)
+    if not details:
+        details = f"exit code {completed.returncode}"
+    return False, details, command
+
+
+def _ensure_backend_runtime(selected_suites: list[str]) -> SuiteResult | None:
+    if not _needs_backend_runtime(selected_suites):
+        return None
+
+    probe_ok, probe_detail, probe_command = _probe_backend_runtime()
+    if probe_ok:
+        return None
+
+    started = time.monotonic()
+    command = [
+        sys.executable,
+        str(ROOT / "tools" / "control.py"),
+        "install",
+        "--skip-frontend",
+        "--skip-playwright",
+    ]
+    completed = _run(command, cwd=ROOT)
+    if completed.returncode != 0:
+        return SuiteResult(
+            "backend-preflight",
+            "FAIL",
+            "backend runtime install failed",
+            time.monotonic() - started,
+            command=command,
+            cwd=str(ROOT),
+            exit_code=completed.returncode,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+            stdout_tail=_tail_text(completed.stdout),
+            stderr_tail=_tail_text(completed.stderr),
+            detail=f"Initial probe failed: {probe_detail}",
+        )
+
+    repaired_ok, repaired_detail, repaired_command = _probe_backend_runtime()
+    if not repaired_ok:
+        return SuiteResult(
+            "backend-preflight",
+            "FAIL",
+            "backend runtime still not executable after install",
+            time.monotonic() - started,
+            command=repaired_command or probe_command or command,
+            cwd=str(ROOT),
+            exit_code=1,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+            stdout_tail=_tail_text(completed.stdout),
+            stderr_tail=_tail_text(completed.stderr),
+            detail=f"Initial probe failed: {probe_detail}; post-install probe failed: {repaired_detail}",
+        )
+
+    return SuiteResult(
+        "backend-preflight",
+        "OK",
+        "backend runtime repaired before tests",
+        time.monotonic() - started,
+        command=command,
+        cwd=str(ROOT),
+        exit_code=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+        stdout_tail=_tail_text(completed.stdout),
+        stderr_tail=_tail_text(completed.stderr),
+        detail=f"Initial probe failed: {probe_detail}",
+    )
 
 
 def _result_from_completed(
@@ -489,9 +576,12 @@ def main(args: argparse.Namespace) -> int:
 
     selected_suites = _expand_suites(args.suite)
 
+    preflight = _ensure_backend_runtime(selected_suites)
     started_by_runner, bootstrap = _start_services_if_needed(selected_suites, args.no_start)
 
     results: list[SuiteResult] = []
+    if preflight is not None:
+        results.append(preflight)
 
     try:
         if bootstrap.status == "FAIL":
