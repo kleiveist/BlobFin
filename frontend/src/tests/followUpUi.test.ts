@@ -37,6 +37,8 @@ const realEstateYear: RealEstateFinancingYear = {
   additionalRepayment: 0,
   additionalRepaymentBreakdown: additionalBreakdown,
   loanEnd: 212000,
+  loanCostPaidToDate: 15000,
+  loanCostRemaining: 225000,
   propertyEquity: 88000,
   netPropertyWealth: 88000
 };
@@ -91,8 +93,10 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-real-estate-field="targetTermYears"');
     expect(html).not.toContain('data-real-estate-field="subsidyAmount"');
     expect(html).not.toContain('data-real-estate-field="remainingDebtAfterFixedInterest"');
-    expect(count(html, 'data-real-estate-field="financingEndAge"')).toBe(1);
+    expect(count(html, 'data-real-estate-field="financingEndAge"')).toBe(0);
     expect(count(html, 'data-real-estate-field="plannedSaleYear"')).toBe(1);
+    expect(html).toContain('id="realEstateCalculatedEndAgeMetric"');
+    expect(html).toContain("Bezahlt bis Alter");
     expect(count(html, 'data-real-estate-field="interestRatePercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="interestRatePercent"')).toBe(1);
     expect(count(html, 'data-real-estate-field="monthlyPayment"')).toBe(0);
@@ -163,11 +167,7 @@ describe("follow-up ui rendering", () => {
   });
 
   it("exposes real estate popup segment labels", () => {
-    const repaymentSegments = realEstateRepaymentSegments({
-      point: realEstateYear,
-      totalLoanCost: 240000,
-      paidLoanCostToDate: paidLoanCostForYear(realEstateYear)
-    });
+    const repaymentSegments = realEstateRepaymentSegments({ point: realEstateYear, totalLoanCost: 240000 });
     const repaymentLabels = repaymentSegments.map((segment) => segment.label);
     const trendLabels = realEstateTrendSegments(realEstateYear, realEstateYear.propertyValue).map(
       (segment) => segment.label
@@ -189,28 +189,26 @@ describe("follow-up ui rendering", () => {
     expect(paidLoanCostForYear(realEstateYear)).toBe(15000);
   });
 
-  it("does not leave an open loan cost when the real debt is fully repaid", () => {
+  it("does not leave an open loan cost when the calculated loan cost is fully repaid", () => {
     const repaymentSegments = realEstateRepaymentSegments({
-      point: { ...realEstateYear, loanEnd: 0 },
-      totalLoanCost: 240000,
-      paidLoanCostToDate: 180000
+      point: { ...realEstateYear, loanEnd: 0, loanCostPaidToDate: 240000, loanCostRemaining: 0 },
+      totalLoanCost: 240000
     });
 
     expect(repaymentSegments.find((segment) => segment.label === "Darlehensbetrag inkl. Zinsen offen")?.value).toBe(0);
     expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(240000);
   });
 
-  it("keeps the visible open loan cost at least as high as the real debt", () => {
+  it("uses the calculated open loan cost without a debt-zero override", () => {
     const repaymentSegments = realEstateRepaymentSegments({
-      point: { ...realEstateYear, loanEnd: 260000 },
-      totalLoanCost: 240000,
-      paidLoanCostToDate: 15000
+      point: { ...realEstateYear, loanEnd: 0, loanCostPaidToDate: 15000, loanCostRemaining: 225000 },
+      totalLoanCost: 240000
     });
 
     expect(repaymentSegments.find((segment) => segment.label === "Darlehensbetrag inkl. Zinsen offen")?.value).toBe(
-      260000
+      225000
     );
-    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(0);
+    expect(repaymentSegments.find((segment) => segment.label === "Getilgter Kreditanteil")?.value).toBe(15000);
   });
 
   it("formats real estate popup headings with age and year", () => {
@@ -242,13 +240,13 @@ describe("follow-up ui rendering", () => {
 
   it("scales the repayment chart above the loan cost basis when real debt grows", () => {
     const repayment = renderRealEstateRepaymentChart({
-      points: [{ ...realEstateYear, loanEnd: 250000, interestDue: 12000 }],
+      points: [{ ...realEstateYear, loanEnd: 250000, interestDue: 12000, loanCostRemaining: 225000 }],
       selectedYear: 2026,
       loanCostBasis: 240000,
       formatMoney: String
     });
 
-    expect(repayment).toContain("265 Tsd. EUR");
+    expect(repayment).toContain("250 Tsd. EUR");
     expect(repayment).toContain('wealth-column-overlay interest');
   });
 });

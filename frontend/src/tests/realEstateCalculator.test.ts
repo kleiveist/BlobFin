@@ -24,17 +24,6 @@ function repeated(value: number, count = 240): number[] {
   return Array.from({ length: count }, () => value);
 }
 
-function expectedFixedTotalLoanCost(loanAmount: number, interestRatePercent: number, financingYears: number): number {
-  const monthlyRate = Math.max(0, interestRatePercent) / 100 / 12;
-  if (loanAmount <= 0) return 0;
-  if (monthlyRate <= 0) return roundTestMoney(loanAmount);
-  return roundTestMoney(loanAmount * (1 + monthlyRate) ** (financingYears * 12));
-}
-
-function roundTestMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
 function projectSettings(
   projectCost: number,
   overrides: Partial<RealEstateFinancingSettings> = {}
@@ -293,20 +282,21 @@ describe("real estate calculator", () => {
     expect(lowRepayment.years[0].loanEnd).toBeGreaterThan(highRepayment.years[0].loanEnd);
   });
 
-  it("calculates total loan cost from monthly compounding over the financing period", () => {
+  it("calculates total loan cost from actual interest until payoff", () => {
     const state = defaultAppState();
-    const settings = projectSettings(595000, {
+    const settings = projectSettings(120000, {
       interestRatePercent: 3.7,
       financingYears: 25
     });
 
-    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(1000, 300)));
+    const result = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(2000, 300)));
 
-    expect(result.totalLoanCost).toBe(expectedFixedTotalLoanCost(595000, 3.7, 25));
-    expect(result.totalLoanCost).toBeCloseTo(1498377.73, 2);
+    expect(result.years[result.years.length - 1]?.loanEnd).toBe(0);
+    expect(result.totalLoanCost).toBeCloseTo(result.startLoanAmount + result.totalInterestDue, 2);
+    expect(result.totalLoanCost).toBeLessThan(120000 * 1.5);
   });
 
-  it("changes fixed total loan cost through loan basis, interest, and the actual payoff period", () => {
+  it("changes total loan cost through loan basis, interest, and the actual payoff period", () => {
     const state = defaultAppState();
     const settings = projectSettings(120000, {
       interestRatePercent: 3,
@@ -330,25 +320,27 @@ describe("real estate calculator", () => {
       settings,
       schedule(repeated(1000, 300), [], [], 20000)
     );
-    const shorterFinancing = calculateRealEstateFinancing(
+    const legacyEndAgeChange = calculateRealEstateFinancing(
       state.settings.year,
       { ...settings, financingEndAge: 65 },
       schedule(repeated(1000, 300))
     );
+    const fasterPayoff = calculateRealEstateFinancing(state.settings.year, settings, schedule(repeated(2000, 300)));
 
     expect(base.startLoanAmount).toBe(120000);
     expect(withEquity.startLoanAmount).toBe(100000);
     expect(higherInterest.totalLoanCost).toBeGreaterThan(base.totalLoanCost);
     expect(higherProjectCost.totalLoanCost).toBeGreaterThan(base.totalLoanCost);
     expect(withEquity.totalLoanCost).toBeLessThan(base.totalLoanCost);
-    expect(shorterFinancing.totalLoanCost).toBe(base.totalLoanCost);
+    expect(legacyEndAgeChange.totalLoanCost).toBe(base.totalLoanCost);
+    expect(fasterPayoff.financingYears).toBeLessThan(base.financingYears);
+    expect(fasterPayoff.totalLoanCost).toBeLessThan(base.totalLoanCost);
   });
 
   it("derives the financing period from the first payment to the final payment", () => {
     const state = defaultAppState();
     const settings = projectSettings(120000, {
       financingStartAge: 45,
-      financingEndAge: 70,
       financingYears: 99,
       interestRatePercent: 0
     });
@@ -357,7 +349,7 @@ describe("real estate calculator", () => {
 
     expect(result.financingYears).toBe(10);
     expect(result.financingEndYear).toBe(state.settings.year + 9);
-    expect(result.years).toHaveLength(25);
+    expect(result.years).toHaveLength(10);
   });
 
   it("extends projection beyond the target period until the debt is paid", () => {
@@ -377,7 +369,10 @@ describe("real estate calculator", () => {
     expect(result.years).toHaveLength(10);
     expect(result.financingYears).toBe(10);
     expect(result.financingEndYear).toBe(state.settings.year + 9);
+    expect(result.years[result.years.length - 2]?.loanCostRemaining).toBeGreaterThan(0);
     expect(result.years[result.years.length - 1]?.loanEnd).toBe(0);
+    expect(result.years[result.years.length - 1]?.loanCostRemaining).toBe(0);
+    expect(result.years[result.years.length - 1]?.loanCostPaidToDate).toBe(result.totalLoanCost);
   });
 
   it("continues scheduled repayment after the target period while sources still exist", () => {
@@ -424,6 +419,8 @@ describe("real estate calculator", () => {
     expect(result.years).toHaveLength(2);
     expect(result.financingEndYear).toBe(state.settings.year + 1);
     expect(result.projectionEndYear).toBe(state.settings.year + 1);
+    expect(result.years[1].loanCostRemaining).toBeGreaterThan(0);
+    expect(result.validationErrors.join(" ")).toContain("nicht vollstaendig getilgt");
   });
 
   it("marks invalid required settings", () => {

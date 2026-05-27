@@ -336,13 +336,13 @@ export function renderAppShell(): string {
             <p class="planning-account-summary">Hilfetext: Eigenkapital, Monatsrate, Anfangstilgung und Sondertilgung werden aus echten Sparpositionen abgeleitet.</p>
             <div class="field-grid wide">
               ${realEstateNumberField("financingStartAge", "Finanzierung ab Alter", { step: 1 })}
-              ${realEstateNumberField("financingEndAge", "Bezahlt bis Alter", { step: 1 })}
               ${realEstateNumberField("plannedSaleYear", "Verkaufsjahr", { step: 1, nullable: true })}
             </div>
             <div class="real-estate-slider-grid">
               ${realEstateAssumptionControl("interestRatePercent", "Zinssatz", 0, 10, 0.05)}
             </div>
             <div class="chart-inline-metrics">
+              ${chartMetric("realEstateCalculatedEndAgeMetric", "Bezahlt bis Alter")}
               ${chartMetric("realEstateFinancingYearsMetric", "Finanzierungszeitraum")}
               ${chartMetric("realEstateDerivedEquityMetric", "Eigenkapital")}
               ${chartMetric("realEstateDerivedMonthlyPaymentMetric", "Monatsrate")}

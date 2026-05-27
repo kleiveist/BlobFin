@@ -381,6 +381,8 @@ export interface RealEstateFinancingYear {
   additionalRepayment: number;
   additionalRepaymentBreakdown: AdditionalRepaymentYearBreakdown;
   loanEnd: number;
+  loanCostPaidToDate?: number;
+  loanCostRemaining?: number;
   propertyEquity: number;
   netPropertyWealth: number;
 }

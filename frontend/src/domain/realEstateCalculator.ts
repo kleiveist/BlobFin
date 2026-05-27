@@ -21,10 +21,6 @@ export function validateRealEstateSettings(settings: RealEstateFinancingSettings
   if (settings.interestRatePercent < 0) errors.push("Zinssatz darf nicht negativ sein.");
   if (settings.propertyValueGrowthPercent < 0) errors.push("Immobilienwertsteigerung darf nicht negativ sein.");
   if (settings.financingStartAge < 0) errors.push("Finanzierung ab Alter darf nicht negativ sein.");
-  if (settings.financingEndAge <= 0) errors.push("Bezahlt bis Alter muss groesser als 0 sein.");
-  if (settings.financingStartAge > 0 && settings.financingEndAge <= settings.financingStartAge) {
-    errors.push("Bezahlt bis Alter muss nach dem Finanzierungsstart liegen.");
-  }
   return errors;
 }
 
@@ -93,8 +89,8 @@ export function calculateRealEstateFinancing(
   const projectCost = totalProjectCost(settings);
   const equityCapital = roundMoney(Math.max(0, sourceSchedule.equityCapital));
   const loanAmount = deriveLoanAmount(settings, equityCapital);
-  const targetFinancingYears = clampYears(options.financingYears ?? deriveFinancingYearsFromSettings(settings));
-  const projectionYears = clampYears(options.projectionYears ?? targetFinancingYears);
+  const fallbackProjectionYears = clampYears(options.financingYears ?? deriveFinancingYearsFromSettings(settings));
+  const projectionYears = clampYears(options.projectionYears ?? fallbackProjectionYears);
   const maxProjectionYears = Math.max(projectionYears, clampYears(options.maxProjectionYears ?? projectionYears));
   const monthlyRate = Math.max(0, settings.interestRatePercent) / 100 / 12;
   const growthRate = Math.max(0, settings.propertyValueGrowthPercent) / 100;
@@ -247,17 +243,24 @@ export function calculateRealEstateFinancing(
       netPropertyWealth
     });
 
-    if (yearIndex + 1 >= projectionYears && remainingDebt <= 0) break;
+    if (remainingDebt <= 0 && yearIndex + 1 >= projectionYears) break;
   }
 
   const totalInterestDue = roundMoney(years.reduce((sum, entry) => sum + entry.interestDue, 0));
   const totalInterestPaid = roundMoney(years.reduce((sum, entry) => sum + entry.interestPaid, 0));
   const totalInterestShortfall = roundMoney(years.reduce((sum, entry) => sum + entry.interestShortfall, 0));
-  const financingYears = actualFinancingYears(firstPaymentMonthIndex, lastPaymentMonthIndex, targetFinancingYears);
-  const totalLoanCost = fixedTotalLoanCost(loanAmount, monthlyRate, financingYears);
+  const financingYears = actualFinancingYears(firstPaymentMonthIndex, lastPaymentMonthIndex, years.length);
+  const totalLoanCost = roundMoney(loanAmount + totalInterestDue);
+  applyLoanCostProgress(years, totalLoanCost);
   if (totalInterestShortfall > 0) {
     validationErrors.push(
       `Die ausgewaehlten Zahlungsquellen decken die Zinsen nicht vollstaendig (${totalInterestShortfall.toFixed(2)} EUR fehlen).`
+    );
+  }
+  const finalDebt = years[years.length - 1]?.loanEnd ?? loanAmount;
+  if (loanAmount > 0 && finalDebt > 0) {
+    validationErrors.push(
+      `Die Finanzierung ist innerhalb des Projektionszeitraums nicht vollstaendig getilgt (${finalDebt.toFixed(2)} EUR offen).`
     );
   }
 
@@ -343,10 +346,18 @@ function projectedPropertyValue(startPropertyValue: number, growthRate: number, 
   return roundMoney(startPropertyValue * (1 + growthRate) ** yearIndex);
 }
 
-function fixedTotalLoanCost(loanAmount: number, monthlyRate: number, financingYears: number): number {
-  if (loanAmount <= 0) return 0;
-  if (monthlyRate <= 0) return roundMoney(loanAmount);
-  return roundMoney(loanAmount * (1 + monthlyRate) ** (financingYears * 12));
+function applyLoanCostProgress(years: RealEstateFinancingYear[], totalLoanCost: number): void {
+  let paidToDate = 0;
+  for (const year of years) {
+    paidToDate = roundMoney(paidToDate + paidLoanCostForYear(year));
+    const remainingByCost = roundMoney(Math.max(0, totalLoanCost - Math.min(totalLoanCost, paidToDate)));
+    year.loanCostRemaining = year.loanEnd <= 0 ? 0 : roundMoney(Math.max(remainingByCost, year.loanEnd));
+    year.loanCostPaidToDate = roundMoney(Math.max(0, totalLoanCost - year.loanCostRemaining));
+  }
+}
+
+function paidLoanCostForYear(year: RealEstateFinancingYear): number {
+  return roundMoney(Math.max(0, year.interestPaid) + Math.max(0, year.principalPaid));
 }
 
 function actualFinancingYears(
@@ -366,9 +377,6 @@ function financingEndYear(startYear: number, lastPaymentMonthIndex: number | nul
 }
 
 function deriveFinancingYearsFromSettings(settings: RealEstateFinancingSettings): number {
-  if (settings.financingStartAge > 0 && settings.financingEndAge > settings.financingStartAge) {
-    return settings.financingEndAge - settings.financingStartAge;
-  }
   return settings.financingYears || settings.targetTermYears || 1;
 }
 

@@ -78,7 +78,6 @@ import type {
 import { drawInvestmentChart } from "./views/investmentChart";
 import { renderAccountYearTableOverview } from "./views/accountYearTables";
 import {
-  paidLoanCostForYear,
   realEstatePopupHeading,
   realEstateRepaymentSegments,
   realEstateTrendSegments,
@@ -701,7 +700,6 @@ function renderCalculations(
     state.investment.birthYear,
     state.realEstate.financingStartAge
   );
-  const financingYears = currentRealEstateFinancingYears();
   const realEstateProjectionYears = currentRealEstateProjectionYears(financingStartYear, standardProjection.endAge);
   const maxRealEstateProjectionYears = currentRealEstateMaximumProjectionYears(financingStartYear);
   const combinedRealEstateProjectionYears = currentCombinedRealEstateProjectionYears(
@@ -715,7 +713,6 @@ function renderCalculations(
     state.realEstate,
     realEstateSourceSchedule(financingStartYear, maxRealEstateProjectionYears, standardProjection),
     {
-      financingYears,
       projectionYears: realEstateProjectionYears,
       maxProjectionYears: maxRealEstateProjectionYears
     }
@@ -730,7 +727,6 @@ function renderCalculations(
           state.realEstate,
           realEstateSourceSchedule(financingStartYear, combinedRealEstateProjectionYears, standardProjection),
           {
-            financingYears,
             projectionYears: combinedRealEstateProjectionYears,
             maxProjectionYears: combinedRealEstateProjectionYears
           }
@@ -785,10 +781,15 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult): void {
   setText("realEstateTotalProjectCostMetric", money(result.totalProjectCost));
   setText("realEstateStartDebtMetric", money(result.startLoanAmount));
   setText("realEstateTotalLoanCostMetric", money(result.totalLoanCost));
+  const finalLoanYear = result.years[result.years.length - 1];
   const actualFinancingStartYear =
     realEstateActualPaymentStartYear(result) ?? result.years[0]?.year ?? currentRealEstateFinancingStartYear();
   const actualFinancingStartAge = Math.max(0, actualFinancingStartYear - state.investment.birthYear);
   const actualFinancingEndAge = Math.max(actualFinancingStartAge, result.financingEndYear - state.investment.birthYear);
+  setText(
+    "realEstateCalculatedEndAgeMetric",
+    finalLoanYear && finalLoanYear.loanEnd <= 0 ? `${intNumber(actualFinancingEndAge)} Jahre` : "nicht getilgt"
+  );
   setText(
     "realEstateFinancingYearsMetric",
     `${intNumber(actualFinancingStartAge)} -> ${intNumber(actualFinancingEndAge)} | ${intNumber(result.financingYears)} Jahre`
@@ -826,21 +827,6 @@ function realEstateFinancingStartYear(currentYear: number, birthYear: number, fi
 
 function currentRealEstateFinancingStartYear(): number {
   return realEstateFinancingStartYear(state.settings.year, state.investment.birthYear, state.realEstate.financingStartAge);
-}
-
-function currentRealEstateFinancingStartAge(): number {
-  const currentAge = Math.max(0, state.settings.year - state.investment.birthYear);
-  if (Number.isFinite(state.realEstate.financingStartAge) && state.realEstate.financingStartAge > 0) {
-    return Math.max(currentAge, Math.floor(state.realEstate.financingStartAge));
-  }
-  return currentAge;
-}
-
-function currentRealEstateFinancingYears(): number {
-  const startAge = currentRealEstateFinancingStartAge();
-  const endAge = Math.floor(state.realEstate.financingEndAge);
-  if (!Number.isFinite(endAge)) return 1;
-  return clamp(Math.round(endAge - startAge), 1, 80);
 }
 
 function realEstateActualPaymentStartYear(result: RealEstateFinancingResult): number | null {
@@ -3763,13 +3749,10 @@ function showRealEstateChartPopup(
   if (!result || !point || !popup || !card) return;
 
   const initialPropertyValue = Math.max(0, result.years[0]?.propertyValue ?? 0);
-  const paidLoanCostToDate = realEstatePaidLoanCostToDate(result, point.year);
   const repaymentGroup = chartPopupSection("Tilgung und Kredit", [
-    ...realEstateRepaymentSegments({
-      point,
-      totalLoanCost: result.totalLoanCost,
-      paidLoanCostToDate
-    }).map((segment) => chartPopupLine(segment.className, segment.label, money(segment.value))),
+    ...realEstateRepaymentSegments({ point }).map((segment) =>
+      chartPopupLine(segment.className, segment.label, money(segment.value))
+    ),
     chartPopupLine("gross", "Darlehensbetrag inkl. Zinsen", money(result.totalLoanCost))
   ]);
   const trendGroup = chartPopupSection("Immobilienwertentwicklung", [
@@ -3796,10 +3779,6 @@ function showRealEstateChartPopup(
 
   popup.hidden = false;
   positionChartPopup(popup, card, clientX, clientY);
-}
-
-function realEstatePaidLoanCostToDate(result: RealEstateFinancingResult, year: number): number {
-  return result.years.reduce((sum, entry) => sum + (entry.year <= year ? paidLoanCostForYear(entry) : 0), 0);
 }
 
 function positionChartPopup(popup: HTMLDivElement, card: HTMLElement, clientX: number, clientY: number): void {

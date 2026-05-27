@@ -25,8 +25,8 @@ export interface VerticalBarSegment {
 
 export interface RealEstateRepaymentSegmentInput {
   point: RealEstateFinancingYear;
-  totalLoanCost: number;
-  paidLoanCostToDate: number;
+  totalLoanCost?: number;
+  paidLoanCostToDate?: number;
 }
 
 export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartInput): string {
@@ -38,14 +38,8 @@ export function renderRealEstateRepaymentChart(input: RealEstateRepaymentChartIn
   if (!Number.isFinite(loanCostBasis) || loanCostBasis <= 0) {
     return '<div class="chart-empty">Noch kein Start-Kreditvolumen fuer die Tilgung vorhanden.</div>';
   }
-  let paidLoanCostToDate = 0;
   const repaymentPoints = input.points.map((point) => {
-    paidLoanCostToDate += paidLoanCostForYear(point);
-    const composition = propertyComposition({
-      point,
-      totalLoanCost: loanCostBasis,
-      paidLoanCostToDate
-    });
+    const composition = propertyComposition({ point, totalLoanCost: loanCostBasis });
     return {
       ...composition,
       year: point.year,
@@ -300,7 +294,8 @@ function propertyComposition(input: RealEstateRepaymentSegmentInput): {
   const segments = realEstateRepaymentSegments(input);
   const openLoanCost = segments.find((segment) => segment.className === "debt")?.value ?? 0;
   const paidLoanCost = segments.find((segment) => segment.className === "equity")?.value ?? 0;
-  const barTotal = Math.max(input.totalLoanCost, openLoanCost + paidLoanCost);
+  const totalLoanCost = Math.max(0, input.totalLoanCost ?? openLoanCost + paidLoanCost);
+  const barTotal = Math.max(totalLoanCost, openLoanCost + paidLoanCost);
   return {
     barTotal,
     openLoanCost,
@@ -309,12 +304,15 @@ function propertyComposition(input: RealEstateRepaymentSegmentInput): {
 }
 
 export function realEstateRepaymentSegments(input: RealEstateRepaymentSegmentInput): VerticalBarSegment[] {
-  const totalLoanCost = Math.max(0, input.totalLoanCost);
-  const currentDebt = Math.max(0, input.point.loanEnd);
-  const paidLoanCostToDate = Math.max(0, input.paidLoanCostToDate);
-  const calculatedOpenLoanCost = Math.max(0, totalLoanCost - Math.min(totalLoanCost, paidLoanCostToDate));
-  const openLoanCost = currentDebt <= 0 ? 0 : Math.max(calculatedOpenLoanCost, currentDebt);
-  const paidLoanCost = Math.max(0, Math.min(totalLoanCost, totalLoanCost - openLoanCost));
+  const pointTotalLoanCost = Math.max(0, (input.point.loanCostPaidToDate ?? 0) + (input.point.loanCostRemaining ?? 0));
+  const totalLoanCost = Math.max(0, input.totalLoanCost ?? pointTotalLoanCost);
+  const paidLoanCostToDate = Math.max(0, input.point.loanCostPaidToDate ?? input.paidLoanCostToDate ?? 0);
+  const fallbackOpenLoanCost = Math.max(0, totalLoanCost - Math.min(totalLoanCost, paidLoanCostToDate));
+  const openLoanCost = Math.max(0, input.point.loanCostRemaining ?? fallbackOpenLoanCost);
+  const paidLoanCost = Math.max(
+    0,
+    Math.min(totalLoanCost, input.point.loanCostPaidToDate ?? totalLoanCost - openLoanCost)
+  );
   return [
     { className: "debt", label: "Darlehensbetrag inkl. Zinsen offen", value: openLoanCost },
     { className: "equity", label: "Getilgter Kreditanteil", value: paidLoanCost },
