@@ -62,9 +62,9 @@ describe("follow-up ui rendering", () => {
   it("renders real estate assumption fields as one control each", () => {
     const html = renderAppShell();
 
-    expect(count(html, 'data-real-estate-field="interestRatePercent"')).toBe(1);
+    expect(count(html, 'data-real-estate-field="interestRatePercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="interestRatePercent"')).toBe(1);
-    expect(count(html, 'data-real-estate-field="monthlyPayment"')).toBe(1);
+    expect(count(html, 'data-real-estate-field="monthlyPayment"')).toBe(0);
     expect(count(html, 'data-real-estate-range="monthlyPayment"')).toBe(1);
   });
 

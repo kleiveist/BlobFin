@@ -593,17 +593,7 @@ function realEstateAssumptionControl(
     <label class="range-field assumption-control" for="propertyFinancing.${key}">
       <span data-real-estate-label-key="${key}" data-label-de="${label}" data-label-en="${englishLabel}">${label}</span>
       <input type="range" min="${min}" max="${max}" step="${step}" data-real-estate-range="${key}" />
-      <div class="assumption-control-row">
-        <input
-          id="propertyFinancing.${key}"
-          type="number"
-          min="${min}"
-          max="${max}"
-          step="${step}"
-          data-real-estate-field="${key}"
-        />
-        <strong id="realEstate${capitalize(key)}Value">-</strong>
-      </div>
+      <strong id="realEstate${capitalize(key)}Value">-</strong>
     </label>
   `;
 }

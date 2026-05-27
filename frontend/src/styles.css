@@ -2360,23 +2360,45 @@ tfoot th {
 }
 
 .assumption-control {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   padding: 10px;
 }
 
+.assumption-control > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assumption-control > input[type="range"] {
+  width: 100%;
+  min-width: 0;
+}
+
 .assumption-control-row {
   display: grid;
   align-items: center;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(110px, 1fr) minmax(max-content, 96px);
+  min-width: 0;
+}
+
+.assumption-control-row input {
+  min-width: 0;
 }
 
 .assumption-control-row strong {
   color: var(--accent-strong);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
+  justify-self: end;
   white-space: nowrap;
 }
 
