@@ -411,6 +411,22 @@ export function renderAppShell(): string {
         </div>
         <div class="combined-wealth-grid">
           <section class="combined-wealth-card">
+            <div class="combined-account-modules">
+              <div class="combined-account-module">
+                <h3>Konten aktivieren</h3>
+                <div id="combinedAccountSelector" class="planning-account-cards" aria-label="Aktive Konten fuer Kombination"></div>
+              </div>
+              <div class="combined-account-module">
+                <h3>Kombi-Leitkonto (Depot/Entnahme)</h3>
+                <div
+                  id="combinedLeadInvestmentAccountSelector"
+                  class="planning-account-cards"
+                  aria-label="Leitkonto fuer Depot und Entnahme in Kombination"
+                ></div>
+              </div>
+            </div>
+          </section>
+          <section class="combined-wealth-card">
             <h3>Module aktivieren</h3>
             <div class="combined-toggle-grid">
               ${combinedToggle("includeCashPositions", "Cash-/Kontopositionen", "Beruecksichtigt liquide Konten und laufende Ruecklagen.")}

@@ -104,6 +104,15 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
     return '<div class="chart-empty">Bitte zuerst Module aktivieren und berechnen.</div>';
   }
 
+  const selectedPoint =
+    input.points.find((point) => point.year === input.selectedYear) ?? input.points[input.points.length - 1];
+  const startYear = input.points[0]?.year ?? 0;
+  const endYear = input.points[input.points.length - 1]?.year ?? startYear;
+  const tickYears = new Set(
+    input.points
+      .filter((point) => point.year === startYear || point.year === endYear || (point.year - startYear) % 5 === 0)
+      .map((point) => point.year)
+  );
   const maxValue = Math.max(
     1,
     ...input.points.map((point) => Math.max(0, point.cashValue) + Math.max(0, point.depotValue) + Math.max(0, point.propertyValue))
@@ -111,7 +120,29 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
 
   return renderVerticalChart({
     label: "Kombiniertes Vermoegen je Jahr",
+    chartClassName: "combined-wealth-vertical-chart",
+    header: `
+      <div class="combined-wealth-summary" aria-hidden="true">
+        ${renderCombinedSummaryValue("Cash", selectedPoint.cashValue, input.formatMoney)}
+        ${renderCombinedSummaryValue("Depot", selectedPoint.depotValue, input.formatMoney)}
+        ${renderCombinedSummaryValue("Immobilienwert", selectedPoint.propertyValue, input.formatMoney)}
+      </div>
+    `,
+    footer: `
+      <div class="combined-wealth-ticks" aria-hidden="true" style="--wealth-chart-count:${Math.max(1, input.points.length)};">
+        ${input.points
+          .map((point) => `
+            <span class="combined-wealth-tick${tickYears.has(point.year) ? " visible" : ""}">
+              ${tickYears.has(point.year) ? point.year : ""}
+            </span>
+          `)
+          .join("")}
+      </div>
+    `,
     maxValue,
+    showColumnValue: false,
+    showColumnYear: false,
+    showXAxisLabel: false,
     legend: [
       { className: "cash", label: "Cash" },
       { className: "depot", label: "Depot" },
@@ -172,8 +203,14 @@ export function realEstatePopupHeading(
 
 function renderVerticalChart(input: {
   label: string;
+  chartClassName?: string;
   title?: string;
+  header?: string;
+  footer?: string;
   maxValue: number;
+  showColumnValue?: boolean;
+  showColumnYear?: boolean;
+  showXAxisLabel?: boolean;
   legend: Array<{ className: string; label: string }>;
   points: Array<{
     year: number;
@@ -188,19 +225,25 @@ function renderVerticalChart(input: {
   }>;
 }): string {
   const columnCount = Math.max(1, input.points.length);
+  const showColumnValue = input.showColumnValue ?? true;
+  const showColumnYear = input.showColumnYear ?? true;
+  const showXAxisLabel = input.showXAxisLabel ?? true;
+  const chartClassName = ["wealth-vertical-chart", input.chartClassName].filter(Boolean).join(" ");
 
   return `
-    <div class="wealth-vertical-chart" aria-label="${input.label}">
+    <div class="${chartClassName}" aria-label="${input.label}">
       ${input.title ? `<h3 class="wealth-chart-title">${input.title}</h3>` : ""}
+      ${input.header ?? ""}
       <div class="wealth-y-axis" aria-hidden="true">
         <span>${formatAxis(input.maxValue)}</span>
         <span>${formatAxis(input.maxValue / 2)}</span>
         <span>0 EUR</span>
       </div>
       <div class="wealth-plot" role="list" style="--wealth-chart-count:${columnCount};">
-        ${input.points.map((point) => renderVerticalBar(point, input.maxValue)).join("")}
+        ${input.points.map((point) => renderVerticalBar(point, input.maxValue, showColumnValue, showColumnYear)).join("")}
       </div>
-      <div class="wealth-x-axis" aria-hidden="true">Jahr</div>
+      ${showXAxisLabel ? '<div class="wealth-x-axis" aria-hidden="true">Jahr</div>' : ""}
+      ${input.footer ?? ""}
       <div class="wealth-legend">
         ${input.legend
           .map((item) => `<span class="legend-item"><span class="legend-dot ${item.className}"></span>${item.label}</span>`)
@@ -226,7 +269,9 @@ function renderVerticalBar(
     barTotal: number;
     segments: VerticalBarSegment[];
   },
-  maxValue: number
+  maxValue: number,
+  showValue: boolean,
+  showYear: boolean
 ): string {
   const barHeight = heightPercent(point.barTotal, maxValue);
   const buttonClasses = [
@@ -247,15 +292,28 @@ function renderVerticalBar(
       ${point.financingEnd ? 'data-financing-end="true"' : ""}
       title="${point.year}: ${point.valueLabel}"
     >
-      <span class="wealth-column-value">${point.valueLabel}</span>
+      ${showValue ? `<span class="wealth-column-value">${point.valueLabel}</span>` : ""}
       <span class="wealth-column-track">
         <span class="wealth-column-fill" style="height:${barHeight}%">
           ${point.segments.filter((segment) => !segment.overlay).map((segment) => renderSegment(segment, point.barTotal)).join("")}
           ${point.segments.filter((segment) => segment.overlay).map((segment) => renderOverlaySegment(segment, point.barTotal)).join("")}
         </span>
       </span>
-      <span class="wealth-column-year">${point.year}</span>
+      ${showYear ? `<span class="wealth-column-year">${point.year}</span>` : ""}
     </button>
+  `;
+}
+
+function renderCombinedSummaryValue(
+  label: "Cash" | "Depot" | "Immobilienwert",
+  value: number,
+  formatMoney: (value: number) => string
+): string {
+  return `
+    <div class="combined-wealth-summary-item">
+      <span class="combined-wealth-summary-label">${label}</span>
+      <strong class="combined-wealth-summary-value">${formatMoney(value)}</strong>
+    </div>
   `;
 }
 

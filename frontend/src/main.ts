@@ -211,6 +211,8 @@ function sanitizeAppState(appState: AppState): AppState {
     selectedInvestmentAccountId: "default-account",
     selectedRealEstateAccountIds: ["default-account"],
     selectedRealEstateWithdrawalGainAccountIds: ["default-account"],
+    selectedCombinedAccountIds: ["default-account"],
+    selectedCombinedLeadInvestmentAccountId: "default-account",
     settingsGrunddatenExpanded: true
   };
   const ui = appState.ui ?? fallbackUi;
@@ -243,6 +245,17 @@ function sanitizeAppState(appState: AppState): AppState {
     accountIds.includes(accountId)
   );
   const normalizedRealEstateAccountIds = selectedRealEstateAccountIds.length ? selectedRealEstateAccountIds : accountIds;
+  const selectedCombinedAccountIds = (ui.selectedCombinedAccountIds ?? accountIds).filter((accountId) =>
+    accountIds.includes(accountId)
+  );
+  const selectedCombinedLeadInvestmentAccountId = accountIds.includes(ui.selectedCombinedLeadInvestmentAccountId)
+    ? ui.selectedCombinedLeadInvestmentAccountId
+    : selectedInvestmentAccountId;
+  const normalizedCombinedLeadInvestmentAccountId = selectedCombinedAccountIds.includes(
+    selectedCombinedLeadInvestmentAccountId
+  )
+    ? selectedCombinedLeadInvestmentAccountId
+    : selectedCombinedAccountIds[0] ?? selectedCombinedLeadInvestmentAccountId;
   const positions =
     planningAccounts.find((account) => account.id === selectedPlanningAccountId)?.yearlyRows ??
     appState.positions.map((position) => sanitizePosition(position, appState.settings.year));
@@ -268,6 +281,8 @@ function sanitizeAppState(appState: AppState): AppState {
       selectedInvestmentAccountId,
       selectedRealEstateAccountIds: normalizedRealEstateAccountIds,
       selectedRealEstateWithdrawalGainAccountIds: normalizedRealEstateAccountIds,
+      selectedCombinedAccountIds,
+      selectedCombinedLeadInvestmentAccountId: normalizedCombinedLeadInvestmentAccountId,
       activeSection: ui.activeSection === "grunddaten" ? "cost_reserve_positions" : ui.activeSection
     },
     positions,
@@ -314,6 +329,13 @@ function planningAccountById(accountId: string): PlanningAccount | null {
   return state.planningAccounts.find((account) => account.id === accountId) ?? null;
 }
 
+function planningAccountsByIds(accountIds: string[]): PlanningAccount[] {
+  if (!accountIds.length) return [];
+  return accountIds
+    .map((accountId) => planningAccountById(accountId))
+    .filter((account): account is PlanningAccount => account !== null);
+}
+
 function selectedInvestmentPlanningAccount(): PlanningAccount {
   const selectedId = state.ui.selectedInvestmentAccountId;
   const fallbackId = state.ui.selectedPlanningAccountId;
@@ -328,15 +350,30 @@ function selectedInvestmentPlanningAccount(): PlanningAccount {
 }
 
 function selectedRealEstateSourceAccounts(): PlanningAccount[] {
-  const selectedIds = state.ui.selectedRealEstateAccountIds;
-  if (!selectedIds.length) return [];
-  return selectedIds
-    .map((accountId) => planningAccountById(accountId))
-    .filter((account): account is PlanningAccount => account !== null);
+  return planningAccountsByIds(state.ui.selectedRealEstateAccountIds);
 }
 
 function selectedRealEstateWithdrawalAccounts(): PlanningAccount[] {
   return selectedRealEstateSourceAccounts();
+}
+
+function selectedCombinedAccounts(): PlanningAccount[] {
+  return planningAccountsByIds(state.ui.selectedCombinedAccountIds);
+}
+
+function selectedCombinedLeadInvestmentPlanningAccount(): PlanningAccount | null {
+  const activeCombinedAccounts = selectedCombinedAccounts();
+  if (!activeCombinedAccounts.length) return null;
+  const leadId = state.ui.selectedCombinedLeadInvestmentAccountId;
+  const lead =
+    activeCombinedAccounts.find((account) => account.id === leadId) ??
+    activeCombinedAccounts[0] ??
+    null;
+  if (!lead) return null;
+  if (state.ui.selectedCombinedLeadInvestmentAccountId !== lead.id) {
+    state.ui = { ...state.ui, selectedCombinedLeadInvestmentAccountId: lead.id };
+  }
+  return lead;
 }
 
 function synchronizeAccountScopedState(): void {
@@ -362,6 +399,17 @@ function synchronizeAccountScopedState(): void {
   const normalizedRealEstateAccountIds = selectedRealEstateAccountIds.length
     ? selectedRealEstateAccountIds
     : [...accountIds];
+  const selectedCombinedAccountIds = state.ui.selectedCombinedAccountIds.filter((accountId) =>
+    accountIds.includes(accountId)
+  );
+  const selectedCombinedLeadInvestmentAccountId = accountIds.includes(state.ui.selectedCombinedLeadInvestmentAccountId)
+    ? state.ui.selectedCombinedLeadInvestmentAccountId
+    : selectedInvestmentAccountId;
+  const normalizedCombinedLeadInvestmentAccountId = selectedCombinedAccountIds.includes(
+    selectedCombinedLeadInvestmentAccountId
+  )
+    ? selectedCombinedLeadInvestmentAccountId
+    : selectedCombinedAccountIds[0] ?? selectedCombinedLeadInvestmentAccountId;
 
   const investmentByAccountId = accountIds.reduce<Record<string, InvestmentSettings>>((result, accountId) => {
     result[accountId] = state.investmentByAccountId[accountId] ?? defaultInvestmentSettingsForNewAccount();
@@ -374,7 +422,9 @@ function synchronizeAccountScopedState(): void {
     selectedPlanningAccountId,
     selectedInvestmentAccountId,
     selectedRealEstateAccountIds: normalizedRealEstateAccountIds,
-    selectedRealEstateWithdrawalGainAccountIds: normalizedRealEstateAccountIds
+    selectedRealEstateWithdrawalGainAccountIds: normalizedRealEstateAccountIds,
+    selectedCombinedAccountIds,
+    selectedCombinedLeadInvestmentAccountId: normalizedCombinedLeadInvestmentAccountId
   };
   state.investment = state.investmentByAccountId[selectedInvestmentAccountId] ?? defaultInvestmentSettingsForNewAccount();
   investmentAccountContextId = selectedInvestmentAccountId;
@@ -569,6 +619,12 @@ function bindEvents(): void {
     }
     if (action?.startsWith("toggle-real-estate-account-")) {
       toggleRealEstateSourceAccount(action.replace("toggle-real-estate-account-", ""));
+    }
+    if (action?.startsWith("toggle-combined-account-")) {
+      toggleCombinedAccount(action.replace("toggle-combined-account-", ""));
+    }
+    if (action?.startsWith("select-combined-lead-account-")) {
+      selectCombinedLeadInvestmentAccount(action.replace("select-combined-lead-account-", ""));
     }
     if (action === "toggle-result-max-needed") toggleResultMaxNeeded();
     if (action === "set-investment-depot-standard") setInvestmentDepot("standard");
@@ -812,10 +868,28 @@ function renderCalculations(
   );
   const realEstateProjectionYears = currentRealEstateProjectionYears(financingStartYear, standardProjection.endAge);
   const maxRealEstateProjectionYears = currentRealEstateMaximumProjectionYears(financingStartYear);
+  const combinedLeadAccount = selectedCombinedLeadInvestmentPlanningAccount();
+  const combinedLeadSettings = combinedLeadAccount
+    ? state.investmentByAccountId[combinedLeadAccount.id] ?? defaultInvestmentSettingsForNewAccount()
+    : null;
+  const combinedStandardProjection = combinedLeadAccount
+    ? buildDepotAssetProjection(calculateReserveSummary(state.settings, combinedLeadAccount.yearlyRows), "standard", combinedLeadAccount.id)
+    : combinedProjectionWithoutAccounts(standardProjection);
+  const combinedRetirementProjection = combinedLeadAccount
+    ? buildDepotAssetProjection(
+        calculateReserveSummary(state.settings, combinedLeadAccount.yearlyRows),
+        "retirement",
+        combinedLeadAccount.id
+      )
+    : combinedProjectionWithoutAccounts(retirementProjection);
+  const combinedBirthYear = combinedLeadSettings?.birthYear ?? state.settings.year;
+  const combinedRetirementBirthYear = combinedLeadSettings?.retirementBirthYear ?? state.settings.year;
   const combinedRealEstateProjectionYears = currentCombinedRealEstateProjectionYears(
     financingStartYear,
-    standardProjection,
-    retirementProjection
+    combinedStandardProjection,
+    combinedRetirementProjection,
+    combinedBirthYear,
+    combinedRetirementBirthYear
   );
   renderRealEstateSourceLists();
   const realEstate = calculateRealEstateFinancing(
@@ -828,20 +902,22 @@ function renderCalculations(
     }
   );
   renderRealEstateCalculations(realEstate, realEstateProjectionYears);
-  const combinedRealEstate =
-    combinedRealEstateProjectionYears === realEstateProjectionYears &&
-    combinedRealEstateProjectionYears === maxRealEstateProjectionYears
-      ? realEstate
-      : calculateRealEstateFinancing(
-          financingStartYear,
-          state.realEstate,
-          realEstateSourceSchedule(financingStartYear, combinedRealEstateProjectionYears),
-          {
-            projectionYears: combinedRealEstateProjectionYears,
-            maxProjectionYears: combinedRealEstateProjectionYears
-          }
-        );
-  const combinedYears = calculateCombinedWealthYears(standardProjection, retirementProjection, combinedRealEstate);
+  const combinedRealEstate = calculateRealEstateFinancing(
+    financingStartYear,
+    state.realEstate,
+    realEstateSourceSchedule(financingStartYear, combinedRealEstateProjectionYears, state.ui.selectedCombinedAccountIds),
+    {
+      projectionYears: combinedRealEstateProjectionYears,
+      maxProjectionYears: combinedRealEstateProjectionYears
+    }
+  );
+  const combinedYears = calculateCombinedWealthYears(
+    combinedStandardProjection,
+    combinedRetirementProjection,
+    combinedRealEstate,
+    combinedBirthYear,
+    combinedRetirementBirthYear
+  );
   renderCombinedWealthCalculations(combinedYears);
 }
 
@@ -965,15 +1041,34 @@ function currentRealEstateMaximumProjectionYears(startYear: number): number {
 function currentCombinedRealEstateProjectionYears(
   startYear: number,
   standardProjection: AssetProjection,
-  retirementProjection: AssetProjection
+  retirementProjection: AssetProjection,
+  standardBirthYear: number,
+  retirementBirthYear: number
 ): number {
-  const standardEndYear = state.investment.birthYear + Math.floor(standardProjection.endAge);
-  const retirementEndYear = state.investment.retirementBirthYear + Math.floor(retirementProjection.endAge);
+  const standardEndYear = standardBirthYear + Math.floor(standardProjection.endAge);
+  const retirementEndYear = retirementBirthYear + Math.floor(retirementProjection.endAge);
   const combinedEndYear = Math.max(standardEndYear, retirementEndYear);
   const saleYear = state.realEstate.plannedSaleYear;
   const projectionEndYear =
     saleYear !== null && saleYear >= startYear ? Math.min(Math.round(saleYear), combinedEndYear) : combinedEndYear;
   return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
+}
+
+function combinedProjectionWithoutAccounts(baseProjection: AssetProjection): AssetProjection {
+  return {
+    ...baseProjection,
+    points: [],
+    monthlyRate: 0,
+    annualSavingsRate: 0,
+    monthlyPension: 0,
+    realMonthlyPension: 0,
+    percentageWithdrawalMonthlyAtStart: 0,
+    percentageWithdrawalAnnualAtStart: 0,
+    withdrawalRemainingSavingsMonthlyAtStart: 0,
+    withdrawalGainMonthlyAtStart: 0,
+    endAge: 0,
+    retirementAge: 0
+  };
 }
 
 function realEstateDepotSavingsRateAvailable(standardProjection: AssetProjection): boolean {
@@ -999,8 +1094,9 @@ interface RealEstateWithdrawalProfile {
   depotSavingsRateAvailable: boolean;
 }
 
-function realEstateWithdrawalProfiles(): RealEstateWithdrawalProfile[] {
-  return selectedRealEstateWithdrawalAccounts().map((account) => {
+function realEstateWithdrawalProfiles(accountIds: string[] | null = null): RealEstateWithdrawalProfile[] {
+  const withdrawalAccounts = accountIds ? planningAccountsByIds(accountIds) : selectedRealEstateWithdrawalAccounts();
+  return withdrawalAccounts.map((account) => {
     const settings = state.investmentByAccountId[account.id] ?? defaultInvestmentSettingsForNewAccount();
     const reserve = calculateReserveSummary(state.settings, account.yearlyRows);
     const projection = buildDepotAssetProjection(reserve, "standard", account.id);
@@ -1022,19 +1118,21 @@ function realEstateWithdrawalProfiles(): RealEstateWithdrawalProfile[] {
 
 function realEstateSourceSchedule(
   startYear: number,
-  projectionYears: number
+  projectionYears: number,
+  accountIds = state.ui.selectedRealEstateAccountIds
 ): RealEstateFinancingSourceSchedule {
   const monthCount = Math.max(12, Math.min(80, Math.round(projectionYears || 1)) * 12);
-  const equityPositions = selectedRealEstateSourcePositions("equityCapital");
-  const monthlyPositions = selectedRealEstateSourcePositions("monthlyPayment");
-  const specialPositions = selectedRealEstateSourcePositions("specialRepayment");
+  const sourceAccounts = planningAccountsByIds(accountIds);
+  const equityPositions = selectedRealEstateSourcePositions("equityCapital", sourceAccounts);
+  const monthlyPositions = selectedRealEstateSourcePositions("monthlyPayment", sourceAccounts);
+  const specialPositions = selectedRealEstateSourcePositions("specialRepayment", sourceAccounts);
   const equityCapital = equityPositions.reduce((sum, position) => {
     return sum + (position.payoutType === "once" && position.payoutYear <= startYear ? Number(position.amount) : 0);
   }, 0);
   const monthlyPaymentSavings: number[] = [];
   const withdrawalGainPayments: number[] = [];
   const specialRepayments: number[] = [];
-  const withdrawalProfiles = realEstateWithdrawalProfiles();
+  const withdrawalProfiles = realEstateWithdrawalProfiles(accountIds);
   const depotSavingsRatePayments: number[] = [];
 
   for (let index = 0; index < monthCount; index += 1) {
@@ -1073,9 +1171,10 @@ function realEstateSourceSchedule(
 }
 
 function selectedRealEstateSourcePositions(
-  kind: RealEstatePaymentSourceKind
+  kind: RealEstatePaymentSourceKind,
+  sourceAccounts = selectedRealEstateSourceAccounts()
 ): ReservePosition[] {
-  const positions = selectedRealEstateSourceAccounts().flatMap((account) => account.yearlyRows);
+  const positions = sourceAccounts.flatMap((account) => account.yearlyRows);
   const selectedIds = new Set(realEstateSourceIds(kind));
   return positions.filter(
     (position) =>
@@ -1089,13 +1188,15 @@ function selectedRealEstateSourcePositions(
 function calculateCombinedWealthYears(
   standardProjection: AssetProjection,
   retirementProjection: AssetProjection,
-  realEstate: RealEstateFinancingResult
+  realEstate: RealEstateFinancingResult,
+  standardBirthYear: number,
+  retirementBirthYear: number
 ): CombinedWealthYear[] {
-  const standardEndYear = state.investment.birthYear + standardProjection.endAge;
-  const retirementEndYear = state.investment.retirementBirthYear + retirementProjection.endAge;
+  const standardEndYear = standardBirthYear + standardProjection.endAge;
+  const retirementEndYear = retirementBirthYear + retirementProjection.endAge;
   const horizonYears = combinedWealthHorizonYears(state.settings.year, standardEndYear, retirementEndYear);
 
-  const cashContribution = combinedCashContribution(horizonYears);
+  const cashContribution = combinedCashContribution(horizonYears, selectedCombinedAccounts());
 
   return buildCombinedWealthSeries({
     startYear: state.settings.year,
@@ -1105,14 +1206,14 @@ function calculateCombinedWealthYears(
     yearlyCashDeltas: cashContribution.yearlyCashDeltas,
     depotProjection: standardProjection,
     sharedDepotProjection: retirementProjection,
-    depotBirthYear: state.investment.birthYear,
-    sharedDepotBirthYear: state.investment.retirementBirthYear,
+    depotBirthYear: standardBirthYear,
+    sharedDepotBirthYear: retirementBirthYear,
     realEstateYears: realEstate.years,
     toggles: state.combinedWealth
   });
 }
 
-function combinedCashContribution(horizonYears: number): {
+function combinedCashContribution(horizonYears: number, accounts: PlanningAccount[]): {
   cashStartValue: number;
   yearlyCashDelta: number;
   yearlyCashDeltas: number[];
@@ -1121,14 +1222,8 @@ function combinedCashContribution(horizonYears: number): {
   let yearlyCashDelta = 0;
   const yearlyCashDeltas = Array.from({ length: Math.max(1, horizonYears) }, () => 0);
 
-  for (const account of state.planningAccounts) {
-    const include =
-      account.type === "cost_reserve"
-        ? state.combinedWealth.includeCostReserveAccounts
-        : account.type === "annual_table"
-          ? state.combinedWealth.includeAnnualTableAccounts
-          : state.combinedWealth.includeCostReserveAccounts || state.combinedWealth.includeAnnualTableAccounts;
-    if (!include) continue;
+  for (const account of accounts) {
+    if (!includeAccountInCombinedCashContribution(account.type)) continue;
     for (let yearOffset = 0; yearOffset < yearlyCashDeltas.length; yearOffset += 1) {
       const summary = calculateReserveSummary(
         { ...state.settings, year: state.settings.year + yearOffset },
@@ -1143,14 +1238,16 @@ function combinedCashContribution(horizonYears: number): {
   }
 
   if (!Number.isFinite(cashStartValue) || !Number.isFinite(yearlyCashDelta)) {
-    return { cashStartValue: reserveFallbackValue(), yearlyCashDelta: 0, yearlyCashDeltas };
+    return { cashStartValue: 0, yearlyCashDelta: 0, yearlyCashDeltas };
   }
 
   return { cashStartValue, yearlyCashDelta, yearlyCashDeltas };
 }
 
-function reserveFallbackValue(): number {
-  return calculateReserveSummary(state.settings, state.positions).yearEndBalance;
+function includeAccountInCombinedCashContribution(accountType: PlanningAccount["type"]): boolean {
+  if (accountType === "mixed") return state.combinedWealth.includeCashPositions;
+  if (accountType === "cost_reserve") return state.combinedWealth.includeCostReserveAccounts;
+  return state.combinedWealth.includeAnnualTableAccounts;
 }
 
 function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
@@ -1280,6 +1377,8 @@ function renderPlanningAccounts(): void {
   const yearSelector = document.querySelector<HTMLDivElement>("#yearAccountSelector");
   const investmentSelector = document.querySelector<HTMLDivElement>("#investmentAccountSelector");
   const realEstateAccountSelector = document.querySelector<HTMLDivElement>("#realEstateAccountSelector");
+  const combinedAccountSelector = document.querySelector<HTMLDivElement>("#combinedAccountSelector");
+  const combinedLeadAccountSelector = document.querySelector<HTMLDivElement>("#combinedLeadInvestmentAccountSelector");
   if (!cards || !summary || !yearAccountName) return;
 
   const activeAccount = activePlanningAccount();
@@ -1373,6 +1472,51 @@ function renderPlanningAccounts(): void {
       : '<span class="chart-empty">Noch kein Konto vorhanden.</span>';
   }
 
+  if (combinedAccountSelector) {
+    combinedAccountSelector.innerHTML = state.planningAccounts.length
+      ? state.planningAccounts
+          .map((account) => {
+            const active = state.ui.selectedCombinedAccountIds.includes(account.id);
+            return `
+              <button
+                class="planning-account-card ${active ? "active" : ""}"
+                type="button"
+                data-action="toggle-combined-account-${account.id}"
+                aria-pressed="${active}"
+              >
+                <strong>${escapeHtml(account.name)}</strong>
+                <small>${escapeHtml(account.type)}</small>
+                <small>${intNumber(account.yearlyRows.length)} Positionen</small>
+              </button>
+            `;
+          })
+          .join("")
+      : '<span class="chart-empty">Noch kein Konto vorhanden.</span>';
+  }
+
+  if (combinedLeadAccountSelector) {
+    const activeCombinedAccounts = selectedCombinedAccounts();
+    combinedLeadAccountSelector.innerHTML = activeCombinedAccounts.length
+      ? activeCombinedAccounts
+          .map((account) => {
+            const active = state.ui.selectedCombinedLeadInvestmentAccountId === account.id;
+            return `
+              <button
+                class="planning-account-card ${active ? "active" : ""}"
+                type="button"
+                data-action="select-combined-lead-account-${account.id}"
+                aria-pressed="${active}"
+              >
+                <strong>${escapeHtml(account.name)}</strong>
+                <small>${escapeHtml(account.type)}</small>
+                <small>${intNumber(account.yearlyRows.length)} Positionen</small>
+              </button>
+            `;
+          })
+          .join("")
+      : '<span class="chart-empty">Kein aktives Konto ausgewaehlt.</span>';
+  }
+
   summary.textContent = `Konten gesamt: ${state.planningAccounts.length} | mixed: ${totalsByType.mixed} | cost_reserve: ${totalsByType.costReserve} | annual_table: ${totalsByType.annualTable}`;
   yearAccountName.textContent = `(aktiv: ${activeAccount.name})`;
   renderPlanningAccountDialog();
@@ -1456,7 +1600,8 @@ function savePlanningAccountDialog(): void {
     selectedPlanningAccountId: account.id,
     selectedInvestmentAccountId: account.id,
     selectedRealEstateAccountIds: Array.from(new Set([...state.ui.selectedRealEstateAccountIds, account.id])),
-    selectedRealEstateWithdrawalGainAccountIds: Array.from(new Set([...state.ui.selectedRealEstateAccountIds, account.id]))
+    selectedRealEstateWithdrawalGainAccountIds: Array.from(new Set([...state.ui.selectedRealEstateAccountIds, account.id])),
+    selectedCombinedAccountIds: Array.from(new Set([...state.ui.selectedCombinedAccountIds, account.id]))
   };
   state.positions = account.yearlyRows;
   accountDialog = null;
@@ -1512,6 +1657,7 @@ function deletePlanningAccount(): void {
   state.planningAccounts = state.planningAccounts.filter((item) => item.id !== account.id);
   const nextPlanningAccountId = state.planningAccounts[0].id;
   const nextRealEstateAccountIds = state.ui.selectedRealEstateAccountIds.filter((accountId) => accountId !== account.id);
+  const nextCombinedAccountIds = state.ui.selectedCombinedAccountIds.filter((accountId) => accountId !== account.id);
   const nextInvestmentByAccountId = { ...state.investmentByAccountId };
   delete nextInvestmentByAccountId[account.id];
   state.investmentByAccountId = nextInvestmentByAccountId;
@@ -1521,7 +1667,8 @@ function deletePlanningAccount(): void {
     selectedInvestmentAccountId:
       state.ui.selectedInvestmentAccountId === account.id ? nextPlanningAccountId : state.ui.selectedInvestmentAccountId,
     selectedRealEstateAccountIds: nextRealEstateAccountIds,
-    selectedRealEstateWithdrawalGainAccountIds: nextRealEstateAccountIds
+    selectedRealEstateWithdrawalGainAccountIds: nextRealEstateAccountIds,
+    selectedCombinedAccountIds: nextCombinedAccountIds
   };
   syncPositionsFromActivePlanningAccount();
   renderAll();
@@ -1555,6 +1702,26 @@ function toggleRealEstateSourceAccount(accountId: string): void {
     selectedRealEstateWithdrawalGainAccountIds: selectedIds
   };
   resetRealEstateDetailSelection();
+  renderAll();
+}
+
+function toggleCombinedAccount(accountId: string): void {
+  if (!accountId || !state.planningAccounts.some((account) => account.id === accountId)) return;
+  const selected = new Set(state.ui.selectedCombinedAccountIds);
+  if (selected.has(accountId)) selected.delete(accountId);
+  else selected.add(accountId);
+  state.ui = {
+    ...state.ui,
+    selectedCombinedAccountIds: Array.from(selected)
+  };
+  renderAll();
+}
+
+function selectCombinedLeadInvestmentAccount(accountId: string): void {
+  if (!accountId || !state.planningAccounts.some((account) => account.id === accountId)) return;
+  if (!state.ui.selectedCombinedAccountIds.includes(accountId)) return;
+  if (state.ui.selectedCombinedLeadInvestmentAccountId === accountId) return;
+  state.ui = { ...state.ui, selectedCombinedLeadInvestmentAccountId: accountId };
   renderAll();
 }
 

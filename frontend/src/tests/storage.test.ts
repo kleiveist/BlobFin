@@ -145,7 +145,9 @@ describe("storage", () => {
         selectedPlanningAccountId: "missing-planning-account",
         selectedInvestmentAccountId: "missing-investment-account",
         selectedRealEstateAccountIds: ["missing-real-estate-account", onlyAccountId],
-        selectedRealEstateWithdrawalGainAccountIds: ["missing-withdrawal-account"]
+        selectedRealEstateWithdrawalGainAccountIds: ["missing-withdrawal-account"],
+        selectedCombinedAccountIds: ["missing-combined-account"],
+        selectedCombinedLeadInvestmentAccountId: "missing-combined-lead"
       }
     };
     storage.setItem(STORAGE_KEY, JSON.stringify(invalidUiState));
@@ -156,6 +158,8 @@ describe("storage", () => {
     expect(loaded.ui.selectedInvestmentAccountId).toBe(onlyAccountId);
     expect(loaded.ui.selectedRealEstateAccountIds).toEqual([onlyAccountId]);
     expect(loaded.ui.selectedRealEstateWithdrawalGainAccountIds).toEqual([onlyAccountId]);
+    expect(loaded.ui.selectedCombinedAccountIds).toEqual([]);
+    expect(loaded.ui.selectedCombinedLeadInvestmentAccountId).toBe(onlyAccountId);
   });
 
   it("keeps real estate source and withdrawal account selections synchronized", () => {
@@ -181,5 +185,30 @@ describe("storage", () => {
 
     expect(loaded.realEstate.includeWithdrawalGainAsPaymentSource).toBe(true);
     expect(loaded.ui.selectedRealEstateWithdrawalGainAccountIds).toEqual(loaded.ui.selectedRealEstateAccountIds);
+    expect(loaded.ui.selectedCombinedAccountIds).toEqual(state.planningAccounts.map((account) => account.id));
+    expect(loaded.ui.selectedCombinedLeadInvestmentAccountId).toBe(loaded.ui.selectedInvestmentAccountId);
+  });
+
+  it("uses the new combined module defaults when saved values are missing", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        combinedWealth: {}
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.combinedWealth.includeCashPositions).toBe(true);
+    expect(loaded.combinedWealth.includeCostReserveAccounts).toBe(false);
+    expect(loaded.combinedWealth.includeAnnualTableAccounts).toBe(false);
+    expect(loaded.combinedWealth.includeDepotDevelopment).toBe(true);
+    expect(loaded.combinedWealth.includeSharedDepotDevelopment).toBe(false);
+    expect(loaded.combinedWealth.includeWithdrawals).toBe(false);
+    expect(loaded.combinedWealth.includeRealEstateFinancing).toBe(true);
+    expect(loaded.combinedWealth.includeRealEstateValueTrend).toBe(false);
   });
 });

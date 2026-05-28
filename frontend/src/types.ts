@@ -102,6 +102,8 @@ export interface AppUiState {
   selectedInvestmentAccountId: string;
   selectedRealEstateAccountIds: string[];
   selectedRealEstateWithdrawalGainAccountIds: string[];
+  selectedCombinedAccountIds: string[];
+  selectedCombinedLeadInvestmentAccountId: string;
   settingsGrunddatenExpanded: boolean;
 }
 

@@ -260,7 +260,9 @@ function normalizeAppUiState(value: unknown, accounts: PlanningAccount[]): AppUi
       selectedPlanningAccountId: firstAccountId,
       selectedInvestmentAccountId: firstAccountId,
       selectedRealEstateAccountIds: accountIds,
-      selectedRealEstateWithdrawalGainAccountIds: accountIds
+      selectedRealEstateWithdrawalGainAccountIds: accountIds,
+      selectedCombinedAccountIds: accountIds,
+      selectedCombinedLeadInvestmentAccountId: firstAccountId
     };
   }
 
@@ -269,14 +271,27 @@ function normalizeAppUiState(value: unknown, accounts: PlanningAccount[]): AppUi
   const normalizedPlanningAccountId = planningAccountExists ? selectedPlanningAccountId : firstAccountId;
   const selectedInvestmentAccountId = String(value.selectedInvestmentAccountId || normalizedPlanningAccountId);
   const investmentAccountExists = accounts.some((account) => account.id === selectedInvestmentAccountId);
+  const normalizedInvestmentAccountId = investmentAccountExists
+    ? selectedInvestmentAccountId
+    : normalizedPlanningAccountId;
   const selectedRealEstateAccountIds = normalizeSelectedAccountIds(value.selectedRealEstateAccountIds, accountIds, accountIds);
+  const selectedCombinedAccountIds = normalizeSelectedAccountIds(value.selectedCombinedAccountIds, accountIds, accountIds);
+  const selectedCombinedLeadInvestmentAccountId = String(
+    value.selectedCombinedLeadInvestmentAccountId || normalizedInvestmentAccountId
+  );
+  const leadInCombinedSelection = selectedCombinedAccountIds.includes(selectedCombinedLeadInvestmentAccountId);
+  const normalizedCombinedLeadInvestmentAccountId = leadInCombinedSelection
+    ? selectedCombinedLeadInvestmentAccountId
+    : selectedCombinedAccountIds[0] ?? normalizedInvestmentAccountId;
 
   return {
     activeSection: normalizeAppSectionId(value.activeSection, fallback.activeSection),
     selectedPlanningAccountId: normalizedPlanningAccountId,
-    selectedInvestmentAccountId: investmentAccountExists ? selectedInvestmentAccountId : normalizedPlanningAccountId,
+    selectedInvestmentAccountId: normalizedInvestmentAccountId,
     selectedRealEstateAccountIds,
     selectedRealEstateWithdrawalGainAccountIds: selectedRealEstateAccountIds,
+    selectedCombinedAccountIds,
+    selectedCombinedLeadInvestmentAccountId: normalizedCombinedLeadInvestmentAccountId,
     settingsGrunddatenExpanded: booleanOrDefault(
       value.settingsGrunddatenExpanded,
       fallback.settingsGrunddatenExpanded

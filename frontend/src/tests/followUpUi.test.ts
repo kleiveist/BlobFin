@@ -76,6 +76,9 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("Konten fuer Sparquellen und Entnahme-Zugewinn");
     expect(html).toContain('class="real-estate-locale-default"');
     expect(html).not.toContain('data-action="set-real-estate-locale-en"');
+    expect(html).toContain('id="combinedAccountSelector"');
+    expect(html).toContain('id="combinedLeadInvestmentAccountSelector"');
+    expect(html).toContain("Kombi-Leitkonto (Depot/Entnahme)");
     expect(html).toContain('id="accountYearTableOverview"');
     expect(html).not.toContain('id="resultHead"');
   });
@@ -170,6 +173,39 @@ describe("follow-up ui rendering", () => {
     });
 
     expect(chart).toContain('style="--wealth-chart-count:2;"');
+  });
+
+  it("renders the combined wealth chart with section header values and 5-year ticks", () => {
+    const points: CombinedWealthYear[] = Array.from({ length: 7 }, (_, index) => ({
+      ...combinedYear,
+      year: 2026 + index,
+      cashValue: 10000 + index * 100,
+      depotValue: 20000 + index * 200,
+      propertyValue: 300000 + index * 1000,
+      totalGrossAssets: 330000 + index * 1300
+    }));
+    const chart = renderCombinedWealthChart({
+      points,
+      selectedYear: 2029,
+      formatMoney: (value) => `${value} EUR`
+    });
+    const compact = chart.replace(/\s+/g, " ");
+
+    expect(chart).toContain("combined-wealth-summary");
+    expect(chart).toContain("combined-wealth-summary-label");
+    expect(compact).toContain('class="combined-wealth-summary-label">Cash</span>');
+    expect(compact).toContain('class="combined-wealth-summary-value">10300 EUR</strong>');
+    expect(compact).toContain('class="combined-wealth-summary-value">20600 EUR</strong>');
+    expect(compact).toContain('class="combined-wealth-summary-value">303000 EUR</strong>');
+    expect(chart).not.toContain("wealth-column-value");
+    expect(chart).not.toContain("wealth-column-year");
+    expect(chart).not.toContain('class="wealth-x-axis"');
+    expect(chart).toContain("combined-wealth-ticks");
+    expect(count(chart, "combined-wealth-tick visible")).toBe(3);
+    expect(compact).toContain('class="combined-wealth-tick visible"> 2026 </span>');
+    expect(compact).toContain('class="combined-wealth-tick visible"> 2031 </span>');
+    expect(compact).toContain('class="combined-wealth-tick visible"> 2032 </span>');
+    expect(count(chart, 'data-action="select-combined-wealth-year"')).toBe(7);
   });
 
   it("exposes real estate popup segment labels", () => {

@@ -2599,6 +2599,25 @@ tfoot th {
   gap: 10px;
 }
 
+.combined-account-modules {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.combined-account-module {
+  display: grid;
+  gap: 8px;
+}
+
+.combined-account-module h3 {
+  margin: 0;
+}
+
+.combined-account-module .planning-account-cards {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
 .combined-toggle-item {
   align-items: start;
   background: var(--surface);
@@ -2929,6 +2948,108 @@ tfoot th {
   text-align: center;
 }
 
+.combined-wealth-card .wealth-chart-host {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.combined-wealth-vertical-chart {
+  gap: 6px;
+}
+
+.combined-wealth-summary {
+  align-items: flex-end;
+  border-bottom: 1px solid var(--row-border);
+  display: flex;
+  gap: 12px;
+  grid-column: 2;
+  justify-content: space-between;
+  min-height: 118px;
+  padding: 0 6px 6px;
+}
+
+.combined-wealth-summary-item {
+  align-items: center;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+  min-width: 0;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.combined-wealth-summary-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combined-wealth-summary-value {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combined-wealth-card .wealth-plot {
+  gap: 2px;
+  grid-template-columns: repeat(var(--wealth-chart-count, 1), minmax(14px, 1fr));
+  padding: 12px 2px 0;
+}
+
+.combined-wealth-card .wealth-column-button {
+  border: 0;
+  border-radius: 0;
+  gap: 0;
+  grid-template-rows: minmax(220px, 1fr);
+  padding: 0;
+}
+
+.combined-wealth-card .wealth-column-button.active,
+.combined-wealth-card .wealth-column-button.financing-end,
+.combined-wealth-card .wealth-column-button.active.financing-end {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.combined-wealth-card .wealth-column-track {
+  min-height: 220px;
+  padding: 2px;
+}
+
+.combined-wealth-ticks {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.68rem;
+  font-weight: 800;
+  gap: 2px;
+  grid-column: 2;
+  grid-template-columns: repeat(var(--wealth-chart-count, 1), minmax(14px, 1fr));
+  min-height: 18px;
+}
+
+.combined-wealth-tick {
+  opacity: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.combined-wealth-tick.visible {
+  opacity: 1;
+}
+
 .wealth-detail-box {
   background: var(--surface-soft);
   border: 1px solid var(--row-border);
@@ -2987,6 +3108,33 @@ tfoot th {
   .wealth-column-track {
     padding-left: 2px;
     padding-right: 2px;
+  }
+
+  .combined-wealth-summary {
+    gap: 8px;
+    min-height: 102px;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .combined-wealth-summary-label {
+    font-size: 0.66rem;
+  }
+
+  .combined-wealth-summary-value {
+    font-size: 0.72rem;
+  }
+
+  .combined-wealth-card .wealth-plot {
+    gap: 1px;
+    grid-template-columns: repeat(var(--wealth-chart-count, 1), minmax(12px, 1fr));
+    padding-left: 1px;
+    padding-right: 1px;
+  }
+
+  .combined-wealth-ticks {
+    gap: 1px;
+    grid-template-columns: repeat(var(--wealth-chart-count, 1), minmax(12px, 1fr));
   }
 }
 

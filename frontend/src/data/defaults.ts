@@ -214,6 +214,8 @@ export function defaultAppUiState(): AppUiState {
     selectedInvestmentAccountId: "default-account",
     selectedRealEstateAccountIds: ["default-account"],
     selectedRealEstateWithdrawalGainAccountIds: ["default-account"],
+    selectedCombinedAccountIds: ["default-account"],
+    selectedCombinedLeadInvestmentAccountId: "default-account",
     settingsGrunddatenExpanded: true
   };
 }
@@ -302,13 +304,13 @@ export function defaultRepaymentSourceToggles(): RepaymentSourceToggle {
 export function defaultCombinedWealthToggles(): CombinedWealthToggles {
   return {
     includeCashPositions: true,
-    includeCostReserveAccounts: true,
-    includeAnnualTableAccounts: true,
+    includeCostReserveAccounts: false,
+    includeAnnualTableAccounts: false,
     includeDepotDevelopment: true,
-    includeSharedDepotDevelopment: true,
-    includeWithdrawals: true,
+    includeSharedDepotDevelopment: false,
+    includeWithdrawals: false,
     includeRealEstateFinancing: true,
-    includeRealEstateValueTrend: true
+    includeRealEstateValueTrend: false
   };
 }
 
