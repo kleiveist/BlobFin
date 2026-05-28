@@ -175,8 +175,8 @@ describe("follow-up ui rendering", () => {
     expect(chart).toContain('style="--wealth-chart-count:2;"');
   });
 
-  it("renders the combined wealth chart with section header values and 5-year ticks", () => {
-    const points: CombinedWealthYear[] = Array.from({ length: 7 }, (_, index) => ({
+  it("renders the combined wealth chart with section header values and 15-year ticks", () => {
+    const points: CombinedWealthYear[] = Array.from({ length: 33 }, (_, index) => ({
       ...combinedYear,
       year: 2026 + index,
       cashValue: 10000 + index * 100,
@@ -203,9 +203,10 @@ describe("follow-up ui rendering", () => {
     expect(chart).toContain("combined-wealth-ticks");
     expect(count(chart, "combined-wealth-tick visible")).toBe(3);
     expect(compact).toContain('class="combined-wealth-tick visible"> 2026 </span>');
-    expect(compact).toContain('class="combined-wealth-tick visible"> 2031 </span>');
-    expect(compact).toContain('class="combined-wealth-tick visible"> 2032 </span>');
-    expect(count(chart, 'data-action="select-combined-wealth-year"')).toBe(7);
+    expect(compact).toContain('class="combined-wealth-tick visible"> 2041 </span>');
+    expect(compact).toContain('class="combined-wealth-tick visible"> 2056 </span>');
+    expect(compact).not.toContain('class="combined-wealth-tick visible"> 2058 </span>');
+    expect(count(chart, 'data-action="select-combined-wealth-year"')).toBe(33);
   });
 
   it("exposes real estate popup segment labels", () => {

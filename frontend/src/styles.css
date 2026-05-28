@@ -2958,26 +2958,20 @@ tfoot th {
 }
 
 .combined-wealth-summary {
-  align-items: flex-end;
   border-bottom: 1px solid var(--row-border);
-  display: flex;
-  gap: 12px;
+  display: grid;
+  gap: 6px;
   grid-column: 2;
-  justify-content: space-between;
-  min-height: 118px;
-  padding: 0 6px 6px;
+  grid-template-columns: 1fr;
+  min-height: 0;
+  padding: 0 6px 8px;
 }
 
 .combined-wealth-summary-item {
-  align-items: center;
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: 5px;
-  justify-content: center;
+  align-items: start;
+  display: grid;
+  gap: 2px;
   min-width: 0;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
 }
 
 .combined-wealth-summary-label {
@@ -3111,8 +3105,7 @@ tfoot th {
   }
 
   .combined-wealth-summary {
-    gap: 8px;
-    min-height: 102px;
+    gap: 5px;
     padding-left: 2px;
     padding-right: 2px;
   }

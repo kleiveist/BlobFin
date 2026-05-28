@@ -107,10 +107,9 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
   const selectedPoint =
     input.points.find((point) => point.year === input.selectedYear) ?? input.points[input.points.length - 1];
   const startYear = input.points[0]?.year ?? 0;
-  const endYear = input.points[input.points.length - 1]?.year ?? startYear;
   const tickYears = new Set(
     input.points
-      .filter((point) => point.year === startYear || point.year === endYear || (point.year - startYear) % 5 === 0)
+      .filter((point) => (point.year - startYear) % 15 === 0)
       .map((point) => point.year)
   );
   const maxValue = Math.max(
