@@ -66,6 +66,15 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("grunddatenSettingsContent");
   });
 
+  it("renders the expense submode switch host in the cost reserve toolbar", () => {
+    const html = renderAppShell();
+
+    expect(html).toContain('id="expenseSubmodeSwitchHost"');
+    expect(html).toContain('data-action="show-expense-positions"');
+    expect(html).not.toContain('data-action="show-expense-regular"');
+    expect(html).not.toContain('data-action="show-expense-once"');
+  });
+
   it("renders the annual table account selector host", () => {
     const html = renderAppShell();
 

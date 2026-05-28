@@ -158,6 +158,7 @@ interface PositionFilterDraft {
 
 type RealEstateField = keyof RealEstateFinancingSettings;
 type CombinedToggleKey = keyof AppState["combinedWealth"];
+type ExpenseSubmode = "regular" | "once";
 type AccountDialogMode = "create" | "rename";
 type AccountDialogState = {
   mode: AccountDialogMode;
@@ -172,6 +173,7 @@ let state = loadInitialState();
 let draggedPositionId: string | null = null;
 let exportStatusTimeoutId: number | undefined;
 let selectedPositionMode: PositionTableMode = "expense";
+let selectedExpenseSubmode: ExpenseSubmode = "regular";
 let showResultMaxNeeded = false;
 let reserveChartOpen = false;
 let reserveChartCategory: ReserveChartCategory = "all";
@@ -588,7 +590,10 @@ function bindEvents(): void {
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
     if (action === "show-income-positions") setSelectedPositionMode("income");
-    if (action === "show-expense-positions") setSelectedPositionMode("expense");
+    if (action === "show-expense-positions") setSelectedPositionMode("expense", "regular");
+    if (action === "toggle-expense-once") {
+      setSelectedPositionMode("expense", selectedExpenseSubmode === "once" ? "regular" : "once");
+    }
     if (action === "show-reserve-positions") setSelectedPositionMode("reserve");
     if (action === "show-savings-positions") setSelectedPositionMode("savings");
     if (action === "toggle-position-filter") togglePositionFilterPopup();
@@ -1280,20 +1285,21 @@ function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
 
 function renderPositions(): void {
   renderPositionModeControls();
-  const basePositions = state.positions.filter((position) => positionTableMode(position) === selectedPositionMode);
-  renderPositionTableControls(basePositions);
+  const sourcePositions = positionTableSourcePositions();
+  const basePositions = sourcePositions.filter((position) => positionTableMode(position) === selectedPositionMode);
+  renderPositionTableControls(basePositions, sourcePositions);
   renderPositionTableHead();
   const body = document.querySelector<HTMLTableSectionElement>("#positionsBody");
   if (!body) return;
 
   const view = currentPositionTableView();
-  const positions = positionTableRows(state.positions, selectedPositionMode, view);
+  const positions = positionTableRows(sourcePositions, selectedPositionMode, view);
   const isFilteredOrSorted = hasActivePositionTableView(view);
   if (!basePositions.length) {
     body.innerHTML = `
       <tr>
         <td class="position-empty" colspan="${positionTableColumnCount(selectedPositionMode)}">
-          Noch keine ${positionModeEmptyLabel(selectedPositionMode)} angelegt.
+          Noch keine ${positionModeEmptyLabel(selectedPositionMode, selectedExpenseSubmode)} angelegt.
         </td>
       </tr>
     `;
@@ -1808,13 +1814,25 @@ function renderPositionModeControls(): void {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   }
+  const expenseSubmodeHost = document.querySelector<HTMLDivElement>("#expenseSubmodeSwitchHost");
+  if (expenseSubmodeHost) {
+    if (selectedPositionMode !== "expense") {
+      expenseSubmodeHost.innerHTML = "";
+    } else {
+      expenseSubmodeHost.innerHTML = `
+        <div class="position-mode-switch expense-submode-switch" role="group" aria-label="Ausgaben-Unteransicht">
+          <button class="position-mode-button ${selectedExpenseSubmode === "once" ? "active" : ""}" type="button" data-action="toggle-expense-once" aria-pressed="${selectedExpenseSubmode === "once"}">Einmalig</button>
+        </div>
+      `;
+    }
+  }
   const addButton = document.querySelector<HTMLButtonElement>("#addPositionButton");
   if (addButton) {
-    addButton.textContent = addPositionButtonLabel(selectedPositionMode);
+    addButton.textContent = addPositionButtonLabel(selectedPositionMode, selectedExpenseSubmode);
   }
 }
 
-function renderPositionTableControls(basePositions: ReservePosition[]): void {
+function renderPositionTableControls(basePositions: ReservePosition[], sourcePositions: ReservePosition[]): void {
   const wrapper = document.querySelector<HTMLDivElement>("#positionTableControls");
   if (!wrapper) return;
   syncPositionFilterToggle();
@@ -1823,9 +1841,10 @@ function renderPositionTableControls(basePositions: ReservePosition[]): void {
   const columns = positionTableColumnsForMode(selectedPositionMode);
   const selectedConfig = positionTableColumnConfig(selectedPositionMode, draft.column) ?? columns[0];
   const operators = positionTableOperatorsForColumn(selectedPositionMode, selectedConfig.column);
-  const options = positionTableSelectOptions(selectedPositionMode, selectedConfig.column, state.positions);
-  const labelOptions = positionTableLabelOptions(state.positions, selectedPositionMode);
+  const options = positionTableSelectOptions(selectedPositionMode, selectedConfig.column, sourcePositions);
+  const labelOptions = positionTableLabelOptions(sourcePositions, selectedPositionMode);
   const active = hasActivePositionTableView(view);
+  const visibleCount = positionTableRows(sourcePositions, selectedPositionMode, view).length;
 
   wrapper.innerHTML = `
     <div class="position-table-view-row">
@@ -1833,9 +1852,7 @@ function renderPositionTableControls(basePositions: ReservePosition[]): void {
         ${view.filters.map(positionFilterChip).join("")}
         ${view.sort ? positionSortChip(view.sort) : ""}
       </div>
-      <span class="position-view-count">${positionTableRows(state.positions, selectedPositionMode, view).length} von ${
-        basePositions.length
-      }</span>
+      <span class="position-view-count">${visibleCount} von ${basePositions.length}</span>
     </div>
     ${labelOptions.length ? positionLabelFilterRow(labelOptions, view.selectedLabels) : ""}
     ${
@@ -2240,17 +2257,19 @@ function togglePositionTableSort(column: PositionTableFilterColumn): void {
   saveState(state);
 }
 
-function positionModeEmptyLabel(mode: PositionTableMode): string {
+function positionModeEmptyLabel(mode: PositionTableMode, expenseSubmode: ExpenseSubmode = "regular"): string {
   if (mode === "income") return "Einnahmen";
   if (mode === "reserve") return "Ruecklagen";
   if (mode === "savings") return "Sparpositionen";
+  if (expenseSubmode === "once") return "einmalige Ausgaben";
   return "Ausgaben";
 }
 
-function addPositionButtonLabel(mode: PositionTableMode): string {
+function addPositionButtonLabel(mode: PositionTableMode, expenseSubmode: ExpenseSubmode = "regular"): string {
   if (mode === "income") return "Einnahme hinzufuegen";
   if (mode === "reserve") return "Ruecklage hinzufuegen";
   if (mode === "savings") return "Sparposition hinzufuegen";
+  if (expenseSubmode === "once") return "Einmalige Ausgabe hinzufuegen";
   return "Ausgabe hinzufuegen";
 }
 
@@ -3654,9 +3673,22 @@ function addPosition(): string {
   const isIncome = selectedPositionMode === "income";
   const isReserve = selectedPositionMode === "reserve";
   const isSavings = selectedPositionMode === "savings";
+  const isExpenseOnce = selectedPositionMode === "expense" && selectedExpenseSubmode === "once";
   const flow = isIncome ? "income" : "expense";
-  const name = isIncome ? "Neue Einnahme" : isReserve ? "Neue Ruecklage" : isSavings ? "Neue Sparrate" : "Neue Ausgabe";
+  const name = isIncome
+    ? "Neue Einnahme"
+    : isReserve
+      ? "Neue Ruecklage"
+      : isSavings
+        ? "Neue Sparrate"
+        : isExpenseOnce
+          ? "Neue Einmalige Ausgabe"
+          : "Neue Ausgabe";
   const type = isIncome ? "incomeMonthly" : isReserve ? "reserve" : isSavings ? "savings" : "temporary";
+  const payoutType: ReservePosition["payoutType"] = isExpenseOnce ? "once" : "monthly";
+  const payoutMonth = isIncome ? 1 : 12;
+  const startMonth = isExpenseOnce ? payoutMonth : 1;
+  const endMonth = isExpenseOnce ? payoutMonth : 12;
   const id = createId();
   state.positions = [
     ...state.positions,
@@ -3669,11 +3701,11 @@ function addPosition(): string {
       icon: defaultPositionIconForPosition({ flow, type, name }),
       type,
       amount: 0,
-      startMonth: 1,
-      endMonth: 12,
-      payoutType: "monthly",
+      startMonth,
+      endMonth,
+      payoutType,
       payoutYear: state.settings.year,
-      payoutMonth: isIncome ? 1 : 12,
+      payoutMonth,
       payoutDay: isIncome ? 1 : 14,
       interestBearing: false,
       cashback: false
@@ -3834,9 +3866,23 @@ function setReserveChartAdjustment(adjustment: ReserveChartAdjustment): void {
   showReserveChartPopup();
 }
 
-function setSelectedPositionMode(mode: PositionTableMode): void {
+function setSelectedPositionMode(mode: PositionTableMode, expenseSubmode?: ExpenseSubmode): void {
   selectedPositionMode = mode;
+  if (mode !== "expense") {
+    selectedExpenseSubmode = "regular";
+  } else if (expenseSubmode) {
+    selectedExpenseSubmode = expenseSubmode;
+  }
   renderPositions();
+}
+
+function positionTableSourcePositions(): ReservePosition[] {
+  if (selectedPositionMode !== "expense") return state.positions;
+  return state.positions.filter((position) => {
+    if (positionTableMode(position) !== "expense") return false;
+    if (selectedExpenseSubmode === "once") return position.payoutType === "once";
+    return position.payoutType !== "once";
+  });
 }
 
 function reorderPosition(sourceId: string, targetId: string, afterTarget: boolean): void {

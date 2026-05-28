@@ -239,6 +239,26 @@ button:focus-visible {
   grid-template-columns: repeat(4, minmax(104px, 1fr));
 }
 
+.position-mode-stack {
+  display: grid;
+  width: fit-content;
+}
+
+.expense-submode-switch-host:not(:empty) {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(104px, 1fr));
+}
+
+.expense-submode-switch {
+  grid-column: 2;
+}
+
+.expense-submode-switch .position-mode-button {
+  width: 100%;
+  min-width: 0;
+}
+
 .position-mode-button {
   min-width: 104px;
   border-right: 1px solid var(--border);
