@@ -95,4 +95,91 @@ describe("storage", () => {
     expect(loaded.planningAccounts[0].yearlyRows.length).toBeGreaterThan(0);
     expect(loaded.positions).toEqual(loaded.planningAccounts[0].yearlyRows);
   });
+
+  it("migrates legacy global investment settings into account-specific settings", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const firstAccount = state.planningAccounts[0];
+    const secondAccount = {
+      id: "konto-2",
+      name: "Konto 2",
+      type: "mixed" as const,
+      yearlyRows: []
+    };
+    const legacyState = {
+      ...state,
+      planningAccounts: [firstAccount, secondAccount],
+      ui: {
+        ...state.ui,
+        selectedPlanningAccountId: firstAccount.id,
+        selectedInvestmentAccountId: firstAccount.id
+      },
+      investmentByAccountId: undefined,
+      investment: {
+        ...state.investment,
+        includedIds: ["legacy-investment-id"],
+        retirementIncludedIds: ["legacy-retirement-id"],
+        childIncludedIds: ["legacy-child-id"]
+      }
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.investmentByAccountId[firstAccount.id].includedIds).toEqual(["legacy-investment-id"]);
+    expect(loaded.investmentByAccountId[firstAccount.id].retirementIncludedIds).toEqual(["legacy-retirement-id"]);
+    expect(loaded.investmentByAccountId[firstAccount.id].childIncludedIds).toEqual(["legacy-child-id"]);
+    expect(loaded.investmentByAccountId[secondAccount.id].includedIds).toEqual([]);
+    expect(loaded.investmentByAccountId[secondAccount.id].retirementIncludedIds).toEqual([]);
+    expect(loaded.investmentByAccountId[secondAccount.id].childIncludedIds).toEqual([]);
+  });
+
+  it("normalizes invalid account selectors in ui state", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const onlyAccountId = state.planningAccounts[0].id;
+    const invalidUiState = {
+      ...state,
+      ui: {
+        ...state.ui,
+        selectedPlanningAccountId: "missing-planning-account",
+        selectedInvestmentAccountId: "missing-investment-account",
+        selectedRealEstateAccountIds: ["missing-real-estate-account", onlyAccountId],
+        selectedRealEstateWithdrawalGainAccountIds: ["missing-withdrawal-account"]
+      }
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(invalidUiState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.ui.selectedPlanningAccountId).toBe(onlyAccountId);
+    expect(loaded.ui.selectedInvestmentAccountId).toBe(onlyAccountId);
+    expect(loaded.ui.selectedRealEstateAccountIds).toEqual([onlyAccountId]);
+    expect(loaded.ui.selectedRealEstateWithdrawalGainAccountIds).toEqual([onlyAccountId]);
+  });
+
+  it("keeps real estate source and withdrawal account selections synchronized", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const migratedStateWithoutNewField = {
+      ...state,
+      realEstate: {
+        ...state.realEstate,
+        includeWithdrawalGainAsPaymentSource: true
+      },
+      ui: {
+        activeSection: state.ui.activeSection,
+        selectedPlanningAccountId: state.ui.selectedPlanningAccountId,
+        selectedInvestmentAccountId: state.ui.selectedInvestmentAccountId,
+        selectedRealEstateAccountIds: state.ui.selectedRealEstateAccountIds,
+        settingsGrunddatenExpanded: state.ui.settingsGrunddatenExpanded
+      }
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(migratedStateWithoutNewField));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.realEstate.includeWithdrawalGainAsPaymentSource).toBe(true);
+    expect(loaded.ui.selectedRealEstateWithdrawalGainAccountIds).toEqual(loaded.ui.selectedRealEstateAccountIds);
+  });
 });

@@ -1581,6 +1581,21 @@ tfoot th {
   flex-wrap: wrap;
 }
 
+.investment-account-module {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.investment-account-module h3 {
+  margin: 0;
+}
+
+.investment-depot-switch-wrap {
+  display: grid;
+  gap: 4px;
+}
+
 .investment-depot-switch {
   display: grid;
   width: min(100%, 560px);
@@ -2412,6 +2427,46 @@ tfoot th {
   flex-wrap: wrap;
   gap: 6px;
   max-width: 560px;
+}
+
+.real-estate-heading-controls {
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+  width: min(100%, 860px);
+}
+
+.real-estate-account-modules {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.real-estate-account-module {
+  display: grid;
+  gap: 8px;
+}
+
+.real-estate-account-module h3 {
+  margin: 0;
+}
+
+.real-estate-locale-default {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.real-estate-account-module .planning-account-cards {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+@media (max-width: 960px) {
+  .real-estate-heading-controls {
+    justify-items: stretch;
+    width: 100%;
+  }
 }
 
 .account-dialog-backdrop {

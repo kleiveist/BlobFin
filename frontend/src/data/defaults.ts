@@ -211,7 +211,26 @@ export function defaultAppUiState(): AppUiState {
   return {
     activeSection: "cost_reserve_positions",
     selectedPlanningAccountId: "default-account",
+    selectedInvestmentAccountId: "default-account",
+    selectedRealEstateAccountIds: ["default-account"],
+    selectedRealEstateWithdrawalGainAccountIds: ["default-account"],
     settingsGrunddatenExpanded: true
+  };
+}
+
+export function defaultInvestmentSettingsForNewAccount(): InvestmentSettings {
+  return {
+    ...defaultInvestmentSettings(),
+    activeDepot: "standard",
+    includedIds: [],
+    includeAccountInterest: false,
+    includeAccountCashback: false,
+    retirementIncludedIds: [],
+    retirementIncludeAccountInterest: false,
+    retirementIncludeAccountCashback: false,
+    childIncludedIds: [],
+    childIncludeAccountInterest: false,
+    childIncludeAccountCashback: false
   };
 }
 
@@ -295,6 +314,7 @@ export function defaultCombinedWealthToggles(): CombinedWealthToggles {
 
 export function defaultAppState(): AppState {
   const planningAccounts = defaultPlanningAccounts();
+  const investment = defaultInvestmentSettings();
   return {
     theme: "light",
     settings: defaultPlanningSettings(),
@@ -303,7 +323,10 @@ export function defaultAppState(): AppState {
     realEstate: defaultRealEstateFinancingSettings(),
     combinedWealth: defaultCombinedWealthToggles(),
     positions: planningAccounts[0].yearlyRows,
-    investment: defaultInvestmentSettings(),
+    investmentByAccountId: {
+      [planningAccounts[0].id]: investment
+    },
+    investment,
     positionTableView: defaultPositionTableViewState()
   };
 }

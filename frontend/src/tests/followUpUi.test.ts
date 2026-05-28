@@ -70,6 +70,12 @@ describe("follow-up ui rendering", () => {
     const html = renderAppShell();
 
     expect(html).toContain('id="yearAccountSelector"');
+    expect(html).toContain('id="investmentAccountSelector"');
+    expect(html).toContain('id="realEstateAccountSelector"');
+    expect(html).not.toContain('id="realEstateWithdrawalAccountSelector"');
+    expect(html).toContain("Konten fuer Sparquellen und Entnahme-Zugewinn");
+    expect(html).toContain('class="real-estate-locale-default"');
+    expect(html).not.toContain('data-action="set-real-estate-locale-en"');
     expect(html).toContain('id="accountYearTableOverview"');
     expect(html).not.toContain('id="resultHead"');
   });

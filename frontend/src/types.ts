@@ -99,6 +99,9 @@ export interface PlanningAccount {
 export interface AppUiState {
   activeSection: AppSectionId;
   selectedPlanningAccountId: string;
+  selectedInvestmentAccountId: string;
+  selectedRealEstateAccountIds: string[];
+  selectedRealEstateWithdrawalGainAccountIds: string[];
   settingsGrunddatenExpanded: boolean;
 }
 
@@ -257,6 +260,7 @@ export interface AppState {
   realEstate: RealEstateFinancingSettings;
   combinedWealth: CombinedWealthToggles;
   positions: ReservePosition[];
+  investmentByAccountId: Record<string, InvestmentSettings>;
   investment: InvestmentSettings;
   positionTableView: PositionTableViewState;
 }

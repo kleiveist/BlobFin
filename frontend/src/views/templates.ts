@@ -143,8 +143,17 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel investment-panel" data-module-section="investment_planning">
-        <div class="section-heading investment-heading">
+        <div class="section-heading">
           <h2>Investment- und Auszahlungsplanung</h2>
+        </div>
+        <div class="investment-account-module">
+          <h3>Konto-Module</h3>
+          <div id="investmentAccountSelector" class="planning-account-cards" aria-label="Konto fuer Investmentplanung"></div>
+        </div>
+        <div class="section-heading investment-heading">
+          <div class="investment-depot-switch-wrap">
+            <span class="planning-account-summary">Depot-Varianten</span>
+          </div>
           <div class="position-mode-switch investment-depot-switch" role="tablist" aria-label="Depot-Auswahl">
             <button class="position-mode-button" type="button" data-action="set-investment-depot-standard" aria-pressed="true">Depot</button>
             <button class="position-mode-button" type="button" data-action="set-investment-depot-retirement" aria-pressed="false" aria-label="Altersvorsorge-depot">
@@ -301,9 +310,14 @@ export function renderAppShell(): string {
       <section class="panel real-estate-panel" data-module-section="real_estate_financing">
         <div class="section-heading">
           <h2>Immobilienfinanzierung</h2>
-          <div class="button-row">
-            <button class="button secondary" type="button" data-action="set-real-estate-locale-de">DE</button>
-            <button class="button secondary" type="button" data-action="set-real-estate-locale-en">EN</button>
+          <div class="real-estate-heading-controls">
+            <div class="real-estate-account-modules">
+              <div class="real-estate-account-module">
+                <h3>Konten fuer Sparquellen und Entnahme-Zugewinn</h3>
+                <div id="realEstateAccountSelector" class="planning-account-cards" aria-label="Konten fuer Immobilien Sparquellen und Entnahme-Zugewinn"></div>
+                <small class="real-estate-locale-default" aria-label="Standardsprache">DE</small>
+              </div>
+            </div>
           </div>
         </div>
 

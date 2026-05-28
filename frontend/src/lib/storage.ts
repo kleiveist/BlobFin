@@ -4,6 +4,7 @@ import {
   defaultAppState,
   defaultCombinedWealthToggles,
   defaultInvestmentSettings,
+  defaultInvestmentSettingsForNewAccount,
   defaultPlanningAccounts,
   defaultPlanningSettings,
   defaultPositionTableViewState,
@@ -77,16 +78,26 @@ function normalizeState(value: unknown): AppState {
   const planningAccounts = normalizePlanningAccounts(value.planningAccounts, legacyPositions, settings.year);
   const ui = normalizeAppUiState(value.ui, planningAccounts);
   const positions = positionsForPlanningAccount(planningAccounts, ui.selectedPlanningAccountId, legacyPositions);
+  const realEstate = normalizeRealEstateFinancingSettings(value.realEstate);
+  const normalizedInvestment = normalizeInvestmentSettings(value.investment);
+  const investmentByAccountId = normalizeInvestmentByAccountId(
+    value.investmentByAccountId,
+    planningAccounts,
+    normalizedInvestment,
+    ui.selectedInvestmentAccountId
+  );
+  const investment = investmentForAccount(investmentByAccountId, ui.selectedInvestmentAccountId);
 
   return {
     theme: normalizeThemeMode(value.theme, fallback.theme),
     settings: { ...settings, monthlyNetIncome: 0 },
     planningAccounts,
     ui,
-    realEstate: normalizeRealEstateFinancingSettings(value.realEstate),
+    realEstate,
     combinedWealth: normalizeCombinedWealthToggles(value.combinedWealth),
     positions,
-    investment: normalizeInvestmentSettings(value.investment),
+    investmentByAccountId,
+    investment,
     positionTableView: normalizePositionTableViewState(value.positionTableView)
   };
 }
@@ -109,6 +120,13 @@ function normalizeLegacyState(value: unknown): AppState {
   const planningAccounts = normalizePlanningAccounts(undefined, legacyPositions, settings.year);
   const ui = normalizeAppUiState(undefined, planningAccounts);
   const positions = positionsForPlanningAccount(planningAccounts, ui.selectedPlanningAccountId, legacyPositions);
+  const investment = normalizeLegacyInvestmentSettings(value.investmentSettings);
+  const investmentByAccountId = normalizeInvestmentByAccountId(
+    undefined,
+    planningAccounts,
+    investment,
+    ui.selectedInvestmentAccountId
+  );
 
   return {
     theme: normalizeThemeMode(value.theme, fallback.theme),
@@ -118,7 +136,8 @@ function normalizeLegacyState(value: unknown): AppState {
     realEstate: defaultRealEstateFinancingSettings(),
     combinedWealth: defaultCombinedWealthToggles(),
     positions,
-    investment: normalizeLegacyInvestmentSettings(value.investmentSettings),
+    investmentByAccountId,
+    investment,
     positionTableView: defaultPositionTableViewState()
   };
 }
@@ -234,20 +253,75 @@ function normalizePlanningAccountType(value: unknown): PlanningAccount["type"] {
 function normalizeAppUiState(value: unknown, accounts: PlanningAccount[]): AppUiState {
   const fallback = defaultAppUiState();
   const firstAccountId = accounts[0]?.id ?? fallback.selectedPlanningAccountId;
+  const accountIds = accounts.map((account) => account.id);
   if (!isRecord(value)) {
-    return { ...fallback, selectedPlanningAccountId: firstAccountId };
+    return {
+      ...fallback,
+      selectedPlanningAccountId: firstAccountId,
+      selectedInvestmentAccountId: firstAccountId,
+      selectedRealEstateAccountIds: accountIds,
+      selectedRealEstateWithdrawalGainAccountIds: accountIds
+    };
   }
 
   const selectedPlanningAccountId = String(value.selectedPlanningAccountId || firstAccountId);
-  const accountExists = accounts.some((account) => account.id === selectedPlanningAccountId);
+  const planningAccountExists = accounts.some((account) => account.id === selectedPlanningAccountId);
+  const normalizedPlanningAccountId = planningAccountExists ? selectedPlanningAccountId : firstAccountId;
+  const selectedInvestmentAccountId = String(value.selectedInvestmentAccountId || normalizedPlanningAccountId);
+  const investmentAccountExists = accounts.some((account) => account.id === selectedInvestmentAccountId);
+  const selectedRealEstateAccountIds = normalizeSelectedAccountIds(value.selectedRealEstateAccountIds, accountIds, accountIds);
+
   return {
     activeSection: normalizeAppSectionId(value.activeSection, fallback.activeSection),
-    selectedPlanningAccountId: accountExists ? selectedPlanningAccountId : firstAccountId,
+    selectedPlanningAccountId: normalizedPlanningAccountId,
+    selectedInvestmentAccountId: investmentAccountExists ? selectedInvestmentAccountId : normalizedPlanningAccountId,
+    selectedRealEstateAccountIds,
+    selectedRealEstateWithdrawalGainAccountIds: selectedRealEstateAccountIds,
     settingsGrunddatenExpanded: booleanOrDefault(
       value.settingsGrunddatenExpanded,
       fallback.settingsGrunddatenExpanded
     )
   };
+}
+
+function normalizeSelectedAccountIds(value: unknown, accountIds: string[], fallback: string[]): string[] {
+  if (!Array.isArray(value)) return [...fallback];
+  const selected = value
+    .map((item) => String(item))
+    .filter((accountId, index, items) => items.indexOf(accountId) === index && accountIds.includes(accountId));
+  return selected;
+}
+
+function normalizeInvestmentByAccountId(
+  value: unknown,
+  accounts: PlanningAccount[],
+  primaryInvestment: InvestmentSettings,
+  primaryAccountId: string
+): Record<string, InvestmentSettings> {
+  const byAccount = isRecord(value) ? value : null;
+  const normalized: Record<string, InvestmentSettings> = {};
+
+  for (const account of accounts) {
+    const storedInvestment = byAccount?.[account.id];
+    normalized[account.id] = isRecord(storedInvestment)
+      ? normalizeInvestmentSettings(storedInvestment)
+      : account.id === primaryAccountId
+        ? primaryInvestment
+        : defaultInvestmentSettingsForNewAccount();
+  }
+
+  if (!normalized[primaryAccountId]) {
+    normalized[primaryAccountId] = primaryInvestment;
+  }
+
+  return normalized;
+}
+
+function investmentForAccount(
+  investmentsByAccount: Record<string, InvestmentSettings>,
+  accountId: string
+): InvestmentSettings {
+  return investmentsByAccount[accountId] ?? defaultInvestmentSettingsForNewAccount();
 }
 
 function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSectionId {
@@ -288,7 +362,7 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
   const financingYears = numberOrDefault(value.financingYears, fallback.financingYears);
   const legacyEndAge = financingStartAge > 0 ? financingStartAge + financingYears : fallback.financingEndAge;
   return {
-    locale: value.locale === "en" ? "en" : "de",
+    locale: "de",
     purchasePrice: numberOrDefault(value.purchasePrice, fallback.purchasePrice),
     constructionOrRenovationCosts: numberOrDefault(
       value.constructionOrRenovationCosts,
