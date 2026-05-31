@@ -2,6 +2,7 @@ import type {
   AppState,
   AppUiState,
   CombinedWealthToggles,
+  IncomeTrackerState,
   InvestmentSettings,
   PlanningAccount,
   PlanningSettings,
@@ -314,6 +315,24 @@ export function defaultCombinedWealthToggles(): CombinedWealthToggles {
   };
 }
 
+export function defaultIncomeTrackerState(): IncomeTrackerState {
+  return {
+    monthlyEntries: [],
+    yearlyEntries: [],
+    milestones: [],
+    inflationRates: [],
+    settings: {
+      activeInputTab: "monthly",
+      selectedChartYear: null,
+      projectionMode: "off",
+      manualGrowthRatePercent: null,
+      savingsSharePercent: null,
+      inflationMode: "off",
+      inflationBaseYear: null
+    }
+  };
+}
+
 export function defaultAppState(): AppState {
   const planningAccounts = defaultPlanningAccounts();
   const investment = defaultInvestmentSettings();
@@ -324,6 +343,7 @@ export function defaultAppState(): AppState {
     ui: defaultAppUiState(),
     realEstate: defaultRealEstateFinancingSettings(),
     combinedWealth: defaultCombinedWealthToggles(),
+    incomeTracker: defaultIncomeTrackerState(),
     positions: planningAccounts[0].yearlyRows,
     investmentByAccountId: {
       [planningAccounts[0].id]: investment

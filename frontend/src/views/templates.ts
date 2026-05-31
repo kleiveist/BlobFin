@@ -66,6 +66,7 @@ export function renderAppShell(): string {
           <h2>Bereiche</h2>
         </div>
         <div class="module-launcher-grid">
+          ${moduleCardButton("income_tracking", "Jahresnettoeinkommen", "Einkommen erfassen und auswerten")}
           ${moduleCardButton("cost_reserve_positions", "Kosten- und Ruecklagenpositionen", "kontobasiert bearbeiten")}
           ${moduleCardButton("year_table", "Jahrestabelle", "aktives Konto analysieren")}
           ${moduleCardButton("investment_planning", "Investment- und Auszahlungsplanung", "Depot, Entnahme, Annahmen")}
@@ -143,6 +144,222 @@ export function renderAppShell(): string {
         </div>
         <div id="reserveChartPopup" class="reserve-chart-popup" role="dialog" aria-label="Einnahmen Ausgaben Sparrate Grafik" hidden></div>
         <div id="accountYearTableOverview" class="account-year-table-overview"></div>
+      </section>
+
+      <section class="panel income-tracker-panel" data-module-section="income_tracking">
+        <div class="section-heading income-tracker-heading">
+          <div>
+            <h2>Jahresnettoeinkommen-Tracker</h2>
+            <p class="planning-account-summary">
+              Monatswerte, Jahresentgeltabrechnungen, Meilensteine und explizite Annahmen werden getrennt gepflegt.
+            </p>
+          </div>
+          <div class="button-row">
+            <button class="button secondary" type="button" data-action="income-import-active-account">
+              Aktives Konto uebernehmen
+            </button>
+            <button class="button secondary" type="button" data-action="income-export-csv">CSV</button>
+            <button class="button secondary" type="button" data-action="income-export-json">JSON</button>
+            <button class="button" type="button" data-action="income-export-pdf">PDF-Auswertung</button>
+          </div>
+        </div>
+
+        <div id="incomeMetricGrid" class="income-metric-grid"></div>
+
+        <div class="income-tracker-grid">
+          <section class="income-card income-input-card">
+            <div class="position-mode-switch income-tab-switch" role="tablist" aria-label="Einkommen Eingaben">
+              <button class="position-mode-button" type="button" data-action="income-tab-monthly" aria-pressed="true">
+                Monatswerte
+              </button>
+              <button class="position-mode-button" type="button" data-action="income-tab-yearly" aria-pressed="false">
+                Jahreswerte
+              </button>
+              <button class="position-mode-button" type="button" data-action="income-tab-milestones" aria-pressed="false">
+                Meilensteine
+              </button>
+              <button class="position-mode-button" type="button" data-action="income-tab-settings" aria-pressed="false">
+                Annahmen
+              </button>
+            </div>
+
+            <div id="incomeMonthlyTab" class="income-tab-panel">
+              <div class="table-wrap">
+                <table class="income-table">
+                  <thead>
+                    <tr>
+                      <th>Jahr</th>
+                      <th>Monat</th>
+                      <th>Person</th>
+                      <th>Monatsnetto</th>
+                      <th>Bonus</th>
+                      <th>Weitere Einnahmen</th>
+                      <th>Gesamt</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="incomeMonthlyRows"></tbody>
+                </table>
+              </div>
+              <div class="button-row">
+                <button class="button" type="button" data-action="income-add-monthly">Monatszeile hinzufuegen</button>
+              </div>
+            </div>
+
+            <div id="incomeYearlyTab" class="income-tab-panel" hidden>
+              <div class="table-wrap">
+                <table class="income-table">
+                  <thead>
+                    <tr>
+                      <th>Jahr</th>
+                      <th>Person</th>
+                      <th>Jahresnetto</th>
+                      <th>Jahresbrutto</th>
+                      <th>Steuer / Abgaben</th>
+                      <th>Arbeitgeber</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="incomeYearlyRows"></tbody>
+                </table>
+              </div>
+              <div class="button-row">
+                <button class="button" type="button" data-action="income-add-yearly">Jahreswert hinzufuegen</button>
+              </div>
+            </div>
+
+            <div id="incomeMilestonesTab" class="income-tab-panel" hidden>
+              <div class="table-wrap">
+                <table class="income-table">
+                  <thead>
+                    <tr>
+                      <th>Datum</th>
+                      <th>Typ</th>
+                      <th>Beschreibung</th>
+                      <th>Einfluss</th>
+                      <th>Verknuepftes Jahr</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="incomeMilestoneRows"></tbody>
+                </table>
+              </div>
+              <div class="button-row">
+                <button class="button" type="button" data-action="income-add-milestone">Meilenstein hinzufuegen</button>
+              </div>
+            </div>
+
+            <div id="incomeSettingsTab" class="income-tab-panel" hidden>
+              <div class="field-grid wide">
+                <label class="field">
+                  <span>Projektion</span>
+                  <select data-income-setting="projectionMode">
+                    <option value="off">Deaktiviert</option>
+                    <option value="historical_average">Historische Wachstumsrate verwenden</option>
+                    <option value="manual">Manuelle Wachstumsrate verwenden</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Manuelle Wachstumsrate p. a. in %</span>
+                  <input type="number" step="0.1" data-income-setting="manualGrowthRatePercent" />
+                </label>
+                <label class="field">
+                  <span>Anteil fuer Sparrate / Rate in %</span>
+                  <input type="number" min="0" max="100" step="1" data-income-setting="savingsSharePercent" />
+                </label>
+                <label class="field">
+                  <span>Inflationsmodus</span>
+                  <select data-income-setting="inflationMode">
+                    <option value="off">Deaktiviert</option>
+                    <option value="manual">Manuelle Inflationswerte verwenden</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Basisjahr fuer Realwerte</span>
+                  <input type="number" min="1900" max="2200" step="1" data-income-setting="inflationBaseYear" />
+                </label>
+                <label class="field">
+                  <span>Monatsdiagramm fuer Jahr</span>
+                  <select data-income-setting="selectedChartYear" id="incomeSelectedChartYear"></select>
+                </label>
+              </div>
+              <div class="table-wrap">
+                <table class="income-table small">
+                  <thead>
+                    <tr>
+                      <th>Jahr</th>
+                      <th>Inflationsrate in %</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="incomeInflationRows"></tbody>
+                </table>
+              </div>
+              <div class="button-row">
+                <button class="button" type="button" data-action="income-add-inflation">Inflationsjahr hinzufuegen</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="income-card income-insights-card">
+          <h3>Automatische Aussagen</h3>
+          <div id="incomeInsights" class="income-insight-list"></div>
+        </aside>
+
+        <div class="income-status-grid">
+          <section class="income-card">
+            <h3>Jahreswerte und Quellenstatus</h3>
+            <div class="table-wrap">
+              <table class="income-table income-status-table">
+                <thead>
+                  <tr>
+                    <th>Jahr</th>
+                    <th>Genutztes Jahresnetto</th>
+                    <th>Status</th>
+                    <th>Aus Monatswerten</th>
+                    <th>Jahresentgeltabrechnung</th>
+                    <th>Manuell</th>
+                    <th>Differenz</th>
+                    <th>Nettoquote</th>
+                    <th>Realwert</th>
+                  </tr>
+                </thead>
+                <tbody id="incomeYearStatusRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="income-chart-grid">
+          <section class="income-card">
+            <h3>Jahresnettoeinkommen</h3>
+            <div id="incomeAnnualChart" class="income-chart-host"></div>
+          </section>
+          <section class="income-card">
+            <h3>Jaehrlicher Zuwachs</h3>
+            <div id="incomeGrowthChart" class="income-chart-host"></div>
+          </section>
+          <section class="income-card">
+            <h3>Monatsverlauf</h3>
+            <div id="incomeMonthlyChart" class="income-chart-host"></div>
+          </section>
+          <section class="income-card">
+            <h3>Nominal vs. inflationsbereinigt</h3>
+            <div id="incomeInflationChart" class="income-chart-host"></div>
+          </section>
+          <section class="income-card">
+            <h3>Nettoquote</h3>
+            <div id="incomeRatioChart" class="income-chart-host"></div>
+          </section>
+          <section class="income-card">
+            <h3>Zukunftsprojektion</h3>
+            <div id="incomeProjectionChart" class="income-chart-host"></div>
+          </section>
+        </div>
+
+        <p id="incomeExportStatus" class="export-status" aria-live="polite"></p>
       </section>
 
       <section class="panel investment-panel" data-module-section="investment_planning">

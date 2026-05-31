@@ -10,12 +10,19 @@ export type AppSectionId =
   | "grunddaten"
   | "cost_reserve_positions"
   | "year_table"
+  | "income_tracking"
   | "investment_planning"
   | "real_estate_financing"
   | "combined_wealth";
 export type PlanningAccountType = "cost_reserve" | "annual_table" | "mixed";
 export type RealEstateLocale = "de" | "en";
 export type SpecialRepaymentRhythm = "none" | "monthly" | "yearly";
+export type IncomePerson = "person1" | "person2" | "household";
+export type IncomeYearEntrySource = "annual_statement" | "manual";
+export type IncomeResolvedSource = IncomeYearEntrySource | "monthly_calculated";
+export type CareerMilestoneImpact = "positive" | "negative" | "neutral";
+export type IncomeProjectionMode = "off" | "historical_average" | "manual";
+export type IncomeInflationMode = "off" | "manual";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -239,6 +246,62 @@ export interface CombinedWealthToggles {
   includeRealEstateValueTrend: boolean;
 }
 
+export interface IncomeMonthEntry {
+  id: string;
+  year: number;
+  month: number;
+  person: IncomePerson;
+  netIncome: number | null;
+  bonus: number | null;
+  otherIncome: number | null;
+  note: string;
+}
+
+export interface IncomeYearEntry {
+  id: string;
+  year: number;
+  person: IncomePerson;
+  annualNetIncome: number | null;
+  annualGrossIncome: number | null;
+  taxesAndDeductions: number | null;
+  employer: string;
+  note: string;
+  source: IncomeYearEntrySource;
+}
+
+export interface CareerMilestone {
+  id: string;
+  date: string;
+  type: string;
+  description: string;
+  impact: CareerMilestoneImpact;
+  linkedYear: number | null;
+}
+
+export interface IncomeInflationRate {
+  id: string;
+  year: number;
+  ratePercent: number | null;
+}
+
+export interface IncomeTrackerSettings {
+  activeInputTab: "monthly" | "yearly" | "milestones" | "settings";
+  selectedChartYear: number | null;
+  projectionMode: IncomeProjectionMode;
+  manualGrowthRatePercent: number | null;
+  savingsSharePercent: number | null;
+  inflationMode: IncomeInflationMode;
+  inflationBaseYear: number | null;
+}
+
+export interface IncomeTrackerState {
+  monthlyEntries: IncomeMonthEntry[];
+  yearlyEntries: IncomeYearEntry[];
+  milestones: CareerMilestone[];
+  inflationRates: IncomeInflationRate[];
+  settings: IncomeTrackerSettings;
+}
+
 export interface CombinedWealthYear {
   year: number;
   cashValue: number;
@@ -261,6 +324,7 @@ export interface AppState {
   ui: AppUiState;
   realEstate: RealEstateFinancingSettings;
   combinedWealth: CombinedWealthToggles;
+  incomeTracker: IncomeTrackerState;
   positions: ReservePosition[];
   investmentByAccountId: Record<string, InvestmentSettings>;
   investment: InvestmentSettings;

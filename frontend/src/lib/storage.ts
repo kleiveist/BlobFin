@@ -3,6 +3,7 @@ import {
   defaultAppUiState,
   defaultAppState,
   defaultCombinedWealthToggles,
+  defaultIncomeTrackerState,
   defaultInvestmentSettings,
   defaultInvestmentSettingsForNewAccount,
   defaultPlanningAccounts,
@@ -24,7 +25,18 @@ import type {
   AppSectionId,
   AppState,
   AppUiState,
+  CareerMilestone,
+  CareerMilestoneImpact,
   CombinedWealthToggles,
+  IncomeInflationMode,
+  IncomeInflationRate,
+  IncomeMonthEntry,
+  IncomePerson,
+  IncomeProjectionMode,
+  IncomeTrackerSettings,
+  IncomeTrackerState,
+  IncomeYearEntry,
+  IncomeYearEntrySource,
   InvestmentDepotKey,
   InvestmentSettings,
   PlanningAccount,
@@ -95,6 +107,7 @@ function normalizeState(value: unknown): AppState {
     ui,
     realEstate,
     combinedWealth: normalizeCombinedWealthToggles(value.combinedWealth),
+    incomeTracker: normalizeIncomeTrackerState(value.incomeTracker),
     positions,
     investmentByAccountId,
     investment,
@@ -135,6 +148,7 @@ function normalizeLegacyState(value: unknown): AppState {
     ui,
     realEstate: defaultRealEstateFinancingSettings(),
     combinedWealth: defaultCombinedWealthToggles(),
+    incomeTracker: defaultIncomeTrackerState(),
     positions,
     investmentByAccountId,
     investment,
@@ -346,6 +360,7 @@ function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSecti
   if (
     value === "cost_reserve_positions" ||
     value === "year_table" ||
+    value === "income_tracking" ||
     value === "investment_planning" ||
     value === "real_estate_financing" ||
     value === "combined_wealth"
@@ -471,6 +486,119 @@ function normalizeCombinedWealthToggles(value: unknown): CombinedWealthToggles {
     includeRealEstateFinancing: booleanOrDefault(value.includeRealEstateFinancing, fallback.includeRealEstateFinancing),
     includeRealEstateValueTrend: booleanOrDefault(value.includeRealEstateValueTrend, fallback.includeRealEstateValueTrend)
   };
+}
+
+function normalizeIncomeTrackerState(value: unknown): IncomeTrackerState {
+  const fallback = defaultIncomeTrackerState();
+  if (!isRecord(value)) return fallback;
+  return {
+    monthlyEntries: arrayOrEmpty(value.monthlyEntries).map(normalizeIncomeMonthEntry),
+    yearlyEntries: arrayOrEmpty(value.yearlyEntries).map(normalizeIncomeYearEntry),
+    milestones: arrayOrEmpty(value.milestones).map(normalizeCareerMilestone),
+    inflationRates: arrayOrEmpty(value.inflationRates).map(normalizeIncomeInflationRate),
+    settings: normalizeIncomeTrackerSettings(value.settings)
+  };
+}
+
+function normalizeIncomeTrackerSettings(value: unknown): IncomeTrackerSettings {
+  const fallback = defaultIncomeTrackerState().settings;
+  if (!isRecord(value)) return fallback;
+  return {
+    activeInputTab: normalizeIncomeInputTab(value.activeInputTab, fallback.activeInputTab),
+    selectedChartYear: nullableNumberOrDefault(value.selectedChartYear, fallback.selectedChartYear),
+    projectionMode: normalizeIncomeProjectionMode(value.projectionMode, fallback.projectionMode),
+    manualGrowthRatePercent: nullableNumberOrDefault(
+      value.manualGrowthRatePercent,
+      fallback.manualGrowthRatePercent
+    ),
+    savingsSharePercent: nullableNumberOrDefault(value.savingsSharePercent, fallback.savingsSharePercent),
+    inflationMode: normalizeIncomeInflationMode(value.inflationMode, fallback.inflationMode),
+    inflationBaseYear: nullableNumberOrDefault(value.inflationBaseYear, fallback.inflationBaseYear)
+  };
+}
+
+function normalizeIncomeMonthEntry(value: unknown): IncomeMonthEntry {
+  const entry = isRecord(value) ? value : {};
+  return {
+    id: String(entry.id || createId()),
+    year: Math.round(numberOrDefault(entry.year, defaultPlanningSettings().year)),
+    month: Math.round(clampNumber(numberOrDefault(entry.month, 1), 1, 12)),
+    person: normalizeIncomePerson(entry.person),
+    netIncome: nullableNumberOrDefault(entry.netIncome, null),
+    bonus: nullableNumberOrDefault(entry.bonus, null),
+    otherIncome: nullableNumberOrDefault(entry.otherIncome, null),
+    note: String(entry.note ?? "")
+  };
+}
+
+function normalizeIncomeYearEntry(value: unknown): IncomeYearEntry {
+  const entry = isRecord(value) ? value : {};
+  return {
+    id: String(entry.id || createId()),
+    year: Math.round(numberOrDefault(entry.year, defaultPlanningSettings().year)),
+    person: normalizeIncomePerson(entry.person),
+    annualNetIncome: nullableNumberOrDefault(entry.annualNetIncome, null),
+    annualGrossIncome: nullableNumberOrDefault(entry.annualGrossIncome, null),
+    taxesAndDeductions: nullableNumberOrDefault(entry.taxesAndDeductions, null),
+    employer: String(entry.employer ?? ""),
+    note: String(entry.note ?? ""),
+    source: normalizeIncomeYearSource(entry.source)
+  };
+}
+
+function normalizeCareerMilestone(value: unknown): CareerMilestone {
+  const entry = isRecord(value) ? value : {};
+  return {
+    id: String(entry.id || createId()),
+    date: String(entry.date ?? ""),
+    type: String(entry.type || "Gehaltserhoehung"),
+    description: String(entry.description ?? ""),
+    impact: normalizeCareerMilestoneImpact(entry.impact),
+    linkedYear: nullableNumberOrDefault(entry.linkedYear, null)
+  };
+}
+
+function normalizeIncomeInflationRate(value: unknown): IncomeInflationRate {
+  const entry = isRecord(value) ? value : {};
+  return {
+    id: String(entry.id || createId()),
+    year: Math.round(numberOrDefault(entry.year, defaultPlanningSettings().year)),
+    ratePercent: nullableNumberOrDefault(entry.ratePercent, null)
+  };
+}
+
+function normalizeIncomePerson(value: unknown): IncomePerson {
+  return value === "person1" || value === "person2" || value === "household" ? value : "household";
+}
+
+function normalizeIncomeYearSource(value: unknown): IncomeYearEntrySource {
+  return value === "manual" ? "manual" : "annual_statement";
+}
+
+function normalizeCareerMilestoneImpact(value: unknown): CareerMilestoneImpact {
+  if (value === "negative" || value === "neutral" || value === "positive") return value;
+  return "positive";
+}
+
+function normalizeIncomeProjectionMode(value: unknown, fallback: IncomeProjectionMode): IncomeProjectionMode {
+  if (value === "off" || value === "historical_average" || value === "manual") return value;
+  return fallback;
+}
+
+function normalizeIncomeInflationMode(value: unknown, fallback: IncomeInflationMode): IncomeInflationMode {
+  return value === "manual" ? "manual" : fallback;
+}
+
+function normalizeIncomeInputTab(
+  value: unknown,
+  fallback: IncomeTrackerSettings["activeInputTab"]
+): IncomeTrackerSettings["activeInputTab"] {
+  if (value === "monthly" || value === "yearly" || value === "milestones" || value === "settings") return value;
+  return fallback;
+}
+
+function arrayOrEmpty(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function normalizeSpecialRepaymentRhythm(
@@ -752,6 +880,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function numberOrDefault(value: unknown, fallback: number): number {
   const parsed = Number(String(value ?? "").replace(",", "."));
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function nullableNumberOrDefault(value: unknown, fallback: number | null): number | null {
