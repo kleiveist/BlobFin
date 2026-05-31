@@ -1344,13 +1344,13 @@ function renderIncomeAnalysisDialog(model: IncomeTrackerModel = incomeTrackerMod
   const years = analysis.years;
   root.innerHTML = `
     <div class="income-analysis-backdrop" role="presentation">
-      <div class="income-analysis-dialog" role="dialog" aria-modal="true" aria-label="Wertgrafik Analyse Dashboard">
+      <div class="income-analysis-dialog" role="dialog" aria-modal="true" aria-label="Weltgrafik Analyse Dashboard">
         <div class="income-analysis-head">
           <div>
-            <strong>Wertgrafik</strong>
+            <strong>Weltgrafik</strong>
             <span>Grafik · Analyse · Dashboard · Plattform</span>
           </div>
-          <button class="chart-popup-close" type="button" data-action="income-close-analysis" aria-label="Wertgrafik schliessen">x</button>
+          <button class="chart-popup-close" type="button" data-action="income-close-analysis" aria-label="Weltgrafik schliessen">x</button>
         </div>
         <div class="income-analysis-controls">
           <div class="income-analysis-switch" aria-label="Diagrammtyp">
@@ -1426,7 +1426,7 @@ function incomeAnalysisBreakdownLine(slice: IncomeAnalysisSlice, totalGross: num
 }
 
 function renderIncomeAnalysisChart(analysis: IncomeAnalysisModel, slices: IncomeAnalysisSlice[]): string {
-  if (!analysis.entries.length) return incomeAnalysisEmpty("Noch keine Jahreswerte fuer die Wertgrafik.");
+  if (!analysis.entries.length) return incomeAnalysisEmpty("Noch keine Jahreswerte fuer die Weltgrafik.");
   if (incomeAnalysisChartType === "pie") return renderIncomeAnalysisPie(slices);
   if (incomeAnalysisChartType === "bar") return renderIncomeAnalysisBars(slices);
   return renderIncomeAnalysisLineChart(analysis, incomeAnalysisChartType === "curve");

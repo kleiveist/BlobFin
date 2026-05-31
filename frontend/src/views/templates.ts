@@ -155,7 +155,6 @@ export function renderAppShell(): string {
             </p>
           </div>
           <div class="button-row">
-            <button class="button secondary" type="button" data-action="income-open-analysis">Wertgrafik</button>
             ${toolbarIconButton("income-import-csv", "CSV importieren", "upload")}
             ${toolbarIconButton("income-export-csv", "CSV exportieren", "download")}
             <button class="button" type="button" data-action="income-export-pdf">PDF-Auswertung</button>
@@ -175,6 +174,9 @@ export function renderAppShell(): string {
               </button>
               <button class="position-mode-button" type="button" data-action="income-tab-settings" aria-pressed="false">
                 Annahmen
+              </button>
+              <button class="position-mode-button" type="button" data-action="income-open-analysis" aria-label="Weltgrafik Analyse Dashboard oeffnen">
+                Weltgrafik
               </button>
             </div>
 
