@@ -2051,25 +2051,57 @@ function renderIncomeProjectionChart(model: IncomeTrackerModel): string {
   if (state.incomeTracker.settings.projectionMode === "off") return incomeChartEmpty("Projektion ist deaktiviert.");
   if (!model.projection.points.length) return incomeChartEmpty("Keine nutzbare Projektionsrate vorhanden.");
   const maxValue = Math.max(1, ...model.projection.points.map((point) => point.value), ...model.valueYears.map((year) => year.annualNet ?? 0));
-  return incomeBarChart(
-    model.projection.points.map((point) => {
-      const offset = point.year - (model.latest?.year ?? point.year);
+  const items = model.projection.points.map((point) => {
+    const offset = point.year - (model.latest?.year ?? point.year);
       return {
         label: String(point.year),
         value: point.value,
-        detail: incomeProjectionPointDetail(model, offset),
+        detail: incomeProjectionPointDetail(offset),
         tone: offset < 0 ? "blue" : point.projected ? "warning" : "accent",
         marker: offset < 0 ? "R" : point.projected ? "+" : ""
       };
-    }),
-    maxValue
-  );
+  });
+  return `
+    <div class="income-projection-chart">
+      ${incomeBarChart(items, maxValue)}
+      ${incomeProjectionGrowthArrows(model)}
+    </div>
+  `;
 }
 
-function incomeProjectionPointDetail(model: IncomeTrackerModel, offsetYears: number): string {
+function incomeProjectionPointDetail(offsetYears: number): string {
   if (offsetYears === 0) return "Ist";
-  const growthLabel = model.projection.rate !== null ? `${signedPercent(model.projection.rate * 100)} p.a.` : "Wachstum";
-  return offsetYears < 0 ? "" : `+${offsetYears}J | ${growthLabel}`;
+  return "";
+}
+
+function incomeProjectionGrowthArrows(model: IncomeTrackerModel): string {
+  const points = model.projection.points;
+  const currentYear = model.latest?.year ?? null;
+  if (currentYear === null || points.length < 3) return "";
+  const transitions = [
+    { fromOffset: -10, toOffset: -5 },
+    { fromOffset: -5, toOffset: 0 },
+    { fromOffset: 0, toOffset: 5 },
+    { fromOffset: 5, toOffset: 10 },
+    { fromOffset: 10, toOffset: 15 }
+  ];
+  const arrows = transitions
+    .map((transition) => {
+      const fromIndex = points.findIndex((point) => point.year === currentYear + transition.fromOffset);
+      const toIndex = points.findIndex((point) => point.year === currentYear + transition.toOffset);
+      const from = points[fromIndex];
+      const to = points[toIndex];
+      if (fromIndex < 0 || toIndex < 0 || toIndex <= fromIndex || !from || !to || from.value <= 0) return "";
+      const growthPercent = ((to.value - from.value) / from.value) * 100;
+      return `
+        <span class="income-projection-growth-arrow" style="grid-column: ${fromIndex + 1}">
+          <b>${escapeHtml(signedPercent(growthPercent))}</b>
+        </span>
+      `;
+    })
+    .join("");
+  if (!arrows.trim()) return "";
+  return `<div class="income-projection-growth-row" style="--income-projection-gap-count: ${Math.max(1, points.length - 1)}">${arrows}</div>`;
 }
 
 function setIncomeChart(id: string, html: string): void {

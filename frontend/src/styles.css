@@ -3587,6 +3587,59 @@ tfoot th {
   font-weight: 900;
 }
 
+.income-projection-chart {
+  display: grid;
+  gap: 6px;
+}
+
+.income-projection-growth-row {
+  display: grid;
+  grid-template-columns: repeat(var(--income-projection-gap-count, 1), minmax(42px, 1fr));
+  gap: 8px;
+  min-height: 24px;
+}
+
+.income-projection-growth-arrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: var(--accent-strong);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.income-projection-growth-arrow::before {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 50%;
+  height: 2px;
+  background: var(--accent);
+  content: "";
+}
+
+.income-projection-growth-arrow::after {
+  position: absolute;
+  right: 10%;
+  top: calc(50% - 4px);
+  border-bottom: 4px solid transparent;
+  border-left: 7px solid var(--accent);
+  border-top: 4px solid transparent;
+  content: "";
+}
+
+.income-projection-growth-arrow b {
+  position: relative;
+  z-index: 1;
+  border: 1px solid var(--row-border);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
 .income-chart-milestone-markers {
   position: absolute;
   top: 3px;

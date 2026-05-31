@@ -299,9 +299,22 @@ function buildProjection(
   }
 
   const latestAnnualNet = latest.annualNet;
+  const actualNetByYear = new Map(
+    valueYears
+      .filter((year): year is IncomeYearAnalysis & { annualNet: number } => year.annualNet !== null)
+      .map((year) => [year.year, year.annualNet])
+  );
+  const projectionValue = (offset: number): number => {
+    const year = latest.year + offset;
+    if (offset <= 0) {
+      const actualNet = actualNetByYear.get(year);
+      if (actualNet !== undefined) return roundCents(actualNet);
+    }
+    return roundCents(latestAnnualNet * Math.pow(growthFactor, offset));
+  };
   const points = PROJECTION_CHART_OFFSETS.map((offset) => ({
     year: latest.year + offset,
-    value: roundCents(latestAnnualNet * Math.pow(growthFactor, offset)),
+    value: projectionValue(offset),
     projected: offset > 0
   }));
   const horizons = PROJECTION_HORIZONS.map((years) => ({
