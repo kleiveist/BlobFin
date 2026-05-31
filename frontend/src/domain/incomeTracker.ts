@@ -78,6 +78,7 @@ export interface IncomeTrackerModelOptions {
 }
 
 const PROJECTION_HORIZONS = [5, 10, 15] as const;
+const PROJECTION_CHART_OFFSETS = [-10, -5, 0, 5, 10, 15] as const;
 const TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
   "wageTax",
   "solidaritySurcharge",
@@ -291,15 +292,21 @@ function buildProjection(
     return { enabled: true, rate: null, modeLabel, points: [], horizons: [] };
   }
 
-  const points = Array.from({ length: 16 }, (_, offset) => ({
+  const growthFactor = 1 + rate;
+  if (!Number.isFinite(growthFactor) || growthFactor <= 0) {
+    return { enabled: true, rate: null, modeLabel, points: [], horizons: [] };
+  }
+
+  const latestAnnualNet = latest.annualNet;
+  const points = PROJECTION_CHART_OFFSETS.map((offset) => ({
     year: latest.year + offset,
-    value: latest.annualNet! * Math.pow(1 + rate!, offset),
+    value: roundCents(latestAnnualNet * Math.pow(growthFactor, offset)),
     projected: offset > 0
   }));
   const horizons = PROJECTION_HORIZONS.map((years) => ({
     years,
     year: latest.year + years,
-    value: latest.annualNet! * Math.pow(1 + rate!, years)
+    value: roundCents(latestAnnualNet * Math.pow(growthFactor, years))
   }));
   return { enabled: true, rate, modeLabel, points, horizons };
 }

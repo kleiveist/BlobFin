@@ -2012,19 +2012,26 @@ function renderIncomeRatioChart(model: IncomeTrackerModel): string {
 function renderIncomeProjectionChart(model: IncomeTrackerModel): string {
   if (state.incomeTracker.settings.projectionMode === "off") return incomeChartEmpty("Projektion ist deaktiviert.");
   if (!model.projection.points.length) return incomeChartEmpty("Keine nutzbare Projektionsrate vorhanden.");
-  const actualYears = new Set(model.valueYears.map((year) => year.year));
   const maxValue = Math.max(1, ...model.projection.points.map((point) => point.value), ...model.valueYears.map((year) => year.annualNet ?? 0));
-  const points = model.projection.points.filter((point, index) => index === 0 || point.year % 5 === 0 || index === model.projection.points.length - 1);
   return incomeBarChart(
-    points.map((point) => ({
-      label: String(point.year),
-      value: point.value,
-      detail: actualYears.has(point.year) ? "Ist" : "Projektion",
-      tone: point.projected ? "warning" : "accent",
-      marker: point.projected ? "P" : ""
-    })),
+    model.projection.points.map((point) => {
+      const offset = point.year - (model.latest?.year ?? point.year);
+      return {
+        label: String(point.year),
+        value: point.value,
+        detail: incomeProjectionPointDetail(model, offset),
+        tone: offset < 0 ? "blue" : point.projected ? "warning" : "accent",
+        marker: offset < 0 ? "R" : point.projected ? "+" : ""
+      };
+    }),
     maxValue
   );
+}
+
+function incomeProjectionPointDetail(model: IncomeTrackerModel, offsetYears: number): string {
+  if (offsetYears === 0) return "Ist";
+  const growthLabel = model.projection.rate !== null ? `${signedPercent(model.projection.rate * 100)} p.a.` : "Wachstum";
+  return offsetYears < 0 ? `Rueck ${Math.abs(offsetYears)}J | ${growthLabel}` : `+${offsetYears}J | ${growthLabel}`;
 }
 
 function setIncomeChart(id: string, html: string): void {
