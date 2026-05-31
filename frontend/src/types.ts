@@ -264,10 +264,23 @@ export interface IncomeYearEntry {
   annualNetIncome: number | null;
   annualGrossIncome: number | null;
   taxesAndDeductions: number | null;
+  taxDeductionItems: IncomeTaxDeductionItems;
   employer: string;
   note: string;
   source: IncomeYearEntrySource;
 }
+
+export interface IncomeTaxDeductionItems {
+  wageTax: number | null;
+  solidaritySurcharge: number | null;
+  churchTax: number | null;
+  pensionInsurance: number | null;
+  healthInsurance: number | null;
+  careInsurance: number | null;
+  unemploymentInsurance: number | null;
+}
+
+export type IncomeTaxDeductionField = keyof IncomeTaxDeductionItems;
 
 export interface CareerMilestone {
   id: string;

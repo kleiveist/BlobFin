@@ -33,6 +33,8 @@ import type {
   IncomeMonthEntry,
   IncomePerson,
   IncomeProjectionMode,
+  IncomeTaxDeductionField,
+  IncomeTaxDeductionItems,
   IncomeTrackerSettings,
   IncomeTrackerState,
   IncomeYearEntry,
@@ -53,6 +55,15 @@ import type {
 } from "../types";
 
 const STORAGE_KEY = "blobfin.reserveCalculator.v1";
+const INCOME_TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
+  "wageTax",
+  "solidaritySurcharge",
+  "churchTax",
+  "pensionInsurance",
+  "healthInsurance",
+  "careInsurance",
+  "unemploymentInsurance"
+];
 const LEGACY_STORAGE_KEY = "jahreskalkulatorState";
 
 export function loadState(storage: Storage = localStorage): AppState {
@@ -540,10 +551,27 @@ function normalizeIncomeYearEntry(value: unknown): IncomeYearEntry {
     annualNetIncome: nullableNumberOrDefault(entry.annualNetIncome, null),
     annualGrossIncome: nullableNumberOrDefault(entry.annualGrossIncome, null),
     taxesAndDeductions: nullableNumberOrDefault(entry.taxesAndDeductions, null),
+    taxDeductionItems: normalizeIncomeTaxDeductionItems(entry.taxDeductionItems),
     employer: String(entry.employer ?? ""),
     note: String(entry.note ?? ""),
     source: normalizeIncomeYearSource(entry.source)
   };
+}
+
+function normalizeIncomeTaxDeductionItems(value: unknown): IncomeTaxDeductionItems {
+  const item = isRecord(value) ? value : {};
+  return INCOME_TAX_DEDUCTION_FIELDS.reduce<IncomeTaxDeductionItems>(
+    (result, field) => ({ ...result, [field]: nullableNumberOrDefault(item[field], null) }),
+    {
+      wageTax: null,
+      solidaritySurcharge: null,
+      churchTax: null,
+      pensionInsurance: null,
+      healthInsurance: null,
+      careInsurance: null,
+      unemploymentInsurance: null
+    }
+  );
 }
 
 function normalizeCareerMilestone(value: unknown): CareerMilestone {

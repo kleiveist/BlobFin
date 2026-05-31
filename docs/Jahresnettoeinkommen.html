@@ -339,6 +339,152 @@
       line-height: 1;
     }
 
+    .export-icon-button {
+      width: 38px;
+      height: 38px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      padding: 0;
+    }
+
+    .export-icon-button svg {
+      width: 19px;
+      height: 19px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      clip-path: inset(50%);
+    }
+
+    .tax-button {
+      display: grid;
+      gap: 2px;
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-soft);
+      color: var(--text);
+      padding: 7px 10px;
+      text-align: right;
+      cursor: pointer;
+    }
+
+    .tax-button strong {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.86rem;
+      font-weight: 900;
+    }
+
+    .tax-button span {
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .tax-button:hover {
+      border-color: var(--accent);
+    }
+
+    .tax-dialog-backdrop {
+      position: fixed;
+      z-index: 40;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(31, 37, 40, 0.35);
+      padding: 16px;
+    }
+
+    .tax-dialog {
+      display: grid;
+      gap: 12px;
+      width: min(760px, 100%);
+      max-height: min(760px, calc(100vh - 32px));
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 18px 44px rgba(31, 37, 40, 0.2);
+      padding: 12px;
+    }
+
+    .tax-dialog-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .tax-dialog-head div {
+      display: grid;
+      gap: 2px;
+    }
+
+    .tax-dialog-head strong {
+      font-size: 0.98rem;
+    }
+
+    .tax-dialog-head span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 750;
+    }
+
+    .tax-detail-table th:first-child,
+    .tax-detail-table td:first-child {
+      width: 58px;
+    }
+
+    .tax-detail-table th:last-child,
+    .tax-detail-table td:last-child {
+      width: 190px;
+    }
+
+    .tax-summary {
+      display: grid;
+      border: 1px solid var(--row-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .tax-summary > div {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--row-border);
+    }
+
+    .tax-summary > div:last-child {
+      border-bottom: 0;
+    }
+
+    .tax-summary span {
+      color: var(--muted);
+      font-weight: 750;
+    }
+
+    .tax-summary strong {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tax-summary .total {
+      background: var(--surface-muted);
+    }
+
     .button-row {
       margin-top: 12px;
     }
@@ -749,17 +895,27 @@
       <div>
         <h2>Export</h2>
         <p class="muted-text">
-          CSV, JSON und PDF-Bericht enthalten Eingaben, berechnete Kennzahlen, Projektionen und Hinweise zur Datenbasis.
+          CSV und PDF-Bericht enthalten Eingaben, berechnete Kennzahlen, Projektionen und Hinweise zur Datenbasis.
         </p>
         <p class="status-line" id="statusLine" aria-live="polite"></p>
       </div>
       <div class="button-row">
-        <button class="secondary-button" type="button" id="exportCsvButton">CSV exportieren</button>
-        <button class="secondary-button" type="button" id="exportJsonButton">JSON exportieren</button>
+        <button class="icon-button export-icon-button" type="button" id="importCsvButton" aria-label="CSV importieren" title="CSV importieren">
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M12 17V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /><path d="M5 16v4" /><path d="M19 16v4" />
+          </svg>
+        </button>
+        <button class="icon-button export-icon-button" type="button" id="exportCsvButton" aria-label="CSV exportieren" title="CSV exportieren">
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M12 4v13" /><path d="m7 12 5 5 5-5" /><path d="M5 20h14" /><path d="M5 16v4" /><path d="M19 16v4" />
+          </svg>
+        </button>
         <button class="primary-button" type="button" id="exportPdfButton">PDF-Auswertung</button>
+        <input class="visually-hidden" id="importCsvInput" type="file" accept=".csv,text/csv" />
       </div>
     </section>
   </main>
+  <div id="taxDialogRoot"></div>
 
   <script>
     const STORAGE_KEY = "imocalc-income-tracker-v1";
@@ -810,9 +966,19 @@
       ["annual_statement", "Jahresentgeltabrechnung"],
       ["manual", "Manuell"]
     ];
+    const TAX_DEDUCTION_ROWS = [
+      { field: "wageTax", nr: "4", label: "Einbehaltene Lohnsteuer von 3.", category: "taxes" },
+      { field: "solidaritySurcharge", nr: "5", label: "Einbehaltener Solidaritätszuschlag von 3.", category: "taxes" },
+      { field: "churchTax", nr: "6", label: "Einbehaltene Kirchensteuer des Arbeitnehmers von 3.", category: "taxes" },
+      { field: "pensionInsurance", nr: "23", label: "Arbeitnehmerbeiträge zur gesetzlichen RV", category: "social" },
+      { field: "healthInsurance", nr: "25", label: "Arbeitnehmerbeiträge zur gesetzlichen KV", category: "social" },
+      { field: "careInsurance", nr: "26", label: "Arbeitnehmerbeiträge zur sozialen PV", category: "social" },
+      { field: "unemploymentInsurance", nr: "27", label: "Arbeitnehmerbeiträge zur AV", category: "social" }
+    ];
     const PROJECTION_HORIZONS = [5, 10, 15];
     const currentYear = new Date().getFullYear();
     let state = loadState();
+    let taxDialogEntryId = null;
     let statusTimeoutId;
     let resizeTimeoutId;
 
@@ -901,9 +1067,30 @@
         annualNetIncome: normalizeOptionalNumber(entry?.annualNetIncome),
         annualGrossIncome: normalizeOptionalNumber(entry?.annualGrossIncome),
         taxesAndDeductions: normalizeOptionalNumber(entry?.taxesAndDeductions),
+        taxDeductionItems: normalizeTaxDeductionItems(entry?.taxDeductionItems),
         employer: String(entry?.employer ?? ""),
         note: String(entry?.note ?? ""),
         source: normalizeOption(entry?.source, SOURCE_OPTIONS, "annual_statement")
+      };
+    }
+
+    function normalizeTaxDeductionItems(value) {
+      const source = value && typeof value === "object" ? value : {};
+      return TAX_DEDUCTION_ROWS.reduce((items, row) => {
+        items[row.field] = normalizeOptionalNumber(source[row.field]);
+        return items;
+      }, emptyTaxDeductionItems());
+    }
+
+    function emptyTaxDeductionItems() {
+      return {
+        wageTax: "",
+        solidaritySurcharge: "",
+        churchTax: "",
+        pensionInsurance: "",
+        healthInsurance: "",
+        careInsurance: "",
+        unemploymentInsurance: ""
       };
     }
 
@@ -979,6 +1166,18 @@
           return;
         }
 
+        const openTaxDialogButton = target.closest("[data-open-tax-dialog]");
+        if (openTaxDialogButton) {
+          openTaxDialog(openTaxDialogButton.dataset.openTaxDialog);
+          return;
+        }
+
+        const closeTaxDialogButton = target.closest("[data-close-tax-dialog]");
+        if (closeTaxDialogButton) {
+          closeTaxDialog();
+          return;
+        }
+
         const deleteButton = target.closest("[data-delete-collection]");
         if (deleteButton) {
           deleteRow(deleteButton.dataset.deleteCollection, deleteButton.dataset.deleteId);
@@ -988,10 +1187,21 @@
 
       document.addEventListener("input", handleValueEvent);
       document.addEventListener("change", handleValueEvent);
+      document.getElementById("importCsvButton").addEventListener("click", () => {
+        document.getElementById("importCsvInput").click();
+      });
+      document.getElementById("importCsvInput").addEventListener("change", (event) => {
+        importCsv(event.target.files?.[0]);
+        event.target.value = "";
+      });
       document.getElementById("exportCsvButton").addEventListener("click", exportCsv);
-      document.getElementById("exportJsonButton").addEventListener("click", exportJson);
       document.getElementById("exportPdfButton").addEventListener("click", exportPdfReport);
       document.getElementById("resetDataButton").addEventListener("click", resetData);
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeTaxDialog();
+        }
+      });
       window.addEventListener("resize", () => {
         window.clearTimeout(resizeTimeoutId);
         resizeTimeoutId = window.setTimeout(renderOutputs, 120);
@@ -1023,10 +1233,12 @@
         if (!entry) {
           return;
         }
-        entry[field] = readControlValue(target);
+        updateEntryValue(entry, field, readControlValue(target));
         saveState();
         if (collection === "yearlyEntries") {
           updateYearlyNetInput(id);
+          updateTaxButton(id);
+          updateTaxDialogTotals(id);
         }
         renderOutputs();
         return;
@@ -1045,6 +1257,20 @@
         return normalizeOptionalNumber(control.value);
       }
       return control.value;
+    }
+
+    function updateEntryValue(entry, field, value) {
+      if (field.startsWith("taxDeductionItems.")) {
+        const itemField = field.replace("taxDeductionItems.", "");
+        if (!TAX_DEDUCTION_ROWS.some((row) => row.field === itemField)) {
+          return;
+        }
+        entry.taxDeductionItems = { ...emptyTaxDeductionItems(), ...(entry.taxDeductionItems || {}) };
+        entry.taxDeductionItems[itemField] = value;
+        entry.taxesAndDeductions = taxDeductionItemsTotal(entry.taxDeductionItems);
+        return;
+      }
+      entry[field] = value;
     }
 
     function addRow(collection) {
@@ -1069,6 +1295,7 @@
           annualNetIncome: "",
           annualGrossIncome: "",
           taxesAndDeductions: "",
+          taxDeductionItems: emptyTaxDeductionItems(),
           employer: "",
           note: "",
           source: "annual_statement"
@@ -1104,6 +1331,10 @@
       if (!Array.isArray(state[collection])) {
         return;
       }
+      if (collection === "yearlyEntries" && taxDialogEntryId === id) {
+        taxDialogEntryId = null;
+        renderTaxDialog();
+      }
       state[collection] = state[collection].filter((entry) => entry.id !== id);
       saveState();
       renderInputTables();
@@ -1117,7 +1348,9 @@
         return;
       }
       state = createDefaultState();
+      taxDialogEntryId = null;
       saveState();
+      renderTaxDialog();
       renderInputTables();
       syncSettingControls();
       renderOutputs();
@@ -1158,7 +1391,7 @@
             <td><select data-collection="yearlyEntries" data-id="${entry.id}" data-field="person">${optionTags(PERSON_OPTIONS, entry.person)}</select></td>
             <td><input type="number" step="0.01" min="0" value="${escapeAttribute(yearlyEntryNetIncome(entry))}" data-year-net="${entry.id}" data-collection="yearlyEntries" data-id="${entry.id}" data-field="annualNetIncome" ${yearlyEntryCalculatedNetIncome(entry) !== null ? "disabled" : ""} /></td>
             <td><input type="number" step="0.01" min="0" value="${escapeAttribute(entry.annualGrossIncome)}" data-collection="yearlyEntries" data-id="${entry.id}" data-field="annualGrossIncome" /></td>
-            <td><input type="number" step="0.01" min="0" value="${escapeAttribute(entry.taxesAndDeductions)}" data-collection="yearlyEntries" data-id="${entry.id}" data-field="taxesAndDeductions" /></td>
+            <td>${taxDeductionsButton(entry)}</td>
             <td><input type="text" value="${escapeAttribute(entry.employer)}" data-collection="yearlyEntries" data-id="${entry.id}" data-field="employer" /></td>
             <td><select data-collection="yearlyEntries" data-id="${entry.id}" data-field="source">${optionTags(SOURCE_OPTIONS, entry.source)}</select></td>
             <td><button class="icon-button danger" type="button" title="Zeile löschen" data-delete-collection="yearlyEntries" data-delete-id="${entry.id}">×</button></td>
@@ -1176,6 +1409,126 @@
       const calculatedNet = yearlyEntryCalculatedNetIncome(entry);
       input.disabled = calculatedNet !== null;
       input.value = yearlyEntryNetIncome(entry) ?? "";
+    }
+
+    function taxDeductionsButton(entry) {
+      const taxDeductions = yearlyEntryTaxDeductions(entry);
+      return `
+        <button class="tax-button" type="button" data-open-tax-dialog="${escapeAttribute(entry.id)}" aria-label="Steuer- und Abgabenpositionen bearbeiten">
+          <strong data-year-tax-total="${escapeAttribute(entry.id)}">${taxDeductions === "" ? "Eintragen" : formatMoney(taxDeductions, 2)}</strong>
+          <span>Details</span>
+        </button>
+      `;
+    }
+
+    function updateTaxButton(id) {
+      const entry = state.yearlyEntries.find((item) => item.id === id);
+      const value = document.querySelector(`[data-year-tax-total="${id}"]`);
+      if (!entry || !value) {
+        return;
+      }
+      const taxDeductions = yearlyEntryTaxDeductions(entry);
+      value.textContent = taxDeductions === "" ? "Eintragen" : formatMoney(taxDeductions, 2);
+    }
+
+    function openTaxDialog(id) {
+      if (!state.yearlyEntries.some((entry) => entry.id === id)) {
+        return;
+      }
+      taxDialogEntryId = id;
+      renderTaxDialog();
+    }
+
+    function closeTaxDialog() {
+      if (!taxDialogEntryId) {
+        return;
+      }
+      taxDialogEntryId = null;
+      renderTaxDialog();
+    }
+
+    function renderTaxDialog() {
+      const root = document.getElementById("taxDialogRoot");
+      const entry = state.yearlyEntries.find((item) => item.id === taxDialogEntryId);
+      if (!root) {
+        return;
+      }
+      if (!entry) {
+        root.innerHTML = "";
+        taxDialogEntryId = null;
+        return;
+      }
+      const taxTotal = taxDeductionCategoryTotal(entry.taxDeductionItems, "taxes");
+      const socialTotal = taxDeductionCategoryTotal(entry.taxDeductionItems, "social");
+      const total = yearlyEntryTaxDeductions(entry);
+      root.innerHTML = `
+        <div class="tax-dialog-backdrop" role="presentation">
+          <div class="tax-dialog" role="dialog" aria-modal="true" aria-label="Steuer- und Abgabenpositionen">
+            <div class="tax-dialog-head">
+              <div>
+                <strong>Steuer- und Abgabenpositionen</strong>
+                <span>${escapeHtml(String(entry.year))} · ${escapeHtml(personLabel(entry.person))}</span>
+              </div>
+              <button class="icon-button" type="button" data-close-tax-dialog aria-label="Dialog schließen">×</button>
+            </div>
+            <div class="table-wrap">
+              <table class="tax-detail-table">
+                <thead>
+                  <tr>
+                    <th class="numeric">Nr.</th>
+                    <th>Text</th>
+                    <th class="numeric">Betrag</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${TAX_DEDUCTION_ROWS.map((row) => `
+                    <tr>
+                      <td class="numeric">${escapeHtml(row.nr)}</td>
+                      <td>${escapeHtml(row.label)}</td>
+                      <td><input type="number" step="0.01" min="0" value="${escapeAttribute(entry.taxDeductionItems[row.field])}" data-collection="yearlyEntries" data-id="${escapeAttribute(entry.id)}" data-field="taxDeductionItems.${row.field}" /></td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
+            <div class="tax-summary">
+              <div>
+                <span>Kategorie</span>
+                <strong>Summe</strong>
+              </div>
+              <div>
+                <span>Steuern</span>
+                <strong id="taxDialogTaxesTotal">${formatMoney(taxTotal, 2)}</strong>
+              </div>
+              <div>
+                <span>Sozialversicherung Arbeitnehmer</span>
+                <strong id="taxDialogSocialTotal">${formatMoney(socialTotal, 2)}</strong>
+              </div>
+              <div class="total">
+                <span>Gesamt</span>
+                <strong id="taxDialogGrandTotal">${total === "" ? "-" : formatMoney(total, 2)}</strong>
+              </div>
+            </div>
+            <div class="button-row">
+              <button class="primary-button" type="button" data-close-tax-dialog>Fertig</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateTaxDialogTotals(id) {
+      if (taxDialogEntryId !== id) {
+        return;
+      }
+      const entry = state.yearlyEntries.find((item) => item.id === id);
+      if (!entry) {
+        return;
+      }
+      const total = yearlyEntryTaxDeductions(entry);
+      document.getElementById("taxDialogTaxesTotal").textContent = formatMoney(taxDeductionCategoryTotal(entry.taxDeductionItems, "taxes"), 2);
+      document.getElementById("taxDialogSocialTotal").textContent = formatMoney(taxDeductionCategoryTotal(entry.taxDeductionItems, "social"), 2);
+      document.getElementById("taxDialogGrandTotal").textContent = total === "" ? "-" : formatMoney(total, 2);
     }
 
     function renderMilestoneRows() {
@@ -1982,6 +2335,255 @@
       }
     }
 
+    async function importCsv(file) {
+      if (!file) {
+        return;
+      }
+      const imported = incomeEntriesFromCsvRows(parseCsv(await file.text()));
+      const importedCount = imported.monthlyEntries.length + imported.yearlyEntries.length + imported.milestones.length + imported.inflationRates.length;
+      if (!importedCount) {
+        window.alert("Keine gültigen Einkommen-CSV-Daten gefunden.");
+        return;
+      }
+      state.monthlyEntries.push(...imported.monthlyEntries);
+      state.yearlyEntries.push(...imported.yearlyEntries);
+      state.milestones.push(...imported.milestones);
+      state.inflationRates.push(...imported.inflationRates);
+      saveState();
+      renderInputTables();
+      syncSettingControls();
+      renderOutputs();
+      showTab(imported.yearlyEntries.length ? "yearlyPanel" : imported.monthlyEntries.length ? "monthlyPanel" : "settingsPanel");
+      setStatus(`${importedCount} Einträge aus CSV importiert.`);
+    }
+
+    function parseCsv(text) {
+      const delimiter = detectCsvDelimiter(text);
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let inQuotes = false;
+      for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        const code = text.charCodeAt(index);
+        const next = text[index + 1];
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            cell += '"';
+            index += 1;
+          } else {
+            inQuotes = !inQuotes;
+          }
+          continue;
+        }
+        if (char === delimiter && !inQuotes) {
+          row.push(cell.trim());
+          cell = "";
+          continue;
+        }
+        if ((code === 10 || code === 13) && !inQuotes) {
+          if (code === 13 && text.charCodeAt(index + 1) === 10) {
+            index += 1;
+          }
+          row.push(cell.trim());
+          if (row.some((value) => value !== "")) {
+            rows.push(row);
+          }
+          row = [];
+          cell = "";
+          continue;
+        }
+        cell += char;
+      }
+      row.push(cell.trim());
+      if (row.some((value) => value !== "")) {
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function detectCsvDelimiter(text) {
+      const firstLine = text.split(/\r?\n/, 1)[0] || "";
+      return (firstLine.match(/;/g) || []).length >= (firstLine.match(/,/g) || []).length ? ";" : ",";
+    }
+
+    function incomeEntriesFromCsvRows(rows) {
+      const emptyImport = { monthlyEntries: [], yearlyEntries: [], milestones: [], inflationRates: [] };
+      if (!rows.length) {
+        return emptyImport;
+      }
+      const header = rows[0].map((value) => value.trim().replace(/^\uFEFF/, "").toLowerCase());
+      const hasHeader = header.includes("section") && header.includes("field");
+      const dataRows = hasHeader ? rows.slice(1) : rows;
+      const get = (row, names, fallbackIndex) => {
+        if (hasHeader) {
+          for (const name of names) {
+            const index = header.indexOf(name);
+            if (index >= 0) {
+              return row[index] ?? "";
+            }
+          }
+        }
+        return fallbackIndex >= 0 ? row[fallbackIndex] ?? "" : "";
+      };
+      const monthlyEntries = new Map();
+      const yearlyEntries = new Map();
+      const milestones = new Map();
+      const inflationRates = new Map();
+
+      dataRows.forEach((row, index) => {
+        const section = get(row, ["section"], 0).trim().toLowerCase();
+        const sourceId = get(row, ["id"], 1).trim();
+        const rowKey = sourceId || String(index);
+        const yearValue = get(row, ["year"], 2).trim();
+        const monthValue = get(row, ["month"], 3).trim();
+        const personValue = get(row, ["person"], 4).trim();
+        const field = get(row, ["field"], 5).trim();
+        const fieldKey = field.toLowerCase();
+        const value = get(row, ["value"], 6).trim();
+        const sourceValue = get(row, ["source"], 7).trim();
+
+        if (section === "monthly") {
+          const key = `monthly-${rowKey}`;
+          const entry = monthlyEntries.get(key) || {
+            id: createId(),
+            year: csvYear(yearValue, currentYear),
+            month: csvMonth(monthValue),
+            person: normalizeOption(personValue, PERSON_OPTIONS, "household"),
+            netIncome: "",
+            bonus: "",
+            otherIncome: "",
+            note: ""
+          };
+          entry.year = csvYear(yearValue, entry.year);
+          entry.month = csvMonth(monthValue, entry.month);
+          entry.person = normalizeOption(personValue || entry.person, PERSON_OPTIONS, "household");
+          if (fieldKey === "netincome") entry.netIncome = csvNumber(value);
+          if (fieldKey === "bonus") entry.bonus = csvNumber(value);
+          if (fieldKey === "otherincome") entry.otherIncome = csvNumber(value);
+          monthlyEntries.set(key, entry);
+          return;
+        }
+
+        if (section === "yearly" || section === "yearly_tax_detail") {
+          const key = `yearly-${rowKey}`;
+          const entry = yearlyEntries.get(key) || {
+            id: createId(),
+            year: csvYear(yearValue, currentYear),
+            person: normalizeOption(personValue, PERSON_OPTIONS, "household"),
+            annualNetIncome: "",
+            annualGrossIncome: "",
+            taxesAndDeductions: "",
+            taxDeductionItems: emptyTaxDeductionItems(),
+            employer: "",
+            note: "",
+            source: normalizeOption(sourceValue, SOURCE_OPTIONS, "annual_statement")
+          };
+          entry.year = csvYear(yearValue, entry.year);
+          entry.person = normalizeOption(personValue || entry.person, PERSON_OPTIONS, "household");
+          entry.source = normalizeOption(sourceValue || entry.source, SOURCE_OPTIONS, "annual_statement");
+          if (section === "yearly_tax_detail") {
+            const taxField = taxDeductionFieldFromCsv(field);
+            if (taxField) {
+              entry.taxDeductionItems[taxField] = csvNumber(value);
+              entry.taxesAndDeductions = taxDeductionItemsTotal(entry.taxDeductionItems);
+            }
+          } else if (fieldKey === "annualnetincome") {
+            entry.annualNetIncome = csvNumber(value);
+          } else if (fieldKey === "annualgrossincome") {
+            entry.annualGrossIncome = csvNumber(value);
+          } else if (fieldKey === "taxesanddeductions") {
+            entry.taxesAndDeductions = csvNumber(value);
+          } else if (fieldKey === "employer") {
+            entry.employer = value;
+          }
+          yearlyEntries.set(key, entry);
+          return;
+        }
+
+        if (section === "milestone") {
+          const key = `milestone-${rowKey}`;
+          const entry = milestones.get(key) || {
+            id: createId(),
+            date: monthValue,
+            type: "Sonstiges",
+            description: "",
+            impact: "positive",
+            linkedYear: csvYearOrEmpty(yearValue)
+          };
+          entry.date = monthValue || entry.date;
+          entry.linkedYear = csvYearOrEmpty(yearValue) || entry.linkedYear;
+          if (fieldKey === "description") {
+            entry.description = value;
+          } else if (field) {
+            entry.type = field;
+            entry.impact = normalizeOption(value, IMPACT_OPTIONS, "positive");
+          }
+          milestones.set(key, entry);
+          return;
+        }
+
+        if (section === "inflation") {
+          const key = `inflation-${rowKey}`;
+          const entry = inflationRates.get(key) || { id: createId(), year: csvYear(yearValue, currentYear), ratePercent: "" };
+          entry.year = csvYear(yearValue, entry.year);
+          if (fieldKey === "ratepercent") entry.ratePercent = csvNumber(value);
+          inflationRates.set(key, entry);
+        }
+      });
+
+      return {
+        monthlyEntries: Array.from(monthlyEntries.values()).filter((entry) => hasAnyAmount(entry, ["netIncome", "bonus", "otherIncome"])),
+        yearlyEntries: Array.from(yearlyEntries.values()).filter((entry) =>
+          hasNumber(entry.annualNetIncome) ||
+          hasNumber(entry.annualGrossIncome) ||
+          hasNumber(entry.taxesAndDeductions) ||
+          Boolean(entry.employer.trim()) ||
+          taxDeductionItemsTotal(entry.taxDeductionItems) !== ""
+        ),
+        milestones: Array.from(milestones.values()).filter((entry) => entry.date || entry.description || entry.type !== "Sonstiges"),
+        inflationRates: Array.from(inflationRates.values()).filter((entry) => hasNumber(entry.ratePercent))
+      };
+    }
+
+    function csvNumber(value) {
+      const text = String(value ?? "").trim();
+      if (!text) {
+        return "";
+      }
+      const cleaned = text.replace(/[^\d,.-]/g, "");
+      const normalized = cleaned.includes(",") ? cleaned.replaceAll(".", "").replace(",", ".") : cleaned;
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : "";
+    }
+
+    function csvYear(value, fallback) {
+      const parsed = csvNumber(value);
+      return hasNumber(parsed) ? Math.min(2200, Math.max(1900, Math.round(parsed))) : fallback;
+    }
+
+    function csvYearOrEmpty(value) {
+      const parsed = csvNumber(value);
+      return hasNumber(parsed) ? Math.min(2200, Math.max(1900, Math.round(parsed))) : "";
+    }
+
+    function csvMonth(value, fallback = 1) {
+      const parsed = csvNumber(value);
+      return hasNumber(parsed) ? Math.min(12, Math.max(1, Math.round(parsed))) : fallback;
+    }
+
+    function taxDeductionFieldFromCsv(value) {
+      const text = value.toLowerCase();
+      if (text.startsWith("4 ") || text.includes("lohnsteuer")) return "wageTax";
+      if (text.startsWith("5 ") || text.includes("solidar")) return "solidaritySurcharge";
+      if (text.startsWith("6 ") || text.includes("kirchensteuer")) return "churchTax";
+      if (text.startsWith("23 ") || text.includes(" rv") || text.includes("renten")) return "pensionInsurance";
+      if (text.startsWith("25 ") || text.includes(" kv") || text.includes("kranken")) return "healthInsurance";
+      if (text.startsWith("26 ") || text.includes(" pv") || text.includes("pflege")) return "careInsurance";
+      if (text.startsWith("27 ") || text.includes(" av") || text.includes("arbeitslosen")) return "unemploymentInsurance";
+      return "";
+    }
+
     function exportCsv() {
       const model = buildIncomeModel();
       const rows = [
@@ -1995,7 +2597,10 @@
       for (const entry of state.yearlyEntries) {
         rows.push(["yearly", entry.id, entry.year, "", entry.person, "annualNetIncome", yearlyEntryNetIncome(entry), entry.source]);
         rows.push(["yearly", entry.id, entry.year, "", entry.person, "annualGrossIncome", entry.annualGrossIncome, entry.source]);
-        rows.push(["yearly", entry.id, entry.year, "", entry.person, "taxesAndDeductions", entry.taxesAndDeductions, entry.source]);
+        rows.push(["yearly", entry.id, entry.year, "", entry.person, "taxesAndDeductions", yearlyEntryTaxDeductions(entry), entry.source]);
+        for (const row of TAX_DEDUCTION_ROWS) {
+          rows.push(["yearly_tax_detail", entry.id, entry.year, "", entry.person, `${row.nr} ${row.label}`, entry.taxDeductionItems[row.field], entry.source]);
+        }
         rows.push(["yearly", entry.id, entry.year, "", entry.person, "employer", entry.employer, entry.source]);
       }
       for (const entry of state.milestones) {
@@ -2019,34 +2624,6 @@
       const csv = rows.map((row) => row.map(csvCell).join(";")).join("\n");
       downloadFile(`jahresnettoeinkommen-${dateStamp()}.csv`, "\uFEFF" + csv, "text/csv;charset=utf-8");
       setStatus("CSV-Export wurde erstellt.");
-    }
-
-    function exportJson() {
-      const model = buildIncomeModel();
-      const payload = {
-        exportedAt: new Date().toISOString(),
-        dataBasis: "Nur Nutzereingaben und daraus berechnete Werte. Projektionen nur bei aktivierter Annahme.",
-        state,
-        calculated: {
-          years: model.years,
-          metrics: {
-            latestYear: model.latest,
-            previousYear: model.previous,
-            yearlyGrowthAmount: model.yoyAmount,
-            yearlyGrowthPercent: model.yoyPercent,
-            averageGrowthRate: model.averageGrowthRate,
-            extraMonthlySpace: model.extraMonthlySpace,
-            savingsSharePercent: model.savingsShare,
-            additionalSavings: model.additionalSavings,
-            bestYear: model.bestYear,
-            weakestYear: model.weakestYear
-          },
-          projection: model.projection,
-          chartSummary: buildChartSummary(model)
-        }
-      };
-      downloadFile(`jahresnettoeinkommen-${dateStamp()}.json`, JSON.stringify(payload, null, 2), "application/json");
-      setStatus("JSON-Export wurde erstellt.");
     }
 
     function exportPdfReport() {
@@ -2212,14 +2789,38 @@
 
     function yearlyEntryNetIncome(entry) {
       const calculatedNet = yearlyEntryCalculatedNetIncome(entry);
-      return calculatedNet !== null ? calculatedNet : entry.annualNetIncome;
+      return calculatedNet !== null ? calculatedNet : hasNumber(entry.annualNetIncome) ? roundCents(entry.annualNetIncome) : entry.annualNetIncome;
     }
 
     function yearlyEntryCalculatedNetIncome(entry) {
-      if (!hasNumber(entry.annualGrossIncome) || !hasNumber(entry.taxesAndDeductions)) {
+      const taxDeductions = yearlyEntryTaxDeductions(entry);
+      if (!hasNumber(entry.annualGrossIncome) || !hasNumber(taxDeductions)) {
         return null;
       }
-      return Number(entry.annualGrossIncome) - Number(entry.taxesAndDeductions);
+      return roundCents(Number(entry.annualGrossIncome) - Number(taxDeductions));
+    }
+
+    function yearlyEntryTaxDeductions(entry) {
+      const detailTotal = taxDeductionItemsTotal(entry.taxDeductionItems);
+      return detailTotal !== "" ? detailTotal : hasNumber(entry.taxesAndDeductions) ? roundCents(entry.taxesAndDeductions) : "";
+    }
+
+    function taxDeductionItemsTotal(items) {
+      const values = TAX_DEDUCTION_ROWS.map((row) => items?.[row.field] ?? "");
+      if (!values.some((value) => hasNumber(value))) {
+        return "";
+      }
+      return roundCents(values.reduce((sum, value) => sum + numberValue(value), 0));
+    }
+
+    function taxDeductionCategoryTotal(items, category) {
+      return TAX_DEDUCTION_ROWS
+        .filter((row) => row.category === category)
+        .reduce((sum, row) => sum + numberValue(items?.[row.field]), 0);
+    }
+
+    function personLabel(value) {
+      return PERSON_OPTIONS.find(([optionValue]) => optionValue === value)?.[1] ?? "Haushalt";
     }
 
     function monthlyTotalForYear(year) {
@@ -2238,6 +2839,11 @@
 
     function numberValue(value) {
       return hasNumber(value) ? Number(value) : 0;
+    }
+
+    function roundCents(value) {
+      const rounded = Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+      return Object.is(rounded, -0) ? 0 : rounded;
     }
 
     function isValidYear(value) {

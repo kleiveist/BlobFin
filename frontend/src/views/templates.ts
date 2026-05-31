@@ -105,9 +105,9 @@ export function renderAppShell(): string {
           </div>
           <div class="button-row">
             <button class="button" id="addPositionButton" type="button" data-action="add-position">Ausgabe hinzufuegen</button>
-            ${toolbarIconButton("import-positions", "Positionen importieren", "upload")}
-            ${toolbarIconButton("export-positions", "Positionen exportieren", "download")}
-            ${toolbarIconButton("export-year", "Aktive Jahrestabelle exportieren", "table")}
+            ${toolbarIconButton("import-positions", "CSV importieren", "upload")}
+            ${toolbarIconButton("export-positions", "CSV exportieren", "download")}
+            ${toolbarIconButton("export-year", "Jahrestabelle exportieren", "table")}
             <button
               class="button secondary position-filter-toggle"
               type="button"
@@ -158,8 +158,8 @@ export function renderAppShell(): string {
             <button class="button secondary" type="button" data-action="income-import-active-account">
               Aktives Konto uebernehmen
             </button>
-            <button class="button secondary" type="button" data-action="income-export-csv">CSV</button>
-            <button class="button secondary" type="button" data-action="income-export-json">JSON</button>
+            ${toolbarIconButton("income-import-csv", "CSV importieren", "upload")}
+            ${toolbarIconButton("income-export-csv", "CSV exportieren", "download")}
             <button class="button" type="button" data-action="income-export-pdf">PDF-Auswertung</button>
           </div>
         </div>
@@ -360,6 +360,8 @@ export function renderAppShell(): string {
         </div>
 
         <p id="incomeExportStatus" class="export-status" aria-live="polite"></p>
+        <input class="visually-hidden" id="incomeCsvImport" type="file" accept=".csv,text/csv" />
+        <div id="incomeTaxDialogRoot"></div>
       </section>
 
       <section class="panel investment-panel" data-module-section="investment_planning">

@@ -11,11 +11,14 @@ import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from 
 import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/combinedWealth";
 import {
   buildIncomeTrackerModel,
+  emptyIncomeTaxDeductionItems,
   incomeMonthEntryTotal,
   incomeMonthlyTotalsByMonth,
   incomeSelectedChartYear,
+  incomeTaxDeductionItemsTotal,
   incomeYearEntryCalculatedNetIncome,
   incomeYearEntryNetIncome,
+  incomeYearEntryTaxDeductions,
   INCOME_SOURCE_LABELS,
   type IncomeTrackerModel
 } from "./domain/incomeTracker";
@@ -85,6 +88,8 @@ import type {
   IncomePerson,
   IncomeProjectionMode,
   IncomeResolvedSource,
+  IncomeTaxDeductionField,
+  IncomeTaxDeductionItems,
   IncomeTrackerSettings,
   IncomeYearEntry,
   IncomeYearEntrySource,
@@ -131,6 +136,20 @@ const INCOME_PERSON_OPTIONS: Array<{ value: IncomePerson; label: string }> = [
 const INCOME_YEAR_SOURCE_OPTIONS: Array<{ value: IncomeYearEntrySource; label: string }> = [
   { value: "annual_statement", label: "Jahresentgeltabrechnung" },
   { value: "manual", label: "Manuell" }
+];
+const INCOME_TAX_DEDUCTION_ROWS: Array<{
+  field: IncomeTaxDeductionField;
+  nr: string;
+  label: string;
+  category: "taxes" | "social";
+}> = [
+  { field: "wageTax", nr: "4", label: "Einbehaltene Lohnsteuer von 3.", category: "taxes" },
+  { field: "solidaritySurcharge", nr: "5", label: "Einbehaltener Solidaritaetszuschlag von 3.", category: "taxes" },
+  { field: "churchTax", nr: "6", label: "Einbehaltene Kirchensteuer des Arbeitnehmers von 3.", category: "taxes" },
+  { field: "pensionInsurance", nr: "23", label: "Arbeitnehmerbeitraege zur gesetzlichen RV", category: "social" },
+  { field: "healthInsurance", nr: "25", label: "Arbeitnehmerbeitraege zur gesetzlichen KV", category: "social" },
+  { field: "careInsurance", nr: "26", label: "Arbeitnehmerbeitraege zur sozialen PV", category: "social" },
+  { field: "unemploymentInsurance", nr: "27", label: "Arbeitnehmerbeitraege zur AV", category: "social" }
 ];
 const CAREER_MILESTONE_TYPES = [
   "Jobwechsel",
@@ -233,6 +252,7 @@ let reserveChartScenario: ReserveChartScenario = "current";
 let reserveChartHighlightId: string | null = null;
 let reserveChartAdjustment: ReserveChartAdjustment = "none";
 let reserveChartStyle: ReserveChartStyle = "bars";
+let incomeTaxDialogEntryId: string | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 let positionFilterDrafts = createPositionFilterDrafts();
 let positionFilterPopupOpen = false;
@@ -657,6 +677,11 @@ function bindEvents(): void {
       void importPositionsFromFile(target.files?.[0]);
       target.value = "";
     }
+
+    if (target.id === "incomeCsvImport" && target instanceof HTMLInputElement) {
+      void importIncomeCsvFromFile(target.files?.[0]);
+      target.value = "";
+    }
   });
 
   root.addEventListener("click", (event) => {
@@ -709,10 +734,12 @@ function bindEvents(): void {
     if (action === "income-add-yearly") addIncomeYearlyEntry();
     if (action === "income-add-milestone") addIncomeMilestone();
     if (action === "income-add-inflation") addIncomeInflationRate();
+    if (action?.startsWith("income-open-tax-dialog-")) openIncomeTaxDialog(action.replace("income-open-tax-dialog-", ""));
+    if (action === "income-close-tax-dialog") closeIncomeTaxDialog();
     if (action === "income-import-active-account") importIncomeFromActiveAccount();
+    if (action === "income-import-csv") document.querySelector<HTMLInputElement>("#incomeCsvImport")?.click();
     if (action?.startsWith("income-remove-")) removeIncomeEntry(action);
     if (action === "income-export-csv") void exportIncomeCsv();
-    if (action === "income-export-json") exportIncomeJson();
     if (action === "income-export-pdf") exportIncomePdf();
     if (action === "add-planning-account") addPlanningAccount();
     if (action === "rename-planning-account") renamePlanningAccount();
@@ -851,6 +878,7 @@ function bindEvents(): void {
       hideReserveChartPopup();
       hidePositionFilterPopup();
       closePlanningAccountDialog();
+      closeIncomeTaxDialog();
     }
   });
   window.addEventListener("resize", drawCurrentInvestmentChart);
@@ -1067,6 +1095,7 @@ function renderIncomeTracker(): void {
   renderIncomeInsights(model);
   renderIncomeYearStatusRows(model);
   renderIncomeCharts(model);
+  renderIncomeTaxDialog();
 }
 
 function renderIncomeLiveUpdate(collection?: string, id?: string, field?: string): void {
@@ -1078,6 +1107,8 @@ function renderIncomeLiveUpdate(collection?: string, id?: string, field?: string
   }
   if (collection === "yearlyEntries" && id) {
     renderIncomeYearlyNetCell(id, field);
+    renderIncomeYearlyTaxButton(id);
+    renderIncomeTaxDialogTotals(id);
   }
   renderIncomeMetricGrid(model);
   renderIncomeInsights(model);
@@ -1094,6 +1125,26 @@ function renderIncomeYearlyNetCell(id: string, changedField?: string): void {
   input.disabled = calculatedNet !== null;
   if (changedField === "annualNetIncome" && calculatedNet === null && document.activeElement === input) return;
   input.value = netValue === null ? "" : String(netValue);
+}
+
+function renderIncomeYearlyTaxButton(id: string): void {
+  const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === id);
+  const value = document.querySelector<HTMLElement>(`[data-income-year-tax-total="${cssEscape(id)}"]`);
+  if (!entry || !value) return;
+  const taxDeductions = incomeYearEntryTaxDeductions(entry);
+  value.textContent = taxDeductions === null ? "Eintragen" : money(taxDeductions);
+}
+
+function renderIncomeTaxDialogTotals(id: string): void {
+  if (incomeTaxDialogEntryId !== id) return;
+  const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === id);
+  if (!entry) return;
+  const taxTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "taxes");
+  const socialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "social");
+  const total = incomeYearEntryTaxDeductions(entry);
+  setText("incomeTaxDialogTaxesTotal", money(taxTotal));
+  setText("incomeTaxDialogSocialTotal", money(socialTotal));
+  setText("incomeTaxDialogGrandTotal", total === null ? "-" : money(total));
 }
 
 function renderIncomeTabs(): void {
@@ -1164,7 +1215,7 @@ function renderIncomeYearlyRows(): void {
           extraAttribute: `data-income-year-net="${escapeHtml(entry.id)}"`
         })}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "annualGrossIncome", entry.annualGrossIncome, { min: 0 })}</td>
-        <td>${incomeNumberInput("yearlyEntries", entry.id, "taxesAndDeductions", entry.taxesAndDeductions, { min: 0 })}</td>
+        <td>${incomeTaxDeductionsButton(entry)}</td>
         <td>${incomeTextInput("yearlyEntries", entry.id, "employer", entry.employer)}</td>
         <td>${incomeSelect("yearlyEntries", entry.id, "source", INCOME_YEAR_SOURCE_OPTIONS, entry.source)}</td>
         <td><button class="icon-button danger" type="button" data-action="income-remove-yearly-${entry.id}" aria-label="Jahreswert entfernen">x</button></td>
@@ -1172,6 +1223,79 @@ function renderIncomeYearlyRows(): void {
     `;
     })
     .join("");
+}
+
+function renderIncomeTaxDialog(): void {
+  const root = document.querySelector<HTMLDivElement>("#incomeTaxDialogRoot");
+  if (!root) return;
+  const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === incomeTaxDialogEntryId);
+  if (!entry) {
+    root.innerHTML = "";
+    incomeTaxDialogEntryId = null;
+    return;
+  }
+
+  const taxTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "taxes");
+  const socialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "social");
+  const total = incomeYearEntryTaxDeductions(entry);
+  root.innerHTML = `
+    <div class="income-tax-dialog-backdrop" role="presentation">
+      <div class="income-tax-dialog" role="dialog" aria-modal="true" aria-label="Steuer- und Abgabenpositionen">
+        <div class="income-tax-dialog-head">
+          <div>
+            <strong>Steuer- und Abgabenpositionen</strong>
+            <span>${escapeHtml(String(entry.year))} · ${escapeHtml(incomePersonLabel(entry.person))}</span>
+          </div>
+          <button class="chart-popup-close" type="button" data-action="income-close-tax-dialog" aria-label="Dialog schliessen">x</button>
+        </div>
+        <div class="table-wrap">
+          <table class="income-table income-tax-table">
+            <thead>
+              <tr>
+                <th>Nr.</th>
+                <th>Text</th>
+                <th>Betrag</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${INCOME_TAX_DEDUCTION_ROWS.map(
+                (row) => `
+                  <tr>
+                    <td class="numeric-cell">${escapeHtml(row.nr)}</td>
+                    <td>${escapeHtml(row.label)}</td>
+                    <td>${incomeNumberInput("yearlyEntries", entry.id, `taxDeductionItems.${row.field}`, entry.taxDeductionItems[row.field], {
+                      min: 0
+                    })}</td>
+                  </tr>
+                `
+              ).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="income-tax-summary">
+          <div>
+            <span>Kategorie</span>
+            <strong>Summe</strong>
+          </div>
+          <div>
+            <span>Steuern</span>
+            <strong id="incomeTaxDialogTaxesTotal">${money(taxTotal)}</strong>
+          </div>
+          <div>
+            <span>Sozialversicherung Arbeitnehmer</span>
+            <strong id="incomeTaxDialogSocialTotal">${money(socialTotal)}</strong>
+          </div>
+          <div class="total">
+            <span>Gesamt</span>
+            <strong id="incomeTaxDialogGrandTotal">${total === null ? "-" : money(total)}</strong>
+          </div>
+        </div>
+        <div class="button-row">
+          <button class="button" type="button" data-action="income-close-tax-dialog">Fertig</button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderIncomeMilestoneRows(): void {
@@ -1585,6 +1709,10 @@ function incomeSourceBadge(source: IncomeResolvedSource): string {
   return `<span class="status-pill${tone}">${escapeHtml(INCOME_SOURCE_LABELS[source])}</span>`;
 }
 
+function incomePersonLabel(person: IncomePerson): string {
+  return INCOME_PERSON_OPTIONS.find((option) => option.value === person)?.label ?? "Haushalt";
+}
+
 function incomeProjectionHorizon(model: IncomeTrackerModel, years: number): IncomeTrackerModel["projection"]["horizons"][number] | null {
   return model.projection.horizons.find((item) => item.years === years) ?? null;
 }
@@ -1648,6 +1776,21 @@ function incomeTextInput(collection: string, id: string, field: string, value: s
   return `<input type="text" value="${escapeHtml(value)}" data-income-collection="${collection}" data-income-id="${id}" data-income-field="${field}" />`;
 }
 
+function incomeTaxDeductionsButton(entry: IncomeYearEntry): string {
+  const taxDeductions = incomeYearEntryTaxDeductions(entry);
+  return `
+    <button
+      class="income-tax-button"
+      type="button"
+      data-action="income-open-tax-dialog-${escapeHtml(entry.id)}"
+      aria-label="Steuer- und Abgabenpositionen bearbeiten"
+    >
+      <strong data-income-year-tax-total="${escapeHtml(entry.id)}">${taxDeductions === null ? "Eintragen" : money(taxDeductions)}</strong>
+      <span>Details</span>
+    </button>
+  `;
+}
+
 function monthOptions(): Array<{ value: number; label: string }> {
   return Array.from({ length: 12 }, (_, index) => ({ value: index + 1, label: monthName(index + 1) }));
 }
@@ -1659,6 +1802,18 @@ function setIncomeInputTab(value: string): void {
     settings: { ...state.incomeTracker.settings, activeInputTab: value }
   };
   renderAll();
+}
+
+function openIncomeTaxDialog(id: string): void {
+  if (!state.incomeTracker.yearlyEntries.some((entry) => entry.id === id)) return;
+  incomeTaxDialogEntryId = id;
+  renderIncomeTaxDialog();
+}
+
+function closeIncomeTaxDialog(): void {
+  if (!incomeTaxDialogEntryId) return;
+  incomeTaxDialogEntryId = null;
+  renderIncomeTaxDialog();
 }
 
 function addIncomeMonthlyEntry(): void {
@@ -1694,6 +1849,7 @@ function addIncomeYearlyEntry(): void {
         annualNetIncome: null,
         annualGrossIncome: null,
         taxesAndDeductions: null,
+        taxDeductionItems: emptyIncomeTaxDeductionItems(),
         employer: "",
         note: "",
         source: "annual_statement"
@@ -1829,7 +1985,31 @@ function updateIncomeYearEntry(entry: IncomeYearEntry, field: string, value: str
   if (field === "annualNetIncome") return { ...entry, annualNetIncome: nullableInputNumber(value) };
   if (field === "annualGrossIncome") return { ...entry, annualGrossIncome: nullableInputNumber(value) };
   if (field === "taxesAndDeductions") return { ...entry, taxesAndDeductions: nullableInputNumber(value) };
+  if (field.startsWith("taxDeductionItems.")) {
+    const itemField = field.replace("taxDeductionItems.", "");
+    if (!isIncomeTaxDeductionField(itemField)) return entry;
+    const taxDeductionItems = {
+      ...entry.taxDeductionItems,
+      [itemField]: nullableInputNumber(value)
+    };
+    return {
+      ...entry,
+      taxDeductionItems,
+      taxesAndDeductions: incomeTaxDeductionItemsTotal(taxDeductionItems)
+    };
+  }
   return entry;
+}
+
+function isIncomeTaxDeductionField(value: string): value is IncomeTaxDeductionField {
+  return INCOME_TAX_DEDUCTION_ROWS.some((row) => row.field === value);
+}
+
+function incomeTaxDeductionCategoryTotal(items: IncomeTaxDeductionItems, category: "taxes" | "social"): number {
+  return INCOME_TAX_DEDUCTION_ROWS.filter((row) => row.category === category).reduce(
+    (sum, row) => sum + numberValue(items[row.field]),
+    0
+  );
 }
 
 function updateIncomeMilestoneEntry(
@@ -1920,22 +2100,39 @@ function importIncomeFromActiveAccount(): void {
   showIncomeExportStatus(`${monthlyEntries.length} Monatswerte aus dem aktiven Konto uebernommen.`);
 }
 
+async function importIncomeCsvFromFile(file: File | undefined): Promise<void> {
+  if (!file) return;
+  const text = await file.text();
+  const imported = incomeTrackerEntriesFromCsvRows(parseCsv(text));
+  const importedCount =
+    imported.monthlyEntries.length +
+    imported.yearlyEntries.length +
+    imported.milestones.length +
+    imported.inflationRates.length;
+  if (!importedCount) {
+    window.alert("Keine gueltigen Einkommen-CSV-Daten gefunden.");
+    return;
+  }
+
+  state.incomeTracker = {
+    ...state.incomeTracker,
+    monthlyEntries: [...state.incomeTracker.monthlyEntries, ...imported.monthlyEntries],
+    yearlyEntries: [...state.incomeTracker.yearlyEntries, ...imported.yearlyEntries],
+    milestones: [...state.incomeTracker.milestones, ...imported.milestones],
+    inflationRates: [...state.incomeTracker.inflationRates, ...imported.inflationRates],
+    settings: {
+      ...state.incomeTracker.settings,
+      activeInputTab: imported.yearlyEntries.length ? "yearly" : imported.monthlyEntries.length ? "monthly" : "settings"
+    }
+  };
+  renderAll();
+  showIncomeExportStatus(`${importedCount} Eintraege aus CSV importiert.`);
+}
+
 async function exportIncomeCsv(): Promise<void> {
   const model = buildIncomeTrackerModel(state.incomeTracker);
   await exportCsvFile("jahresnettoeinkommen.csv", incomeTrackerCsv(model), "Einkommen-CSV");
   showIncomeExportStatus("CSV-Export wurde erstellt.");
-}
-
-function exportIncomeJson(): void {
-  const model = buildIncomeTrackerModel(state.incomeTracker);
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    dataBasis: "Nur Nutzereingaben, berechnete Werte und aktivierte Annahmen.",
-    input: state.incomeTracker,
-    calculated: model
-  };
-  downloadText("jahresnettoeinkommen.json", JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
-  showIncomeExportStatus("JSON-Export wurde erstellt.");
 }
 
 function exportIncomePdf(): void {
@@ -1963,7 +2160,19 @@ function incomeTrackerCsv(model: IncomeTrackerModel): string {
   for (const entry of state.incomeTracker.yearlyEntries) {
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "annualNetIncome", csvValue(incomeYearEntryNetIncome(entry)), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "annualGrossIncome", csvValue(entry.annualGrossIncome), entry.source]);
-    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxesAndDeductions", csvValue(entry.taxesAndDeductions), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxesAndDeductions", csvValue(incomeYearEntryTaxDeductions(entry)), entry.source]);
+    for (const row of INCOME_TAX_DEDUCTION_ROWS) {
+      rows.push([
+        "yearly_tax_detail",
+        entry.id,
+        String(entry.year),
+        "",
+        entry.person,
+        `${row.nr} ${row.label}`,
+        csvValue(entry.taxDeductionItems[row.field]),
+        entry.source
+      ]);
+    }
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "employer", entry.employer, entry.source]);
   }
   for (const entry of state.incomeTracker.milestones) {
@@ -1985,6 +2194,202 @@ function incomeTrackerCsv(model: IncomeTrackerModel): string {
   }
   rows.push(["data_basis", "", "", "", "", "Hinweis", "Nur Nutzereingaben, berechnete Werte und aktivierte Annahmen.", ""]);
   return rows.map((row) => row.map(incomeCsvCell).join(";")).join("\n");
+}
+
+function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
+  monthlyEntries: IncomeMonthEntry[];
+  yearlyEntries: IncomeYearEntry[];
+  milestones: CareerMilestone[];
+  inflationRates: IncomeInflationRate[];
+} {
+  const emptyImport = { monthlyEntries: [], yearlyEntries: [], milestones: [], inflationRates: [] };
+  if (!rows.length) return emptyImport;
+
+  const header = rows[0].map((value) => value.trim().replace(/^\uFEFF/, "").toLowerCase());
+  const hasHeader = header.includes("section") && header.includes("field");
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const get = (row: string[], names: string[], fallbackIndex: number): string => {
+    if (hasHeader) {
+      for (const name of names) {
+        const index = header.indexOf(name);
+        if (index >= 0) return row[index] ?? "";
+      }
+    }
+    return fallbackIndex >= 0 ? row[fallbackIndex] ?? "" : "";
+  };
+
+  const monthlyEntries = new Map<string, IncomeMonthEntry>();
+  const yearlyEntries = new Map<string, IncomeYearEntry>();
+  const milestones = new Map<string, CareerMilestone>();
+  const inflationRates = new Map<string, IncomeInflationRate>();
+
+  dataRows.forEach((row, index) => {
+    const section = get(row, ["section"], 0).trim().toLowerCase();
+    const sourceId = get(row, ["id"], 1).trim();
+    const rowKey = sourceId || String(index);
+    const field = get(row, ["field"], 5).trim();
+    const fieldKey = field.toLowerCase();
+    const value = get(row, ["value"], 6).trim();
+    const yearValue = get(row, ["year"], 2).trim();
+    const monthValue = get(row, ["month"], 3).trim();
+    const personValue = get(row, ["person"], 4).trim();
+    const sourceValue = get(row, ["source"], 7).trim();
+
+    if (section === "monthly") {
+      const key = `monthly-${rowKey}`;
+      const entry =
+        monthlyEntries.get(key) ??
+        ({
+          id: createId(),
+          year: incomeCsvYear(yearValue, state.settings.year),
+          month: incomeCsvMonth(monthValue),
+          person: incomePerson(personValue),
+          netIncome: null,
+          bonus: null,
+          otherIncome: null,
+          note: ""
+        } satisfies IncomeMonthEntry);
+      entry.year = incomeCsvYear(yearValue, entry.year);
+      entry.month = incomeCsvMonth(monthValue, entry.month);
+      entry.person = incomePerson(personValue || entry.person);
+      if (fieldKey === "netincome") entry.netIncome = incomeCsvNumber(value);
+      if (fieldKey === "bonus") entry.bonus = incomeCsvNumber(value);
+      if (fieldKey === "otherincome") entry.otherIncome = incomeCsvNumber(value);
+      monthlyEntries.set(key, entry);
+      return;
+    }
+
+    if (section === "yearly" || section === "yearly_tax_detail") {
+      const key = `yearly-${rowKey}`;
+      const entry =
+        yearlyEntries.get(key) ??
+        ({
+          id: createId(),
+          year: incomeCsvYear(yearValue, state.settings.year),
+          person: incomePerson(personValue),
+          annualNetIncome: null,
+          annualGrossIncome: null,
+          taxesAndDeductions: null,
+          taxDeductionItems: emptyIncomeTaxDeductionItems(),
+          employer: "",
+          note: "",
+          source: incomeYearSource(sourceValue)
+        } satisfies IncomeYearEntry);
+      entry.year = incomeCsvYear(yearValue, entry.year);
+      entry.person = incomePerson(personValue || entry.person);
+      entry.source = incomeYearSource(sourceValue || entry.source);
+      if (section === "yearly_tax_detail") {
+        const taxField = incomeTaxDeductionFieldFromCsv(field);
+        if (taxField) {
+          entry.taxDeductionItems = { ...entry.taxDeductionItems, [taxField]: incomeCsvNumber(value) };
+          entry.taxesAndDeductions = incomeTaxDeductionItemsTotal(entry.taxDeductionItems);
+        }
+      } else if (fieldKey === "annualnetincome") {
+        entry.annualNetIncome = incomeCsvNumber(value);
+      } else if (fieldKey === "annualgrossincome") {
+        entry.annualGrossIncome = incomeCsvNumber(value);
+      } else if (fieldKey === "taxesanddeductions") {
+        entry.taxesAndDeductions = incomeCsvNumber(value);
+      } else if (fieldKey === "employer") {
+        entry.employer = value;
+      }
+      yearlyEntries.set(key, entry);
+      return;
+    }
+
+    if (section === "milestone") {
+      const key = `milestone-${rowKey}`;
+      const entry =
+        milestones.get(key) ??
+        ({
+          id: createId(),
+          date: monthValue,
+          type: "Sonstiges",
+          description: "",
+          impact: "positive",
+          linkedYear: incomeCsvYearOrNull(yearValue)
+        } satisfies CareerMilestone);
+      entry.date = monthValue || entry.date;
+      entry.linkedYear = incomeCsvYearOrNull(yearValue) ?? entry.linkedYear;
+      if (fieldKey === "description") {
+        entry.description = value;
+      } else if (field) {
+        entry.type = field;
+        entry.impact = incomeMilestoneImpact(value);
+      }
+      milestones.set(key, entry);
+      return;
+    }
+
+    if (section === "inflation") {
+      const key = `inflation-${rowKey}`;
+      const entry =
+        inflationRates.get(key) ??
+        ({
+          id: createId(),
+          year: incomeCsvYear(yearValue, state.settings.year),
+          ratePercent: null
+        } satisfies IncomeInflationRate);
+      entry.year = incomeCsvYear(yearValue, entry.year);
+      if (fieldKey === "ratepercent") entry.ratePercent = incomeCsvNumber(value);
+      inflationRates.set(key, entry);
+    }
+  });
+
+  return {
+    monthlyEntries: Array.from(monthlyEntries.values()).filter((entry) =>
+      [entry.netIncome, entry.bonus, entry.otherIncome].some((amount) => amount !== null)
+    ),
+    yearlyEntries: Array.from(yearlyEntries.values()).filter(incomeCsvYearlyEntryHasData),
+    milestones: Array.from(milestones.values()).filter((entry) => entry.date || entry.description || entry.type !== "Sonstiges"),
+    inflationRates: Array.from(inflationRates.values()).filter((entry) => entry.ratePercent !== null)
+  };
+}
+
+function incomeCsvYearlyEntryHasData(entry: IncomeYearEntry): boolean {
+  return (
+    entry.annualNetIncome !== null ||
+    entry.annualGrossIncome !== null ||
+    entry.taxesAndDeductions !== null ||
+    Boolean(entry.employer.trim()) ||
+    incomeTaxDeductionItemsTotal(entry.taxDeductionItems) !== null
+  );
+}
+
+function incomeCsvNumber(value: string): number | null {
+  const text = value.trim();
+  if (!text) return null;
+  const cleaned = text.replace(/[^\d,.-]/g, "");
+  const normalized = cleaned.includes(",") ? cleaned.replaceAll(".", "").replace(",", ".") : cleaned;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function incomeCsvYear(value: string, fallback: number): number {
+  const parsed = incomeCsvNumber(value);
+  return parsed === null ? fallback : clamp(Math.round(parsed), 1900, 2200);
+}
+
+function incomeCsvYearOrNull(value: string): number | null {
+  const parsed = incomeCsvNumber(value);
+  return parsed === null ? null : clamp(Math.round(parsed), 1900, 2200);
+}
+
+function incomeCsvMonth(value: string, fallback = 1): number {
+  const parsed = incomeCsvNumber(value);
+  return parsed === null ? fallback : clamp(Math.round(parsed), 1, 12);
+}
+
+function incomeTaxDeductionFieldFromCsv(value: string): IncomeTaxDeductionField | null {
+  const text = value.toLowerCase();
+  if (text.startsWith("4 ") || text.includes("lohnsteuer")) return "wageTax";
+  if (text.startsWith("5 ") || text.includes("solidar")) return "solidaritySurcharge";
+  if (text.startsWith("6 ") || text.includes("kirchensteuer")) return "churchTax";
+  if (text.startsWith("23 ") || text.includes(" rv") || text.includes("renten")) return "pensionInsurance";
+  if (text.startsWith("25 ") || text.includes(" kv") || text.includes("kranken")) return "healthInsurance";
+  if (text.startsWith("26 ") || text.includes(" pv") || text.includes("pflege")) return "careInsurance";
+  if (text.startsWith("27 ") || text.includes(" av") || text.includes("arbeitslosen")) return "unemploymentInsurance";
+  return null;
 }
 
 function incomePdfHtml(model: IncomeTrackerModel): string {
@@ -2010,7 +2415,7 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
         <td>${escapeHtml(entry.person)}</td>
         <td>${incomeYearEntryNetIncome(entry) !== null ? money(incomeYearEntryNetIncome(entry) ?? 0) : "-"}</td>
         <td>${entry.annualGrossIncome !== null ? money(entry.annualGrossIncome) : "-"}</td>
-        <td>${entry.taxesAndDeductions !== null ? money(entry.taxesAndDeductions) : "-"}</td>
+        <td>${incomeYearEntryTaxDeductions(entry) !== null ? money(incomeYearEntryTaxDeductions(entry) ?? 0) : "-"}</td>
         <td>${escapeHtml(entry.employer)}</td>
         <td>${escapeHtml(INCOME_SOURCE_LABELS[entry.source])}</td>
       </tr>`

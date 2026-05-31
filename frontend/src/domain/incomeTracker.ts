@@ -2,6 +2,8 @@ import type {
   CareerMilestone,
   IncomeMonthEntry,
   IncomeResolvedSource,
+  IncomeTaxDeductionField,
+  IncomeTaxDeductionItems,
   IncomeTrackerState,
   IncomeYearEntry
 } from "../types";
@@ -76,6 +78,15 @@ export interface IncomeTrackerModel {
 }
 
 const PROJECTION_HORIZONS = [5, 10, 15] as const;
+const TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
+  "wageTax",
+  "solidaritySurcharge",
+  "churchTax",
+  "pensionInsurance",
+  "healthInsurance",
+  "careInsurance",
+  "unemploymentInsurance"
+];
 
 export function buildIncomeTrackerModel(tracker: IncomeTrackerState): IncomeTrackerModel {
   const years = buildYearAnalyses(tracker);
@@ -151,12 +162,36 @@ export function incomeMonthEntryTotal(entry: IncomeMonthEntry): number {
 
 export function incomeYearEntryNetIncome(entry: IncomeYearEntry): number | null {
   const calculatedNet = incomeYearEntryCalculatedNetIncome(entry);
-  return calculatedNet ?? entry.annualNetIncome;
+  return calculatedNet ?? (entry.annualNetIncome === null ? null : roundCents(entry.annualNetIncome));
 }
 
 export function incomeYearEntryCalculatedNetIncome(entry: IncomeYearEntry): number | null {
-  if (entry.annualGrossIncome === null || entry.taxesAndDeductions === null) return null;
-  return entry.annualGrossIncome - entry.taxesAndDeductions;
+  const taxDeductions = incomeYearEntryTaxDeductions(entry);
+  if (entry.annualGrossIncome === null || taxDeductions === null) return null;
+  return roundCents(entry.annualGrossIncome - taxDeductions);
+}
+
+export function incomeYearEntryTaxDeductions(entry: IncomeYearEntry): number | null {
+  const itemTotal = incomeTaxDeductionItemsTotal(entry.taxDeductionItems);
+  return itemTotal ?? (entry.taxesAndDeductions === null ? null : roundCents(entry.taxesAndDeductions));
+}
+
+export function incomeTaxDeductionItemsTotal(items: IncomeTaxDeductionItems): number | null {
+  const values = TAX_DEDUCTION_FIELDS.map((field) => items[field]);
+  if (!values.some((value) => value !== null && value !== undefined)) return null;
+  return roundCents(values.reduce((sum, value) => sum + numberValue(value), 0));
+}
+
+export function emptyIncomeTaxDeductionItems(): IncomeTaxDeductionItems {
+  return {
+    wageTax: null,
+    solidaritySurcharge: null,
+    churchTax: null,
+    pensionInsurance: null,
+    healthInsurance: null,
+    careInsurance: null,
+    unemploymentInsurance: null
+  };
 }
 
 export function incomeMonthlyTotalForYear(tracker: IncomeTrackerState, year: number): number {
@@ -394,6 +429,11 @@ function hasAnyAmount(entry: IncomeMonthEntry): boolean {
 
 function numberValue(value: number | null): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function roundCents(value: number): number {
+  const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 function validYear(value: number | null): value is number {
