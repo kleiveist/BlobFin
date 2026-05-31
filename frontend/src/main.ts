@@ -13,8 +13,6 @@ import {
   buildIncomeTrackerModel,
   emptyIncomeTaxDeductionItems,
   incomeMonthEntryTotal,
-  incomeMonthlyTotalsByMonth,
-  incomeSelectedChartYear,
   incomeTaxDeductionItemsTotal,
   incomeYearEntryCalculatedNetIncome,
   incomeYearEntryNetIncome,
@@ -82,8 +80,6 @@ import type {
   CareerMilestone,
   CareerMilestoneImpact,
   CombinedWealthYear,
-  IncomeInflationMode,
-  IncomeInflationRate,
   IncomeMonthEntry,
   IncomePerson,
   IncomeProjectionMode,
@@ -152,6 +148,8 @@ const INCOME_TAX_DEDUCTION_ROWS: Array<{
   { field: "unemploymentInsurance", nr: "27", label: "Arbeitnehmerbeitraege zur AV", category: "social" }
 ];
 const CAREER_MILESTONE_TYPES = [
+  "Ausbildung",
+  "Berufsbeginn",
   "Jobwechsel",
   "Befoerderung",
   "Gehaltserhoehung",
@@ -165,13 +163,28 @@ const CAREER_MILESTONE_TYPES = [
   "Einmalige Sonderzahlung",
   "Sonstiges"
 ] as const;
+const CAREER_MILESTONE_TYPE_OPTIONS: Array<{ type: string; icon: string; description: string }> = [
+  { type: "Ausbildung", icon: "education", description: "Ausbildung, Schule oder Qualifikation gestartet" },
+  { type: "Berufsbeginn", icon: "wallet", description: "Start ins Erwerbsleben oder erster Job" },
+  { type: "Jobwechsel", icon: "tag", description: "Wechsel zu einer neuen Stelle" },
+  { type: "Befoerderung", icon: "investment", description: "Neue Rolle mit mehr Verantwortung" },
+  { type: "Gehaltserhoehung", icon: "coins", description: "Regelmaessiges Einkommen steigt" },
+  { type: "Teilzeit", icon: "calendar", description: "Reduzierte Arbeitszeit" },
+  { type: "Vollzeit", icon: "calendar", description: "Rueckkehr oder Wechsel in Vollzeit" },
+  { type: "Ausbildung / Studium abgeschlossen", icon: "education", description: "Abschluss mit Auswirkung auf Einkommen" },
+  { type: "Elternzeit", icon: "child", description: "Familienphase mit Einkommenseffekt" },
+  { type: "Selbststaendigkeit gestartet", icon: "bank", description: "Start der Selbststaendigkeit" },
+  { type: "Arbeitslosigkeit", icon: "shield", description: "Unterbrechung oder Wegfall von Einkommen" },
+  { type: "Arbeitgeberwechsel", icon: "tag", description: "Neuer Arbeitgeber" },
+  { type: "Einmalige Sonderzahlung", icon: "gift", description: "Bonus oder Sonderzahlung" },
+  { type: "Sonstiges", icon: "tag", description: "Eigener Meilenstein" }
+];
 const CAREER_MILESTONE_IMPACT_OPTIONS: Array<{ value: CareerMilestoneImpact; label: string }> = [
   { value: "positive", label: "positiv" },
   { value: "neutral", label: "neutral" },
   { value: "negative", label: "negativ" }
 ];
 const INCOME_PROJECTION_MODES: IncomeProjectionMode[] = ["off", "historical_average", "manual"];
-const INCOME_INFLATION_MODES: IncomeInflationMode[] = ["off", "manual"];
 type NumericInvestmentSetting =
   | "birthYear"
   | "chartStartAge"
@@ -253,6 +266,7 @@ let reserveChartHighlightId: string | null = null;
 let reserveChartAdjustment: ReserveChartAdjustment = "none";
 let reserveChartStyle: ReserveChartStyle = "bars";
 let incomeTaxDialogEntryId: string | null = null;
+let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 let positionFilterDrafts = createPositionFilterDrafts();
 let positionFilterPopupOpen = false;
@@ -691,6 +705,9 @@ function bindEvents(): void {
       if (positionIconPicker && !target?.closest("#positionIconPicker")) {
         hidePositionIconPicker();
       }
+      if (incomeMilestoneTypePicker && !target?.closest("#incomeMilestoneTypePicker")) {
+        hideIncomeMilestoneTypePicker();
+      }
       if (positionFilterPopupOpen && !target?.closest("#positionFilterPopup")) {
         hidePositionFilterPopup();
       }
@@ -701,6 +718,9 @@ function bindEvents(): void {
     const action = button.dataset.action;
     if (action !== "open-position-icon-picker" && action !== "select-position-icon") {
       hidePositionIconPicker();
+    }
+    if (action !== "open-income-milestone-type-picker" && action !== "select-income-milestone-type") {
+      hideIncomeMilestoneTypePicker();
     }
     if (positionFilterPopupOpen && action !== "toggle-position-filter" && !button.closest("#positionFilterPopup")) {
       hidePositionFilterPopup();
@@ -733,7 +753,6 @@ function bindEvents(): void {
     if (action === "income-add-monthly") addIncomeMonthlyEntry();
     if (action === "income-add-yearly") addIncomeYearlyEntry();
     if (action === "income-add-milestone") addIncomeMilestone();
-    if (action === "income-add-inflation") addIncomeInflationRate();
     if (action?.startsWith("income-open-tax-dialog-")) openIncomeTaxDialog(action.replace("income-open-tax-dialog-", ""));
     if (action === "income-close-tax-dialog") closeIncomeTaxDialog();
     if (action === "income-import-active-account") importIncomeFromActiveAccount();
@@ -801,6 +820,11 @@ function bindEvents(): void {
     if (action === "close-position-icon-picker") hidePositionIconPicker();
     if (action === "select-position-icon") {
       selectPositionIcon(button.dataset.positionId || "", button.dataset.positionIcon || "");
+    }
+    if (action === "open-income-milestone-type-picker") showIncomeMilestoneTypePicker(button);
+    if (action === "close-income-milestone-type-picker") hideIncomeMilestoneTypePicker();
+    if (action === "select-income-milestone-type") {
+      selectIncomeMilestoneType(button.dataset.milestoneId || "", button.dataset.milestoneType || "");
     }
     if (action === "set-theme-light") setThemeMode("light");
     if (action === "set-theme-dark") setThemeMode("dark");
@@ -879,6 +903,7 @@ function bindEvents(): void {
       hidePositionFilterPopup();
       closePlanningAccountDialog();
       closeIncomeTaxDialog();
+      hideIncomeMilestoneTypePicker();
     }
   });
   window.addEventListener("resize", drawCurrentInvestmentChart);
@@ -1087,19 +1112,30 @@ function syncInvestmentProjectionLabels(depot: InvestmentDepotKey): void {
 function renderIncomeTracker(): void {
   const panel = document.querySelector<HTMLElement>('[data-module-section="income_tracking"]');
   if (!panel) return;
-  const model = buildIncomeTrackerModel(state.incomeTracker);
+  const model = incomeTrackerModel();
   renderIncomeTabs();
   renderIncomeRows();
-  renderIncomeSettingControls(model);
+  renderIncomeSettingControls();
   renderIncomeMetricGrid(model);
   renderIncomeInsights(model);
   renderIncomeYearStatusRows(model);
   renderIncomeCharts(model);
   renderIncomeTaxDialog();
+  renderIncomeMilestoneTypePicker();
+}
+
+function incomeTrackerModel(): IncomeTrackerModel {
+  return buildIncomeTrackerModel(state.incomeTracker, {
+    annualInflationRatePercent: incomeGeneralInflationRatePercent()
+  });
+}
+
+function incomeGeneralInflationRatePercent(): number {
+  return depotInvestmentSettings(activeInvestmentDepot()).inflationRatePercent;
 }
 
 function renderIncomeLiveUpdate(collection?: string, id?: string, field?: string): void {
-  const model = buildIncomeTrackerModel(state.incomeTracker);
+  const model = incomeTrackerModel();
   if (collection === "monthlyEntries" && id) {
     const entry = state.incomeTracker.monthlyEntries.find((item) => item.id === id);
     const totalCell = document.querySelector<HTMLElement>(`[data-income-month-total="${cssEscape(id)}"]`);
@@ -1166,7 +1202,6 @@ function renderIncomeRows(): void {
   renderIncomeMonthlyRows();
   renderIncomeYearlyRows();
   renderIncomeMilestoneRows();
-  renderIncomeInflationRows();
 }
 
 function renderIncomeMonthlyRows(): void {
@@ -1201,7 +1236,7 @@ function renderIncomeYearlyRows(): void {
     body.innerHTML = `<tr><td class="position-empty" colspan="8">Noch keine Jahreswerte eingetragen.</td></tr>`;
     return;
   }
-  body.innerHTML = state.incomeTracker.yearlyEntries
+  body.innerHTML = incomeSortedYearEntries()
     .map((entry) => {
       const calculatedNet = incomeYearEntryCalculatedNetIncome(entry);
       const netIncome = incomeYearEntryNetIncome(entry);
@@ -1305,12 +1340,12 @@ function renderIncomeMilestoneRows(): void {
     body.innerHTML = `<tr><td class="position-empty" colspan="6">Noch keine Karriere-Meilensteine eingetragen.</td></tr>`;
     return;
   }
-  body.innerHTML = state.incomeTracker.milestones
+  body.innerHTML = incomeSortedMilestones()
     .map(
       (entry) => `
       <tr>
         <td><input type="month" value="${escapeHtml(entry.date)}" data-income-collection="milestones" data-income-id="${entry.id}" data-income-field="date" /></td>
-        <td>${incomeSelect("milestones", entry.id, "type", CAREER_MILESTONE_TYPES.map((type) => ({ value: type, label: type })), entry.type)}</td>
+        <td>${incomeMilestoneTypeButton(entry)}</td>
         <td>${incomeTextInput("milestones", entry.id, "description", entry.description)}</td>
         <td>${incomeSelect("milestones", entry.id, "impact", CAREER_MILESTONE_IMPACT_OPTIONS, entry.impact)}</td>
         <td>${incomeNumberInput("milestones", entry.id, "linkedYear", entry.linkedYear, { min: 1900, max: 2200, step: 1 })}</td>
@@ -1321,49 +1356,31 @@ function renderIncomeMilestoneRows(): void {
     .join("");
 }
 
-function renderIncomeInflationRows(): void {
-  const body = document.querySelector<HTMLTableSectionElement>("#incomeInflationRows");
-  if (!body) return;
-  if (!state.incomeTracker.inflationRates.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="3">Noch keine Inflationswerte eingetragen.</td></tr>`;
-    return;
-  }
-  const disabled = state.incomeTracker.settings.inflationMode !== "manual";
-  body.innerHTML = state.incomeTracker.inflationRates
-    .map(
-      (entry) => `
-      <tr>
-        <td>${incomeNumberInput("inflationRates", entry.id, "year", entry.year, { min: 1900, max: 2200, step: 1, disabled })}</td>
-        <td>${incomeNumberInput("inflationRates", entry.id, "ratePercent", entry.ratePercent, { step: 0.01, disabled })}</td>
-        <td><button class="icon-button danger" type="button" data-action="income-remove-inflation-${entry.id}" aria-label="Inflationswert entfernen">x</button></td>
-      </tr>
-    `
-    )
-    .join("");
+function incomeSortedYearEntries(): IncomeYearEntry[] {
+  return [...state.incomeTracker.yearlyEntries].sort(
+    (first, second) =>
+      first.year - second.year ||
+      incomePersonLabel(first.person).localeCompare(incomePersonLabel(second.person), "de") ||
+      first.id.localeCompare(second.id)
+  );
 }
 
-function renderIncomeSettingControls(model: IncomeTrackerModel): void {
+function incomeSortedMilestones(): CareerMilestone[] {
+  return [...state.incomeTracker.milestones].sort((first, second) => {
+    const firstYear = first.linkedYear ?? incomeYearFromDate(first.date) ?? 9999;
+    const secondYear = second.linkedYear ?? incomeYearFromDate(second.date) ?? 9999;
+    return firstYear - secondYear || first.date.localeCompare(second.date) || first.id.localeCompare(second.id);
+  });
+}
+
+function renderIncomeSettingControls(): void {
   const settings = state.incomeTracker.settings;
   setInputValue('[data-income-setting="projectionMode"]', settings.projectionMode);
   setInputValue('[data-income-setting="manualGrowthRatePercent"]', settings.manualGrowthRatePercent ?? "");
   setInputValue('[data-income-setting="savingsSharePercent"]', settings.savingsSharePercent ?? "");
-  setInputValue('[data-income-setting="inflationMode"]', settings.inflationMode);
-  setInputValue('[data-income-setting="inflationBaseYear"]', settings.inflationBaseYear ?? "");
   const manualGrowth = document.querySelector<HTMLInputElement>('[data-income-setting="manualGrowthRatePercent"]');
   if (manualGrowth) manualGrowth.disabled = settings.projectionMode !== "manual";
-  const inflationBaseYear = document.querySelector<HTMLInputElement>('[data-income-setting="inflationBaseYear"]');
-  if (inflationBaseYear) inflationBaseYear.disabled = settings.inflationMode !== "manual";
-
-  const select = document.querySelector<HTMLSelectElement>("#incomeSelectedChartYear");
-  if (select) {
-    const years = incomeAvailableChartYears(model);
-    const selectedYear = incomeSelectedChartYear(state.incomeTracker, model);
-    select.innerHTML = [
-      `<option value="">Automatisch</option>`,
-      ...years.map((year) => `<option value="${year}" ${selectedYear === year ? "selected" : ""}>${year}</option>`)
-    ].join("");
-    select.value = settings.selectedChartYear === null ? "" : String(settings.selectedChartYear);
-  }
+  setText("incomeGeneralInflationRate", percent(incomeGeneralInflationRatePercent()));
 }
 
 function renderIncomeMetricGrid(model: IncomeTrackerModel): void {
@@ -1514,7 +1531,7 @@ function renderIncomeYearStatusRows(model: IncomeTrackerModel): void {
   const body = document.querySelector<HTMLTableSectionElement>("#incomeYearStatusRows");
   if (!body) return;
   if (!model.years.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="9">Noch keine Jahreswerte vorhanden.</td></tr>`;
+    body.innerHTML = `<tr><td class="position-empty" colspan="10">Noch keine Jahreswerte vorhanden.</td></tr>`;
     return;
   }
   body.innerHTML = model.years
@@ -1530,16 +1547,21 @@ function renderIncomeYearStatusRows(model: IncomeTrackerModel): void {
         <td class="numeric-cell">${year.difference !== null ? signedMoney(year.difference) : "-"}</td>
         <td class="numeric-cell">${year.netRatio !== null ? percent(year.netRatio) : "-"}</td>
         <td class="numeric-cell">${year.realNet !== null ? money(year.realNet) : "-"}</td>
+        <td>${incomeMilestoneBadges(year.milestones)}</td>
       </tr>
     `
     )
     .join("");
 }
 
+function incomeMilestoneBadges(milestones: CareerMilestone[]): string {
+  if (!milestones.length) return "-";
+  return `<div class="income-milestone-badges">${milestones.map(incomeMilestoneTypeBadge).join("")}</div>`;
+}
+
 function renderIncomeCharts(model: IncomeTrackerModel): void {
   setIncomeChart("incomeAnnualChart", renderIncomeAnnualChart(model));
   setIncomeChart("incomeGrowthChart", renderIncomeGrowthChart(model));
-  setIncomeChart("incomeMonthlyChart", renderIncomeMonthlyChart(model));
   setIncomeChart("incomeInflationChart", renderIncomeInflationChart(model));
   setIncomeChart("incomeRatioChart", renderIncomeRatioChart(model));
   setIncomeChart("incomeProjectionChart", renderIncomeProjectionChart(model));
@@ -1548,16 +1570,58 @@ function renderIncomeCharts(model: IncomeTrackerModel): void {
 function renderIncomeAnnualChart(model: IncomeTrackerModel): string {
   if (!model.valueYears.length) return incomeChartEmpty("Noch keine Jahreswerte.");
   const maxValue = Math.max(1, ...model.valueYears.map((year) => year.annualNet ?? 0));
-  return incomeBarChart(
-    model.valueYears.map((year) => ({
+  const items = model.valueYears.map((year) => {
+    const segments = incomeAnnualChartSegments(year);
+    return {
       label: String(year.year),
       value: year.annualNet ?? 0,
       detail: year.source ? INCOME_SOURCE_LABELS[year.source] : "",
       tone: year.source === "annual_statement" ? "accent" : year.source === "manual" ? "gold" : "blue",
-      marker: year.milestones.length ? String(year.milestones.length) : ""
-    })),
-    maxValue
-  );
+      markerHtml: incomeMilestoneChartMarkers(year.milestones),
+      segments
+    };
+  });
+  return incomeStackedBarChart(items, maxValue);
+}
+
+function incomeMilestoneChartMarkers(milestones: CareerMilestone[]): string {
+  if (!milestones.length) return "";
+  return `
+    <div class="income-chart-milestone-markers">
+      ${milestones
+        .slice(0, 4)
+        .map((milestone) => {
+          const meta = incomeMilestoneTypeMeta(milestone.type);
+          return `<span title="${escapeHtml(meta.type)}">${positionIconSvg(meta.icon)}</span>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function incomeAnnualChartSegments(year: IncomeTrackerModel["years"][number]): Array<{ value: number; label: string; tone: string }> {
+  const contributingEntries = state.incomeTracker.yearlyEntries
+    .filter((entry) => {
+      if (entry.year !== year.year || year.source === "monthly_calculated") return false;
+      if (year.source === "annual_statement") return entry.source === "annual_statement";
+      if (year.source === "manual") return entry.source === "manual";
+      return false;
+    })
+    .map((entry, index) => ({
+      value: incomeYearEntryNetIncome(entry) ?? 0,
+      label: `${incomePersonLabel(entry.person)}${entry.employer ? ` · ${entry.employer}` : ""}`,
+      tone: `segment-${index % 5}`
+    }))
+    .filter((segment) => segment.value > 0);
+
+  if (contributingEntries.length > 1) return contributingEntries;
+  return [
+    {
+      value: year.annualNet ?? 0,
+      label: year.source ? INCOME_SOURCE_LABELS[year.source] : "Jahreswert",
+      tone: year.source === "annual_statement" ? "accent" : year.source === "manual" ? "segment-1" : "blue"
+    }
+  ];
 }
 
 function renderIncomeGrowthChart(model: IncomeTrackerModel): string {
@@ -1573,28 +1637,9 @@ function renderIncomeGrowthChart(model: IncomeTrackerModel): string {
   return incomeBarChart(values, maxValue, true);
 }
 
-function renderIncomeMonthlyChart(model: IncomeTrackerModel): string {
-  const selectedYear = incomeSelectedChartYear(state.incomeTracker, model);
-  if (!selectedYear) return incomeChartEmpty("Kein Jahr fuer Monatsverlauf verfuegbar.");
-  const values = incomeMonthlyTotalsByMonth(state.incomeTracker, selectedYear);
-  if (!values.some((value) => value > 0)) return incomeChartEmpty(`Keine Monatswerte fuer ${selectedYear}.`);
-  const maxValue = Math.max(1, ...values);
-  return incomeBarChart(
-    values.map((value, index) => ({
-      label: monthName(index + 1).slice(0, 3),
-      value,
-      detail: String(selectedYear),
-      tone: "blue",
-      marker: ""
-    })),
-    maxValue
-  );
-}
-
 function renderIncomeInflationChart(model: IncomeTrackerModel): string {
-  if (state.incomeTracker.settings.inflationMode !== "manual") return incomeChartEmpty("Inflationsbereinigung ist deaktiviert.");
   const points = model.valueYears.filter((year) => year.realNet !== null);
-  if (!points.length) return incomeChartEmpty("Basisjahr und manuelle Inflationsraten fehlen.");
+  if (!points.length) return incomeChartEmpty("Keine Jahreswerte fuer Inflationsbereinigung.");
   const maxValue = Math.max(1, ...points.flatMap((year) => [year.annualNet ?? 0, year.realNet ?? 0]));
   return `
     <div class="income-grouped-chart">
@@ -1685,6 +1730,51 @@ function incomeBarChart(
   `;
 }
 
+function incomeStackedBarChart(
+  items: Array<{
+    label: string;
+    value: number;
+    detail: string;
+    tone: string;
+    markerHtml: string;
+    segments: Array<{ value: number; label: string; tone: string }>;
+  }>,
+  maxValue: number
+): string {
+  return `
+    <div class="income-bar-chart" style="--income-bar-count: ${Math.max(1, items.length)}">
+      ${items
+        .map((item) => {
+          const totalHeight = Math.max(3, Math.round((Math.abs(item.value) / Math.max(1, maxValue)) * 100));
+          const segments = item.segments.length
+            ? item.segments
+            : [{ value: item.value, label: item.detail, tone: item.tone }];
+          return `
+            <div class="income-bar-column">
+              <div class="income-bar-track">
+                ${item.markerHtml}
+                <div class="income-bar-stack" style="height: ${totalHeight}%">
+                  ${segments
+                    .map((segment) => {
+                      const height = Math.max(3, Math.round((segment.value / Math.max(1, item.value)) * 100));
+                      return `<i class="income-bar-segment ${escapeHtml(segment.tone)}" style="height: ${height}%" title="${escapeHtml(
+                        `${segment.label}: ${money(segment.value)}`
+                      )}"></i>`;
+                    })
+                    .join("")}
+                </div>
+              </div>
+              <span>${escapeHtml(item.label)}</span>
+              <strong>${escapeHtml(money(item.value))}</strong>
+              <small>${escapeHtml(segments.length > 1 ? `${segments.length} Eintraege` : item.detail)}</small>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
 function incomeMiniBar(value: number, maxValue: number, tone: string, label: string): string {
   const height = Math.max(3, Math.round((value / Math.max(1, maxValue)) * 100));
   return `<i class="income-bar ${escapeHtml(tone)}" style="height: ${height}%" title="${escapeHtml(label)} ${escapeHtml(money(value))}"></i>`;
@@ -1713,19 +1803,13 @@ function incomePersonLabel(person: IncomePerson): string {
   return INCOME_PERSON_OPTIONS.find((option) => option.value === person)?.label ?? "Haushalt";
 }
 
-function incomeProjectionHorizon(model: IncomeTrackerModel, years: number): IncomeTrackerModel["projection"]["horizons"][number] | null {
-  return model.projection.horizons.find((item) => item.years === years) ?? null;
+function incomeYearFromDate(value: string): number | null {
+  const match = value.match(/^(\d{4})/);
+  return match ? Number(match[1]) : null;
 }
 
-function incomeAvailableChartYears(model: IncomeTrackerModel): number[] {
-  return Array.from(
-    new Set([
-      ...state.incomeTracker.monthlyEntries.map((entry) => entry.year),
-      ...model.valueYears.map((year) => year.year)
-    ])
-  )
-    .filter((year) => year >= 1900 && year <= 2200)
-    .sort((firstYear, secondYear) => firstYear - secondYear);
+function incomeProjectionHorizon(model: IncomeTrackerModel, years: number): IncomeTrackerModel["projection"]["horizons"][number] | null {
+  return model.projection.horizons.find((item) => item.years === years) ?? null;
 }
 
 function incomeSelect<T extends string | number>(
@@ -1789,6 +1873,43 @@ function incomeTaxDeductionsButton(entry: IncomeYearEntry): string {
       <span>Details</span>
     </button>
   `;
+}
+
+function incomeMilestoneTypeButton(entry: CareerMilestone): string {
+  const meta = incomeMilestoneTypeMeta(entry.type);
+  return `
+    <button
+      class="income-milestone-type-button"
+      type="button"
+      data-action="open-income-milestone-type-picker"
+      data-milestone-id="${escapeHtml(entry.id)}"
+      aria-label="Meilenstein-Typ auswaehlen"
+      title="${escapeHtml(meta.description)}"
+    >
+      ${positionIconSvg(meta.icon)}
+      <span>${escapeHtml(meta.type)}</span>
+    </button>
+  `;
+}
+
+function incomeMilestoneTypeBadge(entry: CareerMilestone): string {
+  const meta = incomeMilestoneTypeMeta(entry.type);
+  return `
+    <span class="income-milestone-badge" title="${escapeHtml(meta.description)}">
+      ${positionIconSvg(meta.icon)}
+      <span>${escapeHtml(meta.type)}</span>
+    </span>
+  `;
+}
+
+function incomeMilestoneTypeMeta(type: string): { type: string; icon: string; description: string } {
+  return (
+    CAREER_MILESTONE_TYPE_OPTIONS.find((option) => option.type === type) ?? {
+      type: type || "Sonstiges",
+      icon: "tag",
+      description: "Eigener Meilenstein"
+    }
+  );
 }
 
 function monthOptions(): Array<{ value: number; label: string }> {
@@ -1877,17 +1998,6 @@ function addIncomeMilestone(): void {
   renderAll();
 }
 
-function addIncomeInflationRate(): void {
-  state.incomeTracker = {
-    ...state.incomeTracker,
-    inflationRates: [
-      ...state.incomeTracker.inflationRates,
-      { id: createId(), year: state.settings.year, ratePercent: null }
-    ]
-  };
-  renderAll();
-}
-
 function removeIncomeEntry(action: string): void {
   if (action.startsWith("income-remove-monthly-")) {
     const id = action.replace("income-remove-monthly-", "");
@@ -1906,12 +2016,6 @@ function removeIncomeEntry(action: string): void {
     state.incomeTracker = {
       ...state.incomeTracker,
       milestones: state.incomeTracker.milestones.filter((entry) => entry.id !== id)
-    };
-  } else if (action.startsWith("income-remove-inflation-")) {
-    const id = action.replace("income-remove-inflation-", "");
-    state.incomeTracker = {
-      ...state.incomeTracker,
-      inflationRates: state.incomeTracker.inflationRates.filter((entry) => entry.id !== id)
     };
   }
   renderAll();
@@ -1945,24 +2049,6 @@ function updateIncomeEntry(collection: string, id: string, field: string, value:
     };
     return;
   }
-  if (collection === "inflationRates") {
-    state.incomeTracker = {
-      ...state.incomeTracker,
-      inflationRates: state.incomeTracker.inflationRates.map((entry) =>
-        entry.id === id ? updateIncomeInflationRateEntry(entry, field, value) : entry
-      )
-    };
-  }
-}
-
-function updateIncomeInflationRateEntry(
-  entry: IncomeInflationRate,
-  field: string,
-  value: string
-): IncomeInflationRate {
-  if (field === "year") return { ...entry, year: incomeInteger(value, state.settings.year) };
-  if (field === "ratePercent") return { ...entry, ratePercent: nullableInputNumber(value) };
-  return entry;
 }
 
 function updateIncomeMonthEntry(entry: IncomeMonthEntry, field: string, value: string): IncomeMonthEntry {
@@ -2034,20 +2120,8 @@ function updateIncomeSetting(field: keyof IncomeTrackerSettings, value: string):
     };
     return;
   }
-  if (field === "inflationMode") {
-    state.incomeTracker = {
-      ...state.incomeTracker,
-      settings: { ...settings, inflationMode: incomeInflationMode(value) }
-    };
-    return;
-  }
   if (field === "activeInputTab") return;
-  if (field === "selectedChartYear") {
-    state.incomeTracker = {
-      ...state.incomeTracker,
-      settings: { ...settings, selectedChartYear: value.trim() === "" ? null : incomeInteger(value, state.settings.year) }
-    };
-  } else if (field === "manualGrowthRatePercent") {
+  if (field === "manualGrowthRatePercent") {
     state.incomeTracker = {
       ...state.incomeTracker,
       settings: { ...settings, manualGrowthRatePercent: nullableInputNumber(value) }
@@ -2056,11 +2130,6 @@ function updateIncomeSetting(field: keyof IncomeTrackerSettings, value: string):
     state.incomeTracker = {
       ...state.incomeTracker,
       settings: { ...settings, savingsSharePercent: nullableInputNumber(value) }
-    };
-  } else if (field === "inflationBaseYear") {
-    state.incomeTracker = {
-      ...state.incomeTracker,
-      settings: { ...settings, inflationBaseYear: value.trim() === "" ? null : incomeInteger(value, state.settings.year) }
     };
   }
 }
@@ -2107,8 +2176,7 @@ async function importIncomeCsvFromFile(file: File | undefined): Promise<void> {
   const importedCount =
     imported.monthlyEntries.length +
     imported.yearlyEntries.length +
-    imported.milestones.length +
-    imported.inflationRates.length;
+    imported.milestones.length;
   if (!importedCount) {
     window.alert("Keine gueltigen Einkommen-CSV-Daten gefunden.");
     return;
@@ -2119,7 +2187,6 @@ async function importIncomeCsvFromFile(file: File | undefined): Promise<void> {
     monthlyEntries: [...state.incomeTracker.monthlyEntries, ...imported.monthlyEntries],
     yearlyEntries: [...state.incomeTracker.yearlyEntries, ...imported.yearlyEntries],
     milestones: [...state.incomeTracker.milestones, ...imported.milestones],
-    inflationRates: [...state.incomeTracker.inflationRates, ...imported.inflationRates],
     settings: {
       ...state.incomeTracker.settings,
       activeInputTab: imported.yearlyEntries.length ? "yearly" : imported.monthlyEntries.length ? "monthly" : "settings"
@@ -2130,13 +2197,13 @@ async function importIncomeCsvFromFile(file: File | undefined): Promise<void> {
 }
 
 async function exportIncomeCsv(): Promise<void> {
-  const model = buildIncomeTrackerModel(state.incomeTracker);
+  const model = incomeTrackerModel();
   await exportCsvFile("jahresnettoeinkommen.csv", incomeTrackerCsv(model), "Einkommen-CSV");
   showIncomeExportStatus("CSV-Export wurde erstellt.");
 }
 
 function exportIncomePdf(): void {
-  const model = buildIncomeTrackerModel(state.incomeTracker);
+  const model = incomeTrackerModel();
   const reportWindow = window.open("", "_blank");
   if (!reportWindow) {
     showIncomeExportStatus("PDF-Auswertung konnte nicht geoeffnet werden.");
@@ -2179,15 +2246,12 @@ function incomeTrackerCsv(model: IncomeTrackerModel): string {
     rows.push(["milestone", entry.id, String(entry.linkedYear ?? ""), entry.date, "", entry.type, entry.impact, ""]);
     rows.push(["milestone", entry.id, String(entry.linkedYear ?? ""), entry.date, "", "description", entry.description, ""]);
   }
-  for (const entry of state.incomeTracker.inflationRates) {
-    rows.push(["inflation", entry.id, String(entry.year), "", "", "ratePercent", csvValue(entry.ratePercent), "manual"]);
-  }
   for (const year of model.years) {
     rows.push(["calculated", "", String(year.year), "", "", "annualNet", csvValue(year.annualNet), year.source ?? ""]);
     rows.push(["calculated", "", String(year.year), "", "", "monthlyNet", csvValue(year.monthlyNet), "monthly_calculated"]);
     rows.push(["calculated", "", String(year.year), "", "", "difference", csvValue(year.difference), "annual_statement_minus_monthly"]);
     rows.push(["calculated", "", String(year.year), "", "", "netRatio", csvValue(year.netRatio), "gross_net"]);
-    rows.push(["calculated", "", String(year.year), "", "", "realNet", csvValue(year.realNet), "manual_inflation"]);
+    rows.push(["calculated", "", String(year.year), "", "", "realNet", csvValue(year.realNet), "general_inflation"]);
   }
   for (const item of model.chartSummaries) {
     rows.push(["chart_summary", "", "", "", "", item.title, item.text, "calculated"]);
@@ -2200,9 +2264,8 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
   monthlyEntries: IncomeMonthEntry[];
   yearlyEntries: IncomeYearEntry[];
   milestones: CareerMilestone[];
-  inflationRates: IncomeInflationRate[];
 } {
-  const emptyImport = { monthlyEntries: [], yearlyEntries: [], milestones: [], inflationRates: [] };
+  const emptyImport = { monthlyEntries: [], yearlyEntries: [], milestones: [] };
   if (!rows.length) return emptyImport;
 
   const header = rows[0].map((value) => value.trim().replace(/^\uFEFF/, "").toLowerCase());
@@ -2221,7 +2284,6 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
   const monthlyEntries = new Map<string, IncomeMonthEntry>();
   const yearlyEntries = new Map<string, IncomeYearEntry>();
   const milestones = new Map<string, CareerMilestone>();
-  const inflationRates = new Map<string, IncomeInflationRate>();
 
   dataRows.forEach((row, index) => {
     const section = get(row, ["section"], 0).trim().toLowerCase();
@@ -2321,19 +2383,6 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
       return;
     }
 
-    if (section === "inflation") {
-      const key = `inflation-${rowKey}`;
-      const entry =
-        inflationRates.get(key) ??
-        ({
-          id: createId(),
-          year: incomeCsvYear(yearValue, state.settings.year),
-          ratePercent: null
-        } satisfies IncomeInflationRate);
-      entry.year = incomeCsvYear(yearValue, entry.year);
-      if (fieldKey === "ratepercent") entry.ratePercent = incomeCsvNumber(value);
-      inflationRates.set(key, entry);
-    }
   });
 
   return {
@@ -2341,8 +2390,7 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
       [entry.netIncome, entry.bonus, entry.otherIncome].some((amount) => amount !== null)
     ),
     yearlyEntries: Array.from(yearlyEntries.values()).filter(incomeCsvYearlyEntryHasData),
-    milestones: Array.from(milestones.values()).filter((entry) => entry.date || entry.description || entry.type !== "Sonstiges"),
-    inflationRates: Array.from(inflationRates.values()).filter((entry) => entry.ratePercent !== null)
+    milestones: Array.from(milestones.values()).filter((entry) => entry.date || entry.description || entry.type !== "Sonstiges")
   };
 }
 
@@ -2525,10 +2573,6 @@ function incomeMilestoneImpact(value: string): CareerMilestoneImpact {
 
 function incomeProjectionMode(value: string): IncomeProjectionMode {
   return INCOME_PROJECTION_MODES.includes(value as IncomeProjectionMode) ? (value as IncomeProjectionMode) : "off";
-}
-
-function incomeInflationMode(value: string): IncomeInflationMode {
-  return INCOME_INFLATION_MODES.includes(value as IncomeInflationMode) ? (value as IncomeInflationMode) : "off";
 }
 
 function signedMoney(value: number): string {
@@ -3350,6 +3394,84 @@ function selectCombinedLeadInvestmentAccount(accountId: string): void {
   if (state.ui.selectedCombinedLeadInvestmentAccountId === accountId) return;
   state.ui = { ...state.ui, selectedCombinedLeadInvestmentAccountId: accountId };
   renderAll();
+}
+
+function showIncomeMilestoneTypePicker(button: HTMLButtonElement): void {
+  const milestoneId = button.dataset.milestoneId;
+  if (!milestoneId) return;
+  const rect = button.getBoundingClientRect();
+  const panelWidth = 360;
+  const panelHeight = 420;
+  const left =
+    rect.right + 12 + panelWidth <= window.innerWidth
+      ? rect.right + 12
+      : Math.max(12, rect.left - panelWidth - 12);
+  const top = Math.max(12, Math.min(rect.top, window.innerHeight - panelHeight - 12));
+  incomeMilestoneTypePicker = { milestoneId, top, left };
+  renderIncomeMilestoneTypePicker();
+}
+
+function hideIncomeMilestoneTypePicker(): void {
+  incomeMilestoneTypePicker = null;
+  renderIncomeMilestoneTypePicker();
+}
+
+function selectIncomeMilestoneType(milestoneId: string, type: string): void {
+  if (!milestoneId || !type) return;
+  state.incomeTracker = {
+    ...state.incomeTracker,
+    milestones: state.incomeTracker.milestones.map((milestone) =>
+      milestone.id === milestoneId ? { ...milestone, type } : milestone
+    )
+  };
+  incomeMilestoneTypePicker = null;
+  renderAll();
+}
+
+function renderIncomeMilestoneTypePicker(): void {
+  const picker = document.querySelector<HTMLDivElement>("#incomeMilestoneTypePicker");
+  if (!picker) return;
+  if (!incomeMilestoneTypePicker) {
+    picker.hidden = true;
+    return;
+  }
+
+  const milestone = state.incomeTracker.milestones.find((item) => item.id === incomeMilestoneTypePicker?.milestoneId);
+  if (!milestone) {
+    picker.hidden = true;
+    incomeMilestoneTypePicker = null;
+    return;
+  }
+
+  picker.style.top = `${incomeMilestoneTypePicker.top}px`;
+  picker.style.left = `${incomeMilestoneTypePicker.left}px`;
+  picker.innerHTML = `
+    <div class="position-icon-picker-head">
+      <span>Meilenstein-Typ</span>
+      <button class="icon-button" type="button" data-action="close-income-milestone-type-picker" aria-label="Typauswahl schliessen">x</button>
+    </div>
+    <div class="position-icon-picker-grid income-milestone-type-grid">
+      ${CAREER_MILESTONE_TYPE_OPTIONS.map((option) => {
+        const active = option.type === milestone.type;
+        return `
+          <button
+            class="position-icon-option income-milestone-type-option ${active ? "active" : ""}"
+            type="button"
+            data-action="select-income-milestone-type"
+            data-milestone-id="${milestone.id}"
+            data-milestone-type="${escapeHtml(option.type)}"
+            aria-pressed="${active}"
+            title="${escapeHtml(option.description)}"
+          >
+            ${positionIconSvg(option.icon)}
+            <span>${escapeHtml(option.type)}</span>
+            <small>${escapeHtml(option.description)}</small>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+  picker.hidden = false;
 }
 
 function showPositionIconPicker(button: HTMLButtonElement): void {

@@ -77,6 +77,10 @@ export interface IncomeTrackerModel {
   chartSummaries: IncomeChartSummary[];
 }
 
+export interface IncomeTrackerModelOptions {
+  annualInflationRatePercent?: number | null;
+}
+
 const PROJECTION_HORIZONS = [5, 10, 15] as const;
 const TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
   "wageTax",
@@ -88,9 +92,9 @@ const TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
   "unemploymentInsurance"
 ];
 
-export function buildIncomeTrackerModel(tracker: IncomeTrackerState): IncomeTrackerModel {
+export function buildIncomeTrackerModel(tracker: IncomeTrackerState, options: IncomeTrackerModelOptions = {}): IncomeTrackerModel {
   const years = buildYearAnalyses(tracker);
-  applyInflationValues(tracker, years);
+  applyInflationValues(years, options.annualInflationRatePercent ?? null);
 
   const valueYears = years.filter((year) => year.annualNet !== null);
   const latest = last(valueYears);
@@ -152,7 +156,7 @@ export function buildIncomeTrackerModel(tracker: IncomeTrackerState): IncomeTrac
 
   return {
     ...modelWithoutSummaries,
-    chartSummaries: buildChartSummaries(tracker, modelWithoutSummaries)
+    chartSummaries: buildChartSummaries(modelWithoutSummaries)
   };
 }
 
@@ -198,27 +202,6 @@ export function incomeMonthlyTotalForYear(tracker: IncomeTrackerState, year: num
   return tracker.monthlyEntries
     .filter((entry) => validYear(entry.year) && entry.year === year && hasAnyAmount(entry))
     .reduce((sum, entry) => sum + incomeMonthEntryTotal(entry), 0);
-}
-
-export function incomeMonthlyTotalsByMonth(tracker: IncomeTrackerState, year: number): number[] {
-  return Array.from({ length: 12 }, (_, index) => {
-    const month = index + 1;
-    return tracker.monthlyEntries
-      .filter((entry) => entry.year === year && entry.month === month && hasAnyAmount(entry))
-      .reduce((sum, entry) => sum + incomeMonthEntryTotal(entry), 0);
-  });
-}
-
-export function incomeSelectedChartYear(tracker: IncomeTrackerState, model: IncomeTrackerModel): number | null {
-  const configuredYear = tracker.settings.selectedChartYear;
-  if (configuredYear !== null && validYear(configuredYear)) return configuredYear;
-  const years = Array.from(
-    new Set([
-      ...tracker.monthlyEntries.filter((entry) => validYear(entry.year)).map((entry) => entry.year),
-      ...model.valueYears.map((year) => year.year)
-    ])
-  ).sort((firstYear, secondYear) => firstYear - secondYear);
-  return last(years);
 }
 
 function buildYearAnalyses(tracker: IncomeTrackerState): IncomeYearAnalysis[] {
@@ -299,42 +282,18 @@ function addNetRatioBasis(year: IncomeYearAnalysis, entry: IncomeYearEntry, netI
   year.ratioGross += entry.annualGrossIncome;
 }
 
-function applyInflationValues(tracker: IncomeTrackerState, years: IncomeYearAnalysis[]): void {
-  if (tracker.settings.inflationMode !== "manual" || tracker.settings.inflationBaseYear === null) return;
-  const rates = new Map<number, number>();
-  for (const entry of tracker.inflationRates) {
-    if (validYear(entry.year) && entry.ratePercent !== null) {
-      rates.set(entry.year, entry.ratePercent);
-    }
-  }
-
+function applyInflationValues(years: IncomeYearAnalysis[], annualInflationRatePercent: number | null): void {
+  if (annualInflationRatePercent === null || !Number.isFinite(annualInflationRatePercent) || annualInflationRatePercent <= -100) return;
+  const baseYear = years.find((year) => year.annualNet !== null)?.year ?? null;
+  if (baseYear === null) return;
+  const annualRate = annualInflationRatePercent / 100;
   for (const year of years) {
     if (year.annualNet === null) continue;
-    const factor = cumulativeInflationFactor(tracker.settings.inflationBaseYear, year.year, rates);
-    if (factor !== null && factor !== 0) {
+    const factor = Math.pow(1 + annualRate, year.year - baseYear);
+    if (Number.isFinite(factor) && factor !== 0) {
       year.realNet = year.annualNet / factor;
     }
   }
-}
-
-function cumulativeInflationFactor(baseYear: number, targetYear: number, rates: Map<number, number>): number | null {
-  if (baseYear === targetYear) return 1;
-  let factor = 1;
-  if (targetYear > baseYear) {
-    for (let year = baseYear + 1; year <= targetYear; year += 1) {
-      const rate = rates.get(year);
-      if (typeof rate !== "number" || rate <= -100) return null;
-      factor *= 1 + rate / 100;
-    }
-    return factor;
-  }
-
-  for (let year = targetYear + 1; year <= baseYear; year += 1) {
-    const rate = rates.get(year);
-    if (typeof rate !== "number" || rate <= -100) return null;
-    factor /= 1 + rate / 100;
-  }
-  return factor;
 }
 
 function buildProjection(
@@ -374,12 +333,7 @@ function buildProjection(
   return { enabled: true, rate, modeLabel, points, horizons };
 }
 
-function buildChartSummaries(
-  tracker: IncomeTrackerState,
-  model: Omit<IncomeTrackerModel, "chartSummaries">
-): IncomeChartSummary[] {
-  const selectedChartYear = incomeSelectedChartYear(tracker, { ...model, chartSummaries: [] });
-  const monthlyTotal = selectedChartYear ? incomeMonthlyTotalForYear(tracker, selectedChartYear) : null;
+function buildChartSummaries(model: Omit<IncomeTrackerModel, "chartSummaries">): IncomeChartSummary[] {
   return [
     {
       title: "Jahresnettoeinkommen",
@@ -395,16 +349,9 @@ function buildChartSummaries(
           : "Mindestens zwei Jahreswerte noetig."
     },
     {
-      title: "Monatsverlauf",
-      text:
-        selectedChartYear && monthlyTotal !== null && monthlyTotal > 0
-          ? `${selectedChartYear}: ${roundMoney(monthlyTotal)} aus Monatswerten.`
-          : "Kein Jahr mit Monatswerten ausgewaehlt."
-    },
-    {
       title: "Inflationsbereinigung",
       text: model.valueYears.some((year) => year.realNet !== null)
-        ? "Nominale und reale Werte sind auf Basis manueller Inflationsraten verfuegbar."
+        ? "Nominale und reale Werte nutzen die allgemeine Jahresinflation des Kontos."
         : "Keine realen Werte verfuegbar."
     },
     {

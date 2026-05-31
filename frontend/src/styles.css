@@ -3135,7 +3135,7 @@ tfoot th {
 
 .income-chart-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
@@ -3200,6 +3200,134 @@ tfoot th {
 
 .income-tax-button:hover {
   border-color: var(--accent);
+}
+
+.income-milestone-type-button,
+.income-milestone-badge {
+  display: inline-grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 150px;
+}
+
+.income-milestone-type-button {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 7px 9px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.income-milestone-type-button:hover {
+  border-color: var(--accent);
+}
+
+.income-milestone-type-button svg,
+.income-milestone-badge svg,
+.income-milestone-type-option svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.income-milestone-type-button span,
+.income-milestone-badge span {
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-milestone-type-picker {
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(420px, calc(100vh - 24px));
+}
+
+.income-milestone-type-grid {
+  grid-template-columns: 1fr;
+}
+
+.income-milestone-type-option {
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.income-milestone-type-option small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-milestone-type-option.active small {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.income-milestone-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.income-milestone-badge {
+  min-width: 0;
+  width: auto;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text);
+  padding: 4px 8px;
+}
+
+.income-bar-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  width: min(34px, 70%);
+  min-height: 3px;
+  overflow: hidden;
+  border-radius: 5px 5px 0 0;
+}
+
+.income-bar-segment {
+  display: block;
+  min-height: 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+  background: var(--accent);
+}
+
+.income-bar-segment.segment-0,
+.income-bar-segment.accent {
+  background: var(--accent);
+}
+
+.income-bar-segment.segment-1,
+.income-bar-segment.gold {
+  background: var(--gold);
+}
+
+.income-bar-segment.segment-2,
+.income-bar-segment.blue {
+  background: #3366cc;
+}
+
+.income-bar-segment.segment-3 {
+  background: var(--good);
+}
+
+.income-bar-segment.segment-4 {
+  background: #7c3aed;
 }
 
 .income-tax-dialog-backdrop {
@@ -3457,6 +3585,38 @@ tfoot th {
   padding: 1px 6px;
   font-size: 0.68rem;
   font-weight: 900;
+}
+
+.income-chart-milestone-markers {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  display: flex;
+  gap: 3px;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+.income-chart-milestone-markers span {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--row-border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  box-shadow: 0 4px 10px rgba(31, 37, 40, 0.12);
+}
+
+.income-chart-milestone-markers svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .income-chart-legend {

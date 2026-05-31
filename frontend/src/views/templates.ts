@@ -268,36 +268,10 @@ export function renderAppShell(): string {
                   <span>Anteil fuer Sparrate / Rate in %</span>
                   <input type="number" min="0" max="100" step="1" data-income-setting="savingsSharePercent" />
                 </label>
-                <label class="field">
-                  <span>Inflationsmodus</span>
-                  <select data-income-setting="inflationMode">
-                    <option value="off">Deaktiviert</option>
-                    <option value="manual">Manuelle Inflationswerte verwenden</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Basisjahr fuer Realwerte</span>
-                  <input type="number" min="1900" max="2200" step="1" data-income-setting="inflationBaseYear" />
-                </label>
-                <label class="field">
-                  <span>Monatsdiagramm fuer Jahr</span>
-                  <select data-income-setting="selectedChartYear" id="incomeSelectedChartYear"></select>
-                </label>
-              </div>
-              <div class="table-wrap">
-                <table class="income-table small">
-                  <thead>
-                    <tr>
-                      <th>Jahr</th>
-                      <th>Inflationsrate in %</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="incomeInflationRows"></tbody>
-                </table>
-              </div>
-              <div class="button-row">
-                <button class="button" type="button" data-action="income-add-inflation">Inflationsjahr hinzufuegen</button>
+                <div class="field">
+                  <span>Jahresinflation aus Konto</span>
+                  <strong id="incomeGeneralInflationRate">-</strong>
+                </div>
               </div>
             </div>
           </section>
@@ -321,9 +295,10 @@ export function renderAppShell(): string {
                     <th>Aus Monatswerten</th>
                     <th>Jahresentgeltabrechnung</th>
                     <th>Manuell</th>
-                    <th>Differenz</th>
-                    <th>Nettoquote</th>
-                    <th>Realwert</th>
+                      <th>Differenz</th>
+                      <th>Nettoquote</th>
+                      <th>Realwert</th>
+                      <th>Meilensteine</th>
                   </tr>
                 </thead>
                 <tbody id="incomeYearStatusRows"></tbody>
@@ -342,16 +317,12 @@ export function renderAppShell(): string {
             <div id="incomeGrowthChart" class="income-chart-host"></div>
           </section>
           <section class="income-card">
-            <h3>Monatsverlauf</h3>
-            <div id="incomeMonthlyChart" class="income-chart-host"></div>
+            <h3>Nettoquote</h3>
+            <div id="incomeRatioChart" class="income-chart-host"></div>
           </section>
           <section class="income-card">
             <h3>Nominal vs. inflationsbereinigt</h3>
             <div id="incomeInflationChart" class="income-chart-host"></div>
-          </section>
-          <section class="income-card">
-            <h3>Nettoquote</h3>
-            <div id="incomeRatioChart" class="income-chart-host"></div>
           </section>
           <section class="income-card">
             <h3>Zukunftsprojektion</h3>
@@ -362,6 +333,7 @@ export function renderAppShell(): string {
         <p id="incomeExportStatus" class="export-status" aria-live="polite"></p>
         <input class="visually-hidden" id="incomeCsvImport" type="file" accept=".csv,text/csv" />
         <div id="incomeTaxDialogRoot"></div>
+        <div id="incomeMilestoneTypePicker" class="position-icon-picker income-milestone-type-picker" role="dialog" aria-label="Meilenstein-Typ auswaehlen" hidden></div>
       </section>
 
       <section class="panel investment-panel" data-module-section="investment_planning">

@@ -28,8 +28,6 @@ import type {
   CareerMilestone,
   CareerMilestoneImpact,
   CombinedWealthToggles,
-  IncomeInflationMode,
-  IncomeInflationRate,
   IncomeMonthEntry,
   IncomePerson,
   IncomeProjectionMode,
@@ -506,7 +504,6 @@ function normalizeIncomeTrackerState(value: unknown): IncomeTrackerState {
     monthlyEntries: arrayOrEmpty(value.monthlyEntries).map(normalizeIncomeMonthEntry),
     yearlyEntries: arrayOrEmpty(value.yearlyEntries).map(normalizeIncomeYearEntry),
     milestones: arrayOrEmpty(value.milestones).map(normalizeCareerMilestone),
-    inflationRates: arrayOrEmpty(value.inflationRates).map(normalizeIncomeInflationRate),
     settings: normalizeIncomeTrackerSettings(value.settings)
   };
 }
@@ -516,15 +513,12 @@ function normalizeIncomeTrackerSettings(value: unknown): IncomeTrackerSettings {
   if (!isRecord(value)) return fallback;
   return {
     activeInputTab: normalizeIncomeInputTab(value.activeInputTab, fallback.activeInputTab),
-    selectedChartYear: nullableNumberOrDefault(value.selectedChartYear, fallback.selectedChartYear),
     projectionMode: normalizeIncomeProjectionMode(value.projectionMode, fallback.projectionMode),
     manualGrowthRatePercent: nullableNumberOrDefault(
       value.manualGrowthRatePercent,
       fallback.manualGrowthRatePercent
     ),
-    savingsSharePercent: nullableNumberOrDefault(value.savingsSharePercent, fallback.savingsSharePercent),
-    inflationMode: normalizeIncomeInflationMode(value.inflationMode, fallback.inflationMode),
-    inflationBaseYear: nullableNumberOrDefault(value.inflationBaseYear, fallback.inflationBaseYear)
+    savingsSharePercent: nullableNumberOrDefault(value.savingsSharePercent, fallback.savingsSharePercent)
   };
 }
 
@@ -586,15 +580,6 @@ function normalizeCareerMilestone(value: unknown): CareerMilestone {
   };
 }
 
-function normalizeIncomeInflationRate(value: unknown): IncomeInflationRate {
-  const entry = isRecord(value) ? value : {};
-  return {
-    id: String(entry.id || createId()),
-    year: Math.round(numberOrDefault(entry.year, defaultPlanningSettings().year)),
-    ratePercent: nullableNumberOrDefault(entry.ratePercent, null)
-  };
-}
-
 function normalizeIncomePerson(value: unknown): IncomePerson {
   return value === "person1" || value === "person2" || value === "household" ? value : "household";
 }
@@ -611,10 +596,6 @@ function normalizeCareerMilestoneImpact(value: unknown): CareerMilestoneImpact {
 function normalizeIncomeProjectionMode(value: unknown, fallback: IncomeProjectionMode): IncomeProjectionMode {
   if (value === "off" || value === "historical_average" || value === "manual") return value;
   return fallback;
-}
-
-function normalizeIncomeInflationMode(value: unknown, fallback: IncomeInflationMode): IncomeInflationMode {
-  return value === "manual" ? "manual" : fallback;
 }
 
 function normalizeIncomeInputTab(

@@ -22,7 +22,6 @@ export type IncomeYearEntrySource = "annual_statement" | "manual";
 export type IncomeResolvedSource = IncomeYearEntrySource | "monthly_calculated";
 export type CareerMilestoneImpact = "positive" | "negative" | "neutral";
 export type IncomeProjectionMode = "off" | "historical_average" | "manual";
-export type IncomeInflationMode = "off" | "manual";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -291,27 +290,17 @@ export interface CareerMilestone {
   linkedYear: number | null;
 }
 
-export interface IncomeInflationRate {
-  id: string;
-  year: number;
-  ratePercent: number | null;
-}
-
 export interface IncomeTrackerSettings {
   activeInputTab: "monthly" | "yearly" | "milestones" | "settings";
-  selectedChartYear: number | null;
   projectionMode: IncomeProjectionMode;
   manualGrowthRatePercent: number | null;
   savingsSharePercent: number | null;
-  inflationMode: IncomeInflationMode;
-  inflationBaseYear: number | null;
 }
 
 export interface IncomeTrackerState {
   monthlyEntries: IncomeMonthEntry[];
   yearlyEntries: IncomeYearEntry[];
   milestones: CareerMilestone[];
-  inflationRates: IncomeInflationRate[];
   settings: IncomeTrackerSettings;
 }
 

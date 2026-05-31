@@ -320,15 +320,11 @@ export function defaultIncomeTrackerState(): IncomeTrackerState {
     monthlyEntries: [],
     yearlyEntries: [],
     milestones: [],
-    inflationRates: [],
     settings: {
       activeInputTab: "monthly",
-      selectedChartYear: null,
       projectionMode: "off",
       manualGrowthRatePercent: null,
-      savingsSharePercent: null,
-      inflationMode: "off",
-      inflationBaseYear: null
+      savingsSharePercent: null
     }
   };
 }
