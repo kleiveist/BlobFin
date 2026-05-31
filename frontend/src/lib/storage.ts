@@ -28,7 +28,6 @@ import type {
   CareerMilestone,
   CareerMilestoneImpact,
   CombinedWealthToggles,
-  IncomeMonthEntry,
   IncomePerson,
   IncomeProjectionMode,
   IncomeTaxDeductionField,
@@ -501,7 +500,6 @@ function normalizeIncomeTrackerState(value: unknown): IncomeTrackerState {
   const fallback = defaultIncomeTrackerState();
   if (!isRecord(value)) return fallback;
   return {
-    monthlyEntries: arrayOrEmpty(value.monthlyEntries).map(normalizeIncomeMonthEntry),
     yearlyEntries: arrayOrEmpty(value.yearlyEntries).map(normalizeIncomeYearEntry),
     milestones: arrayOrEmpty(value.milestones).map(normalizeCareerMilestone),
     settings: normalizeIncomeTrackerSettings(value.settings)
@@ -519,20 +517,6 @@ function normalizeIncomeTrackerSettings(value: unknown): IncomeTrackerSettings {
       fallback.manualGrowthRatePercent
     ),
     savingsSharePercent: nullableNumberOrDefault(value.savingsSharePercent, fallback.savingsSharePercent)
-  };
-}
-
-function normalizeIncomeMonthEntry(value: unknown): IncomeMonthEntry {
-  const entry = isRecord(value) ? value : {};
-  return {
-    id: String(entry.id || createId()),
-    year: Math.round(numberOrDefault(entry.year, defaultPlanningSettings().year)),
-    month: Math.round(clampNumber(numberOrDefault(entry.month, 1), 1, 12)),
-    person: normalizeIncomePerson(entry.person),
-    netIncome: nullableNumberOrDefault(entry.netIncome, null),
-    bonus: nullableNumberOrDefault(entry.bonus, null),
-    otherIncome: nullableNumberOrDefault(entry.otherIncome, null),
-    note: String(entry.note ?? "")
   };
 }
 
@@ -602,7 +586,7 @@ function normalizeIncomeInputTab(
   value: unknown,
   fallback: IncomeTrackerSettings["activeInputTab"]
 ): IncomeTrackerSettings["activeInputTab"] {
-  if (value === "monthly" || value === "yearly" || value === "milestones" || value === "settings") return value;
+  if (value === "yearly" || value === "milestones" || value === "settings") return value;
   return fallback;
 }
 

@@ -151,13 +151,10 @@ export function renderAppShell(): string {
           <div>
             <h2>Jahresnettoeinkommen-Tracker</h2>
             <p class="planning-account-summary">
-              Monatswerte, Jahresentgeltabrechnungen, Meilensteine und explizite Annahmen werden getrennt gepflegt.
+              Jahreswerte, Meilensteine und explizite Annahmen werden getrennt gepflegt.
             </p>
           </div>
           <div class="button-row">
-            <button class="button secondary" type="button" data-action="income-import-active-account">
-              Aktives Konto uebernehmen
-            </button>
             ${toolbarIconButton("income-import-csv", "CSV importieren", "upload")}
             ${toolbarIconButton("income-export-csv", "CSV exportieren", "download")}
             <button class="button" type="button" data-action="income-export-pdf">PDF-Auswertung</button>
@@ -169,10 +166,7 @@ export function renderAppShell(): string {
         <div class="income-tracker-grid">
           <section class="income-card income-input-card">
             <div class="position-mode-switch income-tab-switch" role="tablist" aria-label="Einkommen Eingaben">
-              <button class="position-mode-button" type="button" data-action="income-tab-monthly" aria-pressed="true">
-                Monatswerte
-              </button>
-              <button class="position-mode-button" type="button" data-action="income-tab-yearly" aria-pressed="false">
+              <button class="position-mode-button" type="button" data-action="income-tab-yearly" aria-pressed="true">
                 Jahreswerte
               </button>
               <button class="position-mode-button" type="button" data-action="income-tab-milestones" aria-pressed="false">
@@ -183,30 +177,7 @@ export function renderAppShell(): string {
               </button>
             </div>
 
-            <div id="incomeMonthlyTab" class="income-tab-panel">
-              <div class="table-wrap">
-                <table class="income-table">
-                  <thead>
-                    <tr>
-                      <th>Jahr</th>
-                      <th>Monat</th>
-                      <th>Person</th>
-                      <th>Monatsnetto</th>
-                      <th>Bonus</th>
-                      <th>Weitere Einnahmen</th>
-                      <th>Gesamt</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="incomeMonthlyRows"></tbody>
-                </table>
-              </div>
-              <div class="button-row">
-                <button class="button" type="button" data-action="income-add-monthly">Monatszeile hinzufuegen</button>
-              </div>
-            </div>
-
-            <div id="incomeYearlyTab" class="income-tab-panel" hidden>
+            <div id="incomeYearlyTab" class="income-tab-panel">
               <div class="table-wrap">
                 <table class="income-table">
                   <thead>
@@ -292,13 +263,11 @@ export function renderAppShell(): string {
                     <th>Jahr</th>
                     <th>Genutztes Jahresnetto</th>
                     <th>Status</th>
-                    <th>Aus Monatswerten</th>
                     <th>Jahresentgeltabrechnung</th>
                     <th>Manuell</th>
-                      <th>Differenz</th>
-                      <th>Nettoquote</th>
-                      <th>Realwert</th>
-                      <th>Meilensteine</th>
+                    <th>Nettoquote</th>
+                    <th>Realwert</th>
+                    <th>Meilensteine</th>
                   </tr>
                 </thead>
                 <tbody id="incomeYearStatusRows"></tbody>

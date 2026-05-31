@@ -771,7 +771,7 @@
       <p class="eyebrow">ImoCalc Einkommen</p>
       <h1>Jahresnettoeinkommen-Tracker</h1>
       <p class="header-copy">
-        Erfasse Monatswerte, bestätigte Jahreswerte und Karriere-Meilensteine. Auswertungen,
+        Erfasse bestätigte Jahreswerte und Karriere-Meilensteine. Auswertungen,
         Projektionen und Exporte werden nur aus eingetragenen Daten oder aktivierten Annahmen berechnet.
       </p>
     </div>
@@ -793,10 +793,7 @@
         </div>
 
         <div class="tab-list" role="tablist" aria-label="Eingabebereiche">
-          <button class="tab-button" type="button" role="tab" aria-selected="true" data-tab-target="monthlyPanel">
-            Monatswerte
-          </button>
-          <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab-target="yearlyPanel">
+          <button class="tab-button" type="button" role="tab" aria-selected="true" data-tab-target="yearlyPanel">
             Jahreswerte
           </button>
           <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab-target="milestonesPanel">
@@ -807,30 +804,7 @@
           </button>
         </div>
 
-        <div id="monthlyPanel" class="tab-panel" role="tabpanel">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Jahr</th>
-                  <th>Monat</th>
-                  <th>Person</th>
-                  <th class="numeric">Monatsnetto</th>
-                  <th class="numeric">Bonus</th>
-                  <th class="numeric">Weitere Einnahmen</th>
-                  <th class="numeric">Gesamt</th>
-                  <th>Aktion</th>
-                </tr>
-              </thead>
-              <tbody id="monthlyRows"></tbody>
-            </table>
-          </div>
-          <div class="button-row">
-            <button class="primary-button" type="button" data-add-row="monthlyEntries">+ Monatszeile</button>
-          </div>
-        </div>
-
-        <div id="yearlyPanel" class="tab-panel" role="tabpanel" hidden>
+        <div id="yearlyPanel" class="tab-panel" role="tabpanel">
           <div class="table-wrap">
             <table>
               <thead>
@@ -921,7 +895,7 @@
         <div>
           <h2>Jahreswerte und Quellenstatus</h2>
           <p class="muted-text">
-            Bestätigte Jahresentgeltabrechnungen haben Vorrang. Berechnete Monatswerte bleiben als Vergleich sichtbar.
+            Bestätigte Jahresentgeltabrechnungen haben Vorrang vor manuellen Jahreswerten.
           </p>
         </div>
       </div>
@@ -932,10 +906,8 @@
               <th>Jahr</th>
               <th class="numeric">Genutztes Jahresnetto</th>
               <th>Status</th>
-              <th class="numeric">Aus Monatswerten</th>
               <th class="numeric">Jahresentgeltabrechnung</th>
               <th class="numeric">Manuell</th>
-              <th class="numeric">Differenz</th>
               <th class="numeric">Nettoquote</th>
               <th class="numeric">Realwert</th>
               <th>Meilensteine</th>
@@ -1018,7 +990,6 @@
   <script>
     const STORAGE_KEY = "imocalc-income-tracker-v1";
     const SOURCE_LABELS = {
-      monthly_calculated: "berechnet aus Monatswerten",
       annual_statement: "bestätigt durch Jahresentgeltabrechnung",
       manual: "manuell eingetragener Jahreswert"
     };
@@ -1026,20 +997,6 @@
       ["household", "Haushalt"],
       ["person1", "Person 1"],
       ["person2", "Person 2"]
-    ];
-    const MONTH_OPTIONS = [
-      [1, "Januar"],
-      [2, "Februar"],
-      [3, "März"],
-      [4, "April"],
-      [5, "Mai"],
-      [6, "Juni"],
-      [7, "Juli"],
-      [8, "August"],
-      [9, "September"],
-      [10, "Oktober"],
-      [11, "November"],
-      [12, "Dezember"]
     ];
     const MILESTONE_TYPES = [
       "Ausbildung",
@@ -1134,7 +1091,6 @@
 
     function createDefaultState() {
       return {
-        monthlyEntries: [],
         yearlyEntries: [],
         milestones: [],
         settings: {
@@ -1163,9 +1119,6 @@
       const fallback = createDefaultState();
       const settings = { ...fallback.settings, ...(value && value.settings ? value.settings : {}) };
       return {
-        monthlyEntries: Array.isArray(value?.monthlyEntries)
-          ? value.monthlyEntries.map(normalizeMonthlyEntry)
-          : [],
         yearlyEntries: Array.isArray(value?.yearlyEntries)
           ? value.yearlyEntries.map(normalizeYearlyEntry)
           : [],
@@ -1180,19 +1133,6 @@
           savingsSharePercent: normalizeOptionalNumber(settings.savingsSharePercent),
           annualInflationRatePercent: normalizeAnnualInflationRate(settings.annualInflationRatePercent)
         }
-      };
-    }
-
-    function normalizeMonthlyEntry(entry) {
-      return {
-        id: normalizeId(entry?.id),
-        year: normalizeOptionalInteger(entry?.year),
-        month: normalizeMonth(entry?.month),
-        person: normalizeOption(entry?.person, PERSON_OPTIONS, "household"),
-        netIncome: normalizeOptionalNumber(entry?.netIncome),
-        bonus: normalizeOptionalNumber(entry?.bonus),
-        otherIncome: normalizeOptionalNumber(entry?.otherIncome),
-        note: String(entry?.note ?? "")
       };
     }
 
@@ -1261,11 +1201,6 @@
     function normalizeOptionalInteger(value) {
       const number = normalizeOptionalNumber(value);
       return number === "" ? "" : Math.trunc(number);
-    }
-
-    function normalizeMonth(value) {
-      const number = Number(value);
-      return Number.isInteger(number) && number >= 1 && number <= 12 ? number : new Date().getMonth() + 1;
     }
 
     function normalizeOption(value, options, fallback) {
@@ -1431,19 +1366,6 @@
     }
 
     function addRow(collection) {
-      if (collection === "monthlyEntries") {
-        state.monthlyEntries.push({
-          id: createId(),
-          year: currentYear,
-          month: new Date().getMonth() + 1,
-          person: "household",
-          netIncome: "",
-          bonus: "",
-          otherIncome: "",
-          note: ""
-        });
-      }
-
       if (collection === "yearlyEntries") {
         state.yearlyEntries.push({
           id: createId(),
@@ -1507,27 +1429,8 @@
     }
 
     function renderInputTables() {
-      renderMonthlyRows();
       renderYearlyRows();
       renderMilestoneRows();
-    }
-
-    function renderMonthlyRows() {
-      const body = document.getElementById("monthlyRows");
-      body.innerHTML = state.monthlyEntries.length
-        ? state.monthlyEntries.map((entry) => `
-          <tr>
-            <td><input type="number" min="1900" max="2200" step="1" value="${escapeAttribute(entry.year)}" data-collection="monthlyEntries" data-id="${entry.id}" data-field="year" /></td>
-            <td><select data-collection="monthlyEntries" data-id="${entry.id}" data-field="month">${optionTags(MONTH_OPTIONS, entry.month)}</select></td>
-            <td><select data-collection="monthlyEntries" data-id="${entry.id}" data-field="person">${optionTags(PERSON_OPTIONS, entry.person)}</select></td>
-            <td><input type="number" step="0.01" min="0" value="${escapeAttribute(entry.netIncome)}" data-collection="monthlyEntries" data-id="${entry.id}" data-field="netIncome" /></td>
-            <td><input type="number" step="0.01" min="0" value="${escapeAttribute(entry.bonus)}" data-collection="monthlyEntries" data-id="${entry.id}" data-field="bonus" /></td>
-            <td><input type="number" step="0.01" min="0" value="${escapeAttribute(entry.otherIncome)}" data-collection="monthlyEntries" data-id="${entry.id}" data-field="otherIncome" /></td>
-            <td class="numeric">${formatMoney(monthlyEntryTotal(entry), 2)}</td>
-            <td><button class="icon-button danger" type="button" title="Zeile löschen" data-delete-collection="monthlyEntries" data-delete-id="${entry.id}">×</button></td>
-          </tr>
-        `).join("")
-        : `<tr><td colspan="8" class="empty-row">Noch keine Monatswerte eingetragen.</td></tr>`;
     }
 
     function renderYearlyRows() {
@@ -1853,12 +1756,10 @@
         if (!yearMap.has(year)) {
           yearMap.set(year, {
             year,
-            monthlyNet: null,
             annualStatementNet: null,
             manualNet: null,
             annualNet: null,
             source: null,
-            difference: null,
             ratioNet: 0,
             ratioGross: 0,
             netRatio: null,
@@ -1868,14 +1769,6 @@
         }
         return yearMap.get(year);
       };
-
-      for (const entry of state.monthlyEntries) {
-        if (!isValidYear(entry.year) || !hasAnyAmount(entry, ["netIncome", "bonus", "otherIncome"])) {
-          continue;
-        }
-        const year = getYear(Number(entry.year));
-        year.monthlyNet = (year.monthlyNet ?? 0) + monthlyEntryTotal(entry);
-      }
 
       for (const entry of state.yearlyEntries) {
         const netIncome = yearlyEntryNetIncome(entry);
@@ -1908,16 +1801,9 @@
         if (year.annualStatementNet !== null) {
           year.annualNet = year.annualStatementNet;
           year.source = "annual_statement";
-        } else if (year.monthlyNet !== null) {
-          year.annualNet = year.monthlyNet;
-          year.source = "monthly_calculated";
         } else if (year.manualNet !== null) {
           year.annualNet = year.manualNet;
           year.source = "manual";
-        }
-
-        if (year.annualStatementNet !== null && year.monthlyNet !== null) {
-          year.difference = year.annualStatementNet - year.monthlyNet;
         }
 
         if (year.ratioGross > 0) {
@@ -2115,15 +2001,6 @@
         });
       }
 
-      for (const year of model.years) {
-        if (year.difference !== null && Math.abs(year.difference) >= 1) {
-          insights.push({
-            kind: "warning",
-            text: `Die Jahresentgeltabrechnung ${year.year} weicht um ${formatSignedMoney(year.difference, 0)} von den Monatswerten ab.`
-          });
-        }
-      }
-
       const ratioYear = latestRatioYear(model);
       if (ratioYear) {
         insights.push({
@@ -2153,7 +2030,7 @@
         if (model.yoyAmount > 0 && realGrowth <= 0) {
           insights.push({
             kind: "warning",
-            text: "Nominal steigt das Einkommen, real stagniert oder sinkt es auf Basis deiner Inflationswerte."
+            text: "Nominal steigt das Einkommen, real stagniert oder sinkt es auf Basis deiner Jahresinflation."
           });
         }
       }
@@ -2192,16 +2069,14 @@
             <td>${year.year}</td>
             <td class="numeric">${year.annualNet !== null ? formatMoney(year.annualNet, 0) : "-"}</td>
             <td>${year.source ? sourceBadge(year.source) : `<span class="badge muted">nur Meilenstein</span>`}</td>
-            <td class="numeric">${year.monthlyNet !== null ? formatMoney(year.monthlyNet, 0) : "-"}</td>
             <td class="numeric">${year.annualStatementNet !== null ? formatMoney(year.annualStatementNet, 0) : "-"}</td>
             <td class="numeric">${year.manualNet !== null ? formatMoney(year.manualNet, 0) : "-"}</td>
-            <td class="numeric">${year.difference !== null ? formatSignedMoney(year.difference, 0) : "-"}</td>
             <td class="numeric">${year.netRatio !== null ? formatPercent(year.netRatio) : "-"}</td>
             <td class="numeric">${year.realNet !== null ? formatMoney(year.realNet, 0) : "-"}</td>
             <td>${milestoneBadges(year.milestones)}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="10" class="empty-row">Noch keine Jahreswerte vorhanden.</td></tr>`;
+        : `<tr><td colspan="8" class="empty-row">Noch keine Jahreswerte vorhanden.</td></tr>`;
     }
 
     function sourceBadge(source) {
@@ -2261,7 +2136,6 @@
       drawLine(ctx, linePoints, cssVar("--text"), 2);
       drawLegend(ctx, [
         ["Bestätigt", cssVar("--accent")],
-        ["Monatswerte", cssVar("--blue")],
         ["Manuell", cssVar("--gold")],
         ["Meilenstein-Symbol", cssVar("--text")]
       ], area.left, 12);
@@ -2308,7 +2182,7 @@
       const colors = [cssVar("--accent"), cssVar("--gold"), cssVar("--blue"), cssVar("--good"), "#7c3aed"];
       const entries = state.yearlyEntries
         .filter((entry) => {
-          if (Number(entry.year) !== Number(year.year) || year.source === "monthly_calculated") return false;
+          if (Number(entry.year) !== Number(year.year)) return false;
           if (year.source === "annual_statement") return entry.source === "annual_statement";
           if (year.source === "manual") return entry.source === "manual";
           return false;
@@ -2590,19 +2464,18 @@
         return;
       }
       const imported = incomeEntriesFromCsvRows(parseCsv(await file.text()));
-      const importedCount = imported.monthlyEntries.length + imported.yearlyEntries.length + imported.milestones.length;
+      const importedCount = imported.yearlyEntries.length + imported.milestones.length;
       if (!importedCount) {
         window.alert("Keine gültigen Einkommen-CSV-Daten gefunden.");
         return;
       }
-      state.monthlyEntries.push(...imported.monthlyEntries);
       state.yearlyEntries.push(...imported.yearlyEntries);
       state.milestones.push(...imported.milestones);
       saveState();
       renderInputTables();
       syncSettingControls();
       renderOutputs();
-      showTab(imported.yearlyEntries.length ? "yearlyPanel" : imported.monthlyEntries.length ? "monthlyPanel" : "settingsPanel");
+      showTab(imported.yearlyEntries.length ? "yearlyPanel" : imported.milestones.length ? "milestonesPanel" : "settingsPanel");
       setStatus(`${importedCount} Einträge aus CSV importiert.`);
     }
 
@@ -2657,7 +2530,7 @@
     }
 
     function incomeEntriesFromCsvRows(rows) {
-      const emptyImport = { monthlyEntries: [], yearlyEntries: [], milestones: [] };
+      const emptyImport = { yearlyEntries: [], milestones: [] };
       if (!rows.length) {
         return emptyImport;
       }
@@ -2675,7 +2548,6 @@
         }
         return fallbackIndex >= 0 ? row[fallbackIndex] ?? "" : "";
       };
-      const monthlyEntries = new Map();
       const yearlyEntries = new Map();
       const milestones = new Map();
 
@@ -2690,28 +2562,6 @@
         const fieldKey = field.toLowerCase();
         const value = get(row, ["value"], 6).trim();
         const sourceValue = get(row, ["source"], 7).trim();
-
-        if (section === "monthly") {
-          const key = `monthly-${rowKey}`;
-          const entry = monthlyEntries.get(key) || {
-            id: createId(),
-            year: csvYear(yearValue, currentYear),
-            month: csvMonth(monthValue),
-            person: normalizeOption(personValue, PERSON_OPTIONS, "household"),
-            netIncome: "",
-            bonus: "",
-            otherIncome: "",
-            note: ""
-          };
-          entry.year = csvYear(yearValue, entry.year);
-          entry.month = csvMonth(monthValue, entry.month);
-          entry.person = normalizeOption(personValue || entry.person, PERSON_OPTIONS, "household");
-          if (fieldKey === "netincome") entry.netIncome = csvNumber(value);
-          if (fieldKey === "bonus") entry.bonus = csvNumber(value);
-          if (fieldKey === "otherincome") entry.otherIncome = csvNumber(value);
-          monthlyEntries.set(key, entry);
-          return;
-        }
 
         if (section === "yearly" || section === "yearly_tax_detail") {
           const key = `yearly-${rowKey}`;
@@ -2774,7 +2624,6 @@
       });
 
       return {
-        monthlyEntries: Array.from(monthlyEntries.values()).filter((entry) => hasAnyAmount(entry, ["netIncome", "bonus", "otherIncome"])),
         yearlyEntries: Array.from(yearlyEntries.values()).filter((entry) =>
           hasNumber(entry.annualNetIncome) ||
           hasNumber(entry.annualGrossIncome) ||
@@ -2807,11 +2656,6 @@
       return hasNumber(parsed) ? Math.min(2200, Math.max(1900, Math.round(parsed))) : "";
     }
 
-    function csvMonth(value, fallback = 1) {
-      const parsed = csvNumber(value);
-      return hasNumber(parsed) ? Math.min(12, Math.max(1, Math.round(parsed))) : fallback;
-    }
-
     function taxDeductionFieldFromCsv(value) {
       const text = value.toLowerCase();
       if (text.startsWith("4 ") || text.includes("lohnsteuer")) return "wageTax";
@@ -2829,11 +2673,6 @@
       const rows = [
         ["section", "id", "year", "month", "person", "field", "value", "source"]
       ];
-      for (const entry of state.monthlyEntries) {
-        rows.push(["monthly", entry.id, entry.year, entry.month, entry.person, "netIncome", entry.netIncome, ""]);
-        rows.push(["monthly", entry.id, entry.year, entry.month, entry.person, "bonus", entry.bonus, ""]);
-        rows.push(["monthly", entry.id, entry.year, entry.month, entry.person, "otherIncome", entry.otherIncome, ""]);
-      }
       for (const entry of state.yearlyEntries) {
         rows.push(["yearly", entry.id, entry.year, "", entry.person, "annualNetIncome", yearlyEntryNetIncome(entry), entry.source]);
         rows.push(["yearly", entry.id, entry.year, "", entry.person, "annualGrossIncome", entry.annualGrossIncome, entry.source]);
@@ -2849,8 +2688,6 @@
       }
       for (const year of model.years) {
         rows.push(["calculated", "", year.year, "", "", "annualNet", year.annualNet ?? "", year.source ?? ""]);
-        rows.push(["calculated", "", year.year, "", "", "monthlyNet", year.monthlyNet ?? "", "monthly_calculated"]);
-        rows.push(["calculated", "", year.year, "", "", "difference", year.difference ?? "", "annual_statement_minus_monthly"]);
         rows.push(["calculated", "", year.year, "", "", "netRatio", year.netRatio ?? "", "gross_net"]);
         rows.push(["calculated", "", year.year, "", "", "realNet", year.realNet ?? "", "general_inflation"]);
       }
@@ -2892,7 +2729,6 @@
           <td>${year.year}</td>
           <td>${year.annualNet !== null ? formatMoney(year.annualNet, 0) : "-"}</td>
           <td>${year.source ? SOURCE_LABELS[year.source] : "nur Meilenstein"}</td>
-          <td>${year.difference !== null ? formatSignedMoney(year.difference, 0) : "-"}</td>
           <td>${year.netRatio !== null ? formatPercent(year.netRatio) : "-"}</td>
           <td>${year.realNet !== null ? formatMoney(year.realNet, 0) : "-"}</td>
         </tr>
@@ -2921,8 +2757,8 @@
             <ul>${chartSummary.map((item) => `<li><strong>${escapeHtml(item.title)}:</strong> ${escapeHtml(item.text)}</li>`).join("")}</ul>
             <h2>Jahreswerte</h2>
             <table>
-              <thead><tr><th>Jahr</th><th>Jahresnetto</th><th>Status</th><th>Differenz</th><th>Nettoquote</th><th>Realwert</th></tr></thead>
-              <tbody>${yearRows || `<tr><td colspan="6">Keine Jahreswerte vorhanden.</td></tr>`}</tbody>
+              <thead><tr><th>Jahr</th><th>Jahresnetto</th><th>Status</th><th>Nettoquote</th><th>Realwert</th></tr></thead>
+              <tbody>${yearRows || `<tr><td colspan="5">Keine Jahreswerte vorhanden.</td></tr>`}</tbody>
             </table>
             <h2>Projektion</h2>
             <table>
@@ -3001,10 +2837,6 @@
       return model.projection.horizons.find((item) => item.years === years) ?? null;
     }
 
-    function monthlyEntryTotal(entry) {
-      return numberValue(entry.netIncome) + numberValue(entry.bonus) + numberValue(entry.otherIncome);
-    }
-
     function yearlyEntryNetIncome(entry) {
       const calculatedNet = yearlyEntryCalculatedNetIncome(entry);
       return calculatedNet !== null ? calculatedNet : hasNumber(entry.annualNetIncome) ? roundCents(entry.annualNetIncome) : entry.annualNetIncome;
@@ -3039,10 +2871,6 @@
 
     function personLabel(value) {
       return PERSON_OPTIONS.find(([optionValue]) => optionValue === value)?.[1] ?? "Haushalt";
-    }
-
-    function hasAnyAmount(entry, fields) {
-      return fields.some((field) => hasNumber(entry[field]));
     }
 
     function hasNumber(value) {

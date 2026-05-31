@@ -1,6 +1,5 @@
 import type {
   CareerMilestone,
-  IncomeMonthEntry,
   IncomeResolvedSource,
   IncomeTaxDeductionField,
   IncomeTaxDeductionItems,
@@ -9,19 +8,16 @@ import type {
 } from "../types";
 
 export const INCOME_SOURCE_LABELS: Record<IncomeResolvedSource, string> = {
-  monthly_calculated: "berechnet aus Monatswerten",
   annual_statement: "bestaetigt durch Jahresentgeltabrechnung",
   manual: "manuell eingetragener Jahreswert"
 };
 
 export interface IncomeYearAnalysis {
   year: number;
-  monthlyNet: number | null;
   annualStatementNet: number | null;
   manualNet: number | null;
   annualNet: number | null;
   source: IncomeResolvedSource | null;
-  difference: number | null;
   ratioNet: number;
   ratioGross: number;
   netRatio: number | null;
@@ -160,10 +156,6 @@ export function buildIncomeTrackerModel(tracker: IncomeTrackerState, options: In
   };
 }
 
-export function incomeMonthEntryTotal(entry: IncomeMonthEntry): number {
-  return numberValue(entry.netIncome) + numberValue(entry.bonus) + numberValue(entry.otherIncome);
-}
-
 export function incomeYearEntryNetIncome(entry: IncomeYearEntry): number | null {
   const calculatedNet = incomeYearEntryCalculatedNetIncome(entry);
   return calculatedNet ?? (entry.annualNetIncome === null ? null : roundCents(entry.annualNetIncome));
@@ -198,12 +190,6 @@ export function emptyIncomeTaxDeductionItems(): IncomeTaxDeductionItems {
   };
 }
 
-export function incomeMonthlyTotalForYear(tracker: IncomeTrackerState, year: number): number {
-  return tracker.monthlyEntries
-    .filter((entry) => validYear(entry.year) && entry.year === year && hasAnyAmount(entry))
-    .reduce((sum, entry) => sum + incomeMonthEntryTotal(entry), 0);
-}
-
 function buildYearAnalyses(tracker: IncomeTrackerState): IncomeYearAnalysis[] {
   const yearMap = new Map<number, IncomeYearAnalysis>();
   const getYear = (yearNumber: number): IncomeYearAnalysis => {
@@ -211,12 +197,10 @@ function buildYearAnalyses(tracker: IncomeTrackerState): IncomeYearAnalysis[] {
     if (existing) return existing;
     const year: IncomeYearAnalysis = {
       year: yearNumber,
-      monthlyNet: null,
       annualStatementNet: null,
       manualNet: null,
       annualNet: null,
       source: null,
-      difference: null,
       ratioNet: 0,
       ratioGross: 0,
       netRatio: null,
@@ -226,12 +210,6 @@ function buildYearAnalyses(tracker: IncomeTrackerState): IncomeYearAnalysis[] {
     yearMap.set(yearNumber, year);
     return year;
   };
-
-  for (const entry of tracker.monthlyEntries) {
-    if (!validYear(entry.year) || !hasAnyAmount(entry)) continue;
-    const year = getYear(entry.year);
-    year.monthlyNet = (year.monthlyNet ?? 0) + incomeMonthEntryTotal(entry);
-  }
 
   for (const entry of tracker.yearlyEntries) {
     const netIncome = incomeYearEntryNetIncome(entry);
@@ -256,16 +234,9 @@ function buildYearAnalyses(tracker: IncomeTrackerState): IncomeYearAnalysis[] {
     if (year.annualStatementNet !== null) {
       year.annualNet = year.annualStatementNet;
       year.source = "annual_statement";
-    } else if (year.monthlyNet !== null) {
-      year.annualNet = year.monthlyNet;
-      year.source = "monthly_calculated";
     } else if (year.manualNet !== null) {
       year.annualNet = year.manualNet;
       year.source = "manual";
-    }
-
-    if (year.annualStatementNet !== null && year.monthlyNet !== null) {
-      year.difference = year.annualStatementNet - year.monthlyNet;
     }
 
     if (year.ratioGross > 0) {
@@ -368,10 +339,6 @@ function buildChartSummaries(model: Omit<IncomeTrackerModel, "chartSummaries">):
           : "Keine aktive oder berechenbare Projektion."
     }
   ];
-}
-
-function hasAnyAmount(entry: IncomeMonthEntry): boolean {
-  return entry.netIncome !== null || entry.bonus !== null || entry.otherIncome !== null;
 }
 
 function numberValue(value: number | null): number {

@@ -317,11 +317,10 @@ export function defaultCombinedWealthToggles(): CombinedWealthToggles {
 
 export function defaultIncomeTrackerState(): IncomeTrackerState {
   return {
-    monthlyEntries: [],
     yearlyEntries: [],
     milestones: [],
     settings: {
-      activeInputTab: "monthly",
+      activeInputTab: "yearly",
       projectionMode: "off",
       manualGrowthRatePercent: null,
       savingsSharePercent: null

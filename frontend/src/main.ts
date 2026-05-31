@@ -12,7 +12,6 @@ import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/
 import {
   buildIncomeTrackerModel,
   emptyIncomeTaxDeductionItems,
-  incomeMonthEntryTotal,
   incomeTaxDeductionItemsTotal,
   incomeYearEntryCalculatedNetIncome,
   incomeYearEntryNetIncome,
@@ -80,7 +79,6 @@ import type {
   CareerMilestone,
   CareerMilestoneImpact,
   CombinedWealthYear,
-  IncomeMonthEntry,
   IncomePerson,
   IncomeProjectionMode,
   IncomeResolvedSource,
@@ -750,12 +748,10 @@ function bindEvents(): void {
       return;
     }
     if (action?.startsWith("income-tab-")) setIncomeInputTab(action.replace("income-tab-", ""));
-    if (action === "income-add-monthly") addIncomeMonthlyEntry();
     if (action === "income-add-yearly") addIncomeYearlyEntry();
     if (action === "income-add-milestone") addIncomeMilestone();
     if (action?.startsWith("income-open-tax-dialog-")) openIncomeTaxDialog(action.replace("income-open-tax-dialog-", ""));
     if (action === "income-close-tax-dialog") closeIncomeTaxDialog();
-    if (action === "income-import-active-account") importIncomeFromActiveAccount();
     if (action === "income-import-csv") document.querySelector<HTMLInputElement>("#incomeCsvImport")?.click();
     if (action?.startsWith("income-remove-")) removeIncomeEntry(action);
     if (action === "income-export-csv") void exportIncomeCsv();
@@ -1136,11 +1132,6 @@ function incomeGeneralInflationRatePercent(): number {
 
 function renderIncomeLiveUpdate(collection?: string, id?: string, field?: string): void {
   const model = incomeTrackerModel();
-  if (collection === "monthlyEntries" && id) {
-    const entry = state.incomeTracker.monthlyEntries.find((item) => item.id === id);
-    const totalCell = document.querySelector<HTMLElement>(`[data-income-month-total="${cssEscape(id)}"]`);
-    if (entry && totalCell) totalCell.textContent = money(incomeMonthEntryTotal(entry));
-  }
   if (collection === "yearlyEntries" && id) {
     renderIncomeYearlyNetCell(id, field);
     renderIncomeYearlyTaxButton(id);
@@ -1185,48 +1176,21 @@ function renderIncomeTaxDialogTotals(id: string): void {
 
 function renderIncomeTabs(): void {
   const activeTab = state.incomeTracker.settings.activeInputTab;
-  for (const tab of ["monthly", "yearly", "milestones", "settings"] as const) {
+  for (const tab of ["yearly", "milestones", "settings"] as const) {
     const button = document.querySelector<HTMLButtonElement>(`[data-action="income-tab-${tab}"]`);
     if (button) {
       button.classList.toggle("active", tab === activeTab);
       button.setAttribute("aria-pressed", String(tab === activeTab));
     }
   }
-  setSectionHidden("#incomeMonthlyTab", activeTab !== "monthly");
   setSectionHidden("#incomeYearlyTab", activeTab !== "yearly");
   setSectionHidden("#incomeMilestonesTab", activeTab !== "milestones");
   setSectionHidden("#incomeSettingsTab", activeTab !== "settings");
 }
 
 function renderIncomeRows(): void {
-  renderIncomeMonthlyRows();
   renderIncomeYearlyRows();
   renderIncomeMilestoneRows();
-}
-
-function renderIncomeMonthlyRows(): void {
-  const body = document.querySelector<HTMLTableSectionElement>("#incomeMonthlyRows");
-  if (!body) return;
-  if (!state.incomeTracker.monthlyEntries.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="8">Noch keine Monatswerte eingetragen.</td></tr>`;
-    return;
-  }
-  body.innerHTML = state.incomeTracker.monthlyEntries
-    .map(
-      (entry) => `
-      <tr>
-        <td>${incomeNumberInput("monthlyEntries", entry.id, "year", entry.year, { min: 1900, max: 2200, step: 1 })}</td>
-        <td>${incomeSelect("monthlyEntries", entry.id, "month", monthOptions(), entry.month)}</td>
-        <td>${incomeSelect("monthlyEntries", entry.id, "person", INCOME_PERSON_OPTIONS, entry.person)}</td>
-        <td>${incomeNumberInput("monthlyEntries", entry.id, "netIncome", entry.netIncome, { min: 0 })}</td>
-        <td>${incomeNumberInput("monthlyEntries", entry.id, "bonus", entry.bonus, { min: 0 })}</td>
-        <td>${incomeNumberInput("monthlyEntries", entry.id, "otherIncome", entry.otherIncome, { min: 0 })}</td>
-        <td class="numeric-cell" data-income-month-total="${escapeHtml(entry.id)}">${money(incomeMonthEntryTotal(entry))}</td>
-        <td><button class="icon-button danger" type="button" data-action="income-remove-monthly-${entry.id}" aria-label="Monatswert entfernen">x</button></td>
-      </tr>
-    `
-    )
-    .join("");
 }
 
 function renderIncomeYearlyRows(): void {
@@ -1463,14 +1427,6 @@ function renderIncomeInsights(model: IncomeTrackerModel): void {
       )} pro Monat steigen.`
     });
   }
-  for (const year of model.years) {
-    if (year.difference !== null && Math.abs(year.difference) >= 1) {
-      insights.push({
-        tone: "warning",
-        text: `Die Jahresentgeltabrechnung ${year.year} weicht um ${signedMoney(year.difference)} von den Monatswerten ab.`
-      });
-    }
-  }
   if (model.latestRatioYear && model.latestRatioYear.netRatio !== null) {
     insights.push({
       tone: "normal",
@@ -1497,7 +1453,7 @@ function renderIncomeInsights(model: IncomeTrackerModel): void {
     if ((model.yearlyGrowthAmount ?? 0) > 0 && realGrowth <= 0) {
       insights.push({
         tone: "warning",
-        text: "Nominal steigt das Einkommen, real stagniert oder sinkt es auf Basis deiner manuellen Inflationswerte."
+        text: "Nominal steigt das Einkommen, real stagniert oder sinkt es auf Basis der allgemeinen Jahresinflation."
       });
     }
   }
@@ -1531,7 +1487,7 @@ function renderIncomeYearStatusRows(model: IncomeTrackerModel): void {
   const body = document.querySelector<HTMLTableSectionElement>("#incomeYearStatusRows");
   if (!body) return;
   if (!model.years.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="10">Noch keine Jahreswerte vorhanden.</td></tr>`;
+    body.innerHTML = `<tr><td class="position-empty" colspan="8">Noch keine Jahreswerte vorhanden.</td></tr>`;
     return;
   }
   body.innerHTML = model.years
@@ -1541,10 +1497,8 @@ function renderIncomeYearStatusRows(model: IncomeTrackerModel): void {
         <td>${year.year}</td>
         <td class="numeric-cell">${year.annualNet !== null ? money(year.annualNet) : "-"}</td>
         <td>${year.source ? incomeSourceBadge(year.source) : '<span class="status-pill muted">nur Meilenstein</span>'}</td>
-        <td class="numeric-cell">${year.monthlyNet !== null ? money(year.monthlyNet) : "-"}</td>
         <td class="numeric-cell">${year.annualStatementNet !== null ? money(year.annualStatementNet) : "-"}</td>
         <td class="numeric-cell">${year.manualNet !== null ? money(year.manualNet) : "-"}</td>
-        <td class="numeric-cell">${year.difference !== null ? signedMoney(year.difference) : "-"}</td>
         <td class="numeric-cell">${year.netRatio !== null ? percent(year.netRatio) : "-"}</td>
         <td class="numeric-cell">${year.realNet !== null ? money(year.realNet) : "-"}</td>
         <td>${incomeMilestoneBadges(year.milestones)}</td>
@@ -1602,7 +1556,7 @@ function incomeMilestoneChartMarkers(milestones: CareerMilestone[]): string {
 function incomeAnnualChartSegments(year: IncomeTrackerModel["years"][number]): Array<{ value: number; label: string; tone: string }> {
   const contributingEntries = state.incomeTracker.yearlyEntries
     .filter((entry) => {
-      if (entry.year !== year.year || year.source === "monthly_calculated") return false;
+      if (entry.year !== year.year) return false;
       if (year.source === "annual_statement") return entry.source === "annual_statement";
       if (year.source === "manual") return entry.source === "manual";
       return false;
@@ -1795,7 +1749,7 @@ function incomeMetricCard(label: string, value: string, detail: string): string 
 }
 
 function incomeSourceBadge(source: IncomeResolvedSource): string {
-  const tone = source === "manual" ? " warning" : source === "monthly_calculated" ? " blue" : "";
+  const tone = source === "manual" ? " warning" : "";
   return `<span class="status-pill${tone}">${escapeHtml(INCOME_SOURCE_LABELS[source])}</span>`;
 }
 
@@ -1912,12 +1866,8 @@ function incomeMilestoneTypeMeta(type: string): { type: string; icon: string; de
   );
 }
 
-function monthOptions(): Array<{ value: number; label: string }> {
-  return Array.from({ length: 12 }, (_, index) => ({ value: index + 1, label: monthName(index + 1) }));
-}
-
 function setIncomeInputTab(value: string): void {
-  if (value !== "monthly" && value !== "yearly" && value !== "milestones" && value !== "settings") return;
+  if (value !== "yearly" && value !== "milestones" && value !== "settings") return;
   state.incomeTracker = {
     ...state.incomeTracker,
     settings: { ...state.incomeTracker.settings, activeInputTab: value }
@@ -1935,27 +1885,6 @@ function closeIncomeTaxDialog(): void {
   if (!incomeTaxDialogEntryId) return;
   incomeTaxDialogEntryId = null;
   renderIncomeTaxDialog();
-}
-
-function addIncomeMonthlyEntry(): void {
-  const now = new Date();
-  state.incomeTracker = {
-    ...state.incomeTracker,
-    monthlyEntries: [
-      ...state.incomeTracker.monthlyEntries,
-      {
-        id: createId(),
-        year: state.settings.year,
-        month: now.getMonth() + 1,
-        person: "household",
-        netIncome: null,
-        bonus: null,
-        otherIncome: null,
-        note: ""
-      }
-    ]
-  };
-  renderAll();
 }
 
 function addIncomeYearlyEntry(): void {
@@ -1999,13 +1928,7 @@ function addIncomeMilestone(): void {
 }
 
 function removeIncomeEntry(action: string): void {
-  if (action.startsWith("income-remove-monthly-")) {
-    const id = action.replace("income-remove-monthly-", "");
-    state.incomeTracker = {
-      ...state.incomeTracker,
-      monthlyEntries: state.incomeTracker.monthlyEntries.filter((entry) => entry.id !== id)
-    };
-  } else if (action.startsWith("income-remove-yearly-")) {
+  if (action.startsWith("income-remove-yearly-")) {
     const id = action.replace("income-remove-yearly-", "");
     state.incomeTracker = {
       ...state.incomeTracker,
@@ -2022,15 +1945,6 @@ function removeIncomeEntry(action: string): void {
 }
 
 function updateIncomeEntry(collection: string, id: string, field: string, value: string): void {
-  if (collection === "monthlyEntries") {
-    state.incomeTracker = {
-      ...state.incomeTracker,
-      monthlyEntries: state.incomeTracker.monthlyEntries.map((entry) =>
-        entry.id === id ? updateIncomeMonthEntry(entry, field, value) : entry
-      )
-    };
-    return;
-  }
   if (collection === "yearlyEntries") {
     state.incomeTracker = {
       ...state.incomeTracker,
@@ -2049,17 +1963,6 @@ function updateIncomeEntry(collection: string, id: string, field: string, value:
     };
     return;
   }
-}
-
-function updateIncomeMonthEntry(entry: IncomeMonthEntry, field: string, value: string): IncomeMonthEntry {
-  if (field === "year") return { ...entry, year: incomeInteger(value, state.settings.year) };
-  if (field === "month") return { ...entry, month: clamp(Math.round(numberValue(value)), 1, 12) };
-  if (field === "person") return { ...entry, person: incomePerson(value) };
-  if (field === "note") return { ...entry, note: value };
-  if (field === "netIncome") return { ...entry, netIncome: nullableInputNumber(value) };
-  if (field === "bonus") return { ...entry, bonus: nullableInputNumber(value) };
-  if (field === "otherIncome") return { ...entry, otherIncome: nullableInputNumber(value) };
-  return entry;
 }
 
 function updateIncomeYearEntry(entry: IncomeYearEntry, field: string, value: string): IncomeYearEntry {
@@ -2134,49 +2037,11 @@ function updateIncomeSetting(field: keyof IncomeTrackerSettings, value: string):
   }
 }
 
-function importIncomeFromActiveAccount(): void {
-  const account = activePlanningAccount();
-  const monthlyEntries = Array.from({ length: 12 }, (_, index) => {
-    const month = index + 1;
-    const total = account.yearlyRows
-      .filter((position) => position.active && isIncomePosition(position))
-      .reduce((sum, position) => sum + calculatePlannedIncomeForSingleMonth(position, state.settings.year, month), 0);
-    return total > 0
-      ? {
-          id: createId(),
-          year: state.settings.year,
-          month,
-          person: "household" as const,
-          netIncome: total,
-          bonus: null,
-          otherIncome: null,
-          note: `Aus Konto ${account.name} uebernommen`
-        }
-      : null;
-  }).filter((entry): entry is IncomeMonthEntry => entry !== null);
-
-  if (!monthlyEntries.length) {
-    window.alert("Im aktiven Konto wurden keine aktiven Einnahmen fuer das Jahr gefunden.");
-    return;
-  }
-
-  state.incomeTracker = {
-    ...state.incomeTracker,
-    monthlyEntries: [...state.incomeTracker.monthlyEntries, ...monthlyEntries],
-    settings: { ...state.incomeTracker.settings, activeInputTab: "monthly" }
-  };
-  renderAll();
-  showIncomeExportStatus(`${monthlyEntries.length} Monatswerte aus dem aktiven Konto uebernommen.`);
-}
-
 async function importIncomeCsvFromFile(file: File | undefined): Promise<void> {
   if (!file) return;
   const text = await file.text();
   const imported = incomeTrackerEntriesFromCsvRows(parseCsv(text));
-  const importedCount =
-    imported.monthlyEntries.length +
-    imported.yearlyEntries.length +
-    imported.milestones.length;
+  const importedCount = imported.yearlyEntries.length + imported.milestones.length;
   if (!importedCount) {
     window.alert("Keine gueltigen Einkommen-CSV-Daten gefunden.");
     return;
@@ -2184,12 +2049,11 @@ async function importIncomeCsvFromFile(file: File | undefined): Promise<void> {
 
   state.incomeTracker = {
     ...state.incomeTracker,
-    monthlyEntries: [...state.incomeTracker.monthlyEntries, ...imported.monthlyEntries],
     yearlyEntries: [...state.incomeTracker.yearlyEntries, ...imported.yearlyEntries],
     milestones: [...state.incomeTracker.milestones, ...imported.milestones],
     settings: {
       ...state.incomeTracker.settings,
-      activeInputTab: imported.yearlyEntries.length ? "yearly" : imported.monthlyEntries.length ? "monthly" : "settings"
+      activeInputTab: imported.yearlyEntries.length ? "yearly" : imported.milestones.length ? "milestones" : "settings"
     }
   };
   renderAll();
@@ -2219,11 +2083,6 @@ function exportIncomePdf(): void {
 
 function incomeTrackerCsv(model: IncomeTrackerModel): string {
   const rows: string[][] = [["section", "id", "year", "month", "person", "field", "value", "source"]];
-  for (const entry of state.incomeTracker.monthlyEntries) {
-    rows.push(["monthly", entry.id, String(entry.year), String(entry.month), entry.person, "netIncome", csvValue(entry.netIncome), ""]);
-    rows.push(["monthly", entry.id, String(entry.year), String(entry.month), entry.person, "bonus", csvValue(entry.bonus), ""]);
-    rows.push(["monthly", entry.id, String(entry.year), String(entry.month), entry.person, "otherIncome", csvValue(entry.otherIncome), ""]);
-  }
   for (const entry of state.incomeTracker.yearlyEntries) {
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "annualNetIncome", csvValue(incomeYearEntryNetIncome(entry)), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "annualGrossIncome", csvValue(entry.annualGrossIncome), entry.source]);
@@ -2248,8 +2107,6 @@ function incomeTrackerCsv(model: IncomeTrackerModel): string {
   }
   for (const year of model.years) {
     rows.push(["calculated", "", String(year.year), "", "", "annualNet", csvValue(year.annualNet), year.source ?? ""]);
-    rows.push(["calculated", "", String(year.year), "", "", "monthlyNet", csvValue(year.monthlyNet), "monthly_calculated"]);
-    rows.push(["calculated", "", String(year.year), "", "", "difference", csvValue(year.difference), "annual_statement_minus_monthly"]);
     rows.push(["calculated", "", String(year.year), "", "", "netRatio", csvValue(year.netRatio), "gross_net"]);
     rows.push(["calculated", "", String(year.year), "", "", "realNet", csvValue(year.realNet), "general_inflation"]);
   }
@@ -2261,11 +2118,10 @@ function incomeTrackerCsv(model: IncomeTrackerModel): string {
 }
 
 function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
-  monthlyEntries: IncomeMonthEntry[];
   yearlyEntries: IncomeYearEntry[];
   milestones: CareerMilestone[];
 } {
-  const emptyImport = { monthlyEntries: [], yearlyEntries: [], milestones: [] };
+  const emptyImport = { yearlyEntries: [], milestones: [] };
   if (!rows.length) return emptyImport;
 
   const header = rows[0].map((value) => value.trim().replace(/^\uFEFF/, "").toLowerCase());
@@ -2281,7 +2137,6 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
     return fallbackIndex >= 0 ? row[fallbackIndex] ?? "" : "";
   };
 
-  const monthlyEntries = new Map<string, IncomeMonthEntry>();
   const yearlyEntries = new Map<string, IncomeYearEntry>();
   const milestones = new Map<string, CareerMilestone>();
 
@@ -2296,30 +2151,6 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
     const monthValue = get(row, ["month"], 3).trim();
     const personValue = get(row, ["person"], 4).trim();
     const sourceValue = get(row, ["source"], 7).trim();
-
-    if (section === "monthly") {
-      const key = `monthly-${rowKey}`;
-      const entry =
-        monthlyEntries.get(key) ??
-        ({
-          id: createId(),
-          year: incomeCsvYear(yearValue, state.settings.year),
-          month: incomeCsvMonth(monthValue),
-          person: incomePerson(personValue),
-          netIncome: null,
-          bonus: null,
-          otherIncome: null,
-          note: ""
-        } satisfies IncomeMonthEntry);
-      entry.year = incomeCsvYear(yearValue, entry.year);
-      entry.month = incomeCsvMonth(monthValue, entry.month);
-      entry.person = incomePerson(personValue || entry.person);
-      if (fieldKey === "netincome") entry.netIncome = incomeCsvNumber(value);
-      if (fieldKey === "bonus") entry.bonus = incomeCsvNumber(value);
-      if (fieldKey === "otherincome") entry.otherIncome = incomeCsvNumber(value);
-      monthlyEntries.set(key, entry);
-      return;
-    }
 
     if (section === "yearly" || section === "yearly_tax_detail") {
       const key = `yearly-${rowKey}`;
@@ -2386,9 +2217,6 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
   });
 
   return {
-    monthlyEntries: Array.from(monthlyEntries.values()).filter((entry) =>
-      [entry.netIncome, entry.bonus, entry.otherIncome].some((amount) => amount !== null)
-    ),
     yearlyEntries: Array.from(yearlyEntries.values()).filter(incomeCsvYearlyEntryHasData),
     milestones: Array.from(milestones.values()).filter((entry) => entry.date || entry.description || entry.type !== "Sonstiges")
   };
@@ -2423,11 +2251,6 @@ function incomeCsvYearOrNull(value: string): number | null {
   return parsed === null ? null : clamp(Math.round(parsed), 1900, 2200);
 }
 
-function incomeCsvMonth(value: string, fallback = 1): number {
-  const parsed = incomeCsvNumber(value);
-  return parsed === null ? fallback : clamp(Math.round(parsed), 1, 12);
-}
-
 function incomeTaxDeductionFieldFromCsv(value: string): IncomeTaxDeductionField | null {
   const text = value.toLowerCase();
   if (text.startsWith("4 ") || text.includes("lohnsteuer")) return "wageTax";
@@ -2441,20 +2264,6 @@ function incomeTaxDeductionFieldFromCsv(value: string): IncomeTaxDeductionField 
 }
 
 function incomePdfHtml(model: IncomeTrackerModel): string {
-  const monthlyRows = state.incomeTracker.monthlyEntries
-    .map(
-      (entry) => `
-      <tr>
-        <td>${entry.year}</td>
-        <td>${escapeHtml(monthName(entry.month))}</td>
-        <td>${escapeHtml(entry.person)}</td>
-        <td>${entry.netIncome !== null ? money(entry.netIncome) : "-"}</td>
-        <td>${entry.bonus !== null ? money(entry.bonus) : "-"}</td>
-        <td>${entry.otherIncome !== null ? money(entry.otherIncome) : "-"}</td>
-        <td>${money(incomeMonthEntryTotal(entry))}</td>
-      </tr>`
-    )
-    .join("");
   const yearlyInputRows = state.incomeTracker.yearlyEntries
     .map(
       (entry) => `
@@ -2488,7 +2297,6 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
         <td>${year.year}</td>
         <td>${year.annualNet !== null ? money(year.annualNet) : "-"}</td>
         <td>${year.source ? INCOME_SOURCE_LABELS[year.source] : "nur Meilenstein"}</td>
-        <td>${year.difference !== null ? signedMoney(year.difference) : "-"}</td>
         <td>${year.netRatio !== null ? percent(year.netRatio) : "-"}</td>
         <td>${year.realNet !== null ? money(year.realNet) : "-"}</td>
       </tr>`
@@ -2517,11 +2325,6 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
         <p class="note">Erstellt am ${escapeHtml(new Date().toLocaleString("de-DE"))}. Datenbasis: Nur Nutzereingaben, berechnete Werte und aktivierte Annahmen.</p>
         <h2>Diagrammzusammenfassung</h2>
         <ul>${model.chartSummaries.map((item) => `<li><strong>${escapeHtml(item.title)}:</strong> ${escapeHtml(item.text)}</li>`).join("")}</ul>
-        <h2>Monatswerte</h2>
-        <table>
-          <thead><tr><th>Jahr</th><th>Monat</th><th>Person</th><th>Monatsnetto</th><th>Bonus</th><th>Weitere Einnahmen</th><th>Gesamt</th></tr></thead>
-          <tbody>${monthlyRows || '<tr><td colspan="7">Keine Monatswerte vorhanden.</td></tr>'}</tbody>
-        </table>
         <h2>Jahreswerte</h2>
         <table>
           <thead><tr><th>Jahr</th><th>Person</th><th>Jahresnetto</th><th>Jahresbrutto</th><th>Steuer / Abgaben</th><th>Arbeitgeber</th><th>Status</th></tr></thead>
@@ -2534,8 +2337,8 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
         </table>
         <h2>Berechnete Jahreswerte</h2>
         <table>
-          <thead><tr><th>Jahr</th><th>Jahresnetto</th><th>Status</th><th>Differenz</th><th>Nettoquote</th><th>Realwert</th></tr></thead>
-          <tbody>${yearRows || '<tr><td colspan="6">Keine Jahreswerte vorhanden.</td></tr>'}</tbody>
+          <thead><tr><th>Jahr</th><th>Jahresnetto</th><th>Status</th><th>Nettoquote</th><th>Realwert</th></tr></thead>
+          <tbody>${yearRows || '<tr><td colspan="5">Keine Jahreswerte vorhanden.</td></tr>'}</tbody>
         </table>
         <h2>Projektion</h2>
         <table>

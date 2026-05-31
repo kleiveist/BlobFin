@@ -19,7 +19,7 @@ export type RealEstateLocale = "de" | "en";
 export type SpecialRepaymentRhythm = "none" | "monthly" | "yearly";
 export type IncomePerson = "person1" | "person2" | "household";
 export type IncomeYearEntrySource = "annual_statement" | "manual";
-export type IncomeResolvedSource = IncomeYearEntrySource | "monthly_calculated";
+export type IncomeResolvedSource = IncomeYearEntrySource;
 export type CareerMilestoneImpact = "positive" | "negative" | "neutral";
 export type IncomeProjectionMode = "off" | "historical_average" | "manual";
 export type RepaymentSourceToggleKey =
@@ -245,17 +245,6 @@ export interface CombinedWealthToggles {
   includeRealEstateValueTrend: boolean;
 }
 
-export interface IncomeMonthEntry {
-  id: string;
-  year: number;
-  month: number;
-  person: IncomePerson;
-  netIncome: number | null;
-  bonus: number | null;
-  otherIncome: number | null;
-  note: string;
-}
-
 export interface IncomeYearEntry {
   id: string;
   year: number;
@@ -291,14 +280,13 @@ export interface CareerMilestone {
 }
 
 export interface IncomeTrackerSettings {
-  activeInputTab: "monthly" | "yearly" | "milestones" | "settings";
+  activeInputTab: "yearly" | "milestones" | "settings";
   projectionMode: IncomeProjectionMode;
   manualGrowthRatePercent: number | null;
   savingsSharePercent: number | null;
 }
 
 export interface IncomeTrackerState {
-  monthlyEntries: IncomeMonthEntry[];
   yearlyEntries: IncomeYearEntry[];
   milestones: CareerMilestone[];
   settings: IncomeTrackerSettings;
