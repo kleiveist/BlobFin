@@ -266,6 +266,7 @@ export interface IncomeTaxDeductionItems {
   healthInsurance: number | null;
   careInsurance: number | null;
   unemploymentInsurance: number | null;
+  employerPensionInsurance: number | null;
 }
 
 export type IncomeTaxDeductionField = keyof IncomeTaxDeductionItems;

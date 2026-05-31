@@ -187,7 +187,8 @@ export function emptyIncomeTaxDeductionItems(): IncomeTaxDeductionItems {
     pensionInsurance: null,
     healthInsurance: null,
     careInsurance: null,
-    unemploymentInsurance: null
+    unemploymentInsurance: null,
+    employerPensionInsurance: null
   };
 }
 

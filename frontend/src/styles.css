@@ -3814,6 +3814,14 @@ tfoot th {
   font-weight: 850;
 }
 
+.income-analysis-pie small {
+  max-width: 170px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
 .income-analysis-bars {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
@@ -4000,6 +4008,14 @@ tfoot th {
   stroke: var(--gold);
 }
 
+.income-analysis-line .employer,
+.income-analysis-legend .employer,
+.income-analysis-bar-column .employer,
+.income-analysis-svg .employer {
+  background: #0f766e;
+  stroke: #0f766e;
+}
+
 .income-analysis-line .gold,
 .income-analysis-legend .gold,
 .income-analysis-bar-column .gold {
@@ -4057,6 +4073,11 @@ tfoot th {
 
 .income-analysis-svg .series-point.deduction {
   fill: var(--gold);
+  stroke: var(--surface);
+}
+
+.income-analysis-svg .series-point.employer {
+  fill: #0f766e;
   stroke: var(--surface);
 }
 

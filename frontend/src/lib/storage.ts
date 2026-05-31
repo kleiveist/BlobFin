@@ -59,7 +59,8 @@ const INCOME_TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
   "pensionInsurance",
   "healthInsurance",
   "careInsurance",
-  "unemploymentInsurance"
+  "unemploymentInsurance",
+  "employerPensionInsurance"
 ];
 const LEGACY_STORAGE_KEY = "jahreskalkulatorState";
 
@@ -547,7 +548,8 @@ function normalizeIncomeTaxDeductionItems(value: unknown): IncomeTaxDeductionIte
       pensionInsurance: null,
       healthInsurance: null,
       careInsurance: null,
-      unemploymentInsurance: null
+      unemploymentInsurance: null,
+      employerPensionInsurance: null
     }
   );
 }

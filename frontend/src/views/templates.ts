@@ -190,7 +190,6 @@ export function renderAppShell(): string {
                       <th>Jahresnetto</th>
                       <th>Jahresbrutto</th>
                       <th>Steuer / Abgaben</th>
-                      <th>Arbeitgeber</th>
                       <th>Status</th>
                       <th></th>
                     </tr>

@@ -135,11 +135,12 @@ const INCOME_TAX_DEDUCTION_ROWS: Array<{
   field: IncomeTaxDeductionField;
   nr: string;
   label: string;
-  category: "taxes" | "social";
+  category: "taxes" | "social" | "employer_social";
 }> = [
   { field: "wageTax", nr: "4", label: "Einbehaltene Lohnsteuer von 3.", category: "taxes" },
   { field: "solidaritySurcharge", nr: "5", label: "Einbehaltener Solidaritaetszuschlag von 3.", category: "taxes" },
   { field: "churchTax", nr: "6", label: "Einbehaltene Kirchensteuer des Arbeitnehmers von 3.", category: "taxes" },
+  { field: "employerPensionInsurance", nr: "22", label: "Arbeitgeberbeitraege zur gesetzlichen RV", category: "employer_social" },
   { field: "pensionInsurance", nr: "23", label: "Arbeitnehmerbeitraege zur gesetzlichen RV", category: "social" },
   { field: "healthInsurance", nr: "25", label: "Arbeitnehmerbeitraege zur gesetzlichen KV", category: "social" },
   { field: "careInsurance", nr: "26", label: "Arbeitnehmerbeitraege zur sozialen PV", category: "social" },
@@ -200,6 +201,7 @@ interface IncomeAnalysisYearPoint {
   deductions: number;
   taxes: number;
   social: number;
+  employerSocial: number;
 }
 
 interface IncomeAnalysisModel {
@@ -210,6 +212,7 @@ interface IncomeAnalysisModel {
   totalDeductions: number;
   taxTotal: number;
   socialTotal: number;
+  employerSocialTotal: number;
   unassignedDeductions: number;
   slicesByView: Record<IncomeAnalysisDataView, IncomeAnalysisSlice[]>;
   yearPoints: IncomeAnalysisYearPoint[];
@@ -1202,9 +1205,11 @@ function renderIncomeTaxDialogTotals(id: string): void {
   if (!entry) return;
   const taxTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "taxes");
   const socialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "social");
+  const employerSocialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "employer_social");
   const total = incomeYearEntryTaxDeductions(entry);
   setText("incomeTaxDialogTaxesTotal", money(taxTotal));
   setText("incomeTaxDialogSocialTotal", money(socialTotal));
+  setText("incomeTaxDialogEmployerSocialTotal", money(employerSocialTotal));
   setText("incomeTaxDialogGrandTotal", total === null ? "-" : money(total));
 }
 
@@ -1231,7 +1236,7 @@ function renderIncomeYearlyRows(): void {
   const body = document.querySelector<HTMLTableSectionElement>("#incomeYearlyRows");
   if (!body) return;
   if (!state.incomeTracker.yearlyEntries.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="8">Noch keine Jahreswerte eingetragen.</td></tr>`;
+    body.innerHTML = `<tr><td class="position-empty" colspan="7">Noch keine Jahreswerte eingetragen.</td></tr>`;
     return;
   }
   body.innerHTML = incomeSortedYearEntries()
@@ -1249,7 +1254,6 @@ function renderIncomeYearlyRows(): void {
         })}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "annualGrossIncome", entry.annualGrossIncome, { min: 0 })}</td>
         <td>${incomeTaxDeductionsButton(entry)}</td>
-        <td>${incomeTextInput("yearlyEntries", entry.id, "employer", entry.employer)}</td>
         <td>${incomeSelect("yearlyEntries", entry.id, "source", INCOME_YEAR_SOURCE_OPTIONS, entry.source)}</td>
         <td><button class="icon-button danger" type="button" data-action="income-remove-yearly-${entry.id}" aria-label="Jahreswert entfernen">x</button></td>
       </tr>
@@ -1270,6 +1274,7 @@ function renderIncomeTaxDialog(): void {
 
   const taxTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "taxes");
   const socialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "social");
+  const employerSocialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "employer_social");
   const total = incomeYearEntryTaxDeductions(entry);
   root.innerHTML = `
     <div class="income-tax-dialog-backdrop" role="presentation">
@@ -1318,8 +1323,12 @@ function renderIncomeTaxDialog(): void {
             <span>Sozialversicherung Arbeitnehmer</span>
             <strong id="incomeTaxDialogSocialTotal">${money(socialTotal)}</strong>
           </div>
+          <div>
+            <span>Sozialversicherung Arbeitgeber</span>
+            <strong id="incomeTaxDialogEmployerSocialTotal">${money(employerSocialTotal)}</strong>
+          </div>
           <div class="total">
-            <span>Gesamt</span>
+            <span>Gesamt ohne Arbeitgeber</span>
             <strong id="incomeTaxDialogGrandTotal">${total === null ? "-" : money(total)}</strong>
           </div>
         </div>
@@ -1386,7 +1395,7 @@ function renderIncomeAnalysisDialog(model: IncomeTrackerModel = incomeTrackerMod
               ${slices.length ? slices.map((slice) => incomeAnalysisBreakdownLine(slice, analysis.totalGross)).join("") : incomeAnalysisEmpty("Keine Werte fuer diese Auswahl.")}
             </div>
             <div class="income-analysis-total">
-              <span>Abgabenquote</span>
+              <span>Abgabenquote ohne Arbeitgeber</span>
               <strong>${analysis.totalGross > 0 ? percent((analysis.totalDeductions / analysis.totalGross) * 100) : "-"}</strong>
             </div>
           </section>
@@ -1427,28 +1436,34 @@ function incomeAnalysisBreakdownLine(slice: IncomeAnalysisSlice, totalGross: num
 
 function renderIncomeAnalysisChart(analysis: IncomeAnalysisModel, slices: IncomeAnalysisSlice[]): string {
   if (!analysis.entries.length) return incomeAnalysisEmpty("Noch keine Jahreswerte fuer die Weltgrafik.");
-  if (incomeAnalysisChartType === "pie") return renderIncomeAnalysisPie(slices);
+  if (incomeAnalysisChartType === "pie") return renderIncomeAnalysisPie(analysis, slices);
   if (incomeAnalysisChartType === "bar") return renderIncomeAnalysisBars(slices);
   return renderIncomeAnalysisLineChart(analysis, incomeAnalysisChartType === "curve");
 }
 
-function renderIncomeAnalysisPie(slices: IncomeAnalysisSlice[]): string {
+function renderIncomeAnalysisPie(analysis: IncomeAnalysisModel, slices: IncomeAnalysisSlice[]): string {
   const visible = slices.filter((slice) => slice.value > 0);
   if (!visible.length) return incomeAnalysisEmpty("Keine aufgeteilten Werte vorhanden.");
-  const total = visible.reduce((sum, slice) => sum + slice.value, 0);
+  const visibleTotal = visible.reduce((sum, slice) => sum + slice.value, 0);
+  const ownTotal = incomeAnalysisDataView === "social" ? analysis.socialTotal : incomeAnalysisDataView === "deductions" ? analysis.totalDeductions : visibleTotal;
   let cursor = 0;
   const gradient = visible
     .map((slice) => {
       const start = cursor;
-      cursor += (slice.value / Math.max(1, total)) * 100;
+      cursor += (slice.value / Math.max(1, visibleTotal)) * 100;
       return `${incomeAnalysisToneColor(slice.tone)} ${start.toFixed(2)}% ${cursor.toFixed(2)}%`;
     })
     .join(", ");
+  const employerNote =
+    (incomeAnalysisDataView === "social" || incomeAnalysisDataView === "deductions") && analysis.employerSocialTotal > 0
+      ? `<small>Arbeitgeber separat ${escapeHtml(money(analysis.employerSocialTotal))}</small>`
+      : "";
   return `
     <div class="income-analysis-pie-wrap">
       <div class="income-analysis-pie" style="background: conic-gradient(${gradient})">
-        <strong>${escapeHtml(money(total))}</strong>
+        <strong>${escapeHtml(money(ownTotal))}</strong>
         <span>${escapeHtml(incomeAnalysisViewTitle())}</span>
+        ${employerNote}
       </div>
     </div>
   `;
@@ -1533,6 +1548,7 @@ function incomeAnalysisToneColor(tone: string): string {
     net: "#11795f",
     gross: "#64748b",
     deduction: "#b87514",
+    employer: "#0f766e",
     gold: "#b87514",
     blue: "#1d4ed8",
     care: "#7c3aed",
@@ -1551,9 +1567,13 @@ function incomeAnalysisSeries(points: IncomeAnalysisYearPoint[]): Array<{ label:
     deductions: [
       { key: "taxes", label: "Steuern", tone: "tax" },
       { key: "social", label: "Sozialabgaben", tone: "social" },
+      { key: "employerSocial", label: "Arbeitgeberanteil", tone: "employer" },
       { key: "deductions", label: "Abgaben gesamt", tone: "deduction" }
     ],
-    social: [{ key: "social", label: "Sozialabgaben", tone: "social" }],
+    social: [
+      { key: "social", label: "Arbeitnehmer", tone: "social" },
+      { key: "employerSocial", label: "Arbeitgeber", tone: "employer" }
+    ],
     taxes: [{ key: "taxes", label: "Steuern", tone: "tax" }],
     income: [
       { key: "gross", label: "Brutto", tone: "gross" },
@@ -1600,12 +1620,15 @@ function buildIncomeAnalysisModel(model: IncomeTrackerModel): IncomeAnalysisMode
   const totalGross = entries.reduce((sum, entry) => sum + incomeAnalysisGross(entry), 0);
   const taxSlices = incomeAnalysisTaxRows(entries, "taxes");
   const socialSlices = incomeAnalysisTaxRows(entries, "social");
+  const employerSocialSlices = incomeAnalysisTaxRows(entries, "employer_social");
   const taxTotal = taxSlices.reduce((sum, slice) => sum + slice.value, 0);
   const socialTotal = socialSlices.reduce((sum, slice) => sum + slice.value, 0);
+  const employerSocialTotal = employerSocialSlices.reduce((sum, slice) => sum + slice.value, 0);
   const unassignedDeductions = Math.max(0, totalDeductions - taxTotal - socialTotal);
   const deductionSlices = [
     { label: "Steuern", value: taxTotal, tone: "tax" },
     { label: "Sozialabgaben", value: socialTotal, tone: "social" },
+    { label: "Arbeitgeberanteil", value: employerSocialTotal, tone: "employer" },
     { label: "Nicht aufgeteilt", value: unassignedDeductions, tone: "unassigned" }
   ];
   const incomeSlices = [
@@ -1622,10 +1645,11 @@ function buildIncomeAnalysisModel(model: IncomeTrackerModel): IncomeAnalysisMode
     totalDeductions,
     taxTotal,
     socialTotal,
+    employerSocialTotal,
     unassignedDeductions,
     slicesByView: {
       deductions: deductionSlices,
-      social: socialSlices,
+      social: [...socialSlices, ...employerSocialSlices],
       taxes: taxSlices,
       income: incomeSlices
     },
@@ -1633,11 +1657,16 @@ function buildIncomeAnalysisModel(model: IncomeTrackerModel): IncomeAnalysisMode
   };
 }
 
-function incomeAnalysisTaxRows(entries: IncomeYearEntry[], category: "taxes" | "social"): IncomeAnalysisSlice[] {
-  const tones = category === "taxes" ? ["tax", "gold", "danger"] : ["social", "blue", "care", "unassigned"];
+function incomeAnalysisTaxRows(entries: IncomeYearEntry[], category: "taxes" | "social" | "employer_social"): IncomeAnalysisSlice[] {
+  const tones =
+    category === "taxes"
+      ? ["tax", "gold", "danger"]
+      : category === "employer_social"
+        ? ["employer"]
+        : ["social", "blue", "care", "unassigned"];
   return INCOME_TAX_DEDUCTION_ROWS.filter((row) => row.category === category)
     .map((row, index) => ({
-      label: row.label.replace(/^.*?\s/, ""),
+      label: incomeAnalysisTaxRowLabel(row),
       value: entries.reduce((sum, entry) => sum + numberValue(entry.taxDeductionItems[row.field]), 0),
       tone: tones[index % tones.length]
     }))
@@ -1649,6 +1678,7 @@ function buildIncomeAnalysisYearPoints(model: IncomeTrackerModel): IncomeAnalysi
     const entries = state.incomeTracker.yearlyEntries.filter((entry) => entry.year === year.year);
     const taxes = incomeAnalysisTaxRows(entries, "taxes").reduce((sum, slice) => sum + slice.value, 0);
     const social = incomeAnalysisTaxRows(entries, "social").reduce((sum, slice) => sum + slice.value, 0);
+    const employerSocial = incomeAnalysisTaxRows(entries, "employer_social").reduce((sum, slice) => sum + slice.value, 0);
     const deductions = entries.reduce((sum, entry) => sum + numberValue(incomeYearEntryTaxDeductions(entry)), 0);
     return {
       year: year.year,
@@ -1656,9 +1686,17 @@ function buildIncomeAnalysisYearPoints(model: IncomeTrackerModel): IncomeAnalysi
       net: year.annualNet ?? 0,
       deductions,
       taxes,
-      social
+      social,
+      employerSocial
     };
   });
+}
+
+function incomeAnalysisTaxRowLabel(row: (typeof INCOME_TAX_DEDUCTION_ROWS)[number]): string {
+  const label = row.label.replace(/^.*?\s/, "");
+  if (row.field === "pensionInsurance") return `${label} (Arbeitnehmer)`;
+  if (row.field === "employerPensionInsurance") return `${label} (Arbeitgeber)`;
+  return label;
 }
 
 function incomeAnalysisGross(entry: IncomeYearEntry): number {
@@ -1940,7 +1978,7 @@ function incomeAnnualChartSegments(year: IncomeTrackerModel["years"][number]): A
     })
     .map((entry, index) => ({
       value: incomeYearEntryNetIncome(entry) ?? 0,
-      label: `${incomePersonLabel(entry.person)}${entry.employer ? ` · ${entry.employer}` : ""}`,
+      label: incomePersonLabel(entry.person),
       tone: `segment-${index % 5}`
     }))
     .filter((segment) => segment.value > 0);
@@ -2031,7 +2069,7 @@ function renderIncomeProjectionChart(model: IncomeTrackerModel): string {
 function incomeProjectionPointDetail(model: IncomeTrackerModel, offsetYears: number): string {
   if (offsetYears === 0) return "Ist";
   const growthLabel = model.projection.rate !== null ? `${signedPercent(model.projection.rate * 100)} p.a.` : "Wachstum";
-  return offsetYears < 0 ? `Rueck ${Math.abs(offsetYears)}J | ${growthLabel}` : `+${offsetYears}J | ${growthLabel}`;
+  return offsetYears < 0 ? "" : `+${offsetYears}J | ${growthLabel}`;
 }
 
 function setIncomeChart(id: string, html: string): void {
@@ -2406,7 +2444,7 @@ function isIncomeTaxDeductionField(value: string): value is IncomeTaxDeductionFi
   return INCOME_TAX_DEDUCTION_ROWS.some((row) => row.field === value);
 }
 
-function incomeTaxDeductionCategoryTotal(items: IncomeTaxDeductionItems, category: "taxes" | "social"): number {
+function incomeTaxDeductionCategoryTotal(items: IncomeTaxDeductionItems, category: "taxes" | "social" | "employer_social"): number {
   return INCOME_TAX_DEDUCTION_ROWS.filter((row) => row.category === category).reduce(
     (sum, row) => sum + numberValue(items[row.field]),
     0
@@ -2511,7 +2549,6 @@ function incomeTrackerCsv(model: IncomeTrackerModel): string {
         entry.source
       ]);
     }
-    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "employer", entry.employer, entry.source]);
   }
   for (const entry of state.incomeTracker.milestones) {
     rows.push(["milestone", entry.id, String(entry.linkedYear ?? ""), entry.date, "", entry.type, entry.impact, ""]);
@@ -2639,9 +2676,13 @@ function incomeCsvYearlyEntryHasData(entry: IncomeYearEntry): boolean {
     entry.annualNetIncome !== null ||
     entry.annualGrossIncome !== null ||
     entry.taxesAndDeductions !== null ||
-    Boolean(entry.employer.trim()) ||
-    incomeTaxDeductionItemsTotal(entry.taxDeductionItems) !== null
+    incomeTaxDeductionItemsTotal(entry.taxDeductionItems) !== null ||
+    incomeTaxDeductionItemsHaveData(entry.taxDeductionItems)
   );
+}
+
+function incomeTaxDeductionItemsHaveData(items: IncomeTaxDeductionItems): boolean {
+  return INCOME_TAX_DEDUCTION_ROWS.some((row) => items[row.field] !== null && items[row.field] !== undefined);
 }
 
 function incomeCsvNumber(value: string): number | null {
@@ -2668,6 +2709,7 @@ function incomeTaxDeductionFieldFromCsv(value: string): IncomeTaxDeductionField 
   if (text.startsWith("4 ") || text.includes("lohnsteuer")) return "wageTax";
   if (text.startsWith("5 ") || text.includes("solidar")) return "solidaritySurcharge";
   if (text.startsWith("6 ") || text.includes("kirchensteuer")) return "churchTax";
+  if (text.startsWith("22 ") || text.includes("arbeitgeber")) return "employerPensionInsurance";
   if (text.startsWith("23 ") || text.includes(" rv") || text.includes("renten")) return "pensionInsurance";
   if (text.startsWith("25 ") || text.includes(" kv") || text.includes("kranken")) return "healthInsurance";
   if (text.startsWith("26 ") || text.includes(" pv") || text.includes("pflege")) return "careInsurance";
@@ -2685,7 +2727,6 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
         <td>${incomeYearEntryNetIncome(entry) !== null ? money(incomeYearEntryNetIncome(entry) ?? 0) : "-"}</td>
         <td>${entry.annualGrossIncome !== null ? money(entry.annualGrossIncome) : "-"}</td>
         <td>${incomeYearEntryTaxDeductions(entry) !== null ? money(incomeYearEntryTaxDeductions(entry) ?? 0) : "-"}</td>
-        <td>${escapeHtml(entry.employer)}</td>
         <td>${escapeHtml(INCOME_SOURCE_LABELS[entry.source])}</td>
       </tr>`
     )
@@ -2739,8 +2780,8 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
         <ul>${model.chartSummaries.map((item) => `<li><strong>${escapeHtml(item.title)}:</strong> ${escapeHtml(item.text)}</li>`).join("")}</ul>
         <h2>Jahreswerte</h2>
         <table>
-          <thead><tr><th>Jahr</th><th>Person</th><th>Jahresnetto</th><th>Jahresbrutto</th><th>Steuer / Abgaben</th><th>Arbeitgeber</th><th>Status</th></tr></thead>
-          <tbody>${yearlyInputRows || '<tr><td colspan="7">Keine Jahreswerte vorhanden.</td></tr>'}</tbody>
+          <thead><tr><th>Jahr</th><th>Person</th><th>Jahresnetto</th><th>Jahresbrutto</th><th>Steuer / Abgaben</th><th>Status</th></tr></thead>
+          <tbody>${yearlyInputRows || '<tr><td colspan="6">Keine Jahreswerte vorhanden.</td></tr>'}</tbody>
         </table>
         <h2>Karriere-Meilensteine</h2>
         <table>
