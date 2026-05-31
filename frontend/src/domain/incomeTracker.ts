@@ -175,7 +175,7 @@ export function incomeYearEntryTaxDeductions(entry: IncomeYearEntry): number | n
 export function incomeTaxDeductionItemsTotal(items: IncomeTaxDeductionItems): number | null {
   const values = TAX_DEDUCTION_FIELDS.map((field) => items[field]);
   if (!values.some((value) => value !== null && value !== undefined)) return null;
-  return roundCents(values.reduce((sum, value) => sum + numberValue(value), 0));
+  return roundCents(values.reduce<number>((sum, value) => sum + numberValue(value), 0));
 }
 
 export function emptyIncomeTaxDeductionItems(): IncomeTaxDeductionItems {

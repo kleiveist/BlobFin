@@ -155,6 +155,7 @@ export function renderAppShell(): string {
             </p>
           </div>
           <div class="button-row">
+            <button class="button secondary" type="button" data-action="income-open-analysis">Wertgrafik</button>
             ${toolbarIconButton("income-import-csv", "CSV importieren", "upload")}
             ${toolbarIconButton("income-export-csv", "CSV exportieren", "download")}
             <button class="button" type="button" data-action="income-export-pdf">PDF-Auswertung</button>
@@ -302,6 +303,7 @@ export function renderAppShell(): string {
         <p id="incomeExportStatus" class="export-status" aria-live="polite"></p>
         <input class="visually-hidden" id="incomeCsvImport" type="file" accept=".csv,text/csv" />
         <div id="incomeTaxDialogRoot"></div>
+        <div id="incomeAnalysisDialogRoot"></div>
         <div id="incomeMilestoneTypePicker" class="position-icon-picker income-milestone-type-picker" role="dialog" aria-label="Meilenstein-Typ auswaehlen" hidden></div>
       </section>
 

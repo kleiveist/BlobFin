@@ -712,12 +712,414 @@
       text-align: center;
     }
 
+    .analysis-backdrop {
+      position: fixed;
+      z-index: 42;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(31, 37, 40, 0.38);
+      padding: 16px;
+    }
+
+    .analysis-dialog {
+      display: grid;
+      gap: 12px;
+      width: min(1180px, 100%);
+      max-height: min(840px, calc(100vh - 32px));
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 18px 44px rgba(31, 37, 40, 0.22);
+      padding: 14px;
+    }
+
+    .analysis-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .analysis-head div {
+      display: grid;
+      gap: 3px;
+    }
+
+    .analysis-head strong {
+      font-size: 1.05rem;
+      font-weight: 950;
+    }
+
+    .analysis-head span,
+    .analysis-metrics span,
+    .analysis-metrics small {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+    }
+
+    .analysis-controls {
+      display: grid;
+      gap: 8px;
+    }
+
+    .analysis-switch {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .analysis-toggle {
+      min-height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 850;
+      padding: 6px 10px;
+    }
+
+    .analysis-toggle.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .analysis-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .analysis-metrics article,
+    .analysis-chart-card,
+    .analysis-detail-card {
+      border: 1px solid var(--row-border);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      padding: 10px;
+    }
+
+    .analysis-metrics article {
+      display: grid;
+      gap: 4px;
+    }
+
+    .analysis-metrics strong {
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 950;
+      overflow-wrap: anywhere;
+    }
+
+    .analysis-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.75fr);
+      gap: 12px;
+    }
+
+    .analysis-chart-card {
+      min-height: 330px;
+    }
+
+    .analysis-detail-card {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .analysis-detail-card h3 {
+      margin: 0;
+    }
+
+    .analysis-pie-wrap,
+    .analysis-empty {
+      display: grid;
+      min-height: 300px;
+      place-items: center;
+    }
+
+    .analysis-empty {
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .analysis-pie {
+      display: grid;
+      place-items: center;
+      align-content: center;
+      width: min(280px, 70vw);
+      aspect-ratio: 1;
+      border: 1px solid var(--row-border);
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 42px var(--surface);
+      text-align: center;
+    }
+
+    .analysis-pie strong {
+      max-width: 160px;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 950;
+      overflow-wrap: anywhere;
+    }
+
+    .analysis-pie span {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 850;
+    }
+
+    .analysis-bars {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+      gap: 10px;
+      min-height: 300px;
+    }
+
+    .analysis-bar-column {
+      display: grid;
+      grid-template-rows: minmax(190px, 1fr) auto auto;
+      gap: 5px;
+      min-width: 0;
+      text-align: center;
+    }
+
+    .analysis-bar-column div {
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      border-bottom: 1px solid var(--row-border);
+    }
+
+    .analysis-bar-column i {
+      display: block;
+      width: min(40px, 70%);
+      min-height: 4px;
+      border-radius: 6px 6px 0 0;
+    }
+
+    .analysis-bar-column span,
+    .analysis-bar-column strong {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 0.76rem;
+      font-weight: 850;
+    }
+
+    .analysis-bar-column span {
+      color: var(--muted);
+    }
+
+    .analysis-svg-wrap {
+      display: grid;
+      gap: 8px;
+      min-height: 300px;
+    }
+
+    .analysis-svg {
+      width: 100%;
+      min-height: 270px;
+    }
+
+    .analysis-svg .axis,
+    .analysis-svg .grid {
+      fill: none;
+      stroke: var(--row-border);
+      stroke-width: 2;
+    }
+
+    .analysis-svg .grid {
+      stroke-width: 1;
+    }
+
+    .analysis-svg .series {
+      fill: none;
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .analysis-svg text {
+      fill: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .analysis-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 850;
+    }
+
+    .analysis-legend span,
+    .analysis-line span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .analysis-legend i,
+    .analysis-line i {
+      display: inline-block;
+      flex: 0 0 auto;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    .analysis-breakdown {
+      display: grid;
+      gap: 6px;
+    }
+
+    .analysis-line {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--row-border);
+      padding: 7px 0;
+    }
+
+    .analysis-line strong,
+    .analysis-line small {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .analysis-line small {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .analysis-total {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-radius: var(--radius);
+      background: var(--surface-muted);
+      padding: 10px;
+      font-weight: 900;
+    }
+
+    .analysis-line .tax,
+    .analysis-legend .tax,
+    .analysis-bar-column .tax,
+    .analysis-svg .tax {
+      background: var(--danger);
+      stroke: var(--danger);
+    }
+
+    .analysis-line .social,
+    .analysis-legend .social,
+    .analysis-bar-column .social,
+    .analysis-svg .social {
+      background: var(--blue);
+      stroke: var(--blue);
+    }
+
+    .analysis-line .net,
+    .analysis-legend .net,
+    .analysis-bar-column .net,
+    .analysis-svg .net {
+      background: var(--good);
+      stroke: var(--good);
+    }
+
+    .analysis-line .gross,
+    .analysis-legend .gross,
+    .analysis-bar-column .gross,
+    .analysis-svg .gross {
+      background: #64748b;
+      stroke: #64748b;
+    }
+
+    .analysis-line .deduction,
+    .analysis-legend .deduction,
+    .analysis-bar-column .deduction,
+    .analysis-svg .deduction,
+    .analysis-line .gold,
+    .analysis-legend .gold,
+    .analysis-bar-column .gold {
+      background: var(--gold);
+      stroke: var(--gold);
+    }
+
+    .analysis-line .blue,
+    .analysis-legend .blue,
+    .analysis-bar-column .blue {
+      background: #1d4ed8;
+    }
+
+    .analysis-line .care,
+    .analysis-legend .care,
+    .analysis-bar-column .care {
+      background: #7c3aed;
+    }
+
+    .analysis-line .danger,
+    .analysis-legend .danger,
+    .analysis-bar-column .danger {
+      background: var(--danger);
+    }
+
+    .analysis-line .unassigned,
+    .analysis-legend .unassigned,
+    .analysis-bar-column .unassigned {
+      background: #737373;
+    }
+
+    .analysis-svg .series-point {
+      stroke: var(--surface);
+      stroke-width: 2;
+    }
+
+    .analysis-svg .series-point.tax {
+      fill: var(--danger);
+      stroke: var(--surface);
+    }
+
+    .analysis-svg .series-point.social {
+      fill: var(--blue);
+      stroke: var(--surface);
+    }
+
+    .analysis-svg .series-point.net {
+      fill: var(--good);
+      stroke: var(--surface);
+    }
+
+    .analysis-svg .series-point.gross {
+      fill: #64748b;
+      stroke: var(--surface);
+    }
+
+    .analysis-svg .series-point.deduction {
+      fill: var(--gold);
+      stroke: var(--surface);
+    }
+
     @media (max-width: 1280px) {
       .metric-grid {
         grid-template-columns: repeat(3, minmax(170px, 1fr));
       }
 
       .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .analysis-layout,
+      .analysis-metrics {
         grid-template-columns: 1fr;
       }
     }
@@ -969,6 +1371,7 @@
         <p class="status-line" id="statusLine" aria-live="polite"></p>
       </div>
       <div class="button-row">
+        <button class="secondary-button" type="button" data-open-analysis>Wertgrafik</button>
         <button class="icon-button export-icon-button" type="button" id="importCsvButton" aria-label="CSV importieren" title="CSV importieren">
           <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
             <path d="M12 17V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /><path d="M5 16v4" /><path d="M19 16v4" />
@@ -985,6 +1388,7 @@
     </section>
   </main>
   <div id="taxDialogRoot"></div>
+  <div id="analysisDialogRoot"></div>
   <div id="milestoneTypePicker" class="milestone-type-picker" role="dialog" aria-label="Meilenstein-Typ auswählen" hidden></div>
 
   <script>
@@ -1080,6 +1484,10 @@
     const currentYear = new Date().getFullYear();
     let state = loadState();
     let taxDialogEntryId = null;
+    let analysisDialogOpen = false;
+    let analysisChartType = "pie";
+    let analysisDataView = "deductions";
+    let analysisYearFilter = "all";
     let milestoneTypePickerId = null;
     let statusTimeoutId;
     let resizeTimeoutId;
@@ -1269,6 +1677,34 @@
           return;
         }
 
+        if (target.closest("[data-open-analysis]")) {
+          openAnalysisDialog();
+          return;
+        }
+
+        if (target.closest("[data-close-analysis]")) {
+          closeAnalysisDialog();
+          return;
+        }
+
+        const analysisChartButton = target.closest("[data-analysis-chart]");
+        if (analysisChartButton) {
+          setAnalysisChartType(analysisChartButton.dataset.analysisChart);
+          return;
+        }
+
+        const analysisViewButton = target.closest("[data-analysis-view]");
+        if (analysisViewButton) {
+          setAnalysisDataView(analysisViewButton.dataset.analysisView);
+          return;
+        }
+
+        const analysisYearButton = target.closest("[data-analysis-year]");
+        if (analysisYearButton) {
+          setAnalysisYearFilter(analysisYearButton.dataset.analysisYear);
+          return;
+        }
+
         const deleteButton = target.closest("[data-delete-collection]");
         if (deleteButton) {
           deleteRow(deleteButton.dataset.deleteCollection, deleteButton.dataset.deleteId);
@@ -1291,6 +1727,7 @@
       window.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
           closeTaxDialog();
+          closeAnalysisDialog();
           closeMilestoneTypePicker();
         }
       });
@@ -1582,6 +2019,385 @@
       document.getElementById("taxDialogGrandTotal").textContent = total === "" ? "-" : formatMoney(total, 2);
     }
 
+    function openAnalysisDialog() {
+      analysisDialogOpen = true;
+      renderAnalysisDialog();
+    }
+
+    function closeAnalysisDialog() {
+      if (!analysisDialogOpen) {
+        return;
+      }
+      analysisDialogOpen = false;
+      renderAnalysisDialog();
+    }
+
+    function setAnalysisChartType(value) {
+      if (!["pie", "bar", "line", "curve"].includes(value)) {
+        return;
+      }
+      analysisChartType = value;
+      renderAnalysisDialog();
+    }
+
+    function setAnalysisDataView(value) {
+      if (!["deductions", "social", "taxes", "income"].includes(value)) {
+        return;
+      }
+      analysisDataView = value;
+      renderAnalysisDialog();
+    }
+
+    function setAnalysisYearFilter(value) {
+      analysisYearFilter = value === "all" ? "all" : csvYear(value, currentYear);
+      renderAnalysisDialog();
+    }
+
+    function renderAnalysisDialog(model = buildIncomeModel()) {
+      const root = document.getElementById("analysisDialogRoot");
+      if (!root) {
+        return;
+      }
+      if (!analysisDialogOpen) {
+        root.innerHTML = "";
+        return;
+      }
+      const analysis = buildAnalysisModel(model);
+      const slices = analysisSlices(analysis);
+      root.innerHTML = `
+        <div class="analysis-backdrop" role="presentation">
+          <div class="analysis-dialog" role="dialog" aria-modal="true" aria-label="Wertgrafik Analyse Dashboard">
+            <div class="analysis-head">
+              <div>
+                <strong>Wertgrafik</strong>
+                <span>Grafik · Analyse · Dashboard · Plattform</span>
+              </div>
+              <button class="icon-button" type="button" data-close-analysis aria-label="Wertgrafik schließen">×</button>
+            </div>
+            <div class="analysis-controls">
+              <div class="analysis-switch">
+                ${analysisToggle("pie", "Kreis", analysisChartType === "pie", "chart")}
+                ${analysisToggle("bar", "Balken", analysisChartType === "bar", "chart")}
+                ${analysisToggle("line", "Linie", analysisChartType === "line", "chart")}
+                ${analysisToggle("curve", "Kurve", analysisChartType === "curve", "chart")}
+              </div>
+              <div class="analysis-switch">
+                ${analysisToggle("deductions", "Abgabenmix", analysisDataView === "deductions", "view")}
+                ${analysisToggle("social", "Sozialabgaben", analysisDataView === "social", "view")}
+                ${analysisToggle("taxes", "Steuern", analysisDataView === "taxes", "view")}
+                ${analysisToggle("income", "Einkommen", analysisDataView === "income", "view")}
+              </div>
+              <div class="analysis-switch">
+                ${analysisToggle("all", "Alle Jahre", analysisYearFilter === "all", "year")}
+                ${analysis.years.map((year) => analysisToggle(String(year), String(year), analysisYearFilter === year, "year")).join("")}
+              </div>
+            </div>
+            <div class="analysis-metrics">
+              ${analysisMetric("Bisher eingenommen", formatMoney(analysis.totalGross, 0), "Brutto erfasst")}
+              ${analysisMetric("Zum Leben verfügbar", formatMoney(analysis.totalNet, 0), "Jahresnetto")}
+              ${analysisMetric("Steuern bezahlt", formatMoney(analysis.taxTotal, 0), "Lohnsteuer, Soli, Kirche")}
+              ${analysisMetric("Sozialabgaben", formatMoney(analysis.socialTotal, 0), "Arbeitnehmeranteile")}
+            </div>
+            <div class="analysis-layout">
+              <section class="analysis-chart-card">
+                ${renderAnalysisChart(analysis, slices)}
+              </section>
+              <section class="analysis-detail-card">
+                <h3>${escapeHtml(analysisViewTitle())}</h3>
+                <div class="analysis-breakdown">
+                  ${slices.length ? slices.map((slice) => analysisBreakdownLine(slice, analysis.totalGross)).join("") : analysisEmpty("Keine Werte für diese Auswahl.")}
+                </div>
+                <div class="analysis-total">
+                  <span>Abgabenquote</span>
+                  <strong>${analysis.totalGross > 0 ? formatPercent(analysis.totalDeductions / analysis.totalGross * 100) : "-"}</strong>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function analysisToggle(value, label, active, type) {
+      const attribute = type === "chart" ? "data-analysis-chart" : type === "view" ? "data-analysis-view" : "data-analysis-year";
+      return `<button class="analysis-toggle ${active ? "active" : ""}" type="button" ${attribute}="${escapeAttribute(value)}" aria-pressed="${active}">${escapeHtml(label)}</button>`;
+    }
+
+    function analysisMetric(label, value, detail) {
+      return `
+        <article>
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          <small>${escapeHtml(detail)}</small>
+        </article>
+      `;
+    }
+
+    function analysisBreakdownLine(slice, totalGross) {
+      const share = totalGross > 0 ? slice.value / totalGross * 100 : 0;
+      return `
+        <div class="analysis-line">
+          <span><i class="${escapeAttribute(slice.tone)}"></i>${escapeHtml(slice.label)}</span>
+          <strong>${formatMoney(slice.value, 0)}</strong>
+          <small>${formatPercent(share)}</small>
+        </div>
+      `;
+    }
+
+    function renderAnalysisChart(analysis, slices) {
+      if (!analysis.entries.length) {
+        return analysisEmpty("Noch keine Jahreswerte für die Wertgrafik.");
+      }
+      if (analysisChartType === "pie") {
+        return renderAnalysisPie(slices);
+      }
+      if (analysisChartType === "bar") {
+        return renderAnalysisBars(slices);
+      }
+      return renderAnalysisLineChart(analysis, analysisChartType === "curve");
+    }
+
+    function renderAnalysisPie(slices) {
+      const visible = slices.filter((slice) => slice.value > 0);
+      if (!visible.length) {
+        return analysisEmpty("Keine aufgeteilten Werte vorhanden.");
+      }
+      const total = visible.reduce((sum, slice) => sum + slice.value, 0);
+      let cursor = 0;
+      const gradient = visible.map((slice) => {
+        const start = cursor;
+        cursor += slice.value / Math.max(1, total) * 100;
+        return `${analysisToneColor(slice.tone)} ${start.toFixed(2)}% ${cursor.toFixed(2)}%`;
+      }).join(", ");
+      return `
+        <div class="analysis-pie-wrap">
+          <div class="analysis-pie" style="background: conic-gradient(${gradient})">
+            <strong>${formatMoney(total, 0)}</strong>
+            <span>${escapeHtml(analysisViewTitle())}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAnalysisBars(slices) {
+      const visible = slices.filter((slice) => slice.value > 0);
+      if (!visible.length) {
+        return analysisEmpty("Keine aufgeteilten Werte vorhanden.");
+      }
+      const maxValue = Math.max(1, ...visible.map((slice) => slice.value));
+      return `
+        <div class="analysis-bars">
+          ${visible.map((slice) => {
+            const height = Math.max(4, Math.round(slice.value / maxValue * 100));
+            return `
+              <div class="analysis-bar-column">
+                <div><i class="${escapeAttribute(slice.tone)}" style="height:${height}%"></i></div>
+                <span>${escapeHtml(slice.label)}</span>
+                <strong>${formatMoney(slice.value, 0)}</strong>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderAnalysisLineChart(analysis, curved) {
+      const points = analysisYearFilter === "all"
+        ? analysis.yearPoints
+        : analysis.yearPoints.filter((point) => point.year === analysisYearFilter);
+      const series = analysisSeries(points);
+      if (!points.length || !series.length) {
+        return analysisEmpty("Keine Jahresentwicklung für diese Auswahl.");
+      }
+      const values = series.flatMap((item) => item.values.map((point) => point.value));
+      const maxValue = Math.max(1, ...values);
+      const minYear = points[0]?.year ?? 0;
+      const maxYear = points[points.length - 1]?.year ?? minYear;
+      const width = 720;
+      const height = 270;
+      const left = 54;
+      const right = width - 24;
+      const top = 24;
+      const bottom = height - 42;
+      const xForYear = (year) => minYear === maxYear
+        ? left + (right - left) / 2
+        : left + ((year - minYear) / (maxYear - minYear)) * (right - left);
+      const yForValue = (value) => bottom - value / maxValue * (bottom - top);
+      return `
+        <div class="analysis-svg-wrap">
+          <svg class="analysis-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Wertentwicklung">
+            <path class="axis" d="M${left} ${top}V${bottom}H${right}" />
+            <path class="grid" d="M${left} ${(top + bottom) / 2}H${right}" />
+            ${series.map((item) => {
+              const coords = item.values.map((point) => ({ x: xForYear(point.year), y: yForValue(point.value) }));
+              return `
+                <path class="series ${escapeAttribute(item.tone)}" d="${curved ? curvePath(coords) : linePath(coords)}" />
+                ${coords.map((point) => `<circle class="series-point ${escapeAttribute(item.tone)}" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="4" />`).join("")}
+              `;
+            }).join("")}
+            ${points.map((point) => `<text x="${xForYear(point.year)}" y="${bottom + 24}" text-anchor="middle">${point.year}</text>`).join("")}
+          </svg>
+          <div class="analysis-legend">
+            ${series.map((item) => `<span><i class="${escapeAttribute(item.tone)}"></i>${escapeHtml(item.label)}</span>`).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function analysisEmpty(message) {
+      return `<div class="analysis-empty">${escapeHtml(message)}</div>`;
+    }
+
+    function buildAnalysisModel(model) {
+      const years = [...new Set(state.yearlyEntries.map((entry) => Number(entry.year)).filter((year) => Number.isFinite(year)))].sort((a, b) => a - b);
+      if (analysisYearFilter !== "all" && !years.includes(analysisYearFilter)) {
+        analysisYearFilter = "all";
+      }
+      const entries = state.yearlyEntries.filter((entry) => analysisYearFilter === "all" ? true : Number(entry.year) === analysisYearFilter);
+      const totalNet = entries.reduce((sum, entry) => sum + numberValue(yearlyEntryNetIncome(entry)), 0);
+      const totalDeductions = entries.reduce((sum, entry) => sum + numberValue(yearlyEntryTaxDeductions(entry)), 0);
+      const totalGross = entries.reduce((sum, entry) => sum + analysisGross(entry), 0);
+      const taxSlices = analysisTaxRows(entries, "taxes");
+      const socialSlices = analysisTaxRows(entries, "social");
+      const taxTotal = taxSlices.reduce((sum, slice) => sum + slice.value, 0);
+      const socialTotal = socialSlices.reduce((sum, slice) => sum + slice.value, 0);
+      const unassignedDeductions = Math.max(0, totalDeductions - taxTotal - socialTotal);
+      return {
+        entries,
+        years,
+        totalGross,
+        totalNet,
+        totalDeductions,
+        taxTotal,
+        socialTotal,
+        unassignedDeductions,
+        slicesByView: {
+          deductions: [
+            { label: "Steuern", value: taxTotal, tone: "tax" },
+            { label: "Sozialabgaben", value: socialTotal, tone: "social" },
+            { label: "Nicht aufgeteilt", value: unassignedDeductions, tone: "unassigned" }
+          ],
+          social: socialSlices,
+          taxes: taxSlices,
+          income: [
+            { label: "Zum Leben verfügbar", value: totalNet, tone: "net" },
+            { label: "Steuern bezahlt", value: taxTotal, tone: "tax" },
+            { label: "Sozialabgaben", value: socialTotal, tone: "social" },
+            { label: "Nicht aufgeteilt", value: unassignedDeductions, tone: "unassigned" }
+          ]
+        },
+        yearPoints: buildAnalysisYearPoints(model)
+      };
+    }
+
+    function analysisTaxRows(entries, category) {
+      const tones = category === "taxes" ? ["tax", "gold", "danger"] : ["social", "blue", "care", "unassigned"];
+      return TAX_DEDUCTION_ROWS.filter((row) => row.category === category)
+        .map((row, index) => ({
+          label: row.label.replace(/^.*?\s/, ""),
+          value: entries.reduce((sum, entry) => sum + numberValue(entry.taxDeductionItems[row.field]), 0),
+          tone: tones[index % tones.length]
+        }))
+        .filter((slice) => slice.value > 0);
+    }
+
+    function buildAnalysisYearPoints(model) {
+      return model.valueYears.map((year) => {
+        const entries = state.yearlyEntries.filter((entry) => Number(entry.year) === Number(year.year));
+        const taxes = analysisTaxRows(entries, "taxes").reduce((sum, slice) => sum + slice.value, 0);
+        const social = analysisTaxRows(entries, "social").reduce((sum, slice) => sum + slice.value, 0);
+        const deductions = entries.reduce((sum, entry) => sum + numberValue(yearlyEntryTaxDeductions(entry)), 0);
+        return {
+          year: year.year,
+          gross: entries.reduce((sum, entry) => sum + analysisGross(entry), 0),
+          net: year.annualNet ?? 0,
+          deductions,
+          taxes,
+          social
+        };
+      });
+    }
+
+    function analysisGross(entry) {
+      const gross = numberValue(entry.annualGrossIncome);
+      if (gross > 0) {
+        return gross;
+      }
+      return numberValue(yearlyEntryNetIncome(entry)) + numberValue(yearlyEntryTaxDeductions(entry));
+    }
+
+    function analysisSlices(analysis) {
+      return analysis.slicesByView[analysisDataView].filter((slice) => slice.value > 0);
+    }
+
+    function analysisSeries(points) {
+      const seriesByView = {
+        deductions: [
+          { key: "taxes", label: "Steuern", tone: "tax" },
+          { key: "social", label: "Sozialabgaben", tone: "social" },
+          { key: "deductions", label: "Abgaben gesamt", tone: "deduction" }
+        ],
+        social: [{ key: "social", label: "Sozialabgaben", tone: "social" }],
+        taxes: [{ key: "taxes", label: "Steuern", tone: "tax" }],
+        income: [
+          { key: "gross", label: "Brutto", tone: "gross" },
+          { key: "net", label: "Netto", tone: "net" },
+          { key: "deductions", label: "Abgaben", tone: "deduction" }
+        ]
+      };
+      return seriesByView[analysisDataView]
+        .map((item) => ({
+          label: item.label,
+          tone: item.tone,
+          values: points.map((point) => ({ year: point.year, value: Number(point[item.key]) || 0 }))
+        }))
+        .filter((item) => item.values.some((point) => point.value > 0));
+    }
+
+    function linePath(points) {
+      if (!points.length) {
+        return "";
+      }
+      return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+    }
+
+    function curvePath(points) {
+      if (points.length < 2) {
+        return linePath(points);
+      }
+      return points.map((point, index) => {
+        if (index === 0) {
+          return `M${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+        }
+        const previous = points[index - 1];
+        const controlX = (previous.x + point.x) / 2;
+        return `C${controlX.toFixed(1)} ${previous.y.toFixed(1)}, ${controlX.toFixed(1)} ${point.y.toFixed(1)}, ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+      }).join(" ");
+    }
+
+    function analysisToneColor(tone) {
+      const colors = {
+        tax: "#b42318",
+        social: "#3366cc",
+        net: "#11795f",
+        gross: "#64748b",
+        deduction: "#b87514",
+        gold: "#b87514",
+        blue: "#1d4ed8",
+        care: "#7c3aed",
+        danger: "#b42318",
+        unassigned: "#737373"
+      };
+      return colors[tone] || "#1f7a68";
+    }
+
+    function analysisViewTitle() {
+      if (analysisDataView === "social") return "Sozialabgaben";
+      if (analysisDataView === "taxes") return "Steuern";
+      if (analysisDataView === "income") return "Einkommen und Abgaben";
+      return "Abgabenmix";
+    }
+
     function renderMilestoneRows() {
       const body = document.getElementById("milestoneRows");
       body.innerHTML = state.milestones.length
@@ -1747,6 +2563,7 @@
       renderInsights(model);
       renderYearStatusRows(model);
       syncSettingAvailability();
+      renderAnalysisDialog(model);
       drawCharts(model);
     }
 
@@ -1972,7 +2789,7 @@
       if (!model.valueYears.length) {
         insights.push({
           kind: "warning",
-          text: "Noch keine Einkommen eingetragen. Kennzahlen, Diagramme und Exporte bleiben leer, bis Monats- oder Jahreswerte vorhanden sind."
+          text: "Noch keine Einkommen eingetragen. Kennzahlen, Diagramme und Exporte bleiben leer, bis Jahreswerte vorhanden sind."
         });
       }
 

@@ -875,10 +875,6 @@ function numberOrDefault(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 function nullableNumberOrDefault(value: unknown, fallback: number | null): number | null {
   if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(String(value).replace(",", "."));
