@@ -39,6 +39,7 @@ import {
   labelForType,
   monthName,
   money,
+  normalizeHeader,
   numberValue,
   percent
 } from "./lib/format";
@@ -143,10 +144,14 @@ const INCOME_TAX_DEDUCTION_ROWS: Array<{
 ];
 const INCOME_YEAR_LABEL_OPTIONS: Array<{ id: string; label: string; icon: string; description: string }> = [
   { id: "salary", label: "Gehalt", icon: "coins", description: "Regelmaessiges Arbeitsentgelt" },
+  { id: "training_allowance", label: "Ausbildungsverguetung", icon: "education", description: "Verguetung waehrend Ausbildung oder dualem Studium" },
+  { id: "mini_job", label: "MiniJob", icon: "wallet", description: "Geringfuegige Beschaeftigung oder kleiner Nebenjob" },
   { id: "self_employed", label: "Selbststaendigkeit", icon: "bank", description: "Einkommen aus eigener Taetigkeit" },
   { id: "freelance", label: "Freiberuflich", icon: "investment", description: "Freiberufliche oder projektbezogene Einkuenfte" },
   { id: "side_income", label: "Nebeneinkuenfte", icon: "wallet", description: "Weitere laufende Einkommensquellen" },
   { id: "fees", label: "Gagen", icon: "card", description: "Gagen, Honorare oder Auftrittserloese" },
+  { id: "dividends", label: "Dividenden", icon: "investment", description: "Ausschuettungen aus Aktien oder Fonds" },
+  { id: "asset_income", label: "Einnahme aus Vermoegen", icon: "bank", description: "Einnahmen aus Vermoegen, Kapital oder Besitz" },
   { id: "bonus", label: "Sonderzahlung", icon: "gift", description: "Bonus, Praemie oder Einmalzahlung" },
   { id: "severance", label: "Abfindung", icon: "shield", description: "Abfindung oder Ausgleichszahlung" },
   { id: "volunteer", label: "Ehrenamt", icon: "child", description: "Ehrenamtliche Verguetung" },
@@ -2283,7 +2288,7 @@ function incomeYearLabelMeta(value: string | undefined): { id: string; label: st
 }
 
 function incomeLabelKey(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalizeHeader(value);
 }
 
 function incomeYearFromDate(value: string): number | null {
