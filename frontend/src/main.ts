@@ -122,11 +122,6 @@ const CHILD_DEPOT_DEFAULT_PAYOUT_AGE = 18;
 const CHILD_DEPOT_MAX_PAYOUT_AGE = 25;
 const MAX_REAL_ESTATE_PROJECTION_YEARS = 80;
 const INVESTMENT_DEPOTS: InvestmentDepotKey[] = ["standard", "retirement", "child"];
-const INCOME_PERSON_OPTIONS: Array<{ value: IncomePerson; label: string }> = [
-  { value: "household", label: "Haushalt" },
-  { value: "person1", label: "Person 1" },
-  { value: "person2", label: "Person 2" }
-];
 const INCOME_YEAR_SOURCE_OPTIONS: Array<{ value: IncomeYearEntrySource; label: string }> = [
   { value: "annual_statement", label: "Jahresentgeltabrechnung" },
   { value: "manual", label: "Manuell" }
@@ -145,6 +140,20 @@ const INCOME_TAX_DEDUCTION_ROWS: Array<{
   { field: "healthInsurance", nr: "25", label: "Arbeitnehmerbeitraege zur gesetzlichen KV", category: "social" },
   { field: "careInsurance", nr: "26", label: "Arbeitnehmerbeitraege zur sozialen PV", category: "social" },
   { field: "unemploymentInsurance", nr: "27", label: "Arbeitnehmerbeitraege zur AV", category: "social" }
+];
+const INCOME_YEAR_LABEL_OPTIONS: Array<{ id: string; label: string; icon: string; description: string }> = [
+  { id: "salary", label: "Gehalt", icon: "coins", description: "Regelmaessiges Arbeitsentgelt" },
+  { id: "self_employed", label: "Selbststaendigkeit", icon: "bank", description: "Einkommen aus eigener Taetigkeit" },
+  { id: "freelance", label: "Freiberuflich", icon: "investment", description: "Freiberufliche oder projektbezogene Einkuenfte" },
+  { id: "side_income", label: "Nebeneinkuenfte", icon: "wallet", description: "Weitere laufende Einkommensquellen" },
+  { id: "fees", label: "Gagen", icon: "card", description: "Gagen, Honorare oder Auftrittserloese" },
+  { id: "bonus", label: "Sonderzahlung", icon: "gift", description: "Bonus, Praemie oder Einmalzahlung" },
+  { id: "severance", label: "Abfindung", icon: "shield", description: "Abfindung oder Ausgleichszahlung" },
+  { id: "volunteer", label: "Ehrenamt", icon: "child", description: "Ehrenamtliche Verguetung" },
+  { id: "board", label: "Vorstand", icon: "bank", description: "Vorstandsverguetung" },
+  { id: "office_holder", label: "Amtstraeger", icon: "tax", description: "Verguetung fuer Amt oder Mandat" },
+  { id: "supervisory_board", label: "Aufsichtsrat", icon: "investment", description: "Aufsichtsratsverguetung" },
+  { id: "other", label: "Sonstiges", icon: "tag", description: "Andere Einkommensart" }
 ];
 const CAREER_MILESTONE_TYPE_OPTIONS: Array<{ type: string; icon: string; description: string }> = [
   { type: "Ausbildung", icon: "education", description: "Ausbildung, Schule oder Qualifikation gestartet" },
@@ -287,6 +296,7 @@ let incomeAnalysisOpen = false;
 let incomeAnalysisChartType: IncomeAnalysisChartType = "pie";
 let incomeAnalysisDataView: IncomeAnalysisDataView = "deductions";
 let incomeAnalysisYearFilter: IncomeAnalysisYearFilter = "all";
+let incomeYearLabelPicker: { entryId: string; top: number; left: number } | null = null;
 let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 let positionFilterDrafts = createPositionFilterDrafts();
@@ -726,6 +736,9 @@ function bindEvents(): void {
       if (positionIconPicker && !target?.closest("#positionIconPicker")) {
         hidePositionIconPicker();
       }
+      if (incomeYearLabelPicker && !target?.closest("#incomeYearLabelPicker")) {
+        hideIncomeYearLabelPicker();
+      }
       if (incomeMilestoneTypePicker && !target?.closest("#incomeMilestoneTypePicker")) {
         hideIncomeMilestoneTypePicker();
       }
@@ -739,6 +752,9 @@ function bindEvents(): void {
     const action = button.dataset.action;
     if (action !== "open-position-icon-picker" && action !== "select-position-icon") {
       hidePositionIconPicker();
+    }
+    if (action !== "open-income-year-label-picker" && action !== "select-income-year-label") {
+      hideIncomeYearLabelPicker();
     }
     if (action !== "open-income-milestone-type-picker" && action !== "select-income-milestone-type") {
       hideIncomeMilestoneTypePicker();
@@ -786,6 +802,7 @@ function bindEvents(): void {
     if (action?.startsWith("income-analysis-year-")) {
       setIncomeAnalysisYearFilter(action.replace("income-analysis-year-", ""));
     }
+    if (action === "toggle-income-year-label-filter") toggleIncomeYearLabelFilter(button.dataset.incomeLabel || "");
     if (action === "income-import-csv") document.querySelector<HTMLInputElement>("#incomeCsvImport")?.click();
     if (action?.startsWith("income-remove-")) removeIncomeEntry(action);
     if (action === "income-export-csv") void exportIncomeCsv();
@@ -850,6 +867,11 @@ function bindEvents(): void {
     if (action === "close-position-icon-picker") hidePositionIconPicker();
     if (action === "select-position-icon") {
       selectPositionIcon(button.dataset.positionId || "", button.dataset.positionIcon || "");
+    }
+    if (action === "open-income-year-label-picker") showIncomeYearLabelPicker(button);
+    if (action === "close-income-year-label-picker") hideIncomeYearLabelPicker();
+    if (action === "select-income-year-label") {
+      selectIncomeYearLabel(button.dataset.incomeYearId || "", button.dataset.incomeLabel || "");
     }
     if (action === "open-income-milestone-type-picker") showIncomeMilestoneTypePicker(button);
     if (action === "close-income-milestone-type-picker") hideIncomeMilestoneTypePicker();
@@ -934,6 +956,7 @@ function bindEvents(): void {
       closePlanningAccountDialog();
       closeIncomeTaxDialog();
       closeIncomeAnalysisDialog();
+      hideIncomeYearLabelPicker();
       hideIncomeMilestoneTypePicker();
     }
   });
@@ -1145,6 +1168,7 @@ function renderIncomeTracker(): void {
   if (!panel) return;
   const model = incomeTrackerModel();
   renderIncomeTabs();
+  renderIncomeYearLabelFilters();
   renderIncomeRows();
   renderIncomeSettingControls();
   renderIncomeMetricGrid(model);
@@ -1153,6 +1177,7 @@ function renderIncomeTracker(): void {
   renderIncomeCharts(model);
   renderIncomeTaxDialog();
   renderIncomeAnalysisDialog(model);
+  renderIncomeYearLabelPicker();
   renderIncomeMilestoneTypePicker();
 }
 
@@ -1232,6 +1257,33 @@ function renderIncomeRows(): void {
   renderIncomeMilestoneRows();
 }
 
+function renderIncomeYearLabelFilters(): void {
+  const host = document.querySelector<HTMLDivElement>("#incomeYearLabelFilters");
+  if (!host) return;
+  const selected = new Set(state.incomeTracker.settings.selectedYearlyLabels.map(incomeYearLabel));
+  const options = INCOME_YEAR_LABEL_OPTIONS;
+  host.innerHTML = `
+    ${options
+      .map((option) => {
+        const active = selected.has(option.id);
+        return `
+          <button
+            class="position-label-filter-button${active ? " active" : ""}"
+            type="button"
+            data-action="toggle-income-year-label-filter"
+            data-income-label="${escapeHtml(option.id)}"
+            aria-pressed="${active}"
+            aria-label="Label ${escapeHtml(option.label)} ${active ? "deaktivieren" : "aktivieren"}"
+            title="${escapeHtml(option.label)}"
+          >
+            ${positionIconSvg(option.icon)}
+          </button>
+        `;
+      })
+      .join("")}
+  `;
+}
+
 function renderIncomeYearlyRows(): void {
   const body = document.querySelector<HTMLTableSectionElement>("#incomeYearlyRows");
   if (!body) return;
@@ -1239,14 +1291,19 @@ function renderIncomeYearlyRows(): void {
     body.innerHTML = `<tr><td class="position-empty" colspan="7">Noch keine Jahreswerte eingetragen.</td></tr>`;
     return;
   }
-  body.innerHTML = incomeSortedYearEntries()
+  const rows = incomeFilteredYearEntries();
+  if (!rows.length) {
+    body.innerHTML = `<tr><td class="position-empty" colspan="7">Keine Jahreswerte fuer diese Labelauswahl.</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows
     .map((entry) => {
       const calculatedNet = incomeYearEntryCalculatedNetIncome(entry);
       const netIncome = incomeYearEntryNetIncome(entry);
       return `
       <tr>
+        <td>${incomeYearLabelButton(entry)}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "year", entry.year, { min: 1900, max: 2200, step: 1 })}</td>
-        <td>${incomeSelect("yearlyEntries", entry.id, "person", INCOME_PERSON_OPTIONS, entry.person)}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "annualNetIncome", netIncome, {
           min: 0,
           disabled: calculatedNet !== null,
@@ -1282,7 +1339,7 @@ function renderIncomeTaxDialog(): void {
         <div class="income-tax-dialog-head">
           <div>
             <strong>Steuer- und Abgabenpositionen</strong>
-            <span>${escapeHtml(String(entry.year))} · ${escapeHtml(incomePersonLabel(entry.person))}</span>
+            <span>${escapeHtml(String(entry.year))} · ${escapeHtml(incomeYearLabelMeta(entry.label).label)}</span>
           </div>
           <button class="chart-popup-close" type="button" data-action="income-close-tax-dialog" aria-label="Dialog schliessen">x</button>
         </div>
@@ -1739,9 +1796,16 @@ function incomeSortedYearEntries(): IncomeYearEntry[] {
   return [...state.incomeTracker.yearlyEntries].sort(
     (first, second) =>
       first.year - second.year ||
-      incomePersonLabel(first.person).localeCompare(incomePersonLabel(second.person), "de") ||
+      incomeYearLabelMeta(first.label).label.localeCompare(incomeYearLabelMeta(second.label).label, "de") ||
       first.id.localeCompare(second.id)
   );
+}
+
+function incomeFilteredYearEntries(): IncomeYearEntry[] {
+  const selected = new Set(state.incomeTracker.settings.selectedYearlyLabels.map(incomeYearLabel));
+  const entries = incomeSortedYearEntries();
+  if (!selected.size) return entries;
+  return entries.filter((entry) => selected.has(incomeYearLabel(entry.label)));
 }
 
 function incomeSortedMilestones(): CareerMilestone[] {
@@ -1978,7 +2042,7 @@ function incomeAnnualChartSegments(year: IncomeTrackerModel["years"][number]): A
     })
     .map((entry, index) => ({
       value: incomeYearEntryNetIncome(entry) ?? 0,
-      label: incomePersonLabel(entry.person),
+      label: incomeYearLabelMeta(entry.label).label,
       tone: `segment-${index % 5}`
     }))
     .filter((segment) => segment.value > 0);
@@ -2207,8 +2271,19 @@ function incomeSourceBadge(source: IncomeResolvedSource): string {
   return `<span class="status-pill${tone}">${escapeHtml(INCOME_SOURCE_LABELS[source])}</span>`;
 }
 
-function incomePersonLabel(person: IncomePerson): string {
-  return INCOME_PERSON_OPTIONS.find((option) => option.value === person)?.label ?? "Haushalt";
+function incomeYearLabel(value: string | undefined): string {
+  const normalized = String(value ?? "").trim();
+  if (INCOME_YEAR_LABEL_OPTIONS.some((option) => option.id === normalized)) return normalized;
+  const byLabel = INCOME_YEAR_LABEL_OPTIONS.find((option) => incomeLabelKey(option.label) === incomeLabelKey(normalized));
+  return byLabel?.id ?? "salary";
+}
+
+function incomeYearLabelMeta(value: string | undefined): { id: string; label: string; icon: string; description: string } {
+  return INCOME_YEAR_LABEL_OPTIONS.find((option) => option.id === incomeYearLabel(value)) ?? INCOME_YEAR_LABEL_OPTIONS[0];
+}
+
+function incomeLabelKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function incomeYearFromDate(value: string): number | null {
@@ -2279,6 +2354,23 @@ function incomeTaxDeductionsButton(entry: IncomeYearEntry): string {
     >
       <strong data-income-year-tax-total="${escapeHtml(entry.id)}">${taxDeductions === null ? "Eintragen" : money(taxDeductions)}</strong>
       <span>Details</span>
+    </button>
+  `;
+}
+
+function incomeYearLabelButton(entry: IncomeYearEntry): string {
+  const meta = incomeYearLabelMeta(entry.label);
+  return `
+    <button
+      class="position-label-button income-year-label-button"
+      type="button"
+      data-action="open-income-year-label-picker"
+      data-income-year-id="${escapeHtml(entry.id)}"
+      title="${escapeHtml(meta.description)}"
+      aria-label="Einkommenslabel: ${escapeHtml(meta.label)}"
+      aria-haspopup="dialog"
+    >
+      ${positionIconSvg(meta.icon)}
     </button>
   `;
 }
@@ -2369,6 +2461,20 @@ function setIncomeAnalysisYearFilter(value: string): void {
   renderIncomeAnalysisDialog();
 }
 
+function toggleIncomeYearLabelFilter(label: string): void {
+  const normalized = incomeYearLabel(label);
+  const selected = new Set(state.incomeTracker.settings.selectedYearlyLabels.map(incomeYearLabel));
+  if (selected.has(normalized)) selected.delete(normalized);
+  else selected.add(normalized);
+  state.incomeTracker = {
+    ...state.incomeTracker,
+    settings: { ...state.incomeTracker.settings, selectedYearlyLabels: Array.from(selected) }
+  };
+  renderIncomeYearLabelFilters();
+  renderIncomeYearlyRows();
+  saveState(state);
+}
+
 function addIncomeYearlyEntry(): void {
   state.incomeTracker = {
     ...state.incomeTracker,
@@ -2377,6 +2483,7 @@ function addIncomeYearlyEntry(): void {
       {
         id: createId(),
         year: state.settings.year,
+        label: "salary",
         person: "household",
         annualNetIncome: null,
         annualGrossIncome: null,
@@ -2449,6 +2556,7 @@ function updateIncomeEntry(collection: string, id: string, field: string, value:
 
 function updateIncomeYearEntry(entry: IncomeYearEntry, field: string, value: string): IncomeYearEntry {
   if (field === "year") return { ...entry, year: incomeInteger(value, state.settings.year) };
+  if (field === "label") return { ...entry, label: incomeYearLabel(value) };
   if (field === "person") return { ...entry, person: incomePerson(value) };
   if (field === "source") return { ...entry, source: incomeYearSource(value) };
   if (field === "employer") return { ...entry, employer: value };
@@ -2566,6 +2674,7 @@ function exportIncomePdf(): void {
 function incomeTrackerCsv(model: IncomeTrackerModel): string {
   const rows: string[][] = [["section", "id", "year", "month", "person", "field", "value", "source"]];
   for (const entry of state.incomeTracker.yearlyEntries) {
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "label", entry.label, entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "annualNetIncome", csvValue(incomeYearEntryNetIncome(entry)), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "annualGrossIncome", csvValue(entry.annualGrossIncome), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxesAndDeductions", csvValue(incomeYearEntryTaxDeductions(entry)), entry.source]);
@@ -2640,6 +2749,7 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
         ({
           id: createId(),
           year: incomeCsvYear(yearValue, state.settings.year),
+          label: "salary",
           person: incomePerson(personValue),
           annualNetIncome: null,
           annualGrossIncome: null,
@@ -2660,6 +2770,8 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
         }
       } else if (fieldKey === "annualnetincome") {
         entry.annualNetIncome = incomeCsvNumber(value);
+      } else if (fieldKey === "label") {
+        entry.label = incomeYearLabel(value);
       } else if (fieldKey === "annualgrossincome") {
         entry.annualGrossIncome = incomeCsvNumber(value);
       } else if (fieldKey === "taxesanddeductions") {
@@ -2755,7 +2867,7 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
       (entry) => `
       <tr>
         <td>${entry.year}</td>
-        <td>${escapeHtml(entry.person)}</td>
+        <td>${escapeHtml(incomeYearLabelMeta(entry.label).label)}</td>
         <td>${incomeYearEntryNetIncome(entry) !== null ? money(incomeYearEntryNetIncome(entry) ?? 0) : "-"}</td>
         <td>${entry.annualGrossIncome !== null ? money(entry.annualGrossIncome) : "-"}</td>
         <td>${incomeYearEntryTaxDeductions(entry) !== null ? money(incomeYearEntryTaxDeductions(entry) ?? 0) : "-"}</td>
@@ -2812,7 +2924,7 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
         <ul>${model.chartSummaries.map((item) => `<li><strong>${escapeHtml(item.title)}:</strong> ${escapeHtml(item.text)}</li>`).join("")}</ul>
         <h2>Jahreswerte</h2>
         <table>
-          <thead><tr><th>Jahr</th><th>Person</th><th>Jahresnetto</th><th>Jahresbrutto</th><th>Steuer / Abgaben</th><th>Status</th></tr></thead>
+          <thead><tr><th>Jahr</th><th>Label</th><th>Jahresnetto</th><th>Jahresbrutto</th><th>Steuer / Abgaben</th><th>Status</th></tr></thead>
           <tbody>${yearlyInputRows || '<tr><td colspan="6">Keine Jahreswerte vorhanden.</td></tr>'}</tbody>
         </table>
         <h2>Karriere-Meilensteine</h2>
@@ -3682,6 +3794,84 @@ function selectCombinedLeadInvestmentAccount(accountId: string): void {
   if (state.ui.selectedCombinedLeadInvestmentAccountId === accountId) return;
   state.ui = { ...state.ui, selectedCombinedLeadInvestmentAccountId: accountId };
   renderAll();
+}
+
+function showIncomeYearLabelPicker(button: HTMLButtonElement): void {
+  const entryId = button.dataset.incomeYearId;
+  if (!entryId) return;
+  const rect = button.getBoundingClientRect();
+  const panelWidth = 360;
+  const panelHeight = 420;
+  const left =
+    rect.right + 12 + panelWidth <= window.innerWidth
+      ? rect.right + 12
+      : Math.max(12, rect.left - panelWidth - 12);
+  const top = Math.max(12, Math.min(rect.top, window.innerHeight - panelHeight - 12));
+  incomeYearLabelPicker = { entryId, top, left };
+  renderIncomeYearLabelPicker();
+}
+
+function hideIncomeYearLabelPicker(): void {
+  incomeYearLabelPicker = null;
+  renderIncomeYearLabelPicker();
+}
+
+function selectIncomeYearLabel(entryId: string, label: string): void {
+  if (!entryId || !label) return;
+  state.incomeTracker = {
+    ...state.incomeTracker,
+    yearlyEntries: state.incomeTracker.yearlyEntries.map((entry) =>
+      entry.id === entryId ? { ...entry, label: incomeYearLabel(label) } : entry
+    )
+  };
+  incomeYearLabelPicker = null;
+  renderAll();
+}
+
+function renderIncomeYearLabelPicker(): void {
+  const picker = document.querySelector<HTMLDivElement>("#incomeYearLabelPicker");
+  if (!picker) return;
+  if (!incomeYearLabelPicker) {
+    picker.hidden = true;
+    return;
+  }
+
+  const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === incomeYearLabelPicker?.entryId);
+  if (!entry) {
+    picker.hidden = true;
+    incomeYearLabelPicker = null;
+    return;
+  }
+
+  picker.style.top = `${incomeYearLabelPicker.top}px`;
+  picker.style.left = `${incomeYearLabelPicker.left}px`;
+  picker.innerHTML = `
+    <div class="position-icon-picker-head">
+      <span>Einkommenslabel</span>
+      <button class="icon-button" type="button" data-action="close-income-year-label-picker" aria-label="Labelauswahl schliessen">x</button>
+    </div>
+    <div class="position-icon-picker-grid income-year-label-grid">
+      ${INCOME_YEAR_LABEL_OPTIONS.map((option) => {
+        const active = option.id === incomeYearLabel(entry.label);
+        return `
+          <button
+            class="position-icon-option income-year-label-option ${active ? "active" : ""}"
+            type="button"
+            data-action="select-income-year-label"
+            data-income-year-id="${entry.id}"
+            data-income-label="${escapeHtml(option.id)}"
+            aria-pressed="${active}"
+            title="${escapeHtml(option.description)}"
+          >
+            ${positionIconSvg(option.icon)}
+            <span>${escapeHtml(option.label)}</span>
+            <small>${escapeHtml(option.description)}</small>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+  picker.hidden = false;
 }
 
 function showIncomeMilestoneTypePicker(button: HTMLButtonElement): void {

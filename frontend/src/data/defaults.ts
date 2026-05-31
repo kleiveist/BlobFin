@@ -323,7 +323,8 @@ export function defaultIncomeTrackerState(): IncomeTrackerState {
       activeInputTab: "yearly",
       projectionMode: "off",
       manualGrowthRatePercent: null,
-      savingsSharePercent: null
+      savingsSharePercent: null,
+      selectedYearlyLabels: []
     }
   };
 }

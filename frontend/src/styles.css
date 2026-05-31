@@ -612,6 +612,10 @@ button:focus-visible {
   height: 20px;
 }
 
+.income-label-filter-row {
+  margin-bottom: 10px;
+}
+
 .result-table-heading {
   justify-content: space-between;
   flex-wrap: wrap;

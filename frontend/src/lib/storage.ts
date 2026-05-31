@@ -517,7 +517,8 @@ function normalizeIncomeTrackerSettings(value: unknown): IncomeTrackerSettings {
       value.manualGrowthRatePercent,
       fallback.manualGrowthRatePercent
     ),
-    savingsSharePercent: nullableNumberOrDefault(value.savingsSharePercent, fallback.savingsSharePercent)
+    savingsSharePercent: nullableNumberOrDefault(value.savingsSharePercent, fallback.savingsSharePercent),
+    selectedYearlyLabels: stringArrayOrDefault(value.selectedYearlyLabels, fallback.selectedYearlyLabels)
   };
 }
 
@@ -526,6 +527,7 @@ function normalizeIncomeYearEntry(value: unknown): IncomeYearEntry {
   return {
     id: String(entry.id || createId()),
     year: Math.round(numberOrDefault(entry.year, defaultPlanningSettings().year)),
+    label: String(entry.label ?? "salary"),
     person: normalizeIncomePerson(entry.person),
     annualNetIncome: nullableNumberOrDefault(entry.annualNetIncome, null),
     annualGrossIncome: nullableNumberOrDefault(entry.annualGrossIncome, null),

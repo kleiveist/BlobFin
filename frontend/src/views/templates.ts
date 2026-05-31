@@ -181,12 +181,13 @@ export function renderAppShell(): string {
             </div>
 
             <div id="incomeYearlyTab" class="income-tab-panel">
+              <div id="incomeYearLabelFilters" class="position-label-filter-row income-label-filter-row"></div>
               <div class="table-wrap">
                 <table class="income-table">
                   <thead>
                     <tr>
+                      <th>Label</th>
                       <th>Jahr</th>
-                      <th>Person</th>
                       <th>Jahresnetto</th>
                       <th>Jahresbrutto</th>
                       <th>Steuer / Abgaben</th>
@@ -305,6 +306,7 @@ export function renderAppShell(): string {
         <input class="visually-hidden" id="incomeCsvImport" type="file" accept=".csv,text/csv" />
         <div id="incomeTaxDialogRoot"></div>
         <div id="incomeAnalysisDialogRoot"></div>
+        <div id="incomeYearLabelPicker" class="position-icon-picker income-year-label-picker" role="dialog" aria-label="Einkommenslabel auswaehlen" hidden></div>
         <div id="incomeMilestoneTypePicker" class="position-icon-picker income-milestone-type-picker" role="dialog" aria-label="Meilenstein-Typ auswaehlen" hidden></div>
       </section>
 

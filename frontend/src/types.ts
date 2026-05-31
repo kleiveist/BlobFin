@@ -248,6 +248,7 @@ export interface CombinedWealthToggles {
 export interface IncomeYearEntry {
   id: string;
   year: number;
+  label: string;
   person: IncomePerson;
   annualNetIncome: number | null;
   annualGrossIncome: number | null;
@@ -285,6 +286,7 @@ export interface IncomeTrackerSettings {
   projectionMode: IncomeProjectionMode;
   manualGrowthRatePercent: number | null;
   savingsSharePercent: number | null;
+  selectedYearlyLabels: string[];
 }
 
 export interface IncomeTrackerState {
