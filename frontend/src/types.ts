@@ -20,6 +20,7 @@ export type SpecialRepaymentRhythm = "none" | "monthly" | "yearly";
 export type IncomePerson = "person1" | "person2" | "household";
 export type IncomeYearEntrySource = "annual_statement" | "manual";
 export type IncomeResolvedSource = IncomeYearEntrySource;
+export type IncomeTaxAdjustmentType = "refund" | "payment";
 export type CareerMilestoneImpact = "positive" | "negative" | "neutral";
 export type IncomeProjectionMode = "off" | "historical_average" | "manual";
 export type RepaymentSourceToggleKey =
@@ -247,6 +248,8 @@ export interface CombinedWealthToggles {
 
 export interface IncomeYearEntry {
   id: string;
+  active: boolean;
+  visible: boolean;
   year: number;
   label: string;
   person: IncomePerson;
@@ -254,6 +257,7 @@ export interface IncomeYearEntry {
   annualGrossIncome: number | null;
   taxesAndDeductions: number | null;
   taxDeductionItems: IncomeTaxDeductionItems;
+  taxAdjustment: IncomeTaxAdjustment;
   employer: string;
   note: string;
   source: IncomeYearEntrySource;
@@ -271,6 +275,11 @@ export interface IncomeTaxDeductionItems {
 }
 
 export type IncomeTaxDeductionField = keyof IncomeTaxDeductionItems;
+
+export interface IncomeTaxAdjustment {
+  type: IncomeTaxAdjustmentType;
+  amount: number | null;
+}
 
 export interface CareerMilestone {
   id: string;

@@ -11,10 +11,12 @@ import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from 
 import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/combinedWealth";
 import {
   buildIncomeTrackerModel,
+  emptyIncomeTaxAdjustment,
   emptyIncomeTaxDeductionItems,
   incomeTaxDeductionItemsTotal,
   incomeYearEntryCalculatedNetIncome,
   incomeYearEntryNetIncome,
+  incomeYearEntryTaxTotal,
   incomeYearEntryTaxDeductions,
   INCOME_SOURCE_LABELS,
   type IncomeTrackerModel
@@ -82,6 +84,7 @@ import type {
   CombinedWealthYear,
   IncomePerson,
   IncomeProjectionMode,
+  IncomeTaxAdjustmentType,
   IncomeResolvedSource,
   IncomeTaxDeductionField,
   IncomeTaxDeductionItems,
@@ -126,6 +129,10 @@ const INVESTMENT_DEPOTS: InvestmentDepotKey[] = ["standard", "retirement", "chil
 const INCOME_YEAR_SOURCE_OPTIONS: Array<{ value: IncomeYearEntrySource; label: string }> = [
   { value: "annual_statement", label: "Jahresentgeltabrechnung" },
   { value: "manual", label: "Manuell" }
+];
+const INCOME_TAX_ADJUSTMENT_OPTIONS: Array<{ value: IncomeTaxAdjustmentType; label: string }> = [
+  { value: "refund", label: "Rueckerstattung" },
+  { value: "payment", label: "Nachzahlung" }
 ];
 const INCOME_TAX_DEDUCTION_ROWS: Array<{
   field: IncomeTaxDeductionField;
@@ -205,6 +212,7 @@ type IncomeAnalysisYearFilter = "all" | number;
 interface IncomeAnalysisSlice {
   label: string;
   value: number;
+  chartValue?: number;
   tone: string;
 }
 
@@ -213,6 +221,9 @@ interface IncomeAnalysisYearPoint {
   gross: number;
   net: number;
   deductions: number;
+  taxBase: number;
+  taxRefund: number;
+  taxPayment: number;
   taxes: number;
   social: number;
   employerSocial: number;
@@ -224,6 +235,9 @@ interface IncomeAnalysisModel {
   totalGross: number;
   totalNet: number;
   totalDeductions: number;
+  taxBaseTotal: number;
+  taxRefundTotal: number;
+  taxPaymentTotal: number;
   taxTotal: number;
   socialTotal: number;
   employerSocialTotal: number;
@@ -625,11 +639,12 @@ function bindEvents(): void {
     }
 
     if (target.dataset.incomeCollection && target.dataset.incomeId && target.dataset.incomeField) {
+      const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
       updateIncomeEntry(
         target.dataset.incomeCollection,
         target.dataset.incomeId,
         target.dataset.incomeField,
-        target.value
+        value
       );
       renderIncomeLiveUpdate(
         target.dataset.incomeCollection,
@@ -674,11 +689,12 @@ function bindEvents(): void {
     }
 
     if (target.dataset.incomeCollection && target.dataset.incomeId && target.dataset.incomeField) {
+      const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
       updateIncomeEntry(
         target.dataset.incomeCollection,
         target.dataset.incomeId,
         target.dataset.incomeField,
-        target.value
+        value
       );
       renderAll();
       return;
@@ -1233,9 +1249,9 @@ function renderIncomeTaxDialogTotals(id: string): void {
   if (incomeTaxDialogEntryId !== id) return;
   const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === id);
   if (!entry) return;
-  const taxTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "taxes");
-  const socialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "social");
-  const employerSocialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "employer_social");
+  const taxTotal = incomeTaxDeductionCategoryTotal(entry, "taxes");
+  const socialTotal = incomeTaxDeductionCategoryTotal(entry, "social");
+  const employerSocialTotal = incomeTaxDeductionCategoryTotal(entry, "employer_social");
   const total = incomeYearEntryTaxDeductions(entry);
   setText("incomeTaxDialogTaxesTotal", money(taxTotal));
   setText("incomeTaxDialogSocialTotal", money(socialTotal));
@@ -1293,12 +1309,12 @@ function renderIncomeYearlyRows(): void {
   const body = document.querySelector<HTMLTableSectionElement>("#incomeYearlyRows");
   if (!body) return;
   if (!state.incomeTracker.yearlyEntries.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="7">Noch keine Jahreswerte eingetragen.</td></tr>`;
+    body.innerHTML = `<tr><td class="position-empty" colspan="9">Noch keine Jahreswerte eingetragen.</td></tr>`;
     return;
   }
   const rows = incomeFilteredYearEntries();
   if (!rows.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="7">Keine Jahreswerte fuer diese Labelauswahl.</td></tr>`;
+    body.innerHTML = `<tr><td class="position-empty" colspan="9">Keine Jahreswerte fuer diese Labelauswahl.</td></tr>`;
     return;
   }
   body.innerHTML = rows
@@ -1307,6 +1323,8 @@ function renderIncomeYearlyRows(): void {
       const netIncome = incomeYearEntryNetIncome(entry);
       return `
       <tr>
+        <td class="check-cell">${incomeCheckboxInput("yearlyEntries", entry.id, "active", entry.active, "Jahreswert aktiv")}</td>
+        <td class="check-cell">${incomeCheckboxInput("yearlyEntries", entry.id, "visible", entry.visible, "Jahreswert in Grafiken sichtbar")}</td>
         <td>${incomeYearLabelButton(entry)}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "year", entry.year, { min: 1900, max: 2200, step: 1 })}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "annualNetIncome", netIncome, {
@@ -1334,9 +1352,9 @@ function renderIncomeTaxDialog(): void {
     return;
   }
 
-  const taxTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "taxes");
-  const socialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "social");
-  const employerSocialTotal = incomeTaxDeductionCategoryTotal(entry.taxDeductionItems, "employer_social");
+  const taxTotal = incomeTaxDeductionCategoryTotal(entry, "taxes");
+  const socialTotal = incomeTaxDeductionCategoryTotal(entry, "social");
+  const employerSocialTotal = incomeTaxDeductionCategoryTotal(entry, "employer_social");
   const total = incomeYearEntryTaxDeductions(entry);
   root.innerHTML = `
     <div class="income-tax-dialog-backdrop" role="presentation">
@@ -1394,6 +1412,34 @@ function renderIncomeTaxDialog(): void {
             <strong id="incomeTaxDialogGrandTotal">${total === null ? "-" : money(total)}</strong>
           </div>
         </div>
+        <div class="income-tax-adjustment">
+          <div>
+            <strong>Steuernachzahlung oder Rueckerstattung</strong>
+            <span>Dieser Wert wird in der Weltgrafik bei Abgabenmix, Steuern und Einkommen beruecksichtigt.</span>
+          </div>
+          <div class="income-tax-adjustment-options" role="radiogroup" aria-label="Art der Steuerkorrektur">
+            ${INCOME_TAX_ADJUSTMENT_OPTIONS.map(
+              (option) => `
+                <label>
+                  <input
+                    type="radio"
+                    name="income-tax-adjustment-${escapeHtml(entry.id)}"
+                    value="${escapeHtml(option.value)}"
+                    ${entry.taxAdjustment.type === option.value ? "checked" : ""}
+                    data-income-collection="yearlyEntries"
+                    data-income-id="${escapeHtml(entry.id)}"
+                    data-income-field="taxAdjustment.type"
+                  />
+                  <span>${escapeHtml(option.label)}</span>
+                </label>
+              `
+            ).join("")}
+          </div>
+          <div class="income-tax-adjustment-amount">
+            <span>Betrag</span>
+            ${incomeNumberInput("yearlyEntries", entry.id, "taxAdjustment.amount", entry.taxAdjustment.amount, { min: 0 })}
+          </div>
+        </div>
         <div class="button-row">
           <button class="button" type="button" data-action="income-close-tax-dialog">Fertig</button>
         </div>
@@ -1444,7 +1490,7 @@ function renderIncomeAnalysisDialog(model: IncomeTrackerModel = incomeTrackerMod
         <div class="income-analysis-metrics">
           ${incomeAnalysisMetricCard("Bisher eingenommen", money(analysis.totalGross), "Brutto erfasst")}
           ${incomeAnalysisMetricCard("Zum Leben verfuegbar", money(analysis.totalNet), "Jahresnetto")}
-          ${incomeAnalysisMetricCard("Steuern bezahlt", money(analysis.taxTotal), "Lohnsteuer, Soli, Kirche")}
+          ${incomeAnalysisMetricCard("Steuern bezahlt", money(analysis.taxTotal), "inkl. Erstattung/Nachzahlung")}
           ${incomeAnalysisMetricCard("Sozialabgaben", money(analysis.socialTotal), "Arbeitnehmeranteile")}
         </div>
         <div class="income-analysis-layout">
@@ -1504,15 +1550,22 @@ function renderIncomeAnalysisChart(analysis: IncomeAnalysisModel, slices: Income
 }
 
 function renderIncomeAnalysisPie(analysis: IncomeAnalysisModel, slices: IncomeAnalysisSlice[]): string {
-  const visible = slices.filter((slice) => slice.value > 0);
+  const visible = slices.filter(incomeAnalysisSliceHasDisplayValue);
   if (!visible.length) return incomeAnalysisEmpty("Keine aufgeteilten Werte vorhanden.");
-  const visibleTotal = visible.reduce((sum, slice) => sum + slice.value, 0);
-  const ownTotal = incomeAnalysisDataView === "social" ? analysis.socialTotal : incomeAnalysisDataView === "deductions" ? analysis.totalDeductions : visibleTotal;
+  const visibleTotal = visible.reduce((sum, slice) => sum + incomeAnalysisSliceChartValue(slice), 0);
+  const ownTotal =
+    incomeAnalysisDataView === "social"
+      ? analysis.socialTotal
+      : incomeAnalysisDataView === "deductions"
+        ? analysis.totalDeductions
+        : incomeAnalysisDataView === "taxes"
+          ? analysis.taxTotal
+          : visibleTotal;
   let cursor = 0;
   const gradient = visible
     .map((slice) => {
       const start = cursor;
-      cursor += (slice.value / Math.max(1, visibleTotal)) * 100;
+      cursor += (incomeAnalysisSliceChartValue(slice) / Math.max(1, visibleTotal)) * 100;
       return `${incomeAnalysisToneColor(slice.tone)} ${start.toFixed(2)}% ${cursor.toFixed(2)}%`;
     })
     .join(", ");
@@ -1532,14 +1585,14 @@ function renderIncomeAnalysisPie(analysis: IncomeAnalysisModel, slices: IncomeAn
 }
 
 function renderIncomeAnalysisBars(slices: IncomeAnalysisSlice[]): string {
-  const visible = slices.filter((slice) => slice.value > 0);
+  const visible = slices.filter(incomeAnalysisSliceHasDisplayValue);
   if (!visible.length) return incomeAnalysisEmpty("Keine aufgeteilten Werte vorhanden.");
-  const maxValue = Math.max(1, ...visible.map((slice) => slice.value));
+  const maxValue = Math.max(1, ...visible.map(incomeAnalysisSliceChartValue));
   return `
     <div class="income-analysis-bars">
       ${visible
         .map((slice) => {
-          const height = Math.max(4, Math.round((slice.value / maxValue) * 100));
+          const height = Math.max(4, Math.round((incomeAnalysisSliceChartValue(slice) / maxValue) * 100));
           return `
             <div class="income-analysis-bar-column">
               <div><i class="${escapeHtml(slice.tone)}" style="height:${height}%"></i></div>
@@ -1551,6 +1604,14 @@ function renderIncomeAnalysisBars(slices: IncomeAnalysisSlice[]): string {
         .join("")}
     </div>
   `;
+}
+
+function incomeAnalysisSliceChartValue(slice: IncomeAnalysisSlice): number {
+  return Math.abs(slice.chartValue ?? slice.value);
+}
+
+function incomeAnalysisSliceHasDisplayValue(slice: IncomeAnalysisSlice): boolean {
+  return incomeAnalysisSliceChartValue(slice) >= 0.005;
 }
 
 function renderIncomeAnalysisLineChart(analysis: IncomeAnalysisModel, curved: boolean): string {
@@ -1615,13 +1676,14 @@ function incomeAnalysisToneColor(tone: string): string {
     blue: "#1d4ed8",
     care: "#7c3aed",
     danger: "#b42318",
+    refund: "#11795f",
     unassigned: "#737373"
   };
   return colors[tone] ?? "#1f7a68";
 }
 
 function incomeAnalysisSlices(analysis: IncomeAnalysisModel): IncomeAnalysisSlice[] {
-  return analysis.slicesByView[incomeAnalysisDataView].filter((slice) => slice.value > 0);
+  return analysis.slicesByView[incomeAnalysisDataView].filter(incomeAnalysisSliceHasDisplayValue);
 }
 
 function incomeAnalysisSeries(points: IncomeAnalysisYearPoint[]): Array<{ label: string; tone: string; values: Array<{ year: number; value: number }> }> {
@@ -1636,20 +1698,30 @@ function incomeAnalysisSeries(points: IncomeAnalysisYearPoint[]): Array<{ label:
       { key: "social", label: "Arbeitnehmer", tone: "social" },
       { key: "employerSocial", label: "Arbeitgeber", tone: "employer" }
     ],
-    taxes: [{ key: "taxes", label: "Steuern", tone: "tax" }],
+    taxes: [
+      { key: "taxBase", label: "Steuerbasis", tone: "gross" },
+      { key: "taxRefund", label: "Steuerrueckerstattung", tone: "refund" },
+      { key: "taxPayment", label: "Steuernachzahlung", tone: "danger" },
+      { key: "taxes", label: "Steuern netto", tone: "tax" }
+    ],
     income: [
       { key: "gross", label: "Brutto", tone: "gross" },
       { key: "net", label: "Netto", tone: "net" },
       { key: "deductions", label: "Abgaben", tone: "deduction" }
     ]
   };
-  return seriesByView[incomeAnalysisDataView]
+  const series = seriesByView[incomeAnalysisDataView]
     .map((item) => ({
       label: item.label,
       tone: item.tone,
       values: points.map((point) => ({ year: point.year, value: Number(point[item.key]) || 0 }))
-    }))
-    .filter((item) => item.values.some((point) => point.value > 0));
+    }));
+  const hasPositiveTaxSeries = incomeAnalysisDataView === "taxes" && series.some((item) => item.values.some((point) => point.value > 0));
+  return series.filter(
+    (item) =>
+      item.values.some((point) => point.value > 0) ||
+      (hasPositiveTaxSeries && item.label === "Steuern netto")
+  );
 }
 
 function linePath(points: Array<{ x: number; y: number }>): string {
@@ -1669,23 +1741,51 @@ function curvedPath(points: Array<{ x: number; y: number }>): string {
     .join(" ");
 }
 
+function incomeAnalysisEntryTaxBase(entry: IncomeYearEntry): number {
+  if (incomeTaxDeductionItemsTotal(entry.taxDeductionItems) === null) return numberValue(entry.taxesAndDeductions);
+  return INCOME_TAX_DEDUCTION_ROWS.filter((row) => row.category === "taxes").reduce(
+    (sum, row) => sum + numberValue(entry.taxDeductionItems[row.field]),
+    0
+  );
+}
+
+function incomeAnalysisTaxAdjustmentTotals(entries: IncomeYearEntry[]): { refund: number; payment: number } {
+  return entries.reduce(
+    (totals, entry) => {
+      const amount = Math.max(0, numberValue(entry.taxAdjustment.amount));
+      if (amount <= 0) return totals;
+      if (entry.taxAdjustment.type === "payment") {
+        totals.payment += amount;
+      } else {
+        totals.refund += amount;
+      }
+      return totals;
+    },
+    { refund: 0, payment: 0 }
+  );
+}
+
 function buildIncomeAnalysisModel(model: IncomeTrackerModel): IncomeAnalysisModel {
-  const years = [...new Set(state.incomeTracker.yearlyEntries.map((entry) => entry.year))].sort((a, b) => a - b);
+  const activeEntries = incomeActiveYearEntries();
+  const years = [...new Set(incomeVisibleYearEntries(activeEntries).map((entry) => entry.year))].sort((a, b) => a - b);
   if (incomeAnalysisYearFilter !== "all" && !years.includes(incomeAnalysisYearFilter)) {
     incomeAnalysisYearFilter = "all";
   }
-  const entries = state.incomeTracker.yearlyEntries.filter((entry) =>
+  const entries = activeEntries.filter((entry) =>
     incomeAnalysisYearFilter === "all" ? true : entry.year === incomeAnalysisYearFilter
   );
+  const visibleEntries = incomeVisibleYearEntries(entries);
   const totalNet = entries.reduce((sum, entry) => sum + numberValue(incomeYearEntryNetIncome(entry)), 0);
   const totalDeductions = entries.reduce((sum, entry) => sum + numberValue(incomeYearEntryTaxDeductions(entry)), 0);
   const totalGross = entries.reduce((sum, entry) => sum + incomeAnalysisGross(entry), 0);
-  const taxSlices = incomeAnalysisTaxRows(entries, "taxes");
-  const socialSlices = incomeAnalysisTaxRows(entries, "social");
-  const employerSocialSlices = incomeAnalysisTaxRows(entries, "employer_social");
-  const taxTotal = taxSlices.reduce((sum, slice) => sum + slice.value, 0);
-  const socialTotal = socialSlices.reduce((sum, slice) => sum + slice.value, 0);
-  const employerSocialTotal = employerSocialSlices.reduce((sum, slice) => sum + slice.value, 0);
+  const taxSlices = incomeAnalysisTaxRows(visibleEntries, "taxes");
+  const socialSlices = incomeAnalysisTaxRows(visibleEntries, "social");
+  const employerSocialSlices = incomeAnalysisTaxRows(visibleEntries, "employer_social");
+  const taxBaseTotal = entries.reduce((sum, entry) => sum + incomeAnalysisEntryTaxBase(entry), 0);
+  const { refund: taxRefundTotal, payment: taxPaymentTotal } = incomeAnalysisTaxAdjustmentTotals(entries);
+  const taxTotal = entries.reduce((sum, entry) => sum + incomeYearEntryTaxTotal(entry), 0);
+  const socialTotal = incomeAnalysisTaxRows(entries, "social").reduce((sum, slice) => sum + slice.value, 0);
+  const employerSocialTotal = incomeAnalysisTaxRows(entries, "employer_social").reduce((sum, slice) => sum + slice.value, 0);
   const unassignedDeductions = Math.max(0, totalDeductions - taxTotal - socialTotal);
   const deductionSlices = [
     { label: "Steuern", value: taxTotal, tone: "tax" },
@@ -1705,6 +1805,9 @@ function buildIncomeAnalysisModel(model: IncomeTrackerModel): IncomeAnalysisMode
     totalGross,
     totalNet,
     totalDeductions,
+    taxBaseTotal,
+    taxRefundTotal,
+    taxPaymentTotal,
     taxTotal,
     socialTotal,
     employerSocialTotal,
@@ -1726,19 +1829,49 @@ function incomeAnalysisTaxRows(entries: IncomeYearEntry[], category: "taxes" | "
       : category === "employer_social"
         ? ["employer"]
         : ["social", "blue", "care", "unassigned"];
-  return INCOME_TAX_DEDUCTION_ROWS.filter((row) => row.category === category)
+  const slices: IncomeAnalysisSlice[] = INCOME_TAX_DEDUCTION_ROWS.filter((row) => row.category === category)
     .map((row, index) => ({
       label: incomeAnalysisTaxRowLabel(row),
       value: entries.reduce((sum, entry) => sum + numberValue(entry.taxDeductionItems[row.field]), 0),
       tone: tones[index % tones.length]
     }))
     .filter((slice) => slice.value > 0);
+  if (category === "taxes") {
+    const detailedTaxTotal = slices.reduce((sum, slice) => sum + slice.value, 0);
+    const fallbackTaxBase = entries.reduce((sum, entry) => sum + incomeAnalysisEntryTaxBase(entry), 0) - detailedTaxTotal;
+    if (fallbackTaxBase > 0.005) {
+      slices.unshift({
+        label: "Steuerbasis",
+        value: fallbackTaxBase,
+        tone: "gross"
+      });
+    }
+    const { refund, payment } = incomeAnalysisTaxAdjustmentTotals(entries);
+    if (refund > 0) {
+      slices.push({
+        label: "Steuerrueckerstattung",
+        value: -refund,
+        chartValue: refund,
+        tone: "refund"
+      });
+    }
+    if (payment > 0) {
+      slices.push({
+        label: "Steuernachzahlung",
+        value: payment,
+        chartValue: payment,
+        tone: "danger"
+      });
+    }
+  }
+  return slices;
 }
 
 function buildIncomeAnalysisYearPoints(model: IncomeTrackerModel): IncomeAnalysisYearPoint[] {
   return model.valueYears.map((year) => {
-    const entries = state.incomeTracker.yearlyEntries.filter((entry) => entry.year === year.year);
-    const taxes = incomeAnalysisTaxRows(entries, "taxes").reduce((sum, slice) => sum + slice.value, 0);
+    const entries = incomeActiveYearEntries().filter((entry) => entry.year === year.year);
+    const { refund: taxRefund, payment: taxPayment } = incomeAnalysisTaxAdjustmentTotals(entries);
+    const taxes = entries.reduce((sum, entry) => sum + incomeYearEntryTaxTotal(entry), 0);
     const social = incomeAnalysisTaxRows(entries, "social").reduce((sum, slice) => sum + slice.value, 0);
     const employerSocial = incomeAnalysisTaxRows(entries, "employer_social").reduce((sum, slice) => sum + slice.value, 0);
     const deductions = entries.reduce((sum, entry) => sum + numberValue(incomeYearEntryTaxDeductions(entry)), 0);
@@ -1747,6 +1880,9 @@ function buildIncomeAnalysisYearPoints(model: IncomeTrackerModel): IncomeAnalysi
       gross: entries.reduce((sum, entry) => sum + incomeAnalysisGross(entry), 0),
       net: year.annualNet ?? 0,
       deductions,
+      taxBase: entries.reduce((sum, entry) => sum + incomeAnalysisEntryTaxBase(entry), 0),
+      taxRefund,
+      taxPayment,
       taxes,
       social,
       employerSocial
@@ -1811,6 +1947,14 @@ function incomeFilteredYearEntries(): IncomeYearEntry[] {
   const entries = incomeSortedYearEntries();
   if (!selected.size) return entries;
   return entries.filter((entry) => selected.has(incomeYearLabel(entry.label)));
+}
+
+function incomeActiveYearEntries(): IncomeYearEntry[] {
+  return state.incomeTracker.yearlyEntries.filter((entry) => entry.active);
+}
+
+function incomeVisibleYearEntries(entries: IncomeYearEntry[]): IncomeYearEntry[] {
+  return entries.filter((entry) => entry.visible);
 }
 
 function incomeSortedMilestones(): CareerMilestone[] {
@@ -2007,18 +2151,23 @@ function renderIncomeCharts(model: IncomeTrackerModel): void {
 
 function renderIncomeAnnualChart(model: IncomeTrackerModel): string {
   if (!model.valueYears.length) return incomeChartEmpty("Noch keine Jahreswerte.");
-  const maxValue = Math.max(1, ...model.valueYears.map((year) => year.annualNet ?? 0));
-  const items = model.valueYears.map((year) => {
-    const segments = incomeAnnualChartSegments(year);
-    return {
-      label: String(year.year),
-      value: year.annualNet ?? 0,
-      detail: year.source ? INCOME_SOURCE_LABELS[year.source] : "",
-      tone: year.source === "annual_statement" ? "accent" : year.source === "manual" ? "gold" : "blue",
-      markerHtml: incomeMilestoneChartMarkers(year.milestones),
-      segments
-    };
-  });
+  const items = model.valueYears
+    .map((year) => {
+      const segments = incomeAnnualChartSegments(year);
+      const value = segments.reduce((sum, segment) => sum + segment.value, 0);
+      if (value < 0.005) return null;
+      return {
+        label: String(year.year),
+        value,
+        detail: year.source ? INCOME_SOURCE_LABELS[year.source] : "",
+        tone: year.source === "annual_statement" ? "accent" : year.source === "manual" ? "gold" : "blue",
+        markerHtml: incomeMilestoneChartMarkers(year.milestones),
+        segments
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+  if (!items.length) return incomeChartEmpty("Keine sichtbaren Jahreswerte.");
+  const maxValue = Math.max(1, ...items.map((item) => item.value));
   return incomeStackedBarChart(items, maxValue);
 }
 
@@ -2038,8 +2187,9 @@ function incomeMilestoneChartMarkers(milestones: CareerMilestone[]): string {
 }
 
 function incomeAnnualChartSegments(year: IncomeTrackerModel["years"][number]): Array<{ value: number; label: string; tone: string }> {
-  const contributingEntries = state.incomeTracker.yearlyEntries
+  const contributingEntries = incomeActiveYearEntries()
     .filter((entry) => {
+      if (!entry.visible) return false;
       if (entry.year !== year.year) return false;
       if (year.source === "annual_statement") return entry.source === "annual_statement";
       if (year.source === "manual") return entry.source === "manual";
@@ -2052,14 +2202,7 @@ function incomeAnnualChartSegments(year: IncomeTrackerModel["years"][number]): A
     }))
     .filter((segment) => segment.value > 0);
 
-  if (contributingEntries.length > 1) return contributingEntries;
-  return [
-    {
-      value: year.annualNet ?? 0,
-      label: year.source ? INCOME_SOURCE_LABELS[year.source] : "Jahreswert",
-      tone: year.source === "annual_statement" ? "accent" : year.source === "manual" ? "segment-1" : "blue"
-    }
-  ];
+  return contributingEntries;
 }
 
 function renderIncomeGrowthChart(model: IncomeTrackerModel): string {
@@ -2090,6 +2233,10 @@ function renderIncomeInflationChart(model: IncomeTrackerModel): string {
             ${incomeMiniBar(year.realNet ?? 0, maxValue, "gold", "Real")}
           </div>
           <span>${year.year}</span>
+          <div class="income-inflation-values">
+            <small><b>Nominal</b>${escapeHtml(money(year.annualNet ?? 0))}</small>
+            <small><b>Real</b>${escapeHtml(money(year.realNet ?? 0))}</small>
+          </div>
         </div>
       `
         )
@@ -2127,7 +2274,7 @@ function renderIncomeProjectionChart(model: IncomeTrackerModel): string {
         value: point.value,
         detail: incomeProjectionPointDetail(offset),
         tone: offset < 0 ? "blue" : point.projected ? "warning" : "accent",
-        marker: offset < 0 ? "R" : point.projected ? "+" : ""
+        marker: ""
       };
   });
   return `
@@ -2348,6 +2495,19 @@ function incomeTextInput(collection: string, id: string, field: string, value: s
   return `<input type="text" value="${escapeHtml(value)}" data-income-collection="${collection}" data-income-id="${id}" data-income-field="${field}" />`;
 }
 
+function incomeCheckboxInput(collection: string, id: string, field: string, checked: boolean, label: string): string {
+  return `
+    <input
+      type="checkbox"
+      ${checked ? "checked" : ""}
+      data-income-collection="${collection}"
+      data-income-id="${id}"
+      data-income-field="${field}"
+      aria-label="${escapeHtml(label)}"
+    />
+  `;
+}
+
 function incomeTaxDeductionsButton(entry: IncomeYearEntry): string {
   const taxDeductions = incomeYearEntryTaxDeductions(entry);
   return `
@@ -2487,6 +2647,8 @@ function addIncomeYearlyEntry(): void {
       ...state.incomeTracker.yearlyEntries,
       {
         id: createId(),
+        active: true,
+        visible: true,
         year: state.settings.year,
         label: "salary",
         person: "household",
@@ -2494,6 +2656,7 @@ function addIncomeYearlyEntry(): void {
         annualGrossIncome: null,
         taxesAndDeductions: null,
         taxDeductionItems: emptyIncomeTaxDeductionItems(),
+        taxAdjustment: emptyIncomeTaxAdjustment(),
         employer: "",
         note: "",
         source: "annual_statement"
@@ -2560,6 +2723,8 @@ function updateIncomeEntry(collection: string, id: string, field: string, value:
 }
 
 function updateIncomeYearEntry(entry: IncomeYearEntry, field: string, value: string): IncomeYearEntry {
+  if (field === "active") return { ...entry, active: value === "true" };
+  if (field === "visible") return { ...entry, visible: value === "true" };
   if (field === "year") return { ...entry, year: incomeInteger(value, state.settings.year) };
   if (field === "label") return { ...entry, label: incomeYearLabel(value) };
   if (field === "person") return { ...entry, person: incomePerson(value) };
@@ -2569,6 +2734,12 @@ function updateIncomeYearEntry(entry: IncomeYearEntry, field: string, value: str
   if (field === "annualNetIncome") return { ...entry, annualNetIncome: nullableInputNumber(value) };
   if (field === "annualGrossIncome") return { ...entry, annualGrossIncome: nullableInputNumber(value) };
   if (field === "taxesAndDeductions") return { ...entry, taxesAndDeductions: nullableInputNumber(value) };
+  if (field === "taxAdjustment.type") {
+    return { ...entry, taxAdjustment: { ...entry.taxAdjustment, type: incomeTaxAdjustmentType(value) } };
+  }
+  if (field === "taxAdjustment.amount") {
+    return { ...entry, taxAdjustment: { ...entry.taxAdjustment, amount: nullableInputNumber(value) } };
+  }
   if (field.startsWith("taxDeductionItems.")) {
     const itemField = field.replace("taxDeductionItems.", "");
     if (!isIncomeTaxDeductionField(itemField)) return entry;
@@ -2589,9 +2760,10 @@ function isIncomeTaxDeductionField(value: string): value is IncomeTaxDeductionFi
   return INCOME_TAX_DEDUCTION_ROWS.some((row) => row.field === value);
 }
 
-function incomeTaxDeductionCategoryTotal(items: IncomeTaxDeductionItems, category: "taxes" | "social" | "employer_social"): number {
+function incomeTaxDeductionCategoryTotal(entry: IncomeYearEntry, category: "taxes" | "social" | "employer_social"): number {
+  if (category === "taxes") return incomeYearEntryTaxTotal(entry);
   return INCOME_TAX_DEDUCTION_ROWS.filter((row) => row.category === category).reduce(
-    (sum, row) => sum + numberValue(items[row.field]),
+    (sum, row) => sum + numberValue(entry.taxDeductionItems[row.field]),
     0
   );
 }
@@ -2679,10 +2851,14 @@ function exportIncomePdf(): void {
 function incomeTrackerCsv(model: IncomeTrackerModel): string {
   const rows: string[][] = [["section", "id", "year", "month", "person", "field", "value", "source"]];
   for (const entry of state.incomeTracker.yearlyEntries) {
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "active", String(entry.active), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "visible", String(entry.visible), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "label", entry.label, entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "annualNetIncome", csvValue(incomeYearEntryNetIncome(entry)), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "annualGrossIncome", csvValue(entry.annualGrossIncome), entry.source]);
-    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxesAndDeductions", csvValue(incomeYearEntryTaxDeductions(entry)), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxesAndDeductions", csvValue(entry.taxesAndDeductions), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxAdjustmentType", entry.taxAdjustment.type, entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxAdjustmentAmount", csvValue(entry.taxAdjustment.amount), entry.source]);
     for (const row of INCOME_TAX_DEDUCTION_ROWS) {
       rows.push([
         "yearly_tax_detail",
@@ -2753,6 +2929,8 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
         yearlyEntries.get(key) ??
         ({
           id: createId(),
+          active: true,
+          visible: true,
           year: incomeCsvYear(yearValue, state.settings.year),
           label: "salary",
           person: incomePerson(personValue),
@@ -2760,6 +2938,7 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
           annualGrossIncome: null,
           taxesAndDeductions: null,
           taxDeductionItems: emptyIncomeTaxDeductionItems(),
+          taxAdjustment: emptyIncomeTaxAdjustment(),
           employer: "",
           note: "",
           source: incomeYearSource(sourceValue)
@@ -2773,6 +2952,10 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
           entry.taxDeductionItems = { ...entry.taxDeductionItems, [taxField]: incomeCsvNumber(value) };
           entry.taxesAndDeductions = incomeTaxDeductionItemsTotal(entry.taxDeductionItems);
         }
+      } else if (fieldKey === "active") {
+        entry.active = incomeCsvBoolean(value, true);
+      } else if (fieldKey === "visible") {
+        entry.visible = incomeCsvBoolean(value, true);
       } else if (fieldKey === "annualnetincome") {
         entry.annualNetIncome = incomeCsvNumber(value);
       } else if (fieldKey === "label") {
@@ -2781,6 +2964,10 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
         entry.annualGrossIncome = incomeCsvNumber(value);
       } else if (fieldKey === "taxesanddeductions") {
         entry.taxesAndDeductions = incomeCsvNumber(value);
+      } else if (fieldKey === "taxadjustmenttype") {
+        entry.taxAdjustment = { ...entry.taxAdjustment, type: incomeTaxAdjustmentType(value) };
+      } else if (fieldKey === "taxadjustmentamount") {
+        entry.taxAdjustment = { ...entry.taxAdjustment, amount: incomeCsvNumber(value) };
       } else if (fieldKey === "employer") {
         entry.employer = value;
       }
@@ -2826,7 +3013,8 @@ function incomeCsvYearlyEntryHasData(entry: IncomeYearEntry): boolean {
     entry.annualGrossIncome !== null ||
     entry.taxesAndDeductions !== null ||
     incomeTaxDeductionItemsTotal(entry.taxDeductionItems) !== null ||
-    incomeTaxDeductionItemsHaveData(entry.taxDeductionItems)
+    incomeTaxDeductionItemsHaveData(entry.taxDeductionItems) ||
+    entry.taxAdjustment.amount !== null
   );
 }
 
@@ -2841,6 +3029,14 @@ function incomeCsvNumber(value: string): number | null {
   const normalized = cleaned.includes(",") ? cleaned.replaceAll(".", "").replace(",", ".") : cleaned;
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function incomeCsvBoolean(value: string, fallback: boolean): boolean {
+  const text = normalizeHeader(value);
+  if (!text) return fallback;
+  if (["true", "1", "ja", "yes", "aktiv", "sichtbar"].includes(text)) return true;
+  if (["false", "0", "nein", "no", "inaktiv", "aus", "unsichtbar"].includes(text)) return false;
+  return fallback;
 }
 
 function incomeCsvYear(value: string, fallback: number): number {
@@ -2871,6 +3067,8 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
     .map(
       (entry) => `
       <tr>
+        <td>${entry.active ? "Ja" : "Nein"}</td>
+        <td>${entry.visible ? "Ja" : "Nein"}</td>
         <td>${entry.year}</td>
         <td>${escapeHtml(incomeYearLabelMeta(entry.label).label)}</td>
         <td>${incomeYearEntryNetIncome(entry) !== null ? money(incomeYearEntryNetIncome(entry) ?? 0) : "-"}</td>
@@ -2929,8 +3127,8 @@ function incomePdfHtml(model: IncomeTrackerModel): string {
         <ul>${model.chartSummaries.map((item) => `<li><strong>${escapeHtml(item.title)}:</strong> ${escapeHtml(item.text)}</li>`).join("")}</ul>
         <h2>Jahreswerte</h2>
         <table>
-          <thead><tr><th>Jahr</th><th>Label</th><th>Jahresnetto</th><th>Jahresbrutto</th><th>Steuer / Abgaben</th><th>Status</th></tr></thead>
-          <tbody>${yearlyInputRows || '<tr><td colspan="6">Keine Jahreswerte vorhanden.</td></tr>'}</tbody>
+          <thead><tr><th>Aktiv</th><th>View</th><th>Jahr</th><th>Label</th><th>Jahresnetto</th><th>Jahresbrutto</th><th>Steuer / Abgaben</th><th>Status</th></tr></thead>
+          <tbody>${yearlyInputRows || '<tr><td colspan="8">Keine Jahreswerte vorhanden.</td></tr>'}</tbody>
         </table>
         <h2>Karriere-Meilensteine</h2>
         <table>
@@ -2969,6 +3167,10 @@ function incomePerson(value: string): IncomePerson {
 
 function incomeYearSource(value: string): IncomeYearEntrySource {
   return value === "manual" ? "manual" : "annual_statement";
+}
+
+function incomeTaxAdjustmentType(value: string): IncomeTaxAdjustmentType {
+  return value === "payment" ? "payment" : "refund";
 }
 
 function incomeMilestoneImpact(value: string): CareerMilestoneImpact {

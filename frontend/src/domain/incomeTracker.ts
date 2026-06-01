@@ -3,6 +3,7 @@ import type {
   IncomeResolvedSource,
   IncomeTaxDeductionField,
   IncomeTaxDeductionItems,
+  IncomeTaxAdjustment,
   IncomeTrackerState,
   IncomeYearEntry
 } from "../types";
@@ -83,6 +84,13 @@ const TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
   "wageTax",
   "solidaritySurcharge",
   "churchTax",
+  "pensionInsurance",
+  "healthInsurance",
+  "careInsurance",
+  "unemploymentInsurance"
+];
+const TAX_DEDUCTION_TAX_FIELDS: IncomeTaxDeductionField[] = ["wageTax", "solidaritySurcharge", "churchTax"];
+const TAX_DEDUCTION_SOCIAL_FIELDS: IncomeTaxDeductionField[] = [
   "pensionInsurance",
   "healthInsurance",
   "careInsurance",
@@ -170,11 +178,50 @@ export function incomeYearEntryCalculatedNetIncome(entry: IncomeYearEntry): numb
 
 export function incomeYearEntryTaxDeductions(entry: IncomeYearEntry): number | null {
   const itemTotal = incomeTaxDeductionItemsTotal(entry.taxDeductionItems);
-  return itemTotal ?? (entry.taxesAndDeductions === null ? null : roundCents(entry.taxesAndDeductions));
+  const adjustment = incomeTaxAdjustmentSignedAmount(entry.taxAdjustment);
+  if (itemTotal !== null) {
+    const socialTotal = incomeTaxDeductionItemsSocialTotal(entry.taxDeductionItems) ?? 0;
+    return roundCents(socialTotal + incomeYearEntryTaxTotal(entry));
+  }
+  if (entry.taxesAndDeductions === null && adjustment === 0) return null;
+  return roundCents(Math.max(0, numberValue(entry.taxesAndDeductions) + adjustment));
+}
+
+export function incomeYearEntryTaxTotal(entry: IncomeYearEntry): number {
+  const itemTotal = incomeTaxDeductionItemsTotal(entry.taxDeductionItems);
+  const taxItemTotal = incomeTaxDeductionItemsTaxTotal(entry.taxDeductionItems);
+  const baseTaxTotal = itemTotal === null ? numberValue(entry.taxesAndDeductions) : numberValue(taxItemTotal);
+  return roundCents(Math.max(0, baseTaxTotal + incomeTaxAdjustmentSignedAmount(entry.taxAdjustment)));
+}
+
+export function incomeTaxAdjustmentSignedAmount(adjustment: IncomeTaxAdjustment | undefined): number {
+  if (!adjustment) return 0;
+  const amount = Math.max(0, numberValue(adjustment.amount));
+  if (amount === 0) return 0;
+  return adjustment.type === "payment" ? amount : -amount;
 }
 
 export function incomeTaxDeductionItemsTotal(items: IncomeTaxDeductionItems): number | null {
-  const values = TAX_DEDUCTION_FIELDS.map((field) => items[field]);
+  return incomeTaxDeductionFieldTotal(items, TAX_DEDUCTION_FIELDS);
+}
+
+export function incomeTaxDeductionItemsTaxTotal(items: IncomeTaxDeductionItems): number | null {
+  return incomeTaxDeductionFieldTotal(items, TAX_DEDUCTION_TAX_FIELDS);
+}
+
+export function incomeTaxDeductionItemsSocialTotal(items: IncomeTaxDeductionItems): number | null {
+  return incomeTaxDeductionFieldTotal(items, TAX_DEDUCTION_SOCIAL_FIELDS);
+}
+
+export function emptyIncomeTaxAdjustment(): IncomeTaxAdjustment {
+  return {
+    type: "refund",
+    amount: null
+  };
+}
+
+function incomeTaxDeductionFieldTotal(items: IncomeTaxDeductionItems, fields: IncomeTaxDeductionField[]): number | null {
+  const values = fields.map((field) => items[field]);
   if (!values.some((value) => value !== null && value !== undefined)) return null;
   return roundCents(values.reduce<number>((sum, value) => sum + numberValue(value), 0));
 }
@@ -214,6 +261,7 @@ function buildYearAnalyses(tracker: IncomeTrackerState): IncomeYearAnalysis[] {
   };
 
   for (const entry of tracker.yearlyEntries) {
+    if (!entry.active) continue;
     const netIncome = incomeYearEntryNetIncome(entry);
     if (!validYear(entry.year) || netIncome === null) continue;
     const year = getYear(entry.year);

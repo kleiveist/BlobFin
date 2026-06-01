@@ -186,6 +186,8 @@ export function renderAppShell(): string {
                 <table class="income-table">
                   <thead>
                     <tr>
+                      <th>Aktiv</th>
+                      <th>View</th>
                       <th>Label</th>
                       <th>Jahr</th>
                       <th>Jahresnetto</th>

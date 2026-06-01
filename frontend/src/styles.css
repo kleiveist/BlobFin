@@ -3425,6 +3425,62 @@ tfoot th {
   background: var(--surface-muted);
 }
 
+.income-tax-adjustment {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.income-tax-adjustment > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.income-tax-adjustment strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.income-tax-adjustment span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.income-tax-adjustment-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.income-tax-adjustment-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.income-tax-adjustment-options input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.income-tax-adjustment-amount {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  align-items: center;
+  gap: 10px;
+}
+
 .income-table .numeric-cell,
 .income-status-table .numeric-cell {
   text-align: right;
@@ -3576,6 +3632,28 @@ tfoot th {
   min-height: 1em;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.income-inflation-values {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.income-inflation-values small {
+  display: grid;
+  gap: 1px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 750;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.income-inflation-values b {
+  color: var(--text);
+  font-size: 0.66rem;
+  font-weight: 900;
 }
 
 .income-chart-marker {
@@ -4093,8 +4171,18 @@ tfoot th {
 
 .income-analysis-line .danger,
 .income-analysis-legend .danger,
-.income-analysis-bar-column .danger {
+.income-analysis-bar-column .danger,
+.income-analysis-svg .danger {
   background: var(--danger);
+  stroke: var(--danger);
+}
+
+.income-analysis-line .refund,
+.income-analysis-legend .refund,
+.income-analysis-bar-column .refund,
+.income-analysis-svg .refund {
+  background: var(--good);
+  stroke: var(--good);
 }
 
 .income-analysis-line .unassigned,
@@ -4135,6 +4223,16 @@ tfoot th {
 
 .income-analysis-svg .series-point.employer {
   fill: #0f766e;
+  stroke: var(--surface);
+}
+
+.income-analysis-svg .series-point.danger {
+  fill: var(--danger);
+  stroke: var(--surface);
+}
+
+.income-analysis-svg .series-point.refund {
+  fill: var(--good);
   stroke: var(--surface);
 }
 
@@ -4251,6 +4349,10 @@ tfoot th {
   }
 
   .income-tab-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .income-tax-adjustment-amount {
     grid-template-columns: 1fr;
   }
 }

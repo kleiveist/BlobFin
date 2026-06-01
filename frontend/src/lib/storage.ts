@@ -30,6 +30,8 @@ import type {
   CombinedWealthToggles,
   IncomePerson,
   IncomeProjectionMode,
+  IncomeTaxAdjustment,
+  IncomeTaxAdjustmentType,
   IncomeTaxDeductionField,
   IncomeTaxDeductionItems,
   IncomeTrackerSettings,
@@ -526,6 +528,8 @@ function normalizeIncomeYearEntry(value: unknown): IncomeYearEntry {
   const entry = isRecord(value) ? value : {};
   return {
     id: String(entry.id || createId()),
+    active: booleanOrDefault(entry.active, true),
+    visible: booleanOrDefault(entry.visible, true),
     year: Math.round(numberOrDefault(entry.year, defaultPlanningSettings().year)),
     label: String(entry.label ?? "salary"),
     person: normalizeIncomePerson(entry.person),
@@ -533,6 +537,7 @@ function normalizeIncomeYearEntry(value: unknown): IncomeYearEntry {
     annualGrossIncome: nullableNumberOrDefault(entry.annualGrossIncome, null),
     taxesAndDeductions: nullableNumberOrDefault(entry.taxesAndDeductions, null),
     taxDeductionItems: normalizeIncomeTaxDeductionItems(entry.taxDeductionItems),
+    taxAdjustment: normalizeIncomeTaxAdjustment(entry.taxAdjustment),
     employer: String(entry.employer ?? ""),
     note: String(entry.note ?? ""),
     source: normalizeIncomeYearSource(entry.source)
@@ -554,6 +559,18 @@ function normalizeIncomeTaxDeductionItems(value: unknown): IncomeTaxDeductionIte
       employerPensionInsurance: null
     }
   );
+}
+
+function normalizeIncomeTaxAdjustment(value: unknown): IncomeTaxAdjustment {
+  const adjustment = isRecord(value) ? value : {};
+  return {
+    type: normalizeIncomeTaxAdjustmentType(adjustment.type),
+    amount: nullableNumberOrDefault(adjustment.amount, null)
+  };
+}
+
+function normalizeIncomeTaxAdjustmentType(value: unknown): IncomeTaxAdjustmentType {
+  return value === "payment" ? "payment" : "refund";
 }
 
 function normalizeCareerMilestone(value: unknown): CareerMilestone {

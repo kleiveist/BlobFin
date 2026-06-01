@@ -211,4 +211,48 @@ describe("storage", () => {
     expect(loaded.combinedWealth.includeRealEstateFinancing).toBe(true);
     expect(loaded.combinedWealth.includeRealEstateValueTrend).toBe(false);
   });
+
+  it("adds missing income yearly entry defaults to saved yearly entries", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        incomeTracker: {
+          ...state.incomeTracker,
+          yearlyEntries: [
+            {
+              id: "legacy-income",
+              year: 2026,
+              label: "salary",
+              person: "household",
+              annualNetIncome: null,
+              annualGrossIncome: 50000,
+              taxesAndDeductions: null,
+              taxDeductionItems: {
+                wageTax: 3000,
+                solidaritySurcharge: null,
+                churchTax: null,
+                pensionInsurance: null,
+                healthInsurance: null,
+                careInsurance: null,
+                unemploymentInsurance: null,
+                employerPensionInsurance: null
+              },
+              employer: "",
+              note: "",
+              source: "annual_statement"
+            }
+          ]
+        }
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.incomeTracker.yearlyEntries[0].active).toBe(true);
+    expect(loaded.incomeTracker.yearlyEntries[0].visible).toBe(true);
+    expect(loaded.incomeTracker.yearlyEntries[0].taxAdjustment).toEqual({ type: "refund", amount: null });
+  });
 });
