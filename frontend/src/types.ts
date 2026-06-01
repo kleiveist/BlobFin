@@ -8,14 +8,8 @@ export type InvestmentDepotKey = "standard" | "retirement" | "child";
 export type PositionTableMode = PositionFlow | "reserve" | "savings";
 export type AppSectionId =
   | "home"
-  | "investment_overview"
-  | "income_overview"
-  | "cost_reserve_positions"
-  | "year_table"
-  | "income_tracking"
-  | "income_status"
-  | "income_charts"
-  | "investment_planning"
+  | "income"
+  | "planning_scenarios"
   | "real_estate_financing"
   | "combined_wealth";
 export type PlanningAccountType = "cost_reserve" | "annual_table" | "mixed";

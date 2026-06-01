@@ -369,15 +369,25 @@ function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSecti
     return "home";
   }
   if (
-    value === "home" ||
-    value === "investment_overview" ||
-    value === "income_overview" ||
-    value === "cost_reserve_positions" ||
-    value === "year_table" ||
+    value === "income" ||
     value === "income_tracking" ||
     value === "income_status" ||
     value === "income_charts" ||
+    value === "income_overview"
+  ) {
+    return "income";
+  }
+  if (
+    value === "planning_scenarios" ||
+    value === "cost_reserve_positions" ||
+    value === "year_table" ||
     value === "investment_planning" ||
+    value === "investment_overview"
+  ) {
+    return "planning_scenarios";
+  }
+  if (
+    value === "home" ||
     value === "real_estate_financing" ||
     value === "combined_wealth"
   ) {

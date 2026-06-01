@@ -59,51 +59,41 @@ const combinedYear: CombinedWealthYear = {
 };
 
 describe("follow-up ui rendering", () => {
-  it("renders a visual landing page with the two main module entries", () => {
+  it("renders a visual landing page with the four combined module entries", () => {
     const html = renderAppShell();
 
     expect(html).toContain('data-module-section="home"');
     expect(html).toContain('id="landingTitle"');
     expect(html).toContain("BlobFin");
-    expect(html).toContain('data-action="open-section-income_overview"');
-    expect(html).toContain('data-action="open-section-investment_overview"');
-    expect(html).toContain("Einkommen erfassen und auswerten");
-    expect(html).toContain("Konten, Ruecklagen, Investments, Entnahmen und Immobilienfinanzierung planen");
-  });
-
-  it("renders the income overview with three page cards and return actions", () => {
-    const html = renderAppShell();
-
-    expect(html).toContain('data-module-section="income_overview"');
-    expect(html).toContain('id="incomeOverviewTitle"');
-    expect(html).toContain('data-action="open-section-income_tracking"');
-    expect(html).toContain('data-action="open-section-income_status"');
-    expect(html).toContain('data-action="open-section-income_charts"');
-    expect(count(html, 'data-action="open-section-income_overview"')).toBeGreaterThanOrEqual(3);
-    expect(html).toContain("Zur Einkommensuebersicht");
-  });
-
-  it("renders the investment and real estate overview with all five area cards", () => {
-    const html = renderAppShell();
-
-    expect(html).toContain('data-module-section="investment_overview"');
-    expect(html).toContain('id="investmentOverviewTitle"');
-    expect(html).toContain('data-action="open-section-cost_reserve_positions"');
-    expect(html).toContain('data-action="open-section-year_table"');
-    expect(html).toContain('data-action="open-section-investment_planning"');
+    expect(html).not.toContain('data-module-section="income_overview"');
+    expect(html).not.toContain('data-module-section="investment_overview"');
+    expect(html).toContain('data-action="open-section-income"');
+    expect(html).toContain('data-action="open-section-planning_scenarios"');
     expect(html).toContain('data-action="open-section-real_estate_financing"');
     expect(html).toContain('data-action="open-section-combined_wealth"');
-    expect(html).toContain("Zur Bereichsuebersicht");
+    expect(html).not.toContain('data-action="open-section-income_tracking"');
+    expect(html).not.toContain('data-action="open-section-income_status"');
+    expect(html).not.toContain('data-action="open-section-income_charts"');
+    expect(html).not.toContain('data-action="open-section-cost_reserve_positions"');
+    expect(html).not.toContain('data-action="open-section-year_table"');
+    expect(html).not.toContain('data-action="open-section-investment_planning"');
+    expect(count(html, 'class="overview-card module-overview-card"')).toBe(4);
+    expect(html).toContain("Jahresnettoeinkommen");
+    expect(html).toContain("Planungen und Szenarien");
+    expect(html).toContain("Immobilien");
+    expect(html).toContain("Vermoegen");
   });
 
-  it("structures income status and chart pages with insights before status", () => {
+  it("structures income as one combined page with insights before status", () => {
     const html = renderAppShell();
     const insightsIndex = html.indexOf('id="incomeInsightsSection"');
     const statusIndex = html.indexOf('id="incomeStatusSection"');
 
     expect(html).not.toContain('data-action="scroll-income-section"');
-    expect(html).toContain('data-module-section="income_status"');
-    expect(html).toContain('data-module-section="income_charts"');
+    expect(count(html, 'data-module-section="income"')).toBeGreaterThanOrEqual(3);
+    expect(html).not.toContain('data-module-section="income_status"');
+    expect(html).not.toContain('data-module-section="income_charts"');
+    expect(html).not.toContain('data-module-section="income_tracking"');
     expect(html).toContain('id="incomeTrackerInput"');
     expect(html).toContain('id="incomeChartsSection"');
     expect(html).toContain("Jahresnettoeinkommen-Grafiken");
@@ -112,10 +102,22 @@ describe("follow-up ui rendering", () => {
     expect(insightsIndex).toBeLessThan(statusIndex);
   });
 
-  it("renders world graphic actions on all income detail pages", () => {
+  it("structures planning as one combined page", () => {
     const html = renderAppShell();
 
-    expect(count(html, 'data-action="income-open-analysis"')).toBeGreaterThanOrEqual(4);
+    expect(count(html, 'data-module-section="planning_scenarios"')).toBeGreaterThanOrEqual(3);
+    expect(html).not.toContain('data-module-section="cost_reserve_positions"');
+    expect(html).not.toContain('data-module-section="year_table"');
+    expect(html).not.toContain('data-module-section="investment_planning"');
+    expect(html).toContain("Kosten- und Ruecklagenpositionen");
+    expect(html).toContain("Jahrestabellen pro Konto");
+    expect(html).toContain("Investment- und Auszahlungsplanung");
+  });
+
+  it("renders the world graphic action inside the combined income page", () => {
+    const html = renderAppShell();
+
+    expect(count(html, 'data-action="income-open-analysis"')).toBe(1);
     expect(html).toContain("Weltgrafik");
   });
 

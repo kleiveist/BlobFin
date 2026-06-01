@@ -128,14 +128,8 @@ const MAX_REAL_ESTATE_PROJECTION_YEARS = 80;
 const INVESTMENT_DEPOTS: InvestmentDepotKey[] = ["standard", "retirement", "child"];
 const APP_SECTION_IDS: AppSectionId[] = [
   "home",
-  "investment_overview",
-  "income_overview",
-  "income_tracking",
-  "income_status",
-  "income_charts",
-  "cost_reserve_positions",
-  "year_table",
-  "investment_planning",
+  "income",
+  "planning_scenarios",
   "real_estate_financing",
   "combined_wealth"
 ];
@@ -591,6 +585,23 @@ function syncPositionsFromActivePlanningAccount(): void {
 }
 
 function appSectionIdFromValue(value: unknown): AppSectionId | null {
+  if (typeof value !== "string") return null;
+  if (
+    value === "income_tracking" ||
+    value === "income_status" ||
+    value === "income_charts" ||
+    value === "income_overview"
+  ) {
+    return "income";
+  }
+  if (
+    value === "cost_reserve_positions" ||
+    value === "year_table" ||
+    value === "investment_planning" ||
+    value === "investment_overview"
+  ) {
+    return "planning_scenarios";
+  }
   return APP_SECTION_IDS.includes(value as AppSectionId) ? (value as AppSectionId) : null;
 }
 
@@ -1236,7 +1247,7 @@ function syncInvestmentProjectionLabels(depot: InvestmentDepotKey): void {
 }
 
 function renderIncomeTracker(): void {
-  const panel = document.querySelector<HTMLElement>('[data-module-section="income_tracking"]');
+  const panel = document.querySelector<HTMLElement>('[data-module-section="income"]');
   if (!panel) return;
   const model = incomeTrackerModel();
   renderIncomeTabs();
@@ -5680,7 +5691,7 @@ function toggleRealEstateDepotSavingsRateSource(): void {
 }
 
 function addRealEstateSavingsSource(kind: RealEstatePaymentSourceKind): void {
-  setActiveSection("cost_reserve_positions");
+  setActiveSection("planning_scenarios");
   selectedPositionMode = "savings";
   const id = addPosition();
   const activeAccountId = activePlanningAccount().id;

@@ -2337,8 +2337,7 @@ tfoot th {
   }
 }
 
-.landing-page,
-.module-overview-panel {
+.landing-page {
   display: grid;
   gap: 16px;
 }
@@ -2516,29 +2515,14 @@ tfoot th {
   background: var(--gold);
 }
 
-.module-overview-head {
-  display: grid;
-  gap: 8px;
-  max-width: 860px;
-}
-
-.module-overview-head p:last-child {
-  color: var(--muted);
-  font-weight: 750;
-}
-
 .module-overview-grid {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.investment-overview-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.income-overview-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.landing-main-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .overview-card {
@@ -4617,10 +4601,12 @@ tfoot th {
 }
 
 @media (max-width: 1220px) {
-  .investment-overview-grid,
-  .income-overview-grid,
   .module-overview-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .landing-main-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .income-metric-grid {
@@ -4654,9 +4640,7 @@ tfoot th {
     opacity: 0.58;
   }
 
-  .module-overview-grid,
-  .income-overview-grid,
-  .investment-overview-grid {
+  .module-overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -4747,9 +4731,7 @@ tfoot th {
     opacity: 0.42;
   }
 
-  .module-overview-grid,
-  .income-overview-grid,
-  .investment-overview-grid {
+  .module-overview-grid {
     grid-template-columns: 1fr;
   }
 

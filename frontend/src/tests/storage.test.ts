@@ -40,10 +40,10 @@ describe("storage", () => {
     expect(state.ui.activeSection).toBe("home");
   });
 
-  it("persists new income page section ids", () => {
+  it("persists combined app section ids", () => {
     const storage = new MemoryStorage();
 
-    for (const section of ["income_overview", "income_status", "income_charts"] as const) {
+    for (const section of ["income", "planning_scenarios"] as const) {
       const state = defaultAppState();
       state.ui.activeSection = section;
 
@@ -51,6 +51,38 @@ describe("storage", () => {
       const loaded = loadState(storage);
 
       expect(loaded.ui.activeSection).toBe(section);
+    }
+  });
+
+  it("maps old income page section ids to the combined income page", () => {
+    const storage = new MemoryStorage();
+
+    for (const section of ["income_tracking", "income_status", "income_charts", "income_overview"]) {
+      const state = {
+        ...defaultAppState(),
+        ui: { ...defaultAppState().ui, activeSection: section }
+      };
+      storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+      const loaded = loadState(storage);
+
+      expect(loaded.ui.activeSection).toBe("income");
+    }
+  });
+
+  it("maps old planning page section ids to the combined planning page", () => {
+    const storage = new MemoryStorage();
+
+    for (const section of ["cost_reserve_positions", "year_table", "investment_planning", "investment_overview"]) {
+      const state = {
+        ...defaultAppState(),
+        ui: { ...defaultAppState().ui, activeSection: section }
+      };
+      storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+      const loaded = loadState(storage);
+
+      expect(loaded.ui.activeSection).toBe("planning_scenarios");
     }
   });
 
