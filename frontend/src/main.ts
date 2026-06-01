@@ -1346,6 +1346,10 @@ function incomeTaxCategoryEnabled(rule: IncomeTaxRuleResult, category: IncomeTax
   return category === "taxes" ? rule.taxFieldsEnabled : rule.contributionFieldsEnabled;
 }
 
+function incomeTaxDialogCanOpen(entry: IncomeYearEntry, rule = incomeTaxRuleForEntry(entry)): boolean {
+  return rule.status !== "locked" || incomeYearLabel(entry.label) === "minijob";
+}
+
 function incomeGrossFieldLocked(
   entry: IncomeYearEntry,
   entries: IncomeYearEntry[] = state.incomeTracker.yearlyEntries
@@ -1464,21 +1468,22 @@ function renderIncomeYearlyTaxButton(id: string): void {
   const taxDeductions = incomeYearEntryTaxDeductions(entry);
   const rule = incomeTaxRuleForEntry(entry);
   const locked = rule.status === "locked";
+  const canOpen = incomeTaxDialogCanOpen(entry, rule);
   const button = value.closest<HTMLButtonElement>(".income-tax-button");
   const cell = value.closest<HTMLTableCellElement>("[data-income-year-tax-cell]");
   const label = button?.querySelector("span");
-  const title = locked ? incomeTaxRuleTooltipText(rule) : "";
-  value.textContent = locked ? "Gesperrt" : taxDeductions === null ? "Eintragen" : money(taxDeductions);
+  const title = locked ? incomeTaxButtonTooltipText(entry, rule) : "";
+  value.textContent = locked && canOpen ? "Optionen" : locked ? "Gesperrt" : taxDeductions === null ? "Eintragen" : money(taxDeductions);
   if (cell) cell.title = title;
   if (button) {
-    button.disabled = locked;
+    button.disabled = !canOpen;
     button.title = title;
-    button.dataset.action = locked ? "" : `income-open-tax-dialog-${entry.id}`;
+    button.dataset.action = canOpen ? `income-open-tax-dialog-${entry.id}` : "";
     button.classList.toggle("locked", locked);
     button.classList.toggle("partial", rule.status === "partially_enabled");
   }
   if (label) {
-    label.textContent = locked ? "Nicht moeglich" : rule.status === "partially_enabled" ? "Teilweise" : "Details";
+    label.textContent = locked && canOpen ? "RV moeglich" : locked ? "Nicht moeglich" : rule.status === "partially_enabled" ? "Teilweise" : "Details";
   }
 }
 
@@ -1893,6 +1898,14 @@ function incomeTaxRuleTooltipText(rule: IncomeTaxRuleResult): string {
   const reason = incomeTaxRuleReasonText(rule.reasonKey);
   const warning = rule.warningKey ? incomeTaxRuleWarningText(rule.warningKey) : "";
   return warning ? `${reason} ${warning}` : reason;
+}
+
+function incomeTaxButtonTooltipText(entry: IncomeYearEntry, rule: IncomeTaxRuleResult): string {
+  const text = incomeTaxRuleTooltipText(rule);
+  if (rule.status === "locked" && incomeYearLabel(entry.label) === "minijob") {
+    return `${text} Rentenversicherungspflicht kann im Dialog aktiviert werden.`;
+  }
+  return text;
 }
 
 function renderIncomeAnalysisDialog(model: IncomeTrackerModel = incomeTrackerModel()): void {
@@ -2960,17 +2973,18 @@ function incomeCheckboxInput(collection: string, id: string, field: string, chec
 function incomeTaxDeductionsButton(entry: IncomeYearEntry, rule = incomeTaxRuleForEntry(entry)): string {
   const taxDeductions = incomeYearEntryTaxDeductions(entry);
   const locked = rule.status === "locked";
+  const canOpen = incomeTaxDialogCanOpen(entry, rule);
   const stateLabel =
-    locked ? "Nicht moeglich" : rule.status === "partially_enabled" ? "Teilweise" : "Details";
-  const mainLabel = locked ? "Gesperrt" : taxDeductions === null ? "Eintragen" : money(taxDeductions);
-  const lockedTooltip = locked ? incomeTaxRuleTooltipText(rule) : "";
+    locked && canOpen ? "RV moeglich" : locked ? "Nicht moeglich" : rule.status === "partially_enabled" ? "Teilweise" : "Details";
+  const mainLabel = locked && canOpen ? "Optionen" : locked ? "Gesperrt" : taxDeductions === null ? "Eintragen" : money(taxDeductions);
+  const lockedTooltip = locked ? incomeTaxButtonTooltipText(entry, rule) : "";
   return `
     <button
       class="income-tax-button ${locked ? "locked" : rule.status === "partially_enabled" ? "partial" : ""}"
       type="button"
-      ${locked ? "disabled" : `data-action="income-open-tax-dialog-${escapeHtml(entry.id)}"`}
+      ${canOpen ? `data-action="income-open-tax-dialog-${escapeHtml(entry.id)}"` : "disabled"}
       ${lockedTooltip ? `title="${escapeHtml(lockedTooltip)}"` : ""}
-      aria-label="${locked ? `Steuer- und Abgabenpositionen gesperrt: ${escapeHtml(lockedTooltip)}` : "Steuer- und Abgabenpositionen bearbeiten"}"
+      aria-label="${locked && canOpen ? `Steuer- und Abgabenoptionen bearbeiten: ${escapeHtml(lockedTooltip)}` : locked ? `Steuer- und Abgabenpositionen gesperrt: ${escapeHtml(lockedTooltip)}` : "Steuer- und Abgabenpositionen bearbeiten"}"
     >
       <strong data-income-year-tax-total="${escapeHtml(entry.id)}">${escapeHtml(mainLabel)}</strong>
       <span>${escapeHtml(stateLabel)}</span>
@@ -3046,7 +3060,7 @@ function setIncomeInputTab(value: string): void {
 
 function openIncomeTaxDialog(id: string): void {
   const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === id);
-  if (!entry || incomeTaxRuleForEntry(entry).status === "locked") return;
+  if (!entry || !incomeTaxDialogCanOpen(entry)) return;
   incomeTaxDialogEntryId = id;
   renderIncomeTaxDialog();
 }
