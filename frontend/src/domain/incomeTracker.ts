@@ -165,6 +165,16 @@ export function buildIncomeTrackerModel(tracker: IncomeTrackerState, options: In
   };
 }
 
+export function buildIncomeChartModel(tracker: IncomeTrackerState, options: IncomeTrackerModelOptions = {}): IncomeTrackerModel {
+  return buildIncomeTrackerModel(
+    {
+      ...tracker,
+      yearlyEntries: tracker.yearlyEntries.filter((entry) => entry.visible)
+    },
+    options
+  );
+}
+
 export function incomeYearEntryNetIncome(entry: IncomeYearEntry): number | null {
   const calculatedNet = incomeYearEntryCalculatedNetIncome(entry);
   return calculatedNet ?? (entry.annualNetIncome === null ? null : roundCents(entry.annualNetIncome));

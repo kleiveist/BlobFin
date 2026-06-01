@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildIncomeChartModel,
   buildIncomeTrackerModel,
   emptyIncomeTaxAdjustment,
   emptyIncomeTaxDeductionItems,
@@ -107,5 +108,29 @@ describe("income tracker tax adjustment", () => {
     const model = buildIncomeTrackerModel(tracker);
 
     expect(model.latest?.annualNet).toBe(45500);
+  });
+
+  it("excludes invisible entries from the income chart model", () => {
+    const tracker: IncomeTrackerState = {
+      yearlyEntries: [
+        yearlyEntry({ id: "visible-income", year: 2025, annualGrossIncome: 40000 }),
+        yearlyEntry({ id: "hidden-income", visible: false, year: 2026, annualGrossIncome: 80000 })
+      ],
+      milestones: [],
+      settings: {
+        activeInputTab: "yearly",
+        projectionMode: "off",
+        manualGrowthRatePercent: null,
+        savingsSharePercent: null,
+        selectedYearlyLabels: []
+      }
+    };
+
+    const model = buildIncomeTrackerModel(tracker);
+    const chartModel = buildIncomeChartModel(tracker, { annualInflationRatePercent: 2 });
+
+    expect(model.valueYears.map((year) => year.year)).toEqual([2025, 2026]);
+    expect(chartModel.valueYears.map((year) => year.year)).toEqual([2025]);
+    expect(chartModel.ratioYears.map((year) => year.year)).toEqual([2025]);
   });
 });

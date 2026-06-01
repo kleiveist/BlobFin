@@ -10,6 +10,7 @@ import {
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
 import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/combinedWealth";
 import {
+  buildIncomeChartModel,
   buildIncomeTrackerModel,
   emptyIncomeTaxAdjustment,
   emptyIncomeTaxDeductionItems,
@@ -156,6 +157,7 @@ const INCOME_YEAR_LABEL_OPTIONS: Array<{ id: string; label: string; icon: string
   { id: "salary", label: "Gehalt", icon: "coins", description: "Regelmaessiges Arbeitsentgelt" },
   { id: "training_allowance", label: "Ausbildungsverguetung", icon: "education", description: "Verguetung waehrend Ausbildung oder dualem Studium" },
   { id: "mini_job", label: "MiniJob", icon: "wallet", description: "Geringfuegige Beschaeftigung oder kleiner Nebenjob" },
+  { id: "pocket_money", label: "Taschengeld", icon: "pocket_money", description: "Regelmaessiges oder einmaliges Taschengeld" },
   { id: "self_employed", label: "Selbststaendigkeit", icon: "bank", description: "Einkommen aus eigener Taetigkeit" },
   { id: "freelance", label: "Freiberuflich", icon: "investment", description: "Freiberufliche oder projektbezogene Einkuenfte" },
   { id: "side_income", label: "Nebeneinkuenfte", icon: "wallet", description: "Weitere laufende Einkommensquellen" },
@@ -1270,6 +1272,12 @@ function incomeTrackerModel(): IncomeTrackerModel {
   });
 }
 
+function incomeChartModel(): IncomeTrackerModel {
+  return buildIncomeChartModel(state.incomeTracker, {
+    annualInflationRatePercent: incomeGeneralInflationRatePercent()
+  });
+}
+
 function incomeGeneralInflationRatePercent(): number {
   return depotInvestmentSettings(activeInvestmentDepot()).inflationRatePercent;
 }
@@ -2215,10 +2223,11 @@ function incomeMilestoneBadges(milestones: CareerMilestone[]): string {
 }
 
 function renderIncomeCharts(model: IncomeTrackerModel): void {
-  setIncomeChart("incomeAnnualChart", renderIncomeAnnualChart(model));
-  setIncomeChart("incomeGrowthChart", renderIncomeGrowthChart(model));
-  setIncomeChart("incomeInflationChart", renderIncomeInflationChart(model));
-  setIncomeChart("incomeRatioChart", renderIncomeRatioChart(model));
+  const visibleChartModel = incomeChartModel();
+  setIncomeChart("incomeAnnualChart", renderIncomeAnnualChart(visibleChartModel));
+  setIncomeChart("incomeGrowthChart", renderIncomeGrowthChart(visibleChartModel));
+  setIncomeChart("incomeInflationChart", renderIncomeInflationChart(visibleChartModel));
+  setIncomeChart("incomeRatioChart", renderIncomeRatioChart(visibleChartModel));
   setIncomeChart("incomeProjectionChart", renderIncomeProjectionChart(model));
 }
 

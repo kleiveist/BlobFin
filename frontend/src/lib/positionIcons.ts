@@ -22,6 +22,11 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     svg: '<path d="M4 7.5h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5.5A2.5 2.5 0 0 1 3 16V8.5A2.5 2.5 0 0 1 5.5 6H17"/><path d="M16 12h4v4h-4a2 2 0 0 1 0-4Z"/>'
   },
   {
+    id: "pocket_money",
+    label: "Taschengeld",
+    svg: '<path d="M6 7.5V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1.5"/><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M8 11h8"/><path d="M9 15h6"/><circle cx="12" cy="13" r="1.8"/>'
+  },
+  {
     id: "coins",
     label: "Einnahme",
     svg: '<ellipse cx="8" cy="7" rx="4" ry="2.3"/><path d="M4 7v4c0 1.3 1.8 2.3 4 2.3s4-1 4-2.3V7"/><path d="M12 10.5c2.3.1 4 1 4 2.3 0 1.4-1.8 2.4-4 2.4-.8 0-1.6-.1-2.2-.4"/><path d="M8 13.2v3.1c0 1.3 1.8 2.3 4 2.3s4-1 4-2.3v-3.5"/>'
