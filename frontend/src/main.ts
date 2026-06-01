@@ -126,10 +126,6 @@ const CHILD_DEPOT_DEFAULT_PAYOUT_AGE = 18;
 const CHILD_DEPOT_MAX_PAYOUT_AGE = 25;
 const MAX_REAL_ESTATE_PROJECTION_YEARS = 80;
 const INVESTMENT_DEPOTS: InvestmentDepotKey[] = ["standard", "retirement", "child"];
-const INCOME_YEAR_SOURCE_OPTIONS: Array<{ value: IncomeYearEntrySource; label: string }> = [
-  { value: "annual_statement", label: "Jahresentgeltabrechnung" },
-  { value: "manual", label: "Manuell" }
-];
 const INCOME_TAX_ADJUSTMENT_OPTIONS: Array<{ value: IncomeTaxAdjustmentType; label: string }> = [
   { value: "refund", label: "Rueckerstattung" },
   { value: "payment", label: "Nachzahlung" }
@@ -1309,12 +1305,12 @@ function renderIncomeYearlyRows(): void {
   const body = document.querySelector<HTMLTableSectionElement>("#incomeYearlyRows");
   if (!body) return;
   if (!state.incomeTracker.yearlyEntries.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="9">Noch keine Jahreswerte eingetragen.</td></tr>`;
+    body.innerHTML = `<tr><td class="position-empty" colspan="8">Noch keine Jahreswerte eingetragen.</td></tr>`;
     return;
   }
   const rows = incomeFilteredYearEntries();
   if (!rows.length) {
-    body.innerHTML = `<tr><td class="position-empty" colspan="9">Keine Jahreswerte fuer diese Labelauswahl.</td></tr>`;
+    body.innerHTML = `<tr><td class="position-empty" colspan="8">Keine Jahreswerte fuer diese Labelauswahl.</td></tr>`;
     return;
   }
   body.innerHTML = rows
@@ -1334,7 +1330,6 @@ function renderIncomeYearlyRows(): void {
         })}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "annualGrossIncome", entry.annualGrossIncome, { min: 0 })}</td>
         <td>${incomeTaxDeductionsButton(entry)}</td>
-        <td>${incomeSelect("yearlyEntries", entry.id, "source", INCOME_YEAR_SOURCE_OPTIONS, entry.source)}</td>
         <td><button class="icon-button danger" type="button" data-action="income-remove-yearly-${entry.id}" aria-label="Jahreswert entfernen">x</button></td>
       </tr>
     `;
