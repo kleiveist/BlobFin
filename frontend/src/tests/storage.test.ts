@@ -273,11 +273,15 @@ describe("storage", () => {
         ...state,
         incomeTracker: {
           ...state.incomeTracker,
+          settings: {
+            ...state.incomeTracker.settings,
+            selectedYearlyLabels: ["student_newspaper_delivery"]
+          },
           yearlyEntries: [
             {
               id: "legacy-income",
               year: 2026,
-              label: "salary",
+              label: "student_newspaper_delivery",
               person: "household",
               annualNetIncome: null,
               annualGrossIncome: 50000,
@@ -305,6 +309,14 @@ describe("storage", () => {
 
     expect(loaded.incomeTracker.yearlyEntries[0].active).toBe(true);
     expect(loaded.incomeTracker.yearlyEntries[0].visible).toBe(true);
+    expect(loaded.incomeTracker.yearlyEntries[0].label).toBe("child_youth_jobs");
+    expect(loaded.incomeTracker.settings.selectedYearlyLabels).toEqual(["child_youth_jobs"]);
     expect(loaded.incomeTracker.yearlyEntries[0].taxAdjustment).toEqual({ type: "refund", amount: null });
+    expect(loaded.incomeTracker.yearlyEntries[0].employmentContext).toBe("job_loss");
+    expect(loaded.incomeTracker.yearlyEntries[0].minijobType).toBe("commercial");
+    expect(loaded.incomeTracker.yearlyEntries[0].considerPensionInsurance).toBe(false);
+    expect(loaded.incomeTracker.yearlyEntries[0].isRvExempt).toBe(false);
+    expect(loaded.incomeTracker.yearlyEntries[0].studentEmploymentMode).toBe("minijob");
+    expect(loaded.incomeTracker.yearlyEntries[0].requiresManualTaxReview).toBe(false);
   });
 });

@@ -19,6 +19,9 @@ export type IncomePerson = "person1" | "person2" | "household";
 export type IncomeYearEntrySource = "annual_statement" | "manual";
 export type IncomeResolvedSource = IncomeYearEntrySource;
 export type IncomeTaxAdjustmentType = "refund" | "payment";
+export type IncomeEmploymentContext = "job_loss" | "earned_claim" | "other";
+export type IncomeMinijobType = "commercial" | "private_household";
+export type IncomeStudentEmploymentMode = "minijob" | "short_term";
 export type CareerMilestoneImpact = "positive" | "negative" | "neutral";
 export type IncomeProjectionMode = "off" | "historical_average" | "manual";
 export type RepaymentSourceToggleKey =
@@ -256,6 +259,14 @@ export interface IncomeYearEntry {
   taxesAndDeductions: number | null;
   taxDeductionItems: IncomeTaxDeductionItems;
   taxAdjustment: IncomeTaxAdjustment;
+  employmentContext?: IncomeEmploymentContext;
+  minijobType?: IncomeMinijobType;
+  considerPensionInsurance?: boolean;
+  isRvExempt?: boolean;
+  shortTermEmploymentDays?: number | null;
+  shortTermEmploymentMonths?: number | null;
+  studentEmploymentMode?: IncomeStudentEmploymentMode;
+  requiresManualTaxReview?: boolean;
   employer: string;
   note: string;
   source: IncomeYearEntrySource;

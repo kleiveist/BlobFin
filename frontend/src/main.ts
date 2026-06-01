@@ -22,6 +22,13 @@ import {
   INCOME_SOURCE_LABELS,
   type IncomeTrackerModel
 } from "./domain/incomeTracker";
+import {
+  SIDE_INCOME_TAX_RULE_LABELS,
+  evaluateIncomeTaxAndContributionRules,
+  normalizeIncomeTaxRuleLabel,
+  taxRuleConfigForYear,
+  type IncomeTaxRuleResult
+} from "./domain/incomeTaxRules";
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
 import {
   investmentContributionForMonth,
@@ -85,6 +92,9 @@ import type {
   CombinedWealthYear,
   IncomePerson,
   IncomeProjectionMode,
+  IncomeEmploymentContext,
+  IncomeMinijobType,
+  IncomeStudentEmploymentMode,
   IncomeTaxAdjustmentType,
   IncomeResolvedSource,
   IncomeTaxDeductionField,
@@ -138,11 +148,12 @@ const INCOME_TAX_ADJUSTMENT_OPTIONS: Array<{ value: IncomeTaxAdjustmentType; lab
   { value: "refund", label: "Rueckerstattung" },
   { value: "payment", label: "Nachzahlung" }
 ];
+type IncomeTaxDeductionCategory = "taxes" | "social" | "employer_social";
 const INCOME_TAX_DEDUCTION_ROWS: Array<{
   field: IncomeTaxDeductionField;
   nr: string;
   label: string;
-  category: "taxes" | "social" | "employer_social";
+  category: IncomeTaxDeductionCategory;
 }> = [
   { field: "wageTax", nr: "4", label: "Einbehaltene Lohnsteuer von 3.", category: "taxes" },
   { field: "solidaritySurcharge", nr: "5", label: "Einbehaltener Solidaritaetszuschlag von 3.", category: "taxes" },
@@ -156,21 +167,37 @@ const INCOME_TAX_DEDUCTION_ROWS: Array<{
 const INCOME_YEAR_LABEL_OPTIONS: Array<{ id: string; label: string; icon: string; description: string }> = [
   { id: "salary", label: "Gehalt", icon: "coins", description: "Regelmaessiges Arbeitsentgelt" },
   { id: "training_allowance", label: "Ausbildungsverguetung", icon: "education", description: "Verguetung waehrend Ausbildung oder dualem Studium" },
-  { id: "mini_job", label: "MiniJob", icon: "wallet", description: "Geringfuegige Beschaeftigung oder kleiner Nebenjob" },
+  { id: "minijob", label: "Minijob", icon: "job_badge", description: "Geringfuegige Beschaeftigung oder kleiner Nebenjob" },
   { id: "pocket_money", label: "Taschengeld", icon: "pocket_money", description: "Regelmaessiges oder einmaliges Taschengeld" },
-  { id: "self_employed", label: "Selbststaendigkeit", icon: "bank", description: "Einkommen aus eigener Taetigkeit" },
-  { id: "freelance", label: "Freiberuflich", icon: "investment", description: "Freiberufliche oder projektbezogene Einkuenfte" },
-  { id: "side_income", label: "Nebeneinkuenfte", icon: "wallet", description: "Weitere laufende Einkommensquellen" },
-  { id: "fees", label: "Gagen", icon: "card", description: "Gagen, Honorare oder Auftrittserloese" },
-  { id: "dividends", label: "Dividenden", icon: "investment", description: "Ausschuettungen aus Aktien oder Fonds" },
-  { id: "asset_income", label: "Einnahme aus Vermoegen", icon: "bank", description: "Einnahmen aus Vermoegen, Kapital oder Besitz" },
+  { id: "self_employed", label: "Selbststaendigkeit", icon: "briefcase", description: "Einkommen aus eigener Taetigkeit" },
+  { id: "freelance", label: "Freiberuflich", icon: "pen", description: "Freiberufliche oder projektbezogene Einkuenfte" },
+  { id: "side_income", label: "Nebeneinkuenfte", icon: "income_plus", description: "Weitere laufende Einkommensquellen" },
+  { id: "garage_parking_rental", label: "Garage / Stellplatz", icon: "parking", description: "Einnahmen aus Garage oder Stellplatz" },
+  { id: "fees", label: "Gagen", icon: "stage", description: "Gagen, Honorare oder Auftrittserloese" },
+  { id: "dividends", label: "Dividenden", icon: "dividend", description: "Ausschuettungen aus Aktien oder Fonds" },
+  { id: "asset_income", label: "Einnahme aus Vermoegen", icon: "safe", description: "Einnahmen aus Vermoegen, Kapital oder Besitz" },
   { id: "bonus", label: "Sonderzahlung", icon: "gift", description: "Bonus, Praemie oder Einmalzahlung" },
-  { id: "severance", label: "Abfindung", icon: "shield", description: "Abfindung oder Ausgleichszahlung" },
-  { id: "volunteer", label: "Ehrenamt", icon: "child", description: "Ehrenamtliche Verguetung" },
-  { id: "board", label: "Vorstand", icon: "bank", description: "Vorstandsverguetung" },
-  { id: "office_holder", label: "Amtstraeger", icon: "tax", description: "Verguetung fuer Amt oder Mandat" },
-  { id: "supervisory_board", label: "Aufsichtsrat", icon: "investment", description: "Aufsichtsratsverguetung" },
+  { id: "severance_payment", label: "Abfindung", icon: "shield", description: "Abfindung oder Ausgleichszahlung" },
+  { id: "volunteer_allowance", label: "Ehrenamtspauschale", icon: "volunteer_hand", description: "Ehrenamtliche Verguetung bis zum konfigurierten Freibetrag" },
+  { id: "trainer_allowance", label: "Übungsleiterpauschale", icon: "whistle", description: "Eigenes Label fuer Verguetung im Uebungsleiterfreibetrag" },
+  { id: "child_youth_jobs", label: "Kinder- und Jugendjobs", icon: "newspaper_route", description: "Zum Beispiel Zeitung austragen; nicht als lohnsteuerpflichtiger Arbeitslohn gefuehrt" },
+  { id: "board", label: "Vorstand", icon: "boardroom", description: "Vorstandsverguetung" },
+  { id: "office_holder", label: "Amtstraeger", icon: "stamp", description: "Verguetung fuer Amt oder Mandat" },
+  { id: "supervisory_board", label: "Aufsichtsrat", icon: "oversight", description: "Aufsichtsratsverguetung" },
   { id: "other", label: "Sonstiges", icon: "tag", description: "Andere Einkommensart" }
+];
+const INCOME_EMPLOYMENT_CONTEXT_OPTIONS: Array<{ value: IncomeEmploymentContext; label: string }> = [
+  { value: "job_loss", label: "Verlust des Arbeitsplatzes" },
+  { value: "earned_claim", label: "Bereits entstandener Anspruch" },
+  { value: "other", label: "Andere Abgeltung" }
+];
+const INCOME_MINIJOB_TYPE_OPTIONS: Array<{ value: IncomeMinijobType; label: string }> = [
+  { value: "commercial", label: "Gewerblicher Minijob" },
+  { value: "private_household", label: "Privathaushalt" }
+];
+const INCOME_STUDENT_EMPLOYMENT_MODE_OPTIONS: Array<{ value: IncomeStudentEmploymentMode; label: string }> = [
+  { value: "minijob", label: "Minijob" },
+  { value: "short_term", label: "Kurzfristige Beschaeftigung" }
 ];
 const CAREER_MILESTONE_TYPE_OPTIONS: Array<{ type: string; icon: string; description: string }> = [
   { type: "Ausbildung", icon: "education", description: "Ausbildung, Schule oder Qualifikation gestartet" },
@@ -1282,18 +1309,127 @@ function incomeGeneralInflationRatePercent(): number {
   return depotInvestmentSettings(activeInvestmentDepot()).inflationRatePercent;
 }
 
+function incomeTaxRuleForEntry(
+  entry: IncomeYearEntry,
+  entries: IncomeYearEntry[] = state.incomeTracker.yearlyEntries
+): IncomeTaxRuleResult {
+  const annualAmount = incomeYearEntryRuleAmount(entry);
+  return evaluateIncomeTaxAndContributionRules({
+    label: incomeYearLabel(entry.label),
+    annualAmount,
+    monthlyAmount: annualAmount / 12,
+    year: entry.year,
+    aggregatedSideIncome: incomeAggregatedSideIncome(entry, entries),
+    employmentContext: entry.employmentContext,
+    minijobType: entry.minijobType,
+    considerPensionInsurance: entry.considerPensionInsurance,
+    isRvExempt: entry.isRvExempt,
+    shortTermEmploymentDays: entry.shortTermEmploymentDays,
+    shortTermEmploymentMonths: entry.shortTermEmploymentMonths,
+    studentEmploymentMode: entry.studentEmploymentMode,
+    requiresManualTaxReview: entry.requiresManualTaxReview
+  });
+}
+
+function incomeYearEntryRuleAmount(entry: IncomeYearEntry): number {
+  return Math.max(0, numberValue(entry.annualGrossIncome ?? entry.annualNetIncome));
+}
+
+function incomeAggregatedSideIncome(entry: IncomeYearEntry, entries: IncomeYearEntry[]): number {
+  return entries
+    .filter((item) => item.year === entry.year && (item.active || item.id === entry.id))
+    .filter((item) => SIDE_INCOME_TAX_RULE_LABELS.has(incomeYearLabel(item.label)))
+    .reduce((sum, item) => sum + incomeYearEntryRuleAmount(item), 0);
+}
+
+function incomeTaxCategoryEnabled(rule: IncomeTaxRuleResult, category: IncomeTaxDeductionCategory): boolean {
+  return category === "taxes" ? rule.taxFieldsEnabled : rule.contributionFieldsEnabled;
+}
+
+function incomeGrossFieldLocked(
+  entry: IncomeYearEntry,
+  entries: IncomeYearEntry[] = state.incomeTracker.yearlyEntries
+): boolean {
+  return incomeTaxRuleForEntry(entry, entries).status === "locked";
+}
+
+function incomeTaxDeductionRowEnabled(
+  entry: IncomeYearEntry,
+  rule: IncomeTaxRuleResult,
+  row: (typeof INCOME_TAX_DEDUCTION_ROWS)[number]
+): boolean {
+  if (!incomeTaxCategoryEnabled(rule, row.category)) return false;
+  const minijobRvOnly =
+    !rule.taxFieldsEnabled &&
+    rule.contributionFieldsEnabled &&
+    Boolean(entry.considerPensionInsurance) &&
+    !entry.isRvExempt &&
+    (incomeYearLabel(entry.label) === "minijob" ||
+      (incomeYearLabel(entry.label) === "student_newspaper_delivery" &&
+        (entry.studentEmploymentMode ?? "minijob") === "minijob"));
+  if (!minijobRvOnly) return true;
+  return row.field === "pensionInsurance";
+}
+
+function sanitizeIncomeYearEntriesWithTaxRules(entries: IncomeYearEntry[]): IncomeYearEntry[] {
+  return entries.map((entry) => sanitizeIncomeYearEntryWithTaxRules(entry, entries));
+}
+
+function sanitizeIncomeYearEntryWithTaxRules(entry: IncomeYearEntry, entries: IncomeYearEntry[]): IncomeYearEntry {
+  const rule = incomeTaxRuleForEntry(entry, entries);
+  const grossLocked = rule.status === "locked";
+  if (rule.taxFieldsEnabled && rule.contributionFieldsEnabled && !grossLocked) return entry;
+  const taxDeductionItems = { ...entry.taxDeductionItems };
+  for (const row of INCOME_TAX_DEDUCTION_ROWS) {
+    if (!incomeTaxDeductionRowEnabled(entry, rule, row)) {
+      taxDeductionItems[row.field] = null;
+    }
+  }
+  return {
+    ...entry,
+    annualGrossIncome: grossLocked ? null : entry.annualGrossIncome,
+    taxDeductionItems,
+    taxAdjustment: rule.taxFieldsEnabled ? entry.taxAdjustment : emptyIncomeTaxAdjustment(),
+    taxesAndDeductions: incomeTaxDeductionItemsTotal(taxDeductionItems)
+  };
+}
+
 function renderIncomeLiveUpdate(collection?: string, id?: string, field?: string): void {
   const model = incomeTrackerModel();
   if (collection === "yearlyEntries" && id) {
     renderIncomeYearlyNetCell(id, field);
+    renderIncomeYearlyGrossCell(id);
     renderIncomeYearlyTaxButton(id);
-    renderIncomeTaxDialogTotals(id);
+    if (incomeTaxDialogEntryId === id && incomeTaxRuleStructuralField(field)) {
+      renderIncomeTaxDialog();
+    } else {
+      renderIncomeTaxDialogTotals(id);
+    }
   }
   renderIncomeMetricGrid(model);
   renderIncomeInsights(model);
   renderIncomeYearStatusRows(model);
   renderIncomeCharts(model);
   renderIncomeAnalysisDialog(model);
+}
+
+function incomeTaxRuleStructuralField(field: string | undefined): boolean {
+  if (!field) return false;
+  return (
+    field === "year" ||
+    field === "active" ||
+    field === "label" ||
+    field === "annualGrossIncome" ||
+    field === "annualNetIncome" ||
+    field === "employmentContext" ||
+    field === "minijobType" ||
+    field === "considerPensionInsurance" ||
+    field === "isRvExempt" ||
+    field === "shortTermEmploymentDays" ||
+    field === "shortTermEmploymentMonths" ||
+    field === "studentEmploymentMode" ||
+    field === "requiresManualTaxReview"
+  );
 }
 
 function renderIncomeYearlyNetCell(id: string, changedField?: string): void {
@@ -1307,12 +1443,43 @@ function renderIncomeYearlyNetCell(id: string, changedField?: string): void {
   input.value = netValue === null ? "" : String(netValue);
 }
 
+function renderIncomeYearlyGrossCell(id: string): void {
+  const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === id);
+  const input = document.querySelector<HTMLInputElement>(`[data-income-year-gross="${cssEscape(id)}"]`);
+  if (!entry || !input) return;
+  const rule = incomeTaxRuleForEntry(entry);
+  const locked = rule.status === "locked";
+  const title = locked ? incomeTaxRuleTooltipText(rule) : "";
+  const cell = input.closest<HTMLTableCellElement>("[data-income-year-gross-cell]");
+  input.disabled = locked;
+  input.title = title;
+  input.value = locked || entry.annualGrossIncome === null ? "" : String(entry.annualGrossIncome);
+  if (cell) cell.title = title;
+}
+
 function renderIncomeYearlyTaxButton(id: string): void {
   const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === id);
   const value = document.querySelector<HTMLElement>(`[data-income-year-tax-total="${cssEscape(id)}"]`);
   if (!entry || !value) return;
   const taxDeductions = incomeYearEntryTaxDeductions(entry);
-  value.textContent = taxDeductions === null ? "Eintragen" : money(taxDeductions);
+  const rule = incomeTaxRuleForEntry(entry);
+  const locked = rule.status === "locked";
+  const button = value.closest<HTMLButtonElement>(".income-tax-button");
+  const cell = value.closest<HTMLTableCellElement>("[data-income-year-tax-cell]");
+  const label = button?.querySelector("span");
+  const title = locked ? incomeTaxRuleTooltipText(rule) : "";
+  value.textContent = locked ? "Gesperrt" : taxDeductions === null ? "Eintragen" : money(taxDeductions);
+  if (cell) cell.title = title;
+  if (button) {
+    button.disabled = locked;
+    button.title = title;
+    button.dataset.action = locked ? "" : `income-open-tax-dialog-${entry.id}`;
+    button.classList.toggle("locked", locked);
+    button.classList.toggle("partial", rule.status === "partially_enabled");
+  }
+  if (label) {
+    label.textContent = locked ? "Nicht moeglich" : rule.status === "partially_enabled" ? "Teilweise" : "Details";
+  }
 }
 
 function renderIncomeTaxDialogTotals(id: string): void {
@@ -1390,6 +1557,9 @@ function renderIncomeYearlyRows(): void {
   body.innerHTML = rows
     .map((entry) => {
       const calculatedNet = incomeYearEntryCalculatedNetIncome(entry);
+      const rule = incomeTaxRuleForEntry(entry);
+      const grossLocked = rule.status === "locked";
+      const lockedTooltip = grossLocked ? incomeTaxRuleTooltipText(rule) : "";
       const netIncome = incomeYearEntryNetIncome(entry);
       return `
       <tr>
@@ -1414,8 +1584,13 @@ function renderIncomeYearlyRows(): void {
           disabled: calculatedNet !== null,
           extraAttribute: `data-income-year-net="${escapeHtml(entry.id)}"`
         })}</td>
-        <td>${incomeNumberInput("yearlyEntries", entry.id, "annualGrossIncome", entry.annualGrossIncome, { min: 0 })}</td>
-        <td>${incomeTaxDeductionsButton(entry)}</td>
+        <td data-income-year-gross-cell="${escapeHtml(entry.id)}" title="${escapeHtml(lockedTooltip)}">${incomeNumberInput("yearlyEntries", entry.id, "annualGrossIncome", grossLocked ? null : entry.annualGrossIncome, {
+          min: 0,
+          disabled: grossLocked,
+          title: lockedTooltip,
+          extraAttribute: `data-income-year-gross="${escapeHtml(entry.id)}"`
+        })}</td>
+        <td data-income-year-tax-cell="${escapeHtml(entry.id)}" title="${escapeHtml(lockedTooltip)}">${incomeTaxDeductionsButton(entry, rule)}</td>
         <td><button class="icon-button danger" type="button" data-action="income-remove-yearly-${entry.id}" aria-label="Jahreswert entfernen">x</button></td>
       </tr>
     `;
@@ -1437,6 +1612,7 @@ function renderIncomeTaxDialog(): void {
   const socialTotal = incomeTaxDeductionCategoryTotal(entry, "social");
   const employerSocialTotal = incomeTaxDeductionCategoryTotal(entry, "employer_social");
   const total = incomeYearEntryTaxDeductions(entry);
+  const rule = incomeTaxRuleForEntry(entry);
   root.innerHTML = `
     <div class="income-tax-dialog-backdrop" role="presentation">
       <div class="income-tax-dialog" role="dialog" aria-modal="true" aria-label="Steuer- und Abgabenpositionen">
@@ -1447,6 +1623,8 @@ function renderIncomeTaxDialog(): void {
           </div>
           <button class="chart-popup-close" type="button" data-action="income-close-tax-dialog" aria-label="Dialog schliessen">x</button>
         </div>
+        ${incomeTaxRulePanel(entry, rule)}
+        ${incomeTaxRuleContextControls(entry)}
         <div class="table-wrap">
           <table class="income-table income-tax-table">
             <thead>
@@ -1458,15 +1636,24 @@ function renderIncomeTaxDialog(): void {
             </thead>
             <tbody>
               ${INCOME_TAX_DEDUCTION_ROWS.map(
-                (row) => `
-                  <tr>
+                (row) => {
+                  const enabled = incomeTaxDeductionRowEnabled(entry, rule, row);
+                  const lockedReason = enabled ? "" : incomeTaxLockedRowReason(entry, row, rule);
+                  return `
+                  <tr class="${enabled ? "" : "income-tax-row-locked"}" title="${escapeHtml(lockedReason)}">
                     <td class="numeric-cell">${escapeHtml(row.nr)}</td>
-                    <td>${escapeHtml(row.label)}</td>
+                    <td>
+                      ${escapeHtml(row.label)}
+                      ${enabled ? "" : `<small>${escapeHtml(lockedReason)}</small>`}
+                    </td>
                     <td>${incomeNumberInput("yearlyEntries", entry.id, `taxDeductionItems.${row.field}`, entry.taxDeductionItems[row.field], {
-                      min: 0
+                      min: 0,
+                      disabled: !enabled,
+                      title: lockedReason
                     })}</td>
                   </tr>
-                `
+                `;
+                }
               ).join("")}
             </tbody>
           </table>
@@ -1493,10 +1680,14 @@ function renderIncomeTaxDialog(): void {
             <strong id="incomeTaxDialogGrandTotal">${total === null ? "-" : money(total)}</strong>
           </div>
         </div>
-        <div class="income-tax-adjustment">
+        <div class="income-tax-adjustment ${rule.taxFieldsEnabled ? "" : "locked"}">
           <div>
             <strong>Steuernachzahlung oder Rueckerstattung</strong>
-            <span>Dieser Wert wird in der Weltgrafik bei Abgabenmix, Steuern und Einkommen beruecksichtigt.</span>
+            <span>${escapeHtml(
+              rule.taxFieldsEnabled
+                ? "Dieser Wert wird in der Weltgrafik bei Abgabenmix, Steuern und Einkommen beruecksichtigt."
+                : incomeTaxLockedCategoryReason("taxes", rule)
+            )}</span>
           </div>
           <div class="income-tax-adjustment-options" role="radiogroup" aria-label="Art der Steuerkorrektur">
             ${INCOME_TAX_ADJUSTMENT_OPTIONS.map(
@@ -1510,6 +1701,7 @@ function renderIncomeTaxDialog(): void {
                     data-income-collection="yearlyEntries"
                     data-income-id="${escapeHtml(entry.id)}"
                     data-income-field="taxAdjustment.type"
+                    ${rule.taxFieldsEnabled ? "" : "disabled"}
                   />
                   <span>${escapeHtml(option.label)}</span>
                 </label>
@@ -1518,7 +1710,10 @@ function renderIncomeTaxDialog(): void {
           </div>
           <div class="income-tax-adjustment-amount">
             <span>Betrag</span>
-            ${incomeNumberInput("yearlyEntries", entry.id, "taxAdjustment.amount", entry.taxAdjustment.amount, { min: 0 })}
+            ${incomeNumberInput("yearlyEntries", entry.id, "taxAdjustment.amount", entry.taxAdjustment.amount, {
+              min: 0,
+              disabled: !rule.taxFieldsEnabled
+            })}
           </div>
         </div>
         <div class="button-row">
@@ -1527,6 +1722,177 @@ function renderIncomeTaxDialog(): void {
       </div>
     </div>
   `;
+}
+
+function incomeTaxRulePanel(entry: IncomeYearEntry, rule: IncomeTaxRuleResult): string {
+  const config = taxRuleConfigForYear(entry.year);
+  const label = incomeYearLabel(entry.label);
+  const warning = rule.warningKey ? incomeTaxRuleWarningText(rule.warningKey) : "";
+  const badgeText =
+    rule.status === "enabled"
+      ? "Manuelle Steuer-/Abgabenposition moeglich"
+      : rule.status === "partially_enabled"
+        ? "Teilweise freigegeben"
+        : "Gesperrt";
+  return `
+    <section class="income-tax-rule-panel ${escapeHtml(rule.status)}">
+      <div class="income-tax-rule-main">
+        <span class="income-tax-rule-badge">${escapeHtml(badgeText)}</span>
+        <strong>${escapeHtml(incomeTaxRuleReasonText(rule.reasonKey))}</strong>
+        ${warning ? `<p>${escapeHtml(warning)}</p>` : ""}
+      </div>
+      <div class="income-tax-rule-facts">
+        <span>Steuerlich relevant: <strong>${money(rule.taxableAmount)}</strong></span>
+        <span>Beitragsrelevant: <strong>${money(rule.contributionRelevantAmount)}</strong></span>
+        ${rule.estimatedEmployeePensionContribution !== undefined ? `<span>Geschaetzter RV-Eigenanteil: <strong>${money(rule.estimatedEmployeePensionContribution)}</strong></span>` : ""}
+        ${label === "minijob" || label === "student_newspaper_delivery" ? `<span>Minijob-Grenze ${entry.year}: <strong>${money(config.minijobMonthlyLimit)} / Monat</strong></span>` : ""}
+        ${label === "volunteer_allowance" ? `<span>Ehrenamtspauschale ${entry.year}: <strong>${money(config.volunteerAllowance)} / Jahr</strong></span>` : ""}
+        ${label === "trainer_allowance" ? `<span>Übungsleiterpauschale ${entry.year}: <strong>${money(config.trainerAllowance)} / Jahr</strong></span>` : ""}
+      </div>
+    </section>
+  `;
+}
+
+function incomeTaxRuleContextControls(entry: IncomeYearEntry): string {
+  const label = incomeYearLabel(entry.label);
+  const controls: string[] = [];
+
+  if (label === "severance_payment") {
+    controls.push(`
+      <label>
+        <span>Abfindungskontext</span>
+        ${incomeSelect("yearlyEntries", entry.id, "employmentContext", INCOME_EMPLOYMENT_CONTEXT_OPTIONS, entry.employmentContext ?? "job_loss")}
+      </label>
+    `);
+  }
+
+  if (label === "student_newspaper_delivery") {
+    controls.push(`
+      <label>
+        <span>Beschaeftigungsmodus</span>
+        ${incomeSelect(
+          "yearlyEntries",
+          entry.id,
+          "studentEmploymentMode",
+          INCOME_STUDENT_EMPLOYMENT_MODE_OPTIONS,
+          entry.studentEmploymentMode ?? "minijob"
+        )}
+      </label>
+    `);
+  }
+
+  const usesMinijobControls =
+    label === "minijob" || (label === "student_newspaper_delivery" && (entry.studentEmploymentMode ?? "minijob") === "minijob");
+  if (usesMinijobControls) {
+    controls.push(`
+      <label>
+        <span>Minijob-Art</span>
+        ${incomeSelect("yearlyEntries", entry.id, "minijobType", INCOME_MINIJOB_TYPE_OPTIONS, entry.minijobType ?? "commercial")}
+      </label>
+      ${incomeInlineCheckbox(entry, "considerPensionInsurance", Boolean(entry.considerPensionInsurance), "Rentenversicherungspflicht beruecksichtigen")}
+      ${incomeInlineCheckbox(entry, "isRvExempt", Boolean(entry.isRvExempt), "Von Rentenversicherungspflicht befreit")}
+    `);
+  }
+
+  if (label === "student_newspaper_delivery" && (entry.studentEmploymentMode ?? "minijob") === "short_term") {
+    controls.push(`
+      <label>
+        <span>Arbeitstage im Kalenderjahr</span>
+        ${incomeNumberInput("yearlyEntries", entry.id, "shortTermEmploymentDays", entry.shortTermEmploymentDays ?? null, {
+          min: 0,
+          step: 1
+        })}
+      </label>
+      <label>
+        <span>Monate im Kalenderjahr</span>
+        ${incomeNumberInput("yearlyEntries", entry.id, "shortTermEmploymentMonths", entry.shortTermEmploymentMonths ?? null, {
+          min: 0,
+          step: 1
+        })}
+      </label>
+      ${incomeInlineCheckbox(entry, "requiresManualTaxReview", Boolean(entry.requiresManualTaxReview), "Manuelle steuerliche Pruefung erforderlich")}
+    `);
+  }
+
+  if (!controls.length) return "";
+  return `<section class="income-tax-context-controls">${controls.join("")}</section>`;
+}
+
+function incomeInlineCheckbox(entry: IncomeYearEntry, field: string, checked: boolean, label: string): string {
+  return `
+    <label class="income-tax-inline-checkbox">
+      ${incomeCheckboxInput("yearlyEntries", entry.id, field, checked, label)}
+      <span>${escapeHtml(label)}</span>
+    </label>
+  `;
+}
+
+function incomeTaxLockedCategoryReason(category: IncomeTaxDeductionCategory, rule: IncomeTaxRuleResult): string {
+  if (category === "taxes" && !rule.taxFieldsEnabled) return "Steuerfelder sind fuer dieses Label gesperrt.";
+  if (category !== "taxes" && !rule.contributionFieldsEnabled) return "Sozialabgabenfelder sind fuer dieses Label gesperrt.";
+  return "";
+}
+
+function incomeTaxLockedRowReason(
+  entry: IncomeYearEntry,
+  row: (typeof INCOME_TAX_DEDUCTION_ROWS)[number],
+  rule: IncomeTaxRuleResult
+): string {
+  const categoryReason = incomeTaxLockedCategoryReason(row.category, rule);
+  if (categoryReason) return categoryReason;
+  if (
+    !rule.taxFieldsEnabled &&
+    rule.contributionFieldsEnabled &&
+    Boolean(entry.considerPensionInsurance) &&
+    !entry.isRvExempt
+  ) {
+    return "Nur der Arbeitnehmerbeitrag zur gesetzlichen RV ist freigegeben.";
+  }
+  return "Dieses Feld ist fuer die aktuelle Regel gesperrt.";
+}
+
+function incomeTaxRuleReasonText(reasonKey: string): string {
+  const textByKey: Record<string, string> = {
+    "incomeTaxRules.default.enabled": "Normale Steuer- und Abgabenpositionen sind freigegeben.",
+    "incomeTaxRules.pocketMoney.locked": "Taschengeld wird nicht als Arbeitslohn behandelt.",
+    "incomeTaxRules.childYouthJobs.locked": "Kinder- und Jugendjobs wie Zeitung austragen werden hier nicht als lohnsteuerpflichtiger Arbeitslohn gefuehrt.",
+    "incomeTaxRules.severance.jobLoss": "Abfindungen wegen Verlust des Arbeitsplatzes bleiben fuer Sozialabgaben gesperrt.",
+    "incomeTaxRules.severance.earnedClaim": "Zahlungen fuer bereits entstandene Ansprueche sind zur manuellen Pruefung freigegeben.",
+    "incomeTaxRules.garage.locked": "Nebeneinkuenfte liegen innerhalb der konfigurierten Freigrenze.",
+    "incomeTaxRules.garage.sideIncomeExceeded": "Schwelle ueberschritten - manuelle Steuerposition moeglich.",
+    "incomeTaxRules.volunteer.locked": "Bis zur Ehrenamtspauschale ist keine Steuer-/Abgabenposition erforderlich.",
+    "incomeTaxRules.volunteer.allowanceExceeded": "Ehrenamtspauschale ueberschritten - nur der Mehrbetrag ist steuerlich relevant.",
+    "incomeTaxRules.trainer.locked": "Bis zum Übungsleiterfreibetrag ist keine Steuer-/Abgabenposition erforderlich.",
+    "incomeTaxRules.trainer.allowanceExceeded": "Übungsleiterfreibetrag überschritten - nur der Mehrbetrag ist steuerlich relevant.",
+    "incomeTaxRules.minijob.locked": "Pauschale Besteuerung angenommen; Steuer- und Sozialabgabenfelder bleiben gesperrt.",
+    "incomeTaxRules.minijob.rvExempt": "Befreiung von der Rentenversicherungspflicht ist gesetzt.",
+    "incomeTaxRules.minijob.rvActive": "Rentenversicherungspflicht ist aktiv; Sozialabgaben koennen erfasst werden.",
+    "incomeTaxRules.minijob.annualLimitExceeded": "Minijob-Jahresgrenze ueberschritten - manuelle Pruefung noetig.",
+    "incomeTaxRules.studentNewspaper.minijob": "Schuelerjob wird nach Minijob-Regeln bewertet.",
+    "incomeTaxRules.studentNewspaper.shortTermLocked": "Kurzfristige Beschaeftigung liegt innerhalb der konfigurierten Dauergrenzen.",
+    "incomeTaxRules.studentNewspaper.shortTermTaxReview": "Kurzfristige Beschaeftigung mit manueller steuerlicher Pruefung.",
+    "incomeTaxRules.studentNewspaper.shortTermLimitExceeded": "Dauergrenze ueberschritten - Steuer- und Abgabenpositionen sind freigegeben."
+  };
+  return textByKey[reasonKey] ?? "Regelstatus wurde angewendet.";
+}
+
+function incomeTaxRuleWarningText(warningKey: string): string {
+  const textByKey: Record<string, string> = {
+    "incomeTaxRules.severance.warning": "Zahlungen fuer bereits entstandene Ansprueche koennen abweichend beitragspflichtig sein.",
+    "incomeTaxRules.garage.general": "Einnahmen aus Garage oder Stellplatz werden als Vermietung/Verpachtung behandelt. Die 410 EUR sind kein eigener Garage-Freibetrag, sondern nur die aggregierte Nebeneinkuenfte-Pruefung.",
+    "incomeTaxRules.volunteer.warningAllowanceExceeded": "Nur der uebersteigende Betrag ist gesondert zu pruefen.",
+    "incomeTaxRules.trainer.warningAllowanceExceeded": "Nur der übersteigende Betrag ist gesondert zu pruefen.",
+    "incomeTaxRules.minijob.warningAnnualLimitExceeded": "Die Minijob-Grenze wird jahresbezogen geprueft; einzelne Monatsabweichungen koennen zulaessig sein.",
+    "incomeTaxRules.minijob.monthlyLimitNote": "Einzelne Monatsueberschreitungen koennen zulaessig sein, solange die Jahresgrenze eingehalten wird.",
+    "incomeTaxRules.studentNewspaper.warningShortTermLimitExceeded": "Zeitung austragen wird separat gefuehrt; je nach Ausgestaltung gelten Minijob- oder Kurzfristigkeitsregeln."
+  };
+  return textByKey[warningKey] ?? "";
+}
+
+function incomeTaxRuleTooltipText(rule: IncomeTaxRuleResult): string {
+  const reason = incomeTaxRuleReasonText(rule.reasonKey);
+  const warning = rule.warningKey ? incomeTaxRuleWarningText(rule.warningKey) : "";
+  return warning ? `${reason} ${warning}` : reason;
 }
 
 function renderIncomeAnalysisDialog(model: IncomeTrackerModel = incomeTrackerModel()): void {
@@ -2506,7 +2872,7 @@ function incomeSourceBadge(source: IncomeResolvedSource): string {
 }
 
 function incomeYearLabel(value: string | undefined): string {
-  const normalized = String(value ?? "").trim();
+  const normalized = normalizeIncomeTaxRuleLabel(String(value ?? "").trim());
   if (INCOME_YEAR_LABEL_OPTIONS.some((option) => option.id === normalized)) return normalized;
   const byLabel = INCOME_YEAR_LABEL_OPTIONS.find((option) => incomeLabelKey(option.label) === incomeLabelKey(normalized));
   return byLabel?.id ?? "salary";
@@ -2555,7 +2921,7 @@ function incomeNumberInput(
   id: string,
   field: string,
   value: number | null,
-  options: { min?: number; max?: number; step?: number; disabled?: boolean; extraAttribute?: string } = {}
+  options: { min?: number; max?: number; step?: number; disabled?: boolean; title?: string; extraAttribute?: string } = {}
 ): string {
   return `
     <input
@@ -2565,6 +2931,7 @@ function incomeNumberInput(
       ${options.max !== undefined ? `max="${options.max}"` : ""}
       step="${options.step ?? 0.01}"
       ${options.disabled ? "disabled" : ""}
+      ${options.title ? `title="${escapeHtml(options.title)}"` : ""}
       ${options.extraAttribute ?? ""}
       data-income-collection="${collection}"
       data-income-id="${id}"
@@ -2590,17 +2957,23 @@ function incomeCheckboxInput(collection: string, id: string, field: string, chec
   `;
 }
 
-function incomeTaxDeductionsButton(entry: IncomeYearEntry): string {
+function incomeTaxDeductionsButton(entry: IncomeYearEntry, rule = incomeTaxRuleForEntry(entry)): string {
   const taxDeductions = incomeYearEntryTaxDeductions(entry);
+  const locked = rule.status === "locked";
+  const stateLabel =
+    locked ? "Nicht moeglich" : rule.status === "partially_enabled" ? "Teilweise" : "Details";
+  const mainLabel = locked ? "Gesperrt" : taxDeductions === null ? "Eintragen" : money(taxDeductions);
+  const lockedTooltip = locked ? incomeTaxRuleTooltipText(rule) : "";
   return `
     <button
-      class="income-tax-button"
+      class="income-tax-button ${locked ? "locked" : rule.status === "partially_enabled" ? "partial" : ""}"
       type="button"
-      data-action="income-open-tax-dialog-${escapeHtml(entry.id)}"
-      aria-label="Steuer- und Abgabenpositionen bearbeiten"
+      ${locked ? "disabled" : `data-action="income-open-tax-dialog-${escapeHtml(entry.id)}"`}
+      ${lockedTooltip ? `title="${escapeHtml(lockedTooltip)}"` : ""}
+      aria-label="${locked ? `Steuer- und Abgabenpositionen gesperrt: ${escapeHtml(lockedTooltip)}` : "Steuer- und Abgabenpositionen bearbeiten"}"
     >
-      <strong data-income-year-tax-total="${escapeHtml(entry.id)}">${taxDeductions === null ? "Eintragen" : money(taxDeductions)}</strong>
-      <span>Details</span>
+      <strong data-income-year-tax-total="${escapeHtml(entry.id)}">${escapeHtml(mainLabel)}</strong>
+      <span>${escapeHtml(stateLabel)}</span>
     </button>
   `;
 }
@@ -2672,7 +3045,8 @@ function setIncomeInputTab(value: string): void {
 }
 
 function openIncomeTaxDialog(id: string): void {
-  if (!state.incomeTracker.yearlyEntries.some((entry) => entry.id === id)) return;
+  const entry = state.incomeTracker.yearlyEntries.find((item) => item.id === id);
+  if (!entry || incomeTaxRuleForEntry(entry).status === "locked") return;
   incomeTaxDialogEntryId = id;
   renderIncomeTaxDialog();
 }
@@ -2742,6 +3116,14 @@ function addIncomeYearlyEntry(): void {
         taxesAndDeductions: null,
         taxDeductionItems: emptyIncomeTaxDeductionItems(),
         taxAdjustment: emptyIncomeTaxAdjustment(),
+        employmentContext: "job_loss",
+        minijobType: "commercial",
+        considerPensionInsurance: false,
+        isRvExempt: false,
+        shortTermEmploymentDays: null,
+        shortTermEmploymentMonths: null,
+        studentEmploymentMode: "minijob",
+        requiresManualTaxReview: false,
         employer: "",
         note: "",
         source: "annual_statement"
@@ -2772,9 +3154,10 @@ function addIncomeMilestone(): void {
 function removeIncomeEntry(action: string): void {
   if (action.startsWith("income-remove-yearly-")) {
     const id = action.replace("income-remove-yearly-", "");
+    const yearlyEntries = state.incomeTracker.yearlyEntries.filter((entry) => entry.id !== id);
     state.incomeTracker = {
       ...state.incomeTracker,
-      yearlyEntries: state.incomeTracker.yearlyEntries.filter((entry) => entry.id !== id)
+      yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules(yearlyEntries)
     };
   } else if (action.startsWith("income-remove-milestone-")) {
     const id = action.replace("income-remove-milestone-", "");
@@ -2788,11 +3171,12 @@ function removeIncomeEntry(action: string): void {
 
 function updateIncomeEntry(collection: string, id: string, field: string, value: string): void {
   if (collection === "yearlyEntries") {
+    const yearlyEntries = state.incomeTracker.yearlyEntries.map((entry) =>
+      entry.id === id ? updateIncomeYearEntry(entry, field, value) : entry
+    );
     state.incomeTracker = {
       ...state.incomeTracker,
-      yearlyEntries: state.incomeTracker.yearlyEntries.map((entry) =>
-        entry.id === id ? updateIncomeYearEntry(entry, field, value) : entry
-      )
+      yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules(yearlyEntries)
     };
     return;
   }
@@ -2814,6 +3198,14 @@ function updateIncomeYearEntry(entry: IncomeYearEntry, field: string, value: str
   if (field === "label") return { ...entry, label: incomeYearLabel(value) };
   if (field === "person") return { ...entry, person: incomePerson(value) };
   if (field === "source") return { ...entry, source: incomeYearSource(value) };
+  if (field === "employmentContext") return { ...entry, employmentContext: incomeEmploymentContext(value) };
+  if (field === "minijobType") return { ...entry, minijobType: incomeMinijobType(value) };
+  if (field === "considerPensionInsurance") return { ...entry, considerPensionInsurance: value === "true" };
+  if (field === "isRvExempt") return { ...entry, isRvExempt: value === "true" };
+  if (field === "shortTermEmploymentDays") return { ...entry, shortTermEmploymentDays: nullableInputNumber(value) };
+  if (field === "shortTermEmploymentMonths") return { ...entry, shortTermEmploymentMonths: nullableInputNumber(value) };
+  if (field === "studentEmploymentMode") return { ...entry, studentEmploymentMode: incomeStudentEmploymentMode(value) };
+  if (field === "requiresManualTaxReview") return { ...entry, requiresManualTaxReview: value === "true" };
   if (field === "employer") return { ...entry, employer: value };
   if (field === "note") return { ...entry, note: value };
   if (field === "annualNetIncome") return { ...entry, annualNetIncome: nullableInputNumber(value) };
@@ -2845,7 +3237,7 @@ function isIncomeTaxDeductionField(value: string): value is IncomeTaxDeductionFi
   return INCOME_TAX_DEDUCTION_ROWS.some((row) => row.field === value);
 }
 
-function incomeTaxDeductionCategoryTotal(entry: IncomeYearEntry, category: "taxes" | "social" | "employer_social"): number {
+function incomeTaxDeductionCategoryTotal(entry: IncomeYearEntry, category: IncomeTaxDeductionCategory): number {
   if (category === "taxes") return incomeYearEntryTaxTotal(entry);
   return INCOME_TAX_DEDUCTION_ROWS.filter((row) => row.category === category).reduce(
     (sum, row) => sum + numberValue(entry.taxDeductionItems[row.field]),
@@ -2901,7 +3293,10 @@ async function importIncomeCsvFromFile(file: File | undefined): Promise<void> {
 
   state.incomeTracker = {
     ...state.incomeTracker,
-    yearlyEntries: [...state.incomeTracker.yearlyEntries, ...imported.yearlyEntries],
+    yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules([
+      ...state.incomeTracker.yearlyEntries,
+      ...imported.yearlyEntries
+    ]),
     milestones: [...state.incomeTracker.milestones, ...imported.milestones],
     settings: {
       ...state.incomeTracker.settings,
@@ -2944,6 +3339,14 @@ function incomeTrackerCsv(model: IncomeTrackerModel): string {
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxesAndDeductions", csvValue(entry.taxesAndDeductions), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxAdjustmentType", entry.taxAdjustment.type, entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxAdjustmentAmount", csvValue(entry.taxAdjustment.amount), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "employmentContext", entry.employmentContext ?? "job_loss", entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "minijobType", entry.minijobType ?? "commercial", entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "considerPensionInsurance", String(Boolean(entry.considerPensionInsurance)), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "isRvExempt", String(Boolean(entry.isRvExempt)), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "shortTermEmploymentDays", csvValue(entry.shortTermEmploymentDays ?? null), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "shortTermEmploymentMonths", csvValue(entry.shortTermEmploymentMonths ?? null), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "studentEmploymentMode", entry.studentEmploymentMode ?? "minijob", entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "requiresManualTaxReview", String(Boolean(entry.requiresManualTaxReview)), entry.source]);
     for (const row of INCOME_TAX_DEDUCTION_ROWS) {
       rows.push([
         "yearly_tax_detail",
@@ -3024,6 +3427,14 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
           taxesAndDeductions: null,
           taxDeductionItems: emptyIncomeTaxDeductionItems(),
           taxAdjustment: emptyIncomeTaxAdjustment(),
+          employmentContext: "job_loss",
+          minijobType: "commercial",
+          considerPensionInsurance: false,
+          isRvExempt: false,
+          shortTermEmploymentDays: null,
+          shortTermEmploymentMonths: null,
+          studentEmploymentMode: "minijob",
+          requiresManualTaxReview: false,
           employer: "",
           note: "",
           source: incomeYearSource(sourceValue)
@@ -3053,6 +3464,22 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
         entry.taxAdjustment = { ...entry.taxAdjustment, type: incomeTaxAdjustmentType(value) };
       } else if (fieldKey === "taxadjustmentamount") {
         entry.taxAdjustment = { ...entry.taxAdjustment, amount: incomeCsvNumber(value) };
+      } else if (fieldKey === "employmentcontext") {
+        entry.employmentContext = incomeEmploymentContext(value);
+      } else if (fieldKey === "minijobtype") {
+        entry.minijobType = incomeMinijobType(value);
+      } else if (fieldKey === "considerpensioninsurance") {
+        entry.considerPensionInsurance = incomeCsvBoolean(value, false);
+      } else if (fieldKey === "isrvexempt") {
+        entry.isRvExempt = incomeCsvBoolean(value, false);
+      } else if (fieldKey === "shorttermemploymentdays") {
+        entry.shortTermEmploymentDays = incomeCsvNumber(value);
+      } else if (fieldKey === "shorttermemploymentmonths") {
+        entry.shortTermEmploymentMonths = incomeCsvNumber(value);
+      } else if (fieldKey === "studentemploymentmode") {
+        entry.studentEmploymentMode = incomeStudentEmploymentMode(value);
+      } else if (fieldKey === "requiresmanualtaxreview") {
+        entry.requiresManualTaxReview = incomeCsvBoolean(value, false);
       } else if (fieldKey === "employer") {
         entry.employer = value;
       }
@@ -3252,6 +3679,19 @@ function incomePerson(value: string): IncomePerson {
 
 function incomeYearSource(value: string): IncomeYearEntrySource {
   return value === "manual" ? "manual" : "annual_statement";
+}
+
+function incomeEmploymentContext(value: string): IncomeEmploymentContext {
+  if (value === "earned_claim" || value === "other") return value;
+  return "job_loss";
+}
+
+function incomeMinijobType(value: string): IncomeMinijobType {
+  return value === "private_household" ? "private_household" : "commercial";
+}
+
+function incomeStudentEmploymentMode(value: string): IncomeStudentEmploymentMode {
+  return value === "short_term" ? "short_term" : "minijob";
 }
 
 function incomeTaxAdjustmentType(value: string): IncomeTaxAdjustmentType {
@@ -4092,7 +4532,7 @@ function showIncomeYearLabelPicker(button: HTMLButtonElement): void {
   const entryId = button.dataset.incomeYearId;
   if (!entryId) return;
   const rect = button.getBoundingClientRect();
-  const panelWidth = 360;
+  const panelWidth = 500;
   const panelHeight = 420;
   const left =
     rect.right + 12 + panelWidth <= window.innerWidth
@@ -4110,11 +4550,12 @@ function hideIncomeYearLabelPicker(): void {
 
 function selectIncomeYearLabel(entryId: string, label: string): void {
   if (!entryId || !label) return;
+  const yearlyEntries = state.incomeTracker.yearlyEntries.map((entry) =>
+    entry.id === entryId ? { ...entry, label: incomeYearLabel(label) } : entry
+  );
   state.incomeTracker = {
     ...state.incomeTracker,
-    yearlyEntries: state.incomeTracker.yearlyEntries.map((entry) =>
-      entry.id === entryId ? { ...entry, label: incomeYearLabel(label) } : entry
-    )
+    yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules(yearlyEntries)
   };
   incomeYearLabelPicker = null;
   renderAll();

@@ -22,6 +22,11 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     svg: '<path d="M4 7.5h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5.5A2.5 2.5 0 0 1 3 16V8.5A2.5 2.5 0 0 1 5.5 6H17"/><path d="M16 12h4v4h-4a2 2 0 0 1 0-4Z"/>'
   },
   {
+    id: "job_badge",
+    label: "Job-Ausweis",
+    svg: '<path d="M9 6V4h6v2"/><rect x="7" y="6" width="10" height="14" rx="2"/><circle cx="12" cy="11" r="2"/><path d="M9.5 17c.5-2 4.5-2 5 0"/>'
+  },
+  {
     id: "pocket_money",
     label: "Taschengeld",
     svg: '<path d="M6 7.5V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1.5"/><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M8 11h8"/><path d="M9 15h6"/><circle cx="12" cy="13" r="1.8"/>'
@@ -35,6 +40,11 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     id: "receipt",
     label: "Ausgabe",
     svg: '<path d="M6 4h12v16l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2L6 20V4Z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/>'
+  },
+  {
+    id: "income_plus",
+    label: "Nebeneinkuenfte",
+    svg: '<path d="M5 8h8"/><path d="M5 12h6"/><path d="M5 16h8"/><circle cx="17" cy="12" r="4"/><path d="M17 10v4"/><path d="M15 12h4"/>'
   },
   {
     id: "shield",
@@ -82,14 +92,39 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     svg: '<path d="m3 9 9-5 9 5-9 5-9-5Z"/><path d="M7 11.5v4c2.8 2 7.2 2 10 0v-4"/><path d="M21 9v6"/>'
   },
   {
+    id: "briefcase",
+    label: "Selbststaendigkeit",
+    svg: '<rect x="4" y="7" width="16" height="12" rx="2"/><path d="M9 7V5h6v2"/><path d="M4 12h16"/><path d="M10 12v2h4v-2"/>'
+  },
+  {
+    id: "pen",
+    label: "Freiberuflich",
+    svg: '<path d="M4 20l4.5-1 10-10L15 5.5l-10 10L4 20Z"/><path d="m14 6 3.5 3.5"/><path d="M12 20h8"/>'
+  },
+  {
     id: "investment",
     label: "Investment",
     svg: '<path d="M4 19h16"/><path d="M6 16l4-5 3 3 5-8"/><path d="M16 6h2v2"/>'
   },
   {
+    id: "dividend",
+    label: "Dividende",
+    svg: '<circle cx="11" cy="12" r="7"/><path d="M11 5v7h7"/><path d="m16 17 3 3"/><path d="M19 17v3h-3"/>'
+  },
+  {
     id: "bank",
     label: "Bank",
     svg: '<path d="m4 9 8-5 8 5H4Z"/><path d="M6 9v8"/><path d="M10 9v8"/><path d="M14 9v8"/><path d="M18 9v8"/><path d="M4 17h16"/><path d="M3 20h18"/>'
+  },
+  {
+    id: "safe",
+    label: "Tresor",
+    svg: '<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M12 9v6"/><path d="M9 12h6"/><path d="M7 8h2"/><path d="M7 16h2"/>'
+  },
+  {
+    id: "parking",
+    label: "Garage / Stellplatz",
+    svg: '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M10 17V8h4a2.5 2.5 0 0 1 0 5h-4"/><path d="M19 20H5"/>'
   },
   {
     id: "calendar",
@@ -107,9 +142,29 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     svg: '<path d="M3 13h18"/><path d="M6 17h12"/><path d="M8 13l-3-5h3l3 5"/><path d="M15 13l3-5h-3l-3 5"/>'
   },
   {
+    id: "stage",
+    label: "Gagen",
+    svg: '<path d="M4 18h16"/><path d="m7 18 3-10h4l3 10"/><path d="M9 8h6"/><path d="M12 8v10"/><path d="M8 14h8"/>'
+  },
+  {
+    id: "volunteer_hand",
+    label: "Ehrenamt",
+    svg: '<path d="M5 15h4l3 2 5-5a1.8 1.8 0 0 1 2.5 2.5L14 20H5"/><path d="M5 12h3.5l2.5 2h3"/><path d="M12 8.5s-3-1.7-3-4A2 2 0 0 1 12 3a2 2 0 0 1 3 1.5c0 2.3-3 4-3 4Z"/>'
+  },
+  {
+    id: "whistle",
+    label: "Uebungsleiter",
+    svg: '<path d="M6 9h9a4 4 0 1 1-3.5 6H8l-2 3"/><path d="m6 9-2-2"/><path d="M15 9h4"/><circle cx="15" cy="13" r="1"/>'
+  },
+  {
     id: "child",
     label: "Kind",
     svg: '<circle cx="12" cy="7" r="3"/><path d="M6.5 21c.6-4.1 2.4-7 5.5-7s4.9 2.9 5.5 7"/><path d="M9 11c1.8 1.2 4.2 1.2 6 0"/>'
+  },
+  {
+    id: "newspaper_route",
+    label: "Kinder- und Jugendjob",
+    svg: '<rect x="4" y="5" width="11" height="12" rx="1.5"/><path d="M7 8h5"/><path d="M7 11h5"/><path d="M7 14h3"/><circle cx="19" cy="7" r="1.5"/><circle cx="19" cy="17" r="1.5"/><path d="M19 8.5v7"/>'
   },
   {
     id: "gift",
@@ -120,6 +175,21 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     id: "card",
     label: "Karte",
     svg: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>'
+  },
+  {
+    id: "boardroom",
+    label: "Vorstand",
+    svg: '<rect x="6" y="9" width="12" height="6" rx="1.5"/><path d="M8 5h8"/><path d="M8 19h8"/><path d="M3 12h3"/><path d="M18 12h3"/><path d="M12 9v6"/>'
+  },
+  {
+    id: "stamp",
+    label: "Amtstraeger",
+    svg: '<path d="M9 12V6a3 3 0 0 1 6 0v6"/><path d="M6 12h12l1 5H5l1-5Z"/><path d="M5 20h14"/><path d="M8 16h8"/>'
+  },
+  {
+    id: "oversight",
+    label: "Aufsichtsrat",
+    svg: '<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v2"/><path d="M12 18v2"/>'
   },
   {
     id: "cashback",

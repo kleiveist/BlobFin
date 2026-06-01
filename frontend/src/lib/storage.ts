@@ -12,6 +12,7 @@ import {
   defaultRealEstateFinancingSettings,
   defaultRepaymentSourceToggles
 } from "../data/defaults";
+import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
 import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
 import {
@@ -30,6 +31,9 @@ import type {
   CombinedWealthToggles,
   IncomePerson,
   IncomeProjectionMode,
+  IncomeEmploymentContext,
+  IncomeMinijobType,
+  IncomeStudentEmploymentMode,
   IncomeTaxAdjustment,
   IncomeTaxAdjustmentType,
   IncomeTaxDeductionField,
@@ -535,7 +539,9 @@ function normalizeIncomeTrackerSettings(value: unknown): IncomeTrackerSettings {
       fallback.manualGrowthRatePercent
     ),
     savingsSharePercent: nullableNumberOrDefault(value.savingsSharePercent, fallback.savingsSharePercent),
-    selectedYearlyLabels: stringArrayOrDefault(value.selectedYearlyLabels, fallback.selectedYearlyLabels)
+    selectedYearlyLabels: stringArrayOrDefault(value.selectedYearlyLabels, fallback.selectedYearlyLabels).map(
+      normalizeIncomeTrackerLabel
+    )
   };
 }
 
@@ -546,13 +552,21 @@ function normalizeIncomeYearEntry(value: unknown): IncomeYearEntry {
     active: booleanOrDefault(entry.active, true),
     visible: booleanOrDefault(entry.visible, true),
     year: Math.round(numberOrDefault(entry.year, defaultPlanningSettings().year)),
-    label: String(entry.label ?? "salary"),
+    label: normalizeIncomeTrackerLabel(entry.label),
     person: normalizeIncomePerson(entry.person),
     annualNetIncome: nullableNumberOrDefault(entry.annualNetIncome, null),
     annualGrossIncome: nullableNumberOrDefault(entry.annualGrossIncome, null),
     taxesAndDeductions: nullableNumberOrDefault(entry.taxesAndDeductions, null),
     taxDeductionItems: normalizeIncomeTaxDeductionItems(entry.taxDeductionItems),
     taxAdjustment: normalizeIncomeTaxAdjustment(entry.taxAdjustment),
+    employmentContext: normalizeIncomeEmploymentContext(entry.employmentContext),
+    minijobType: normalizeIncomeMinijobType(entry.minijobType),
+    considerPensionInsurance: booleanOrDefault(entry.considerPensionInsurance, false),
+    isRvExempt: booleanOrDefault(entry.isRvExempt, false),
+    shortTermEmploymentDays: nullableNumberOrDefault(entry.shortTermEmploymentDays, null),
+    shortTermEmploymentMonths: nullableNumberOrDefault(entry.shortTermEmploymentMonths, null),
+    studentEmploymentMode: normalizeIncomeStudentEmploymentMode(entry.studentEmploymentMode),
+    requiresManualTaxReview: booleanOrDefault(entry.requiresManualTaxReview, false),
     employer: String(entry.employer ?? ""),
     note: String(entry.note ?? ""),
     source: normalizeIncomeYearSource(entry.source)
@@ -606,6 +620,23 @@ function normalizeIncomePerson(value: unknown): IncomePerson {
 
 function normalizeIncomeYearSource(value: unknown): IncomeYearEntrySource {
   return value === "manual" ? "manual" : "annual_statement";
+}
+
+function normalizeIncomeTrackerLabel(value: unknown): string {
+  return normalizeIncomeTaxRuleLabel(String(value ?? "salary")) || "salary";
+}
+
+function normalizeIncomeEmploymentContext(value: unknown): IncomeEmploymentContext {
+  if (value === "earned_claim" || value === "other") return value;
+  return "job_loss";
+}
+
+function normalizeIncomeMinijobType(value: unknown): IncomeMinijobType {
+  return value === "private_household" ? "private_household" : "commercial";
+}
+
+function normalizeIncomeStudentEmploymentMode(value: unknown): IncomeStudentEmploymentMode {
+  return value === "short_term" ? "short_term" : "minijob";
 }
 
 function normalizeCareerMilestoneImpact(value: unknown): CareerMilestoneImpact {
