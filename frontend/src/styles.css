@@ -3176,6 +3176,44 @@ tfoot th {
   min-width: 110px;
 }
 
+.income-table input[type="checkbox"] {
+  min-width: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.income-yearly-table .income-year-flag-col,
+.income-yearly-table .income-year-flag-cell {
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
+  padding-right: 4px;
+  padding-left: 4px;
+  text-align: center;
+}
+
+.income-yearly-table .income-year-label-col,
+.income-yearly-table .income-year-label-cell {
+  min-width: 160px;
+  text-align: left;
+}
+
+.income-year-label-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.income-year-label-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .income-tax-button {
   display: grid;
   gap: 2px;

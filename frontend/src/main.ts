@@ -1319,9 +1319,21 @@ function renderIncomeYearlyRows(): void {
       const netIncome = incomeYearEntryNetIncome(entry);
       return `
       <tr>
-        <td class="check-cell">${incomeCheckboxInput("yearlyEntries", entry.id, "active", entry.active, "Jahreswert aktiv")}</td>
-        <td class="check-cell">${incomeCheckboxInput("yearlyEntries", entry.id, "visible", entry.visible, "Jahreswert in Grafiken sichtbar")}</td>
-        <td>${incomeYearLabelButton(entry)}</td>
+        <td class="check-cell income-year-flag-cell">${incomeCheckboxInput(
+          "yearlyEntries",
+          entry.id,
+          "active",
+          entry.active,
+          "Jahreswert aktiv"
+        )}</td>
+        <td class="check-cell income-year-flag-cell">${incomeCheckboxInput(
+          "yearlyEntries",
+          entry.id,
+          "visible",
+          entry.visible,
+          "Jahreswert in Grafiken sichtbar"
+        )}</td>
+        <td class="income-year-label-cell">${incomeYearLabelButton(entry)}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "year", entry.year, { min: 1900, max: 2200, step: 1 })}</td>
         <td>${incomeNumberInput("yearlyEntries", entry.id, "annualNetIncome", netIncome, {
           min: 0,
@@ -2521,17 +2533,20 @@ function incomeTaxDeductionsButton(entry: IncomeYearEntry): string {
 function incomeYearLabelButton(entry: IncomeYearEntry): string {
   const meta = incomeYearLabelMeta(entry.label);
   return `
-    <button
-      class="position-label-button income-year-label-button"
-      type="button"
-      data-action="open-income-year-label-picker"
-      data-income-year-id="${escapeHtml(entry.id)}"
-      title="${escapeHtml(meta.description)}"
-      aria-label="Einkommenslabel: ${escapeHtml(meta.label)}"
-      aria-haspopup="dialog"
-    >
-      ${positionIconSvg(meta.icon)}
-    </button>
+    <div class="income-year-label-display">
+      <button
+        class="position-label-button income-year-label-button"
+        type="button"
+        data-action="open-income-year-label-picker"
+        data-income-year-id="${escapeHtml(entry.id)}"
+        title="${escapeHtml(meta.description)}"
+        aria-label="Einkommenslabel: ${escapeHtml(meta.label)}"
+        aria-haspopup="dialog"
+      >
+        ${positionIconSvg(meta.icon)}
+      </button>
+      <span class="income-year-label-text">${escapeHtml(meta.label)}</span>
+    </div>
   `;
 }
 

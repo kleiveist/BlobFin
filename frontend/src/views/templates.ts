@@ -183,12 +183,12 @@ export function renderAppShell(): string {
             <div id="incomeYearlyTab" class="income-tab-panel">
               <div id="incomeYearLabelFilters" class="position-label-filter-row income-label-filter-row"></div>
               <div class="table-wrap">
-                <table class="income-table">
+                <table class="income-table income-yearly-table">
                   <thead>
                     <tr>
-                      <th>Aktiv</th>
-                      <th>View</th>
-                      <th>Label</th>
+                      <th class="income-year-flag-col">Aktiv</th>
+                      <th class="income-year-flag-col">View</th>
+                      <th class="income-year-label-col">Label</th>
                       <th>Jahr</th>
                       <th>Jahresnetto</th>
                       <th>Jahresbrutto</th>
