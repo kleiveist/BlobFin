@@ -126,6 +126,19 @@ const CHILD_DEPOT_DEFAULT_PAYOUT_AGE = 18;
 const CHILD_DEPOT_MAX_PAYOUT_AGE = 25;
 const MAX_REAL_ESTATE_PROJECTION_YEARS = 80;
 const INVESTMENT_DEPOTS: InvestmentDepotKey[] = ["standard", "retirement", "child"];
+const APP_SECTION_IDS: AppSectionId[] = [
+  "home",
+  "investment_overview",
+  "income_overview",
+  "income_tracking",
+  "income_status",
+  "income_charts",
+  "cost_reserve_positions",
+  "year_table",
+  "investment_planning",
+  "real_estate_financing",
+  "combined_wealth"
+];
 const INCOME_TAX_ADJUSTMENT_OPTIONS: Array<{ value: IncomeTaxAdjustmentType; label: string }> = [
   { value: "refund", label: "Rueckerstattung" },
   { value: "payment", label: "Nachzahlung" }
@@ -321,6 +334,7 @@ let latestRealEstateResult: RealEstateFinancingResult | null = null;
 let selectedCombinedWealthYear: number | null = null;
 let accountDialog: AccountDialogState = null;
 normalizeInvestmentBounds();
+applyInitialRoute();
 applyTheme();
 
 renderShell();
@@ -340,7 +354,7 @@ function loadInitialState(): AppState {
 
 function sanitizeAppState(appState: AppState): AppState {
   const fallbackUi = {
-    activeSection: "cost_reserve_positions" as AppSectionId,
+    activeSection: "home" as AppSectionId,
     selectedPlanningAccountId: "default-account",
     selectedInvestmentAccountId: "default-account",
     selectedRealEstateAccountIds: ["default-account"],
@@ -417,7 +431,7 @@ function sanitizeAppState(appState: AppState): AppState {
       selectedRealEstateWithdrawalGainAccountIds: normalizedRealEstateAccountIds,
       selectedCombinedAccountIds,
       selectedCombinedLeadInvestmentAccountId: normalizedCombinedLeadInvestmentAccountId,
-      activeSection: ui.activeSection === "grunddaten" ? "cost_reserve_positions" : ui.activeSection
+      activeSection: appSectionIdFromValue(ui.activeSection) ?? "home"
     },
     positions,
     investmentByAccountId,
@@ -576,14 +590,48 @@ function syncPositionsFromActivePlanningAccount(): void {
   state.positions = activePlanningAccount().yearlyRows;
 }
 
-function setActiveSection(section: AppSectionId): void {
+function appSectionIdFromValue(value: unknown): AppSectionId | null {
+  return APP_SECTION_IDS.includes(value as AppSectionId) ? (value as AppSectionId) : null;
+}
+
+function sectionFromLocationHash(): AppSectionId | null {
+  const hash = window.location.hash.replace(/^#/, "");
+  if (!hash) return null;
+  return appSectionIdFromValue(decodeURIComponent(hash));
+}
+
+function applyInitialRoute(): void {
+  const section = sectionFromLocationHash() ?? "home";
   state.ui = { ...state.ui, activeSection: section };
+  replaceSectionHistory(section);
+}
+
+function sectionUrl(section: AppSectionId): string {
+  return `${window.location.pathname}${window.location.search}#${encodeURIComponent(section)}`;
+}
+
+function pushSectionHistory(section: AppSectionId): void {
+  const hash = `#${encodeURIComponent(section)}`;
+  if (window.location.hash === hash) return;
+  window.history.pushState({ activeSection: section }, "", sectionUrl(section));
+}
+
+function replaceSectionHistory(section: AppSectionId): void {
+  window.history.replaceState({ activeSection: section }, "", sectionUrl(section));
+}
+
+function setActiveSection(section: AppSectionId, options: { updateHistory?: boolean } = {}): void {
+  const activeSection = appSectionIdFromValue(section) ?? "home";
+  state.ui = { ...state.ui, activeSection };
+  if (options.updateHistory !== false) {
+    pushSectionHistory(activeSection);
+  }
   hideThemeSettings();
 }
 
 function updateModuleVisibility(): void {
   const activeSection = state.ui.activeSection;
-  for (const button of document.querySelectorAll<HTMLButtonElement>(".module-card-button[data-section-id]")) {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-section-id]")) {
     const sectionId = button.dataset.sectionId;
     const isActive = sectionId === activeSection;
     button.classList.toggle("active", isActive);
@@ -799,7 +847,9 @@ function bindEvents(): void {
       togglePositionTableSort(action.replace("sort-position-table-", "") as PositionTableFilterColumn);
     }
     if (action?.startsWith("open-section-")) {
-      setActiveSection(action.replace("open-section-", "") as AppSectionId);
+      const section = appSectionIdFromValue(action.replace("open-section-", ""));
+      if (!section) return;
+      setActiveSection(section);
       renderAll();
       return;
     }
@@ -976,6 +1026,11 @@ function bindEvents(): void {
       hideIncomeYearLabelPicker();
       hideIncomeMilestoneTypePicker();
     }
+  });
+  window.addEventListener("popstate", () => {
+    const section = sectionFromLocationHash() ?? "home";
+    setActiveSection(section, { updateHistory: false });
+    renderAll();
   });
   window.addEventListener("resize", drawCurrentInvestmentChart);
 }
@@ -6384,9 +6439,6 @@ function toggleThemeSettings(): void {
 function hideThemeSettings(): void {
   const panel = document.querySelector<HTMLDivElement>("#themeSettingsPanel");
   if (panel) panel.hidden = true;
-  if (state.ui.activeSection === "grunddaten") {
-    state.ui = { ...state.ui, activeSection: "cost_reserve_positions" };
-  }
   syncThemeControls();
   updateModuleVisibility();
 }

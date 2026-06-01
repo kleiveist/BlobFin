@@ -4,6 +4,29 @@ import { normalizePositionIcon, positionIconLabel, positionIconSvg } from "../li
 import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
+type OverviewIconName = "income" | "portfolio" | "table" | "investment" | "property" | "combine" | "account";
+
+interface OverviewCardConfig {
+  sectionId: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  actionLabel: string;
+  icon: OverviewIconName;
+  badge?: string;
+}
+
+interface ModuleTopBarLink {
+  label: string;
+  sectionId: string;
+}
+
+interface ModuleTopBarAction {
+  label: string;
+  action: string;
+  className?: string;
+}
+
 export function renderAppShell(): string {
   return `
     <header class="app-header">
@@ -61,21 +84,149 @@ export function renderAppShell(): string {
     </header>
 
     <main class="app-main">
-      <section class="module-launcher panel" aria-label="Hauptbereiche">
-        <div class="section-heading">
-          <h2>Bereiche</h2>
+      <section class="landing-page" data-module-section="home" aria-labelledby="landingTitle">
+        ${LandingHero()}
+        ${ModuleOverviewGrid(
+          [
+            {
+              sectionId: "income_overview",
+              title: "Jahresnettoeinkommen",
+              subtitle: "Einkommen erfassen und auswerten",
+              description:
+                "Jahreswerte pflegen, Steuer- und Abgabenpositionen auswerten und Einkommensentwicklung transparent sehen.",
+              actionLabel: "Bereiche ansehen",
+              icon: "income",
+              badge: "Einkommen"
+            },
+            {
+              sectionId: "investment_overview",
+              title: "Investment & Immobilien",
+              subtitle: "Konten, Ruecklagen, Investments, Entnahmen und Immobilienfinanzierung planen",
+              description:
+                "Konten strukturieren, Depot- und Auszahlungsannahmen pruefen und Immobilienfinanzierung mit Vermoegenspfaden verbinden.",
+              actionLabel: "Bereiche ansehen",
+              icon: "portfolio",
+              badge: "Planung"
+            }
+          ],
+          "module",
+          "landing-module-grid"
+        )}
+      </section>
+
+      <section class="module-overview-panel" data-module-section="income_overview" aria-labelledby="incomeOverviewTitle">
+        ${moduleTopBar("Jahresnettoeinkommen", "Einkommensuebersicht")}
+        <div class="module-overview-head">
+          <p class="eyebrow">Einkommen</p>
+          <h2 id="incomeOverviewTitle">Jahresnettoeinkommen</h2>
+          <p>
+            Einkommen erfassen und auswerten. Waehle den passenden Unterbereich fuer Eingaben,
+            automatische Aussagen oder Grafiken.
+          </p>
         </div>
-        <div class="module-launcher-grid">
-          ${moduleCardButton("income_tracking", "Jahresnettoeinkommen", "Einkommen erfassen und auswerten")}
-          ${moduleCardButton("cost_reserve_positions", "Kosten- und Ruecklagenpositionen", "kontobasiert bearbeiten")}
-          ${moduleCardButton("year_table", "Jahrestabelle", "aktives Konto analysieren")}
-          ${moduleCardButton("investment_planning", "Investment- und Auszahlungsplanung", "Depot, Entnahme, Annahmen")}
-          ${moduleCardButton("real_estate_financing", "Immobilienfinanzierung", "Kredit, Tilgung, Wertentwicklung")}
-          ${moduleCardButton("combined_wealth", "Vermoegensvarianten / Kombination", "Module zusammenfuehren")}
+        ${ModuleOverviewGrid(
+          [
+            {
+              sectionId: "income_tracking",
+              title: "Jahresnettoeinkommen-Tracker",
+              subtitle: "Tracker",
+              description:
+                "Jahreswerte pflegen, Steuer- und Abgabenpositionen eintragen, Meilensteine und Annahmen bearbeiten.",
+              actionLabel: "Tracker oeffnen",
+              icon: "income"
+            },
+            {
+              sectionId: "income_status",
+              title: "Automatische Aussagen & Jahreswerte und Quellenstatus",
+              subtitle: "Aussagen und Status",
+              description:
+                "Automatisch erzeugte Bewertungstexte lesen und die genutzten Jahreswerte mit Quellenstatus pruefen.",
+              actionLabel: "Status ansehen",
+              icon: "table"
+            },
+            {
+              sectionId: "income_charts",
+              title: "Grafiken",
+              subtitle: "Jahresnettoeinkommen-Grafiken",
+              description:
+                "Diagramme fuer Jahresnetto, Wachstum, Nettoquote, Realwerte und Zukunftsprojektion auswerten.",
+              actionLabel: "Grafiken oeffnen",
+              icon: "investment"
+            }
+          ],
+          "section",
+          "income-overview-grid"
+        )}
+      </section>
+
+      <section class="module-overview-panel" data-module-section="investment_overview" aria-labelledby="investmentOverviewTitle">
+        ${moduleTopBar("Investment & Immobilien", "Bereichsuebersicht")}
+        <div class="module-overview-head">
+          <p class="eyebrow">Investment & Immobilien</p>
+          <h2 id="investmentOverviewTitle">Waehle den naechsten Arbeitsbereich</h2>
+          <p>
+            Alle bestehenden Rechner bleiben erhalten. Diese Uebersicht fuehrt direkt zu den passenden Tabellen,
+            Planungen und Szenarien.
+          </p>
         </div>
+        ${ModuleOverviewGrid(
+          [
+            {
+              sectionId: "cost_reserve_positions",
+              title: "Kosten- und Ruecklagenpositionen",
+              subtitle: "Kontobasiert bearbeiten",
+              description:
+                "Einnahmen, Ausgaben, Ruecklagen und Sparpositionen je Konto strukturiert pflegen.",
+              actionLabel: "Positionen oeffnen",
+              icon: "account"
+            },
+            {
+              sectionId: "year_table",
+              title: "Jahrestabelle",
+              subtitle: "Aktives Konto analysieren",
+              description:
+                "Monatswerte, Jahresreste und benoetigte Kontostaende fuer das aktive Konto auswerten.",
+              actionLabel: "Jahrestabelle ansehen",
+              icon: "table"
+            },
+            {
+              sectionId: "investment_planning",
+              title: "Investment- und Auszahlungsplanung",
+              subtitle: "Depot, Entnahme und Annahmen",
+              description:
+                "Depotvarianten, Sparraten, Renditeannahmen, Steuern und Entnahmephasen planen.",
+              actionLabel: "Investment planen",
+              icon: "investment"
+            },
+            {
+              sectionId: "real_estate_financing",
+              title: "Immobilienfinanzierung",
+              subtitle: "Kredit, Tilgung und Wertentwicklung",
+              description:
+                "Finanzierung, Tilgungsquellen, Restschuld und Immobilienwertentwicklung verbinden.",
+              actionLabel: "Finanzierung oeffnen",
+              icon: "property"
+            },
+            {
+              sectionId: "combined_wealth",
+              title: "Vermoegensvarianten / Kombination",
+              subtitle: "Module zusammenfuehren und Szenarien vergleichen",
+              description:
+                "Konten, Depotentwicklung, Entnahmen und Immobilien in einem Vermoegenspfad vergleichen.",
+              actionLabel: "Szenarien vergleichen",
+              icon: "combine"
+            }
+          ],
+          "section",
+          "investment-overview-grid"
+        )}
       </section>
 
       <section class="panel account-panel" data-module-section="cost_reserve_positions">
+        ${moduleTopBar("Investment & Immobilien", "Kosten- und Ruecklagenpositionen", {
+          label: "Zur Bereichsuebersicht",
+          sectionId: "investment_overview"
+        })}
         <div class="section-heading">
           <h2>Konto-Module</h2>
           <div class="button-row">
@@ -130,6 +281,10 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel result-panel" data-module-section="year_table">
+        ${moduleTopBar("Investment & Immobilien", "Jahrestabelle", {
+          label: "Zur Bereichsuebersicht",
+          sectionId: "investment_overview"
+        })}
         <div class="section-heading result-table-heading">
           <h2>Jahrestabellen pro Konto <span id="activeYearAccountName"></span></h2>
           <div class="result-header-actions">
@@ -147,6 +302,10 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel income-tracker-panel" data-module-section="income_tracking">
+        ${moduleTopBar("Jahresnettoeinkommen", "Tracker", {
+          label: "Zur Einkommensuebersicht",
+          sectionId: "income_overview"
+        }, [incomeWorldGraphicAction()])}
         <div class="section-heading income-tracker-heading">
           <div>
             <h2>Jahresnettoeinkommen-Tracker</h2>
@@ -164,7 +323,11 @@ export function renderAppShell(): string {
         <div id="incomeMetricGrid" class="income-metric-grid"></div>
 
         <div class="income-tracker-grid">
-          <section class="income-card income-input-card">
+          <section id="incomeTrackerInput" class="income-card income-input-card income-module-section">
+            <div class="income-section-head">
+              <h3>Jahresnettoeinkommen-Tracker</h3>
+              <p>Hauptbereich zur Erfassung und Pflege der Einkommensdaten.</p>
+            </div>
             <div class="position-mode-switch income-tab-switch" role="tablist" aria-label="Einkommen Eingaben">
               <button class="position-mode-button" type="button" data-action="income-tab-yearly" aria-pressed="true">
                 Jahreswerte
@@ -251,15 +414,28 @@ export function renderAppShell(): string {
             </div>
           </section>
         </div>
+        <p id="incomeExportStatus" class="export-status" aria-live="polite"></p>
+      </section>
 
-        <aside class="income-card income-insights-card">
-          <h3>Automatische Aussagen</h3>
+      <section class="panel income-tracker-panel" data-module-section="income_status">
+        ${moduleTopBar("Jahresnettoeinkommen", "Automatische Aussagen & Jahreswerte und Quellenstatus", {
+          label: "Zur Einkommensuebersicht",
+          sectionId: "income_overview"
+        }, [incomeWorldGraphicAction()])}
+        <aside id="incomeInsightsSection" class="income-card income-insights-card income-module-section">
+          <div class="income-section-head">
+            <h3>Automatische Aussagen</h3>
+            <p>Automatisch erzeugte Bewertungstexte oberhalb der Jahreswerte.</p>
+          </div>
           <div id="incomeInsights" class="income-insight-list"></div>
         </aside>
 
-        <div class="income-status-grid">
+        <div id="incomeStatusSection" class="income-status-grid income-module-section">
           <section class="income-card">
-            <h3>Jahreswerte und Quellenstatus</h3>
+            <div class="income-section-head">
+              <h3>Jahreswerte und Quellenstatus</h3>
+              <p>Anzeige der genutzten Jahreswerte, Quellen und Realwerte.</p>
+            </div>
             <div class="table-wrap">
               <table class="income-table income-status-table">
                 <thead>
@@ -279,39 +455,56 @@ export function renderAppShell(): string {
             </div>
           </section>
         </div>
+      </section>
 
-        <div class="income-chart-grid">
-          <section class="income-card">
-            <h3>Jahresnettoeinkommen</h3>
-            <div id="incomeAnnualChart" class="income-chart-host"></div>
-          </section>
-          <section class="income-card">
-            <h3>Jaehrlicher Zuwachs</h3>
-            <div id="incomeGrowthChart" class="income-chart-host"></div>
-          </section>
-          <section class="income-card">
-            <h3>Nettoquote</h3>
-            <div id="incomeRatioChart" class="income-chart-host"></div>
-          </section>
-          <section class="income-card">
-            <h3>Nominal vs. inflationsbereinigt</h3>
-            <div id="incomeInflationChart" class="income-chart-host"></div>
-          </section>
-          <section class="income-card">
-            <h3>Zukunftsprojektion</h3>
-            <div id="incomeProjectionChart" class="income-chart-host"></div>
-          </section>
-        </div>
+      <section class="panel income-tracker-panel" data-module-section="income_charts">
+        ${moduleTopBar("Jahresnettoeinkommen", "Grafiken", {
+          label: "Zur Einkommensuebersicht",
+          sectionId: "income_overview"
+        }, [incomeWorldGraphicAction()])}
+        <section id="incomeChartsSection" class="income-module-section income-chart-section">
+          <div class="income-section-head">
+            <h3>Jahresnettoeinkommen-Grafiken</h3>
+            <p>Diagramme und visuelle Auswertung des Einkommensverlaufs.</p>
+          </div>
+          <div class="income-chart-grid">
+            <section class="income-card">
+              <h3>Jahresnettoeinkommen</h3>
+              <div id="incomeAnnualChart" class="income-chart-host"></div>
+            </section>
+            <section class="income-card">
+              <h3>Jaehrlicher Zuwachs</h3>
+              <div id="incomeGrowthChart" class="income-chart-host"></div>
+            </section>
+            <section class="income-card">
+              <h3>Nettoquote</h3>
+              <div id="incomeRatioChart" class="income-chart-host"></div>
+            </section>
+            <section class="income-card">
+              <h3>Nominal vs. inflationsbereinigt</h3>
+              <div id="incomeInflationChart" class="income-chart-host"></div>
+            </section>
+            <section class="income-card">
+              <h3>Zukunftsprojektion</h3>
+              <div id="incomeProjectionChart" class="income-chart-host"></div>
+            </section>
+          </div>
+        </section>
+      </section>
 
-        <p id="incomeExportStatus" class="export-status" aria-live="polite"></p>
+      <div class="income-shared-hosts">
         <input class="visually-hidden" id="incomeCsvImport" type="file" accept=".csv,text/csv" />
         <div id="incomeTaxDialogRoot"></div>
         <div id="incomeAnalysisDialogRoot"></div>
         <div id="incomeYearLabelPicker" class="position-icon-picker income-year-label-picker" role="dialog" aria-label="Einkommenslabel auswaehlen" hidden></div>
         <div id="incomeMilestoneTypePicker" class="position-icon-picker income-milestone-type-picker" role="dialog" aria-label="Meilenstein-Typ auswaehlen" hidden></div>
-      </section>
+      </div>
 
       <section class="panel investment-panel" data-module-section="investment_planning">
+        ${moduleTopBar("Investment & Immobilien", "Investment- und Auszahlungsplanung", {
+          label: "Zur Bereichsuebersicht",
+          sectionId: "investment_overview"
+        })}
         <div class="section-heading">
           <h2>Investment- und Auszahlungsplanung</h2>
         </div>
@@ -477,6 +670,10 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel real-estate-panel" data-module-section="real_estate_financing">
+        ${moduleTopBar("Investment & Immobilien", "Immobilienfinanzierung", {
+          label: "Zur Bereichsuebersicht",
+          sectionId: "investment_overview"
+        })}
         <div class="section-heading">
           <h2>Immobilienfinanzierung</h2>
           <div class="real-estate-heading-controls">
@@ -575,6 +772,10 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel combined-wealth-panel" data-module-section="combined_wealth">
+        ${moduleTopBar("Investment & Immobilien", "Vermoegensvarianten / Kombination", {
+          label: "Zur Bereichsuebersicht",
+          sectionId: "investment_overview"
+        })}
         <div class="section-heading">
           <h2>Vermoegensvarianten / Kombination</h2>
         </div>
@@ -706,18 +907,134 @@ export function monthSelect(id: string, field: keyof ReservePosition, value: num
   `;
 }
 
-function moduleCardButton(id: string, label: string, subtitle: string): string {
+function LandingHero(): string {
+  return `
+    <div class="landing-hero">
+      <div class="landing-hero-graphic" aria-hidden="true">
+        <div class="landing-dashboard">
+          <span class="landing-dashboard-line wide"></span>
+          <span class="landing-dashboard-line"></span>
+          <div class="landing-bars">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="landing-mini-grid">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+        <div class="landing-property-mark">
+          <span></span>
+        </div>
+      </div>
+      <div class="landing-hero-copy">
+        <p class="eyebrow">Gefuehrter Einstieg</p>
+        <h2 id="landingTitle">BlobFin</h2>
+        <p>
+          Starte mit dem passenden Arbeitsbereich: Einkommen auswerten oder Investments,
+          Konten, Ruecklagen und Immobilien gemeinsam planen.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function ModuleOverviewGrid(cards: OverviewCardConfig[], variant: "module" | "section", className = ""): string {
+  const cardHtml = cards.map((card) => (variant === "module" ? ModuleCard(card) : SectionCard(card))).join("");
+  return `<div class="module-overview-grid ${className}">${cardHtml}</div>`;
+}
+
+function ModuleCard(card: OverviewCardConfig): string {
+  return overviewCard(card, "module-overview-card");
+}
+
+function SectionCard(card: OverviewCardConfig): string {
+  return overviewCard(card, "section-overview-card");
+}
+
+function overviewCard(card: OverviewCardConfig, className: string): string {
   return `
     <button
-      class="module-card-button"
+      class="overview-card ${className}"
       type="button"
-      data-action="open-section-${id}"
-      data-section-id="${id}"
+      data-action="open-section-${card.sectionId}"
+      data-section-id="${card.sectionId}"
       aria-pressed="false"
     >
-      <strong>${label}</strong>
-      <small>${subtitle}</small>
+      <span class="overview-card-top">
+        ${overviewIcon(card.icon)}
+        ${card.badge ? `<span class="overview-card-badge">${card.badge}</span>` : ""}
+      </span>
+      <span class="overview-card-copy">
+        <strong>${card.title}</strong>
+        <span>${card.subtitle}</span>
+        <small>${card.description}</small>
+      </span>
+      <span class="overview-card-action">${card.actionLabel}</span>
     </button>
+  `;
+}
+
+function moduleTopBar(
+  title: string,
+  subtitle: string,
+  overview?: ModuleTopBarLink,
+  actions: ModuleTopBarAction[] = []
+): string {
+  return `
+    <div class="module-topbar">
+      <div>
+        <strong>${title}</strong>
+        <span>${subtitle}</span>
+      </div>
+      <div class="module-topbar-actions">
+        ${actions.map(moduleTopBarActionButton).join("")}
+        ${
+          overview
+            ? `<button class="button secondary" type="button" data-action="open-section-${overview.sectionId}">${overview.label}</button>`
+            : ""
+        }
+        <button class="button secondary" type="button" data-action="open-section-home">Startseite</button>
+      </div>
+    </div>
+  `;
+}
+
+function moduleTopBarActionButton(action: ModuleTopBarAction): string {
+  const className = ["button", action.className].filter(Boolean).join(" ");
+  return `<button class="${className}" type="button" data-action="${action.action}">${action.label}</button>`;
+}
+
+function incomeWorldGraphicAction(): ModuleTopBarAction {
+  return { label: "Weltgrafik", action: "income-open-analysis" };
+}
+
+function overviewIcon(icon: OverviewIconName): string {
+  const paths: Record<OverviewIconName, string> = {
+    income:
+      '<path d="M5 19V5" /><path d="M5 19h14" /><path d="M8 15h2" /><path d="M12 11h2" /><path d="M16 7h2" /><path d="M8 11l3-3 3 2 4-5" />',
+    portfolio:
+      '<rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 7V5h6v2" /><path d="M4 12h16" /><path d="M10 12v2h4v-2" />',
+    table:
+      '<rect x="4" y="5" width="16" height="14" rx="2" /><path d="M4 10h16" /><path d="M9 5v14" /><path d="M15 5v14" /><path d="M4 15h16" />',
+    investment:
+      '<path d="M4 18h16" /><path d="M7 15V9" /><path d="M12 15V6" /><path d="M17 15v-4" /><path d="m5 10 5-4 4 3 5-5" />',
+    property:
+      '<path d="M4 11 12 5l8 6" /><path d="M6 10v9h12v-9" /><path d="M10 19v-5h4v5" /><path d="M8 13h1" /><path d="M15 13h1" />',
+    combine:
+      '<path d="M7 7h5a5 5 0 0 1 5 5v5" /><path d="m14 14 3 3 3-3" /><path d="M17 7h-5a5 5 0 0 0-5 5v5" /><path d="m4 14 3 3 3-3" />',
+    account:
+      '<rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h8" /><path d="M8 13h5" /><path d="M8 17h7" />'
+  };
+  return `
+    <span class="overview-card-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        ${paths[icon]}
+      </svg>
+    </span>
   `;
 }
 

@@ -34,6 +34,26 @@ class MemoryStorage implements Storage {
 }
 
 describe("storage", () => {
+  it("starts new app state on the visual landing page", () => {
+    const state = defaultAppState();
+
+    expect(state.ui.activeSection).toBe("home");
+  });
+
+  it("persists new income page section ids", () => {
+    const storage = new MemoryStorage();
+
+    for (const section of ["income_overview", "income_status", "income_charts"] as const) {
+      const state = defaultAppState();
+      state.ui.activeSection = section;
+
+      saveState(state, storage);
+      const loaded = loadState(storage);
+
+      expect(loaded.ui.activeSection).toBe(section);
+    }
+  });
+
   it("migrates saved app state without position table view settings", () => {
     const storage = new MemoryStorage();
     const legacyState: Partial<ReturnType<typeof defaultAppState>> = { ...defaultAppState() };

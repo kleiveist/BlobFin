@@ -210,7 +210,7 @@ export function defaultPositionTableViewState(): PositionTableViewState {
 
 export function defaultAppUiState(): AppUiState {
   return {
-    activeSection: "cost_reserve_positions",
+    activeSection: "home",
     selectedPlanningAccountId: "default-account",
     selectedInvestmentAccountId: "default-account",
     selectedRealEstateAccountIds: ["default-account"],

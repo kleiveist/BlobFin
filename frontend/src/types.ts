@@ -7,10 +7,14 @@ export type ThemeMode = "light" | "dark";
 export type InvestmentDepotKey = "standard" | "retirement" | "child";
 export type PositionTableMode = PositionFlow | "reserve" | "savings";
 export type AppSectionId =
-  | "grunddaten"
+  | "home"
+  | "investment_overview"
+  | "income_overview"
   | "cost_reserve_positions"
   | "year_table"
   | "income_tracking"
+  | "income_status"
+  | "income_charts"
   | "investment_planning"
   | "real_estate_financing"
   | "combined_wealth";

@@ -366,12 +366,17 @@ function investmentForAccount(
 
 function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSectionId {
   if (value === "grunddaten") {
-    return "cost_reserve_positions";
+    return "home";
   }
   if (
+    value === "home" ||
+    value === "investment_overview" ||
+    value === "income_overview" ||
     value === "cost_reserve_positions" ||
     value === "year_table" ||
     value === "income_tracking" ||
+    value === "income_status" ||
+    value === "income_charts" ||
     value === "investment_planning" ||
     value === "real_estate_financing" ||
     value === "combined_wealth"
