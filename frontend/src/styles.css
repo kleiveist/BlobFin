@@ -247,8 +247,8 @@ button:focus-visible {
 .position-cadence-switch-host:not(:empty) {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 2px 0 10px;
+  gap: 8px;
+  margin: 0 0 8px;
 }
 
 .position-cadence-label {
@@ -259,12 +259,12 @@ button:focus-visible {
 }
 
 .position-cadence-switch {
-  min-height: 34px;
+  min-height: 30px;
 }
 
 .position-cadence-switch .position-mode-button {
-  min-width: 116px;
-  padding-block: 7px;
+  min-width: 108px;
+  padding-block: 5px;
 }
 
 .position-mode-button {
@@ -275,6 +275,14 @@ button:focus-visible {
   padding: 9px 12px;
   cursor: pointer;
   font-weight: 850;
+}
+
+.position-toolbar-heading .position-mode-switch {
+  min-height: 34px;
+}
+
+.position-toolbar-heading .position-mode-button {
+  padding: 6px 10px;
 }
 
 .position-table-switch .position-mode-button {
@@ -1206,6 +1214,17 @@ th {
   overflow-wrap: normal;
 }
 
+.position-table th,
+.position-table td {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.position-table input,
+.position-table select {
+  padding: 6px 8px;
+}
+
 .position-table .check-col {
   width: 74px;
   min-width: 74px;
@@ -1244,6 +1263,7 @@ th {
 .position-table .table-sort-button {
   grid-template-columns: auto 12px;
   justify-content: center;
+  min-height: 24px;
   white-space: nowrap;
   word-break: normal;
   overflow-wrap: normal;
