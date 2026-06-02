@@ -54,10 +54,12 @@ export function positionTableColumnsForMode(mode: PositionTableMode): PositionTa
     { column: "active", label: "Aktiv", kind: "select" },
     { column: "visible", label: "View", kind: "select" },
     { column: "label", label: "Label", kind: "select" },
-    { column: "name", label: "Name", kind: "text" },
-    { column: "type", label: "Art", kind: "select" },
-    { column: "amount", label: "Betrag", kind: "number" }
+    { column: "name", label: "Name", kind: "text" }
   ];
+  if (mode === "income" || mode === "reserve") {
+    configs.push({ column: "type", label: "Art", kind: "select" });
+  }
+  configs.push({ column: "amount", label: "Betrag", kind: "number" });
 
   if (mode === "savings") {
     configs.push(

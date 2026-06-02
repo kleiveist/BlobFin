@@ -159,7 +159,6 @@ export function renderAppShell(): string {
             </div>
           </div>
           <div class="button-row">
-            <button class="button" id="addPositionButton" type="button" data-action="add-position">Ausgabe hinzufuegen</button>
             ${toolbarIconButton("import-positions", "CSV importieren", "upload")}
             ${toolbarIconButton("export-positions", "CSV exportieren", "download")}
             ${toolbarIconButton("export-year", "Jahrestabelle exportieren", "table")}
@@ -180,6 +179,9 @@ export function renderAppShell(): string {
             <thead id="positionsHead"></thead>
             <tbody id="positionsBody"></tbody>
           </table>
+        </div>
+        <div class="button-row">
+          <button class="button" id="addPositionButton" type="button" data-action="add-position">Ausgabe hinzufuegen</button>
         </div>
         <div id="positionIconPicker" class="position-icon-picker" role="dialog" aria-label="Positionslabel auswaehlen" hidden></div>
       </section>

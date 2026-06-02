@@ -4510,6 +4510,7 @@ function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
 
 function renderPositions(): void {
   renderPositionModeControls();
+  normalizeCurrentPositionTableViewColumns();
   const sourcePositions = positionTableSourcePositions();
   const basePositions = sourcePositions.filter((position) => positionTableMode(position) === selectedPositionMode);
   renderPositionTableControls(basePositions, sourcePositions);
@@ -4547,6 +4548,7 @@ function renderPositions(): void {
   body.innerHTML = positions
     .map((position) => {
       const isIncome = isIncomePosition(position);
+      const showTypeColumn = positionTableShowsTypeColumn(selectedPositionMode);
       return `
         <tr data-position-row="${position.id}">
           <td class="reorder-cell">
@@ -4562,7 +4564,7 @@ function renderPositions(): void {
           <td class="name-cell"><input class="name-input" value="${escapeHtml(position.name)}" data-position-id="${
             position.id
           }" data-position-field="name" /></td>
-          <td>${positionTypeSelect(position)}</td>
+          ${showTypeColumn ? `<td>${positionTypeSelect(position)}</td>` : ""}
           <td><input class="small-input amount-input" type="number" min="0" step="0.01" value="${position.amount}" data-position-id="${
             position.id
           }" data-position-field="amount" /></td>
@@ -5414,7 +5416,7 @@ function renderPositionTableHead(): void {
       ${positionSortableHeader("visible", "View", "check-col")}
       ${positionSortableHeader("label", "Label", "label-col")}
       ${positionSortableHeader("name", "Name", "name-col")}
-      ${positionSortableHeader("type", "Art")}
+      ${positionTableShowsTypeColumn(selectedPositionMode) ? positionSortableHeader("type", "Art") : ""}
       ${positionSortableHeader("amount", "Betrag", "amount-col")}
       ${dateHeaders}
       ${selectedPositionMode === "income" ? positionSortableHeader("payoutYear", "Jahr") : ""}
@@ -5452,7 +5454,11 @@ function positionSortableHeader(column: PositionTableFilterColumn, label: string
 }
 
 function positionTableColumnCount(mode: PositionTableMode): number {
-  return mode === "income" ? 14 : 15;
+  return (mode === "income" ? 14 : 15) - (positionTableShowsTypeColumn(mode) ? 0 : 1);
+}
+
+function positionTableShowsTypeColumn(mode: PositionTableMode): boolean {
+  return mode === "income" || mode === "reserve";
 }
 
 function positionDragHandle(positionId: string, locked: boolean): string {
@@ -5472,6 +5478,15 @@ function positionDragHandle(positionId: string, locked: boolean): string {
 
 function currentPositionTableView(): PositionTableView {
   return state.positionTableView[selectedPositionMode] ?? emptyPositionTableView();
+}
+
+function normalizeCurrentPositionTableViewColumns(): void {
+  const availableColumns = new Set(positionTableColumnsForMode(selectedPositionMode).map((config) => config.column));
+  updateCurrentPositionTableView((view) => ({
+    ...view,
+    filters: view.filters.filter((filter) => availableColumns.has(filter.column)),
+    sort: view.sort && availableColumns.has(view.sort.column) ? view.sort : null
+  }));
 }
 
 function updateCurrentPositionTableView(updater: (view: PositionTableView) => PositionTableView): void {

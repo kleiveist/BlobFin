@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultAppState, defaultPositionTableViewState } from "../data/defaults";
-import { positionTableRows } from "../lib/positionTableView";
+import { positionTableColumnsForMode, positionTableRows } from "../lib/positionTableView";
 import type { PositionTableView, ReservePosition } from "../types";
 
 function expensePosition(id: string, updates: Partial<ReservePosition> = {}): ReservePosition {
@@ -31,6 +31,16 @@ function view(overrides: Partial<PositionTableView>): PositionTableView {
 }
 
 describe("position table view", () => {
+  it("only exposes the type column for sections with multiple position types", () => {
+    const columnNames = (mode: Parameters<typeof positionTableColumnsForMode>[0]) =>
+      positionTableColumnsForMode(mode).map((column) => column.column);
+
+    expect(columnNames("income")).toContain("type");
+    expect(columnNames("reserve")).toContain("type");
+    expect(columnNames("expense")).not.toContain("type");
+    expect(columnNames("savings")).not.toContain("type");
+  });
+
   it("filters expenses by monthly payout cadence", () => {
     const state = defaultAppState();
     state.positionTableView.expense = view({
