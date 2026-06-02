@@ -916,11 +916,7 @@ function normalizePositions(
           position.payoutType = defaultIncomePayoutType(position.type);
         }
       }
-      if (
-        position.flow !== "expense" ||
-        position.type !== "temporary" ||
-        (position.payoutType !== "monthly" && position.payoutType !== "yearly")
-      ) {
+      if (!positionCostBreakdownAllowed(position.flow, position.type, position.payoutType)) {
         position.costBreakdown = undefined;
       }
       const breakdownTotal = positionCostBreakdownTotal(position.costBreakdown);
@@ -950,6 +946,17 @@ function normalizePositionCostBreakdown(value: unknown): PositionCostBreakdownIt
 function positionCostBreakdownTotal(items: PositionCostBreakdownItem[] | undefined): number | null {
   if (!items?.some((item) => item.amount !== null)) return null;
   return items.reduce((sum, item) => sum + Math.max(0, Number(item.amount ?? 0)), 0);
+}
+
+function positionCostBreakdownAllowed(
+  flow: ReservePosition["flow"],
+  type: ReservePosition["type"],
+  payoutType: ReservePosition["payoutType"]
+): boolean {
+  if (flow === "expense" && type === "temporary") {
+    return payoutType === "monthly" || payoutType === "yearly" || payoutType === "once";
+  }
+  return flow === "income" && type === "incomeTemporary" && payoutType === "once";
 }
 
 function migrateMonthlyNetIncomePosition(settings: PlanningSettings, positions: ReservePosition[]): ReservePosition[] {

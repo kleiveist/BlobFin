@@ -5258,13 +5258,15 @@ function renderPositionCostDialog(): void {
   const total = positionCostBreakdownTotal(items);
   root.innerHTML = `
     <div class="position-cost-dialog-backdrop" role="presentation">
-      <div class="position-cost-dialog" role="dialog" aria-modal="true" aria-label="Kostenaufschluesselung">
+      <div class="position-cost-dialog" role="dialog" aria-modal="true" aria-label="${escapeHtml(
+        positionCostDialogTitle(position)
+      )}">
         <div class="income-tax-dialog-head">
           <div>
-            <strong>Kostenaufschluesselung</strong>
+            <strong>${escapeHtml(positionCostDialogTitle(position))}</strong>
             <span>${escapeHtml(position.name)} · ${escapeHtml(positionCadenceButtonLabel(position.payoutType))}</span>
           </div>
-          <button class="chart-popup-close" type="button" data-action="close-position-cost-dialog" aria-label="Kostenaufschluesselung schliessen">x</button>
+          <button class="chart-popup-close" type="button" data-action="close-position-cost-dialog" aria-label="Betragsdetails schliessen">x</button>
         </div>
         <div class="table-wrap">
           <table class="position-cost-table">
@@ -5287,7 +5289,7 @@ function renderPositionCostDialog(): void {
         <div class="button-row">
           <button class="button secondary" type="button" data-action="add-position-cost-item" data-position-id="${escapeHtml(
             position.id
-          )}">Kostenposition hinzufuegen</button>
+          )}">${escapeHtml(positionCostAddButtonLabel(position))}</button>
           <button class="button" type="button" data-action="close-position-cost-dialog">Fertig</button>
         </div>
       </div>
@@ -5332,6 +5334,14 @@ function positionCostBreakdownRow(positionId: string, item: PositionCostBreakdow
       </td>
     </tr>
   `;
+}
+
+function positionCostDialogTitle(position: ReservePosition): string {
+  return positionFlow(position) === "income" ? "Einnahmendetails" : "Kostenaufschluesselung";
+}
+
+function positionCostAddButtonLabel(position: ReservePosition): string {
+  return positionFlow(position) === "income" ? "Einnahmeposition hinzufuegen" : "Kostenposition hinzufuegen";
 }
 
 function renderPositionCostDialogTotals(positionId: string): void {
@@ -5734,7 +5744,7 @@ function positionAmountCell(position: ReservePosition): string {
         type="button"
         data-action="open-position-cost-dialog-${escapeHtml(position.id)}"
         aria-haspopup="dialog"
-        aria-label="Kostenaufschluesselung bearbeiten"
+        aria-label="Betragsdetails bearbeiten"
       >
         <strong>${money(total)}</strong>
         <span>Details</span>
@@ -5752,19 +5762,30 @@ function positionAmountCell(position: ReservePosition): string {
         type="button"
         data-action="open-position-cost-dialog-${escapeHtml(position.id)}"
         aria-haspopup="dialog"
-        aria-label="Kostenaufschluesselung bearbeiten"
+        aria-label="Betragsdetails bearbeiten"
       >Details</button>
     </div>
   `;
 }
 
 function positionCostBreakdownEligible(position: ReservePosition): boolean {
-  return (
-    selectedPositionMode === "expense" &&
-    positionFlow(position) === "expense" &&
-    position.type === "temporary" &&
-    (position.payoutType === "monthly" || position.payoutType === "yearly")
-  );
+  const mode = positionTableMode(position);
+  return (mode === "expense" || mode === "income") && selectedPositionMode === mode && positionAllowsCostBreakdown(position);
+}
+
+function positionAllowsCostBreakdown(position: ReservePosition): boolean {
+  return positionCostBreakdownAllowed(positionFlow(position), position.type, position.payoutType);
+}
+
+function positionCostBreakdownAllowed(
+  flow: ReservePosition["flow"],
+  type: ReservePosition["type"],
+  payoutType: ReservePosition["payoutType"]
+): boolean {
+  if (flow === "expense" && type === "temporary") {
+    return payoutType === "monthly" || payoutType === "yearly" || payoutType === "once";
+  }
+  return flow === "income" && type === "incomeTemporary" && payoutType === "once";
 }
 
 function positionCostBreakdownTotal(items: PositionCostBreakdownItem[] | undefined): number | null {
@@ -7438,8 +7459,7 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
   const payoutType = normalizePayoutType(position.payoutType, flow, type);
   const payoutMonth = finiteIntegerInRange(position.payoutMonth, 1, 12, 12);
   const costBreakdown = normalizePositionCostBreakdown(position.costBreakdown);
-  const canUseCostBreakdown =
-    flow === "expense" && type === "temporary" && (payoutType === "monthly" || payoutType === "yearly");
+  const canUseCostBreakdown = positionCostBreakdownAllowed(flow, type, payoutType);
   const costBreakdownTotal = canUseCostBreakdown ? positionCostBreakdownTotal(costBreakdown) : null;
   let startMonth = finiteIntegerInRange(position.startMonth, 1, 12, 1);
   let endMonth = finiteIntegerInRange(position.endMonth, 1, 12, 12);

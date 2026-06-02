@@ -148,6 +148,52 @@ describe("storage", () => {
     expect(loaded.positions).toEqual(loaded.planningAccounts[0].yearlyRows);
   });
 
+  it("loads cost breakdown totals for one-time income and expense positions", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const base = state.positions[0];
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        planningAccounts: undefined,
+        positions: [
+          {
+            ...base,
+            id: "expense-once-details",
+            flow: "expense",
+            type: "temporary",
+            payoutType: "once",
+            amount: 1,
+            costBreakdown: [
+              { id: "rent", name: "Miete", amount: 500 },
+              { id: "food", name: "Lebensmittel", amount: 150 }
+            ]
+          },
+          {
+            ...base,
+            id: "income-once-details",
+            flow: "income",
+            type: "incomeTemporary",
+            payoutType: "once",
+            amount: 1,
+            costBreakdown: [
+              { id: "bonus", name: "Bonus", amount: 900 },
+              { id: "refund", name: "Rueckerstattung", amount: 100 }
+            ]
+          }
+        ]
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.positions.find((position) => position.id === "expense-once-details")?.amount).toBe(650);
+    expect(loaded.positions.find((position) => position.id === "expense-once-details")?.costBreakdown).toHaveLength(2);
+    expect(loaded.positions.find((position) => position.id === "income-once-details")?.amount).toBe(1000);
+    expect(loaded.positions.find((position) => position.id === "income-once-details")?.costBreakdown).toHaveLength(2);
+  });
+
   it("migrates legacy global investment settings into account-specific settings", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();

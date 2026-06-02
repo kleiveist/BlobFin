@@ -65,7 +65,7 @@ Savings rows:
 
 For income rows, the `Art` column is hidden because the active rhythm already decides the income type. Monthly, yearly, and one-time income rows hide `Start` and `Ende`; income rows without rhythm keep `Start` and `Ende` editable, so a same-height income can be planned for a short range such as three months. Monthly and yearly expense rows also hide `Start` and `Ende`; the configured payout cadence and payout month decide the timing. For one-time expense payouts, `Start` and `Ende` are replaced by `Abgangsjahr`. Savings rows without rhythm also keep `Start` and `Ende` editable. One-time rows do not appear as yearly table columns. They can still be used for cashback when the row is a temporary expense position with cashback enabled.
 
-Monthly and yearly expense rows can open a `Details` breakdown in the amount cell. As long as no detail amount is entered, the table amount stays editable. Once one or more detail amounts are entered, the table amount is locked and replaced by the sum from the breakdown.
+Monthly, yearly, and one-time expense rows plus one-time income rows can open a `Details` breakdown in the amount cell. As long as no detail amount is entered, the table amount stays editable. Once one or more detail amounts are entered, the table amount is locked and replaced by the sum from the breakdown.
 
 ## Interest
 
