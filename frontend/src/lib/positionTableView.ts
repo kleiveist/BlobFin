@@ -53,7 +53,8 @@ export function positionTableColumnsForMode(
 ): PositionTableColumnConfig[] {
   const timingLabel = mode === "income" ? "Eingang" : mode === "savings" ? "Transfer" : "Abgang";
   const monthLabel = mode === "income" ? "Eingangsmonat" : mode === "savings" ? "Transfermonat" : "Abgangsmonat";
-  const hideIncomeMonthRange = mode === "income" && cadence === "once";
+  const hideIncomeMonthRange = mode === "income" && cadence !== null && cadence !== "none";
+  const hideExpenseMonthRange = mode === "expense" && (cadence === "monthly" || cadence === "yearly" || cadence === "once");
   const hidePayoutMonth = mode === "savings" && cadence === "none";
   const configs: PositionTableColumnConfig[] = [
     { column: "active", label: "Aktiv", kind: "select" },
@@ -61,7 +62,7 @@ export function positionTableColumnsForMode(
     { column: "label", label: "Label", kind: "select" },
     { column: "name", label: "Name", kind: "text" }
   ];
-  if (mode === "income" || mode === "reserve") {
+  if (mode === "reserve") {
     configs.push({ column: "type", label: "Art", kind: "select" });
   }
   configs.push({ column: "amount", label: "Betrag", kind: "number" });
@@ -73,19 +74,21 @@ export function positionTableColumnsForMode(
       { column: "endMonth", label: "Ende", kind: "select" }
     );
   } else {
-    if (!hideIncomeMonthRange) {
+    if (!hideIncomeMonthRange && !hideExpenseMonthRange) {
       configs.push(
         { column: "startMonth", label: "Start", kind: "select" },
         { column: "endMonth", label: "Ende", kind: "select" }
       );
     }
-    configs.push(
-      {
-        column: "payoutYear",
-        label: mode === "income" ? "Jahr" : "Abgangsjahr",
-        kind: "number"
-      }
-    );
+    if (mode !== "expense" || cadence === null || cadence === "once") {
+      configs.push(
+        {
+          column: "payoutYear",
+          label: mode === "income" ? "Jahr" : "Abgangsjahr",
+          kind: "number"
+        }
+      );
+    }
   }
 
   configs.push({ column: "payoutType", label: timingLabel, kind: "select" });

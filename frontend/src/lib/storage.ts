@@ -47,6 +47,7 @@ import type {
   InvestmentSettings,
   PlanningAccount,
   PlanningSettings,
+  PositionCostBreakdownItem,
   PositionTableFilter,
   PositionTableMode,
   PositionTableView,
@@ -871,6 +872,7 @@ function normalizePositions(
       const flow = normalizePositionFlow(item.flow ?? item.direction ?? item.category, flowForType(rawType));
       const type = typeForFlow(rawType, flow);
       const name = String(item.name || "Position");
+      const costBreakdown = normalizePositionCostBreakdown(item.costBreakdown);
       const position: ReservePosition = {
         id: String(item.id || createId()),
         flow,
@@ -893,7 +895,8 @@ function normalizePositions(
         payoutMonth: numberOrDefault(item.payoutMonth, 12),
         payoutDay: numberOrDefault(item.payoutDay, 31),
         interestBearing: flow === "expense" && booleanOrDefault(item.interestBearing ?? item.interest, false),
-        cashback: flow === "expense" && Boolean(item.cashback) && type === "temporary"
+        cashback: flow === "expense" && Boolean(item.cashback) && type === "temporary",
+        ...(costBreakdown.length ? { costBreakdown } : {})
       };
       if (position.id === "investitionsrate" && position.type === "temporary") {
         position.type = "savings";
@@ -913,9 +916,40 @@ function normalizePositions(
           position.payoutType = defaultIncomePayoutType(position.type);
         }
       }
+      if (
+        position.flow !== "expense" ||
+        position.type !== "temporary" ||
+        (position.payoutType !== "monthly" && position.payoutType !== "yearly")
+      ) {
+        position.costBreakdown = undefined;
+      }
+      const breakdownTotal = positionCostBreakdownTotal(position.costBreakdown);
+      if (breakdownTotal !== null) position.amount = breakdownTotal;
       return position;
     })
     .filter((position): position is ReservePosition => position !== null);
+}
+
+function normalizePositionCostBreakdown(value: unknown): PositionCostBreakdownItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const name = String(item.name ?? "").trim();
+      const amount = nullableNumberOrDefault(item.amount, null);
+      if (!name && amount === null) return null;
+      return {
+        id: String(item.id || createId()),
+        name,
+        amount: amount === null ? null : Math.max(0, amount)
+      };
+    })
+    .filter((item): item is PositionCostBreakdownItem => item !== null);
+}
+
+function positionCostBreakdownTotal(items: PositionCostBreakdownItem[] | undefined): number | null {
+  if (!items?.some((item) => item.amount !== null)) return null;
+  return items.reduce((sum, item) => sum + Math.max(0, Number(item.amount ?? 0)), 0);
 }
 
 function migrateMonthlyNetIncomePosition(settings: PlanningSettings, positions: ReservePosition[]): ReservePosition[] {

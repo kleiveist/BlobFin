@@ -184,6 +184,7 @@ export function renderAppShell(): string {
           <button class="button" id="addPositionButton" type="button" data-action="add-position">Ausgabe hinzufuegen</button>
         </div>
         <div id="positionIconPicker" class="position-icon-picker" role="dialog" aria-label="Positionslabel auswaehlen" hidden></div>
+        <div id="positionCostDialogRoot"></div>
       </section>
 
       <section class="panel result-panel" data-module-section="planning_scenarios">

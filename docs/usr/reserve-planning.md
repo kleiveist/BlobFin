@@ -10,9 +10,9 @@ The `Kosten- und Ruecklagenpositionen` table is the base for the yearly planning
 - `Aktiv`: includes the position in calculations.
 - `View`: shows the position as a column in the yearly table when the position is active and not one-time.
 - `Name`: user-facing label.
-- `Art`: position type.
+- `Art`: position type for reserve rows.
 - `Betrag`: amount for the position.
-- `Start` / `Ende`: active month range for recurring positions.
+- `Start` / `Ende`: active month range for rows without rhythm and other range-based rows.
 - `Jahr`: start or matching year for income rows.
 - `Abgang` / `Eingang` / `Transfer`: payout, income, or savings cadence.
 - `Abgangsmonat` / `Eingangsmonat` / `Transfermonat`: month for yearly or one-time rows.
@@ -63,7 +63,9 @@ Savings rows:
 - `Jaehrlich`: amount is considered in the configured payout month.
 - `Einmalig`: amount is considered only once in the configured year and month.
 
-For one-time expense payouts, `Start` and `Ende` are replaced by `Abgangsjahr`. For one-time income rows, the `Start` and `Ende` columns are hidden and the `Jahr` field decides the matching year. Income and savings rows without rhythm keep `Start` and `Ende` editable, so a same-height income or savings rate can be planned for a short range such as three months. One-time rows do not appear as yearly table columns. They can still be used for cashback when the row is a temporary expense position with cashback enabled.
+For income rows, the `Art` column is hidden because the active rhythm already decides the income type. Monthly, yearly, and one-time income rows hide `Start` and `Ende`; income rows without rhythm keep `Start` and `Ende` editable, so a same-height income can be planned for a short range such as three months. Monthly and yearly expense rows also hide `Start` and `Ende`; the configured payout cadence and payout month decide the timing. For one-time expense payouts, `Start` and `Ende` are replaced by `Abgangsjahr`. Savings rows without rhythm also keep `Start` and `Ende` editable. One-time rows do not appear as yearly table columns. They can still be used for cashback when the row is a temporary expense position with cashback enabled.
+
+Monthly and yearly expense rows can open a `Details` breakdown in the amount cell. As long as no detail amount is entered, the table amount stays editable. Once one or more detail amounts are entered, the table amount is locked and replaced by the sum from the breakdown.
 
 ## Interest
 

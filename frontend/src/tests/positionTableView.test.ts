@@ -58,20 +58,41 @@ function view(overrides: Partial<PositionTableView>): PositionTableView {
 }
 
 describe("position table view", () => {
-  it("only exposes the type column for sections with multiple position types", () => {
+  it("exposes columns for each position section and income cadence", () => {
     const columnNames = (
       mode: Parameters<typeof positionTableColumnsForMode>[0],
       cadence?: Parameters<typeof positionTableColumnsForMode>[1]
     ) => positionTableColumnsForMode(mode, cadence).map((column) => column.column);
 
-    expect(columnNames("income")).toContain("type");
+    expect(columnNames("income")).not.toContain("type");
     expect(columnNames("reserve")).toContain("type");
     expect(columnNames("expense")).not.toContain("type");
     expect(columnNames("savings")).not.toContain("type");
     expect(columnNames("savings")).toContain("endMonth");
+    expect(columnNames("income", "monthly")).not.toContain("type");
+    expect(columnNames("income", "monthly")).not.toContain("startMonth");
+    expect(columnNames("income", "monthly")).not.toContain("endMonth");
+    expect(columnNames("income", "yearly")).not.toContain("type");
+    expect(columnNames("income", "yearly")).not.toContain("startMonth");
+    expect(columnNames("income", "yearly")).not.toContain("endMonth");
+    expect(columnNames("income", "none")).not.toContain("type");
+    expect(columnNames("income", "none")).toContain("startMonth");
+    expect(columnNames("income", "none")).toContain("endMonth");
     expect(columnNames("income", "once")).not.toContain("startMonth");
     expect(columnNames("income", "once")).not.toContain("endMonth");
     expect(columnNames("income", "once")).toContain("payoutYear");
+    expect(columnNames("expense", "monthly")).not.toContain("startMonth");
+    expect(columnNames("expense", "monthly")).not.toContain("endMonth");
+    expect(columnNames("expense", "monthly")).not.toContain("payoutYear");
+    expect(columnNames("expense", "yearly")).not.toContain("startMonth");
+    expect(columnNames("expense", "yearly")).not.toContain("endMonth");
+    expect(columnNames("expense", "yearly")).not.toContain("payoutYear");
+    expect(columnNames("expense", "none")).toContain("startMonth");
+    expect(columnNames("expense", "none")).toContain("endMonth");
+    expect(columnNames("expense", "none")).not.toContain("payoutYear");
+    expect(columnNames("expense", "once")).not.toContain("startMonth");
+    expect(columnNames("expense", "once")).not.toContain("endMonth");
+    expect(columnNames("expense", "once")).toContain("payoutYear");
   });
 
   it("filters expenses by monthly payout cadence", () => {

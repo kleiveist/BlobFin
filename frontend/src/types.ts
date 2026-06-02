@@ -69,6 +69,12 @@ export interface PositionTableView {
 
 export type PositionTableViewState = Record<PositionTableMode, PositionTableView>;
 
+export interface PositionCostBreakdownItem {
+  id: string;
+  name: string;
+  amount: number | null;
+}
+
 export interface ReservePosition {
   id: string;
   flow: PositionFlow;
@@ -86,6 +92,7 @@ export interface ReservePosition {
   payoutDay: number;
   interestBearing: boolean;
   cashback: boolean;
+  costBreakdown?: PositionCostBreakdownItem[];
 }
 
 export interface PlanningSettings {

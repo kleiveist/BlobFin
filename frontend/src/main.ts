@@ -122,6 +122,7 @@ import type {
   InvestmentSettings,
   PlanningAccount,
   PlanningSettings,
+  PositionCostBreakdownItem,
   PositionTableFilterColumn,
   PositionTableFilterOperator,
   PositionTableView,
@@ -388,6 +389,7 @@ let reserveChartHighlightId: string | null = null;
 let reserveChartAdjustment: ReserveChartAdjustment = "none";
 let reserveChartStyle: ReserveChartStyle = "bars";
 let incomeTaxDialogEntryId: string | null = null;
+let positionCostDialogId: string | null = null;
 let incomeAnalysisOpen = false;
 let incomeAnalysisChartType: IncomeAnalysisChartType = "pie";
 let incomeAnalysisDataView: IncomeAnalysisDataView = "deductions";
@@ -796,6 +798,19 @@ function bindEvents(): void {
       return;
     }
 
+    if (target.dataset.positionCostPositionId && target.dataset.positionCostItemId && target.dataset.positionCostField) {
+      updatePositionCostBreakdownItem(
+        target.dataset.positionCostPositionId,
+        target.dataset.positionCostItemId,
+        target.dataset.positionCostField,
+        target.value
+      );
+      renderPositions();
+      renderPositionCostDialogTotals(target.dataset.positionCostPositionId);
+      saveState(state);
+      return;
+    }
+
     if (target.dataset.retirementAge) {
       updateRetirementAge(target.value);
       renderAll();
@@ -836,6 +851,17 @@ function bindEvents(): void {
 
     if (target.dataset.incomeSetting) {
       updateIncomeSetting(target.dataset.incomeSetting as keyof IncomeTrackerSettings, target.value);
+      renderAll();
+      return;
+    }
+
+    if (target.dataset.positionCostPositionId && target.dataset.positionCostItemId && target.dataset.positionCostField) {
+      updatePositionCostBreakdownItem(
+        target.dataset.positionCostPositionId,
+        target.dataset.positionCostItemId,
+        target.dataset.positionCostField,
+        target.value
+      );
       renderAll();
       return;
     }
@@ -923,6 +949,14 @@ function bindEvents(): void {
     if (action === "show-expense-positions") setSelectedPositionMode("expense");
     if (action?.startsWith("set-position-cadence-")) {
       setSelectedPositionCadence(action.replace("set-position-cadence-", "") as PositionTableCadence);
+    }
+    if (action?.startsWith("open-position-cost-dialog-")) {
+      openPositionCostDialog(action.replace("open-position-cost-dialog-", ""));
+    }
+    if (action === "close-position-cost-dialog") closePositionCostDialog();
+    if (action === "add-position-cost-item") addPositionCostBreakdownItem(button.dataset.positionId || "");
+    if (action === "remove-position-cost-item") {
+      removePositionCostBreakdownItem(button.dataset.positionId || "", button.dataset.positionCostItemId || "");
     }
     if (action === "show-reserve-positions") setSelectedPositionMode("reserve");
     if (action === "show-savings-positions") setSelectedPositionMode("savings");
@@ -1144,6 +1178,7 @@ function renderAll(): void {
   const reserve = calculateReserveSummary(state.settings, investmentAccount.yearlyRows);
   const activeReserve = calculateReserveSummary(state.settings, state.positions);
   renderPositions();
+  renderPositionCostDialog();
   renderInvestmentIncludeList(reserve);
   renderCalculations(reserve, activeReserve);
   syncRealEstateInputsFromState();
@@ -4569,9 +4604,7 @@ function renderPositions(): void {
             position.id
           }" data-position-field="name" /></td>
           ${showTypeColumn ? `<td>${positionTypeSelect(position)}</td>` : ""}
-          <td><input class="small-input amount-input" type="number" min="0" step="0.01" value="${position.amount}" data-position-id="${
-            position.id
-          }" data-position-field="amount" /></td>
+          <td>${positionAmountCell(position)}</td>
           ${isIncome ? incomeDateCells(position) : expenseDateCells(position)}
           <td>${payoutSelect(position)}</td>
           ${positionTableShowsPayoutMonthColumn(position) ? `<td>${monthSelect(position.id, "payoutMonth", position.payoutMonth)}</td>` : ""}
@@ -5194,6 +5227,179 @@ function renderPositionIconPicker(): void {
   picker.hidden = false;
 }
 
+function openPositionCostDialog(positionId: string): void {
+  const position = state.positions.find((item) => item.id === positionId);
+  if (!position || !positionCostBreakdownEligible(position)) return;
+  positionCostDialogId = positionId;
+  if (!position.costBreakdown?.length) {
+    state.positions = state.positions.map((item) =>
+      item.id === positionId ? { ...item, costBreakdown: [emptyPositionCostBreakdownItem()] } : item
+    );
+  }
+  renderAll();
+}
+
+function closePositionCostDialog(): void {
+  positionCostDialogId = null;
+  renderPositionCostDialog();
+}
+
+function renderPositionCostDialog(): void {
+  const root = document.querySelector<HTMLDivElement>("#positionCostDialogRoot");
+  if (!root) return;
+  const position = state.positions.find((item) => item.id === positionCostDialogId);
+  if (!position || !positionCostBreakdownEligible(position)) {
+    root.innerHTML = "";
+    positionCostDialogId = null;
+    return;
+  }
+
+  const items = position.costBreakdown?.length ? position.costBreakdown : [emptyPositionCostBreakdownItem()];
+  const total = positionCostBreakdownTotal(items);
+  root.innerHTML = `
+    <div class="position-cost-dialog-backdrop" role="presentation">
+      <div class="position-cost-dialog" role="dialog" aria-modal="true" aria-label="Kostenaufschluesselung">
+        <div class="income-tax-dialog-head">
+          <div>
+            <strong>Kostenaufschluesselung</strong>
+            <span>${escapeHtml(position.name)} · ${escapeHtml(positionCadenceButtonLabel(position.payoutType))}</span>
+          </div>
+          <button class="chart-popup-close" type="button" data-action="close-position-cost-dialog" aria-label="Kostenaufschluesselung schliessen">x</button>
+        </div>
+        <div class="table-wrap">
+          <table class="position-cost-table">
+            <thead>
+              <tr>
+                <th>Position</th>
+                <th>Betrag</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((item) => positionCostBreakdownRow(position.id, item)).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="position-cost-summary">
+          <span>Summe</span>
+          <strong data-position-cost-total="${escapeHtml(position.id)}">${total === null ? "-" : money(total)}</strong>
+        </div>
+        <div class="button-row">
+          <button class="button secondary" type="button" data-action="add-position-cost-item" data-position-id="${escapeHtml(
+            position.id
+          )}">Kostenposition hinzufuegen</button>
+          <button class="button" type="button" data-action="close-position-cost-dialog">Fertig</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function positionCostBreakdownRow(positionId: string, item: PositionCostBreakdownItem): string {
+  return `
+    <tr>
+      <td>
+        <input
+          class="position-cost-name-input"
+          value="${escapeHtml(item.name)}"
+          data-position-cost-position-id="${escapeHtml(positionId)}"
+          data-position-cost-item-id="${escapeHtml(item.id)}"
+          data-position-cost-field="name"
+          placeholder="z. B. Lebensunterhalt"
+        />
+      </td>
+      <td>
+        <input
+          class="small-input amount-input"
+          type="number"
+          min="0"
+          step="0.01"
+          value="${item.amount === null ? "" : item.amount}"
+          data-position-cost-position-id="${escapeHtml(positionId)}"
+          data-position-cost-item-id="${escapeHtml(item.id)}"
+          data-position-cost-field="amount"
+        />
+      </td>
+      <td>
+        <button
+          class="icon-button danger"
+          type="button"
+          data-action="remove-position-cost-item"
+          data-position-id="${escapeHtml(positionId)}"
+          data-position-cost-item-id="${escapeHtml(item.id)}"
+          aria-label="Kostenposition entfernen"
+        >x</button>
+      </td>
+    </tr>
+  `;
+}
+
+function renderPositionCostDialogTotals(positionId: string): void {
+  const position = state.positions.find((item) => item.id === positionId);
+  const value = document.querySelector<HTMLElement>(`[data-position-cost-total="${cssEscape(positionId)}"]`);
+  if (!position || !value) return;
+  const total = positionCostBreakdownTotal(position.costBreakdown);
+  value.textContent = total === null ? "-" : money(total);
+}
+
+function emptyPositionCostBreakdownItem(): PositionCostBreakdownItem {
+  return { id: createId(), name: "", amount: null };
+}
+
+function addPositionCostBreakdownItem(positionId: string): void {
+  if (!positionId) return;
+  state.positions = state.positions.map((position) => {
+    if (position.id !== positionId || !positionCostBreakdownEligible(position)) return position;
+    return {
+      ...position,
+      costBreakdown: [...(position.costBreakdown ?? []), emptyPositionCostBreakdownItem()]
+    };
+  });
+  renderAll();
+}
+
+function removePositionCostBreakdownItem(positionId: string, itemId: string): void {
+  if (!positionId || !itemId) return;
+  state.positions = state.positions.map((position) => {
+    if (position.id !== positionId) return position;
+    const costBreakdown = (position.costBreakdown ?? []).filter((item) => item.id !== itemId);
+    const nextCostBreakdown =
+      positionCostDialogId === positionId && costBreakdown.length === 0
+        ? [emptyPositionCostBreakdownItem()]
+        : costBreakdown;
+    return positionWithCostBreakdownAmount({ ...position, costBreakdown: nextCostBreakdown });
+  });
+  renderAll();
+}
+
+function updatePositionCostBreakdownItem(positionId: string, itemId: string, field: string, value: string): void {
+  if (!positionId || !itemId) return;
+  state.positions = state.positions.map((position) => {
+    if (position.id !== positionId) return position;
+    const costBreakdown = (position.costBreakdown?.length ? position.costBreakdown : [emptyPositionCostBreakdownItem()]).map(
+      (item) => {
+        if (item.id !== itemId) return item;
+        if (field === "name") return { ...item, name: value };
+        if (field === "amount") {
+          return { ...item, amount: value.trim() === "" ? null : Math.max(0, numberValue(value)) };
+        }
+        return item;
+      }
+    );
+    return positionWithCostBreakdownAmount({ ...position, costBreakdown });
+  });
+}
+
+function positionWithCostBreakdownAmount(position: ReservePosition): ReservePosition {
+  const costBreakdown = normalizePositionCostBreakdown(position.costBreakdown);
+  const total = positionCostBreakdownTotal(costBreakdown);
+  return {
+    ...position,
+    amount: total === null ? position.amount : total,
+    costBreakdown: costBreakdown.length ? costBreakdown : undefined
+  };
+}
+
 function renderPositionModeControls(): void {
   for (const mode of ["income", "expense", "reserve", "savings"] as PositionTableMode[]) {
     const button = document.querySelector<HTMLButtonElement>(`[data-action='show-${mode}-positions']`);
@@ -5408,11 +5614,15 @@ function positionSortChip(sort: NonNullable<PositionTableView["sort"]>): string 
 function renderPositionTableHead(): void {
   const head = document.querySelector<HTMLTableSectionElement>("#positionsHead");
   if (!head) return;
-  const incomeOnce = positionTableHidesIncomeMonthRange();
+  const hideIncomeMonthRange = positionTableHidesIncomeMonthRange();
+  const hideExpenseMonthRange = positionTableHidesExpenseMonthRange();
+  const expenseOnce = selectedPositionMode === "expense" && activePositionCadence() === "once";
   const savingsWithoutRhythm = selectedPositionMode === "savings" && activePositionCadence() === "none";
   const dateHeaders =
-    incomeOnce
+    hideIncomeMonthRange || hideExpenseMonthRange
       ? ""
+      : expenseOnce
+      ? positionSortableHeader("payoutYear", "Abgangsjahr")
       : savingsWithoutRhythm
       ? [
           positionSortableHeader("payoutYear", "Jahr"),
@@ -5484,22 +5694,91 @@ function positionSortableHeader(column: PositionTableFilterColumn, label: string
 }
 
 function positionTableColumnCount(mode: PositionTableMode, cadence: PositionTableCadence | null = null): number {
-  let count = (mode === "income" ? 14 : 15) - (positionTableShowsTypeColumn(mode) ? 0 : 1);
-  if (mode === "income" && cadence === "once") count -= 2;
-  if (mode === "savings" && cadence === "none") count -= 1;
+  let count = 9;
+  if (positionTableShowsTypeColumn(mode)) count += 1;
+  if (mode === "income") count += cadence === null || cadence === "none" ? 3 : 1;
+  else if (mode === "expense" && (cadence === "monthly" || cadence === "yearly")) count += 0;
+  else if (mode === "expense" && cadence === "once") count += 1;
+  else count += mode === "savings" && cadence === "none" ? 3 : 2;
+  if (!(mode === "savings" && cadence === "none")) count += 1;
+  if (mode !== "income") count += 2;
   return count;
 }
 
 function positionTableShowsTypeColumn(mode: PositionTableMode): boolean {
-  return mode === "income" || mode === "reserve";
+  return mode === "reserve";
 }
 
 function positionTableHidesIncomeMonthRange(): boolean {
-  return selectedPositionMode === "income" && activePositionCadence() === "once";
+  return selectedPositionMode === "income" && activePositionCadence() !== "none";
+}
+
+function positionTableHidesExpenseMonthRange(): boolean {
+  return selectedPositionMode === "expense" && ["monthly", "yearly"].includes(String(activePositionCadence()));
 }
 
 function positionTableShowsPayoutMonthColumn(position: ReservePosition): boolean {
   return !(selectedPositionMode === "savings" && position.type === "savings" && position.payoutType === "none");
+}
+
+function positionAmountCell(position: ReservePosition): string {
+  if (!positionCostBreakdownEligible(position)) {
+    return `<input class="small-input amount-input" type="number" min="0" step="0.01" value="${position.amount}" data-position-id="${position.id}" data-position-field="amount" />`;
+  }
+
+  const total = positionCostBreakdownTotal(position.costBreakdown);
+  if (total !== null) {
+    return `
+      <button
+        class="position-cost-button locked"
+        type="button"
+        data-action="open-position-cost-dialog-${escapeHtml(position.id)}"
+        aria-haspopup="dialog"
+        aria-label="Kostenaufschluesselung bearbeiten"
+      >
+        <strong>${money(total)}</strong>
+        <span>Details</span>
+      </button>
+    `;
+  }
+
+  return `
+    <div class="position-amount-detail-cell">
+      <input class="small-input amount-input" type="number" min="0" step="0.01" value="${
+        position.amount
+      }" data-position-id="${position.id}" data-position-field="amount" />
+      <button
+        class="position-cost-mini-button"
+        type="button"
+        data-action="open-position-cost-dialog-${escapeHtml(position.id)}"
+        aria-haspopup="dialog"
+        aria-label="Kostenaufschluesselung bearbeiten"
+      >Details</button>
+    </div>
+  `;
+}
+
+function positionCostBreakdownEligible(position: ReservePosition): boolean {
+  return (
+    selectedPositionMode === "expense" &&
+    positionFlow(position) === "expense" &&
+    position.type === "temporary" &&
+    (position.payoutType === "monthly" || position.payoutType === "yearly")
+  );
+}
+
+function positionCostBreakdownTotal(items: PositionCostBreakdownItem[] | undefined): number | null {
+  if (!items?.some((item) => item.amount !== null)) return null;
+  return items.reduce((sum, item) => sum + Math.max(0, Number(item.amount ?? 0)), 0);
+}
+
+function normalizePositionCostBreakdown(items: PositionCostBreakdownItem[] | undefined): PositionCostBreakdownItem[] {
+  if (!items?.length) return [];
+  return items.map((item) => ({
+    id: String(item.id || createId()),
+    name: String(item.name ?? ""),
+    amount: item.amount === null || item.amount === undefined ? null : Math.max(0, Number(item.amount) || 0)
+  }));
 }
 
 function positionDragHandle(positionId: string, locked: boolean): string {
@@ -6425,10 +6704,10 @@ function blockedInvestmentDepotForPosition(positionId: string): InvestmentDepotK
 function expenseDateCells(position: ReservePosition): string {
   if (position.type === "savings") return savingsDateCells(position);
   if (position.type === "fixed") return monthRangeDateCells(position);
+  if (positionTableHidesExpenseMonthRange()) return "";
 
   if (position.payoutType === "once") {
     return `
-      <td class="once-year-label">Abgangsjahr</td>
       <td>
         <input class="small-input payout-year-input" type="number" min="2000" max="2200" step="1" value="${
           position.payoutYear
@@ -7158,6 +7437,10 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
   const flow = flowForType(type);
   const payoutType = normalizePayoutType(position.payoutType, flow, type);
   const payoutMonth = finiteIntegerInRange(position.payoutMonth, 1, 12, 12);
+  const costBreakdown = normalizePositionCostBreakdown(position.costBreakdown);
+  const canUseCostBreakdown =
+    flow === "expense" && type === "temporary" && (payoutType === "monthly" || payoutType === "yearly");
+  const costBreakdownTotal = canUseCostBreakdown ? positionCostBreakdownTotal(costBreakdown) : null;
   let startMonth = finiteIntegerInRange(position.startMonth, 1, 12, 1);
   let endMonth = finiteIntegerInRange(position.endMonth, 1, 12, 12);
 
@@ -7182,7 +7465,7 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
     name: String(position.name || "Position"),
     icon: normalizePositionIcon(position.icon, defaultPositionIconForPosition({ ...position, flow, type })),
     type,
-    amount: Math.max(0, finiteNumber(position.amount, 0)),
+    amount: costBreakdownTotal === null ? Math.max(0, finiteNumber(position.amount, 0)) : costBreakdownTotal,
     startMonth,
     endMonth,
     payoutType,
@@ -7190,7 +7473,8 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
     payoutMonth,
     payoutDay: finiteIntegerInRange(position.payoutDay, 1, 31, 31),
     interestBearing: !isIncome && payoutType !== "once" && Boolean(position.interestBearing),
-    cashback: !isIncome && type === "temporary" && Boolean(position.cashback)
+    cashback: !isIncome && type === "temporary" && Boolean(position.cashback),
+    costBreakdown: canUseCostBreakdown && costBreakdown.length ? costBreakdown : undefined
   };
 }
 
