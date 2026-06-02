@@ -3705,11 +3705,8 @@ async function importIncomeCsvFromFile(file: File | undefined): Promise<void> {
 
   state.incomeTracker = {
     ...state.incomeTracker,
-    yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules([
-      ...state.incomeTracker.yearlyEntries,
-      ...imported.yearlyEntries
-    ]),
-    milestones: [...state.incomeTracker.milestones, ...imported.milestones],
+    yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules(imported.yearlyEntries),
+    milestones: imported.milestones,
     settings: {
       ...state.incomeTracker.settings,
       activeInputTab: imported.yearlyEntries.length ? "yearly" : imported.milestones.length ? "milestones" : "settings"
