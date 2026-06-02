@@ -10,6 +10,12 @@ import {
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
 import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/combinedWealth";
 import {
+  buildIncomeAnalysisLabelDetails,
+  type IncomeAnalysisLabelDetails,
+  type IncomeAnalysisLabelEntry,
+  type IncomeAnalysisLabelGroup
+} from "./domain/incomeAnalysis";
+import {
   buildIncomeChartModel,
   buildIncomeTrackerModel,
   applyCapitalGainsTaxToEntries,
@@ -263,7 +269,7 @@ type ReserveChartScenario = "current" | "lowerExpenses" | "raiseSavings" | "bala
 type ReserveChartAdjustment = "none" | "down10" | "up10";
 type ReserveChartStyle = "bars" | "pie";
 type IncomeAnalysisChartType = "pie" | "bar" | "line" | "curve";
-type IncomeAnalysisDataView = "deductions" | "social" | "taxes" | "income";
+type IncomeAnalysisDataView = "deductions" | "social" | "taxes" | "income" | "label_distribution";
 type IncomeAnalysisYearFilter = "all" | number;
 
 interface IncomeAnalysisSlice {
@@ -286,9 +292,16 @@ interface IncomeAnalysisYearPoint {
   employerSocial: number;
 }
 
+type IncomeAnalysisSeriesItem = {
+  label: string;
+  tone: string;
+  values: Array<{ year: number; value: number }>;
+};
+
 interface IncomeAnalysisModel {
   entries: IncomeYearEntry[];
   years: number[];
+  labelDetails: IncomeAnalysisLabelDetails;
   totalGross: number;
   totalNet: number;
   totalDeductions: number;
@@ -372,6 +385,7 @@ let incomeAnalysisOpen = false;
 let incomeAnalysisChartType: IncomeAnalysisChartType = "pie";
 let incomeAnalysisDataView: IncomeAnalysisDataView = "deductions";
 let incomeAnalysisYearFilter: IncomeAnalysisYearFilter = "all";
+let incomeAnalysisSelectedLabels: string[] = [];
 let incomeYearLabelPicker: { entryId: string; top: number; left: number } | null = null;
 let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
@@ -938,6 +952,7 @@ function bindEvents(): void {
     if (action?.startsWith("income-analysis-year-")) {
       setIncomeAnalysisYearFilter(action.replace("income-analysis-year-", ""));
     }
+    if (action === "toggle-income-analysis-label") toggleIncomeAnalysisLabel(button.dataset.incomeAnalysisLabel || "");
     if (action === "toggle-income-year-label-filter") toggleIncomeYearLabelFilter(button.dataset.incomeLabel || "");
     if (action === "income-import-csv") document.querySelector<HTMLInputElement>("#incomeCsvImport")?.click();
     if (action?.startsWith("income-remove-")) removeIncomeEntry(action);
@@ -2057,9 +2072,10 @@ function renderIncomeAnalysisDialog(model: IncomeTrackerModel = incomeTrackerMod
   const analysis = buildIncomeAnalysisModel(model);
   const slices = incomeAnalysisSlices(analysis);
   const years = analysis.years;
+  const distributionMode = incomeAnalysisDataView === "label_distribution";
   root.innerHTML = `
     <div class="income-analysis-backdrop" role="presentation">
-      <div class="income-analysis-dialog" role="dialog" aria-modal="true" aria-label="Weltgrafik Analyse Dashboard">
+      <div class="income-analysis-dialog${distributionMode ? " label-distribution" : ""}" role="dialog" aria-modal="true" aria-label="Weltgrafik Analyse Dashboard">
         <div class="income-analysis-head">
           <div>
             <strong>Weltgrafik</strong>
@@ -2079,35 +2095,191 @@ function renderIncomeAnalysisDialog(model: IncomeTrackerModel = incomeTrackerMod
             ${incomeAnalysisToggle("income-analysis-view-social", "Sozialabgaben", incomeAnalysisDataView === "social")}
             ${incomeAnalysisToggle("income-analysis-view-taxes", "Steuern", incomeAnalysisDataView === "taxes")}
             ${incomeAnalysisToggle("income-analysis-view-income", "Einkommen", incomeAnalysisDataView === "income")}
+            ${incomeAnalysisToggle("income-analysis-view-label_distribution", "Einkommensverteilung", incomeAnalysisDataView === "label_distribution")}
           </div>
           <div class="income-analysis-switch" aria-label="Jahresfilter">
             ${incomeAnalysisToggle("income-analysis-year-all", "Alle Jahre", incomeAnalysisYearFilter === "all")}
             ${years.map((year) => incomeAnalysisToggle(`income-analysis-year-${year}`, String(year), incomeAnalysisYearFilter === year)).join("")}
           </div>
         </div>
-        <div class="income-analysis-metrics">
-          ${incomeAnalysisMetricCard("Bisher eingenommen", money(analysis.totalGross), "Brutto erfasst")}
-          ${incomeAnalysisMetricCard("Zum Leben verfuegbar", money(analysis.totalNet), "Jahresnetto")}
-          ${incomeAnalysisMetricCard("Steuern bezahlt", money(analysis.taxTotal), "inkl. Erstattung/Nachzahlung")}
-          ${incomeAnalysisMetricCard("Sozialabgaben", money(analysis.socialTotal), "Arbeitnehmeranteile")}
-        </div>
-        <div class="income-analysis-layout">
-          <section class="income-analysis-chart-card">
-            ${renderIncomeAnalysisChart(analysis, slices)}
-          </section>
-          <section class="income-analysis-detail-card">
-            <h3>${escapeHtml(incomeAnalysisViewTitle())}</h3>
-            <div class="income-analysis-breakdown">
-              ${slices.length ? slices.map((slice) => incomeAnalysisBreakdownLine(slice, analysis.totalGross)).join("") : incomeAnalysisEmpty("Keine Werte fuer diese Auswahl.")}
-            </div>
-            <div class="income-analysis-total">
-              <span>Abgabenquote ohne Arbeitgeber</span>
-              <strong>${analysis.totalGross > 0 ? percent((analysis.totalDeductions / analysis.totalGross) * 100) : "-"}</strong>
-            </div>
-          </section>
-        </div>
+        ${
+          distributionMode
+            ? renderIncomeAnalysisDistributionContent(analysis, slices)
+            : `
+              <div class="income-analysis-metrics">
+                ${incomeAnalysisMetricCard("Bisher eingenommen", money(analysis.totalGross), "Brutto erfasst")}
+                ${incomeAnalysisMetricCard("Zum Leben verfuegbar", money(analysis.totalNet), "Jahresnetto")}
+                ${incomeAnalysisMetricCard("Steuern bezahlt", money(analysis.taxTotal), "inkl. Erstattung/Nachzahlung")}
+                ${incomeAnalysisMetricCard("Sozialabgaben", money(analysis.socialTotal), "Arbeitnehmeranteile")}
+              </div>
+              <div class="income-analysis-layout">
+                <section class="income-analysis-chart-card">
+                  ${renderIncomeAnalysisChart(analysis, slices)}
+                </section>
+                <section class="income-analysis-detail-card">
+                  <h3>${escapeHtml(incomeAnalysisViewTitle())}</h3>
+                  <div class="income-analysis-detail-body">
+                    <div class="income-analysis-breakdown">
+                      ${slices.length ? slices.map((slice) => incomeAnalysisBreakdownLine(slice, analysis.totalGross)).join("") : incomeAnalysisEmpty("Keine Werte fuer diese Auswahl.")}
+                    </div>
+                  </div>
+                  <div class="income-analysis-total">
+                    <span>Abgabenquote ohne Arbeitgeber</span>
+                    <strong>${analysis.totalGross > 0 ? percent((analysis.totalDeductions / analysis.totalGross) * 100) : "-"}</strong>
+                  </div>
+                </section>
+              </div>
+            `
+        }
       </div>
     </div>
+  `;
+}
+
+function renderIncomeAnalysisDistributionContent(analysis: IncomeAnalysisModel, slices: IncomeAnalysisSlice[]): string {
+  return `
+    <div class="income-analysis-distribution-layout">
+      <div class="income-analysis-distribution-main">
+        <section class="income-analysis-chart-card income-analysis-distribution-chart">
+          ${renderIncomeAnalysisChart(analysis, slices)}
+        </section>
+        ${renderIncomeAnalysisLabelFilter(analysis.labelDetails)}
+        ${renderIncomeAnalysisLabelTable(analysis.labelDetails)}
+      </div>
+      ${renderIncomeAnalysisDistributionDetail(analysis.labelDetails)}
+    </div>
+  `;
+}
+
+function renderIncomeAnalysisDistributionDetail(details: IncomeAnalysisLabelDetails): string {
+  return `
+    <section class="income-analysis-detail-card income-analysis-distribution-detail">
+      <h3>Einkommen</h3>
+      <div class="income-analysis-detail-body income-analysis-label-income-list">
+        ${
+          details.availableGroups.length
+            ? details.availableGroups.map(renderIncomeAnalysisLabelIncomeCard).join("")
+            : incomeAnalysisEmpty("Keine sichtbaren Labels fuer diese Auswahl.")
+        }
+      </div>
+    </section>
+  `;
+}
+
+function renderIncomeAnalysisLabelIncomeCard(group: IncomeAnalysisLabelGroup): string {
+  return `
+    <article class="income-analysis-label-income-card">
+      <span>${escapeHtml(group.labelText)}</span>
+      <strong>${escapeHtml(money(group.net))}</strong>
+    </article>
+  `;
+}
+
+function renderIncomeAnalysisLabelFilter(details: IncomeAnalysisLabelDetails): string {
+  if (!details.availableLabels.length) {
+    return `
+      <section class="income-analysis-label-filter-card">
+        ${incomeAnalysisEmpty("Keine sichtbaren Labels fuer diese Auswahl.")}
+      </section>
+    `;
+  }
+
+  const selected = new Set(details.selectedLabels);
+  return `
+    <section class="income-analysis-label-filter-card" aria-label="Label-Auswahl">
+      <div class="income-analysis-label-filter-row" aria-label="Label-Filter">
+        ${details.availableLabels
+          .map((label) => {
+            const active = selected.has(label.id);
+            return `
+              <button
+                class="position-label-filter-button income-analysis-label-filter-button${active ? " active" : ""}"
+                type="button"
+                data-action="toggle-income-analysis-label"
+                data-income-analysis-label="${escapeHtml(label.id)}"
+                aria-pressed="${active}"
+                aria-label="Label ${escapeHtml(label.label)} ${active ? "deaktivieren" : "aktivieren"}"
+                title="${escapeHtml(label.label)}"
+              >
+                ${positionIconSvg(label.icon)}
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderIncomeAnalysisLabelTable(details: IncomeAnalysisLabelDetails): string {
+  if (!details.groups.length) {
+    return `
+      <section class="income-analysis-label-table-card">
+        ${incomeAnalysisEmpty("Keine Positionen fuer die gewaehlten Labels.")}
+      </section>
+    `;
+  }
+
+  return `
+    <section class="income-analysis-label-table-card" aria-label="Einkommensverteilung Tabelle">
+      <div class="table-wrap income-analysis-label-table-wrap">
+        <table class="income-analysis-label-table">
+          <thead>
+            <tr>
+              <th>Label / Position</th>
+              <th>Brutto</th>
+              <th>Steuern</th>
+              <th>Sozialabgaben</th>
+              <th>Netto</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${details.groups.map(renderIncomeAnalysisLabelTableGroup).join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderIncomeAnalysisLabelTableGroup(group: IncomeAnalysisLabelGroup): string {
+  return `
+    <tr class="income-analysis-label-summary-row">
+      <td>
+        <span class="income-analysis-label-table-title">
+          ${positionIconSvg(group.icon)}
+          <strong>${escapeHtml(group.labelText)}</strong>
+          <small>${group.entries.length} ${group.entries.length === 1 ? "Position" : "Positionen"}</small>
+        </span>
+      </td>
+      <td>${escapeHtml(money(group.gross))}</td>
+      <td>${escapeHtml(money(group.taxes))}</td>
+      <td>${escapeHtml(money(group.social))}</td>
+      <td>${escapeHtml(money(group.net))}</td>
+    </tr>
+    ${group.entries.map(renderIncomeAnalysisLabelTableEntry).join("")}
+  `;
+}
+
+function renderIncomeAnalysisLabelTableEntry(entry: IncomeAnalysisLabelEntry): string {
+  const sourceParts = [
+    entry.employer.trim() || null,
+    incomePersonLabel(entry.person),
+    INCOME_SOURCE_LABELS[entry.source]
+  ].filter(Boolean);
+  return `
+    <tr class="income-analysis-label-entry-row">
+      <td>
+        <span class="income-analysis-label-entry-cell">
+          <strong>${escapeHtml(String(entry.year))}</strong>
+          <small>${escapeHtml(sourceParts.join(" · "))}</small>
+        </span>
+      </td>
+      <td>${escapeHtml(money(entry.gross))}</td>
+      <td>${escapeHtml(money(entry.taxes))}</td>
+      <td>${escapeHtml(money(entry.social))}</td>
+      <td>${escapeHtml(money(entry.net))}</td>
+    </tr>
   `;
 }
 
@@ -2217,12 +2389,13 @@ function renderIncomeAnalysisLineChart(analysis: IncomeAnalysisModel, curved: bo
     incomeAnalysisYearFilter === "all"
       ? analysis.yearPoints
       : analysis.yearPoints.filter((point) => point.year === incomeAnalysisYearFilter);
-  const series = incomeAnalysisSeries(points);
-  if (!points.length || !series.length) return incomeAnalysisEmpty("Keine Jahresentwicklung fuer diese Auswahl.");
+  const series = incomeAnalysisSeries(analysis, points);
+  const years = incomeAnalysisSeriesYears(series);
+  if (!years.length || !series.length) return incomeAnalysisEmpty("Keine Jahresentwicklung fuer diese Auswahl.");
   const values = series.flatMap((item) => item.values.map((point) => point.value));
   const maxValue = Math.max(1, ...values);
-  const minYear = points[0]?.year ?? 0;
-  const maxYear = points[points.length - 1]?.year ?? minYear;
+  const minYear = years[0] ?? 0;
+  const maxYear = years[years.length - 1] ?? minYear;
   const width = 720;
   const height = 270;
   const left = 54;
@@ -2247,8 +2420,8 @@ function renderIncomeAnalysisLineChart(analysis: IncomeAnalysisModel, curved: bo
             `;
           })
           .join("")}
-        ${points
-          .map((point) => `<text x="${xForYear(point.year)}" y="${bottom + 24}" text-anchor="middle">${point.year}</text>`)
+        ${years
+          .map((year) => `<text x="${xForYear(year)}" y="${bottom + 24}" text-anchor="middle">${year}</text>`)
           .join("")}
       </svg>
       <div class="income-analysis-legend">
@@ -2280,12 +2453,18 @@ function incomeAnalysisToneColor(tone: string): string {
   return colors[tone] ?? "#1f7a68";
 }
 
+function incomeAnalysisLabelTone(index: number): string {
+  const tones = ["net", "gross", "deduction", "tax", "social", "gold", "blue", "care", "employer", "unassigned"];
+  return tones[index % tones.length];
+}
+
 function incomeAnalysisSlices(analysis: IncomeAnalysisModel): IncomeAnalysisSlice[] {
   return analysis.slicesByView[incomeAnalysisDataView].filter(incomeAnalysisSliceHasDisplayValue);
 }
 
-function incomeAnalysisSeries(points: IncomeAnalysisYearPoint[]): Array<{ label: string; tone: string; values: Array<{ year: number; value: number }> }> {
-  const seriesByView: Record<IncomeAnalysisDataView, Array<{ key: keyof IncomeAnalysisYearPoint; label: string; tone: string }>> = {
+function incomeAnalysisSeries(analysis: IncomeAnalysisModel, points: IncomeAnalysisYearPoint[]): IncomeAnalysisSeriesItem[] {
+  if (incomeAnalysisDataView === "label_distribution") return incomeAnalysisLabelSeries(analysis.labelDetails);
+  const seriesByView: Record<Exclude<IncomeAnalysisDataView, "label_distribution">, Array<{ key: keyof IncomeAnalysisYearPoint; label: string; tone: string }>> = {
     deductions: [
       { key: "taxes", label: "Steuern", tone: "tax" },
       { key: "social", label: "Sozialabgaben", tone: "social" },
@@ -2320,6 +2499,28 @@ function incomeAnalysisSeries(points: IncomeAnalysisYearPoint[]): Array<{ label:
       item.values.some((point) => point.value > 0) ||
       (hasPositiveTaxSeries && item.label === "Steuern netto")
   );
+}
+
+function incomeAnalysisLabelSeries(details: IncomeAnalysisLabelDetails): IncomeAnalysisSeriesItem[] {
+  const years = incomeAnalysisSeriesYears([{ label: "", tone: "", values: details.yearPoints.map((point) => ({ year: point.year, value: point.net })) }]);
+  return details.groups
+    .map((group, index) => {
+      const pointByYear = new Map(
+        details.yearPoints
+          .filter((point) => point.label === group.label)
+          .map((point) => [point.year, point.net] as const)
+      );
+      return {
+        label: group.labelText,
+        tone: incomeAnalysisLabelTone(index),
+        values: years.map((year) => ({ year, value: pointByYear.get(year) ?? 0 }))
+      };
+    })
+    .filter((item) => item.values.some((point) => point.value > 0));
+}
+
+function incomeAnalysisSeriesYears(series: IncomeAnalysisSeriesItem[]): number[] {
+  return [...new Set(series.flatMap((item) => item.values.map((point) => point.year)))].sort((a, b) => a - b);
 }
 
 function linePath(points: Array<{ x: number; y: number }>): string {
@@ -2379,6 +2580,13 @@ function buildIncomeAnalysisModel(model: IncomeTrackerModel): IncomeAnalysisMode
   const taxSlices = incomeAnalysisTaxRows(visibleEntries, "taxes");
   const socialSlices = incomeAnalysisTaxRows(visibleEntries, "social");
   const employerSocialSlices = incomeAnalysisTaxRows(visibleEntries, "employer_social");
+  const labelDetails = buildIncomeAnalysisLabelDetails(
+    state.incomeTracker.yearlyEntries,
+    INCOME_YEAR_LABEL_OPTIONS,
+    incomeAnalysisSelectedLabels,
+    incomeAnalysisYearFilter
+  );
+  incomeAnalysisSelectedLabels = labelDetails.selectedLabels;
   const taxBaseTotal = entries.reduce((sum, entry) => sum + incomeAnalysisEntryTaxBase(entry), 0);
   const { refund: taxRefundTotal, payment: taxPaymentTotal } = incomeAnalysisTaxAdjustmentTotals(entries);
   const taxTotal = entries.reduce((sum, entry) => sum + incomeYearEntryTaxTotal(entry), 0);
@@ -2397,9 +2605,15 @@ function buildIncomeAnalysisModel(model: IncomeTrackerModel): IncomeAnalysisMode
     { label: "Sozialabgaben", value: socialTotal, tone: "social" },
     { label: "Nicht aufgeteilt", value: unassignedDeductions, tone: "unassigned" }
   ];
+  const labelDistributionSlices = labelDetails.groups.map((group, index) => ({
+    label: group.labelText,
+    value: group.net,
+    tone: incomeAnalysisLabelTone(index)
+  }));
   return {
     entries,
     years,
+    labelDetails,
     totalGross,
     totalNet,
     totalDeductions,
@@ -2414,7 +2628,8 @@ function buildIncomeAnalysisModel(model: IncomeTrackerModel): IncomeAnalysisMode
       deductions: deductionSlices,
       social: [...socialSlices, ...employerSocialSlices],
       taxes: taxSlices,
-      income: incomeSlices
+      income: incomeSlices,
+      label_distribution: labelDistributionSlices
     },
     yearPoints: buildIncomeAnalysisYearPoints(model)
   };
@@ -2505,6 +2720,7 @@ function incomeAnalysisViewTitle(): string {
   if (incomeAnalysisDataView === "social") return "Sozialabgaben";
   if (incomeAnalysisDataView === "taxes") return "Steuern";
   if (incomeAnalysisDataView === "income") return "Einkommen und Abgaben";
+  if (incomeAnalysisDataView === "label_distribution") return "Einkommensverteilung";
   return "Abgabenmix";
 }
 
@@ -3210,6 +3426,7 @@ function closeIncomeTaxDialog(): void {
 }
 
 function openIncomeAnalysisDialog(): void {
+  incomeAnalysisSelectedLabels = [];
   incomeAnalysisOpen = true;
   renderIncomeAnalysisDialog();
 }
@@ -3217,6 +3434,7 @@ function openIncomeAnalysisDialog(): void {
 function closeIncomeAnalysisDialog(): void {
   if (!incomeAnalysisOpen) return;
   incomeAnalysisOpen = false;
+  incomeAnalysisSelectedLabels = [];
   renderIncomeAnalysisDialog();
 }
 
@@ -3227,13 +3445,40 @@ function setIncomeAnalysisChartType(value: IncomeAnalysisChartType): void {
 }
 
 function setIncomeAnalysisDataView(value: IncomeAnalysisDataView): void {
-  if (value !== "deductions" && value !== "social" && value !== "taxes" && value !== "income") return;
+  if (
+    value !== "deductions" &&
+    value !== "social" &&
+    value !== "taxes" &&
+    value !== "income" &&
+    value !== "label_distribution"
+  ) {
+    return;
+  }
   incomeAnalysisDataView = value;
   renderIncomeAnalysisDialog();
 }
 
 function setIncomeAnalysisYearFilter(value: string): void {
   incomeAnalysisYearFilter = value === "all" ? "all" : incomeInteger(value, state.settings.year);
+  renderIncomeAnalysisDialog();
+}
+
+function toggleIncomeAnalysisLabel(label: string): void {
+  const normalized = incomeYearLabel(label);
+  const details = buildIncomeAnalysisLabelDetails(
+    state.incomeTracker.yearlyEntries,
+    INCOME_YEAR_LABEL_OPTIONS,
+    incomeAnalysisSelectedLabels,
+    incomeAnalysisYearFilter
+  );
+  const availableLabels = new Set(details.availableLabels.map((option) => option.id));
+  if (!availableLabels.has(normalized)) return;
+  const selected = new Set(details.selectedLabels);
+  if (selected.has(normalized)) selected.delete(normalized);
+  else selected.add(normalized);
+  incomeAnalysisSelectedLabels = INCOME_YEAR_LABEL_OPTIONS.map((option) => option.id).filter((option) =>
+    selected.has(option)
+  );
   renderIncomeAnalysisDialog();
 }
 
@@ -3852,6 +4097,12 @@ function incomeInteger(value: string, fallback: number): number {
 function incomePerson(value: string): IncomePerson {
   if (value === "person1" || value === "person2" || value === "household") return value;
   return "household";
+}
+
+function incomePersonLabel(value: IncomePerson): string {
+  if (value === "person1") return "Person 1";
+  if (value === "person2") return "Person 2";
+  return "Haushalt";
 }
 
 function incomeYearSource(value: string): IncomeYearEntrySource {
