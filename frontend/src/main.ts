@@ -68,9 +68,14 @@ import {
   flowForType,
   isIncomePosition,
   isPositionType,
+  payoutTypeForPositionTableSelection,
+  positionCadencesForTableMode,
   positionFlow,
+  positionMatchesTableCadence,
   positionTableMode,
+  typeForPositionTableSelection,
   typeForFlow,
+  type PositionTableCadence,
   type PositionTableMode
 } from "./lib/positionKinds";
 import {
@@ -357,7 +362,6 @@ interface PositionFilterDraft {
 
 type RealEstateField = keyof RealEstateFinancingSettings;
 type CombinedToggleKey = keyof AppState["combinedWealth"];
-type ExpenseSubmode = "regular" | "once";
 type AccountDialogMode = "create" | "rename";
 type AccountDialogState = {
   mode: AccountDialogMode;
@@ -372,7 +376,8 @@ let state = loadInitialState();
 let draggedPositionId: string | null = null;
 let exportStatusTimeoutId: number | undefined;
 let selectedPositionMode: PositionTableMode = "expense";
-let selectedExpenseSubmode: ExpenseSubmode = "regular";
+let selectedIncomeCadence: PositionTableCadence = "monthly";
+let selectedExpenseCadence: PositionTableCadence = "monthly";
 let showResultMaxNeeded = false;
 let reserveChartOpen = false;
 let reserveChartCategory: ReserveChartCategory = "all";
@@ -913,9 +918,9 @@ function bindEvents(): void {
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
     if (action === "show-income-positions") setSelectedPositionMode("income");
-    if (action === "show-expense-positions") setSelectedPositionMode("expense", "regular");
-    if (action === "toggle-expense-once") {
-      setSelectedPositionMode("expense", selectedExpenseSubmode === "once" ? "regular" : "once");
+    if (action === "show-expense-positions") setSelectedPositionMode("expense");
+    if (action?.startsWith("set-position-cadence-")) {
+      setSelectedPositionCadence(action.replace("set-position-cadence-", "") as PositionTableCadence);
     }
     if (action === "show-reserve-positions") setSelectedPositionMode("reserve");
     if (action === "show-savings-positions") setSelectedPositionMode("savings");
@@ -4525,7 +4530,7 @@ function renderPositions(): void {
     body.innerHTML = `
       <tr>
         <td class="position-empty" colspan="${positionTableColumnCount(selectedPositionMode)}">
-          Noch keine ${positionModeEmptyLabel(selectedPositionMode, selectedExpenseSubmode)} angelegt.
+          Noch keine ${positionModeEmptyLabel(selectedPositionMode, activePositionCadence())} angelegt.
         </td>
       </tr>
     `;
@@ -5198,21 +5203,36 @@ function renderPositionModeControls(): void {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   }
-  const expenseSubmodeHost = document.querySelector<HTMLDivElement>("#expenseSubmodeSwitchHost");
-  if (expenseSubmodeHost) {
-    if (selectedPositionMode !== "expense") {
-      expenseSubmodeHost.innerHTML = "";
-    } else {
-      expenseSubmodeHost.innerHTML = `
-        <div class="position-mode-switch expense-submode-switch" role="group" aria-label="Ausgaben-Unteransicht">
-          <button class="position-mode-button ${selectedExpenseSubmode === "once" ? "active" : ""}" type="button" data-action="toggle-expense-once" aria-pressed="${selectedExpenseSubmode === "once"}">Einmalig</button>
+  const cadenceHost = document.querySelector<HTMLDivElement>("#positionCadenceSwitchHost");
+  if (cadenceHost) {
+    const cadences = positionCadencesForTableMode(selectedPositionMode);
+    const activeCadence = activePositionCadence();
+    cadenceHost.innerHTML = cadences.length
+      ? `
+        <div class="position-cadence-label">Rhythmus</div>
+        <div class="position-mode-switch position-cadence-switch" role="group" aria-label="${positionCadenceGroupLabel(
+          selectedPositionMode
+        )}">
+          ${cadences
+            .map((cadence) => {
+              const active = activeCadence === cadence;
+              return `
+                <button
+                  class="position-mode-button ${active ? "active" : ""}"
+                  type="button"
+                  data-action="set-position-cadence-${cadence}"
+                  aria-pressed="${active}"
+                >${escapeHtml(positionCadenceButtonLabel(cadence))}</button>
+              `;
+            })
+            .join("")}
         </div>
-      `;
-    }
+      `
+      : "";
   }
   const addButton = document.querySelector<HTMLButtonElement>("#addPositionButton");
   if (addButton) {
-    addButton.textContent = addPositionButtonLabel(selectedPositionMode, selectedExpenseSubmode);
+    addButton.textContent = addPositionButtonLabel(selectedPositionMode, activePositionCadence());
   }
 }
 
@@ -5654,20 +5674,63 @@ function togglePositionTableSort(column: PositionTableFilterColumn): void {
   saveState(state);
 }
 
-function positionModeEmptyLabel(mode: PositionTableMode, expenseSubmode: ExpenseSubmode = "regular"): string {
-  if (mode === "income") return "Einnahmen";
-  if (mode === "reserve") return "Ruecklagen";
-  if (mode === "savings") return "Sparpositionen";
-  if (expenseSubmode === "once") return "einmalige Ausgaben";
-  return "Ausgaben";
+function activePositionCadence(): PositionTableCadence | null {
+  if (selectedPositionMode === "income") return selectedIncomeCadence;
+  if (selectedPositionMode === "expense") return selectedExpenseCadence;
+  return null;
 }
 
-function addPositionButtonLabel(mode: PositionTableMode, expenseSubmode: ExpenseSubmode = "regular"): string {
-  if (mode === "income") return "Einnahme hinzufuegen";
+function positionCadenceButtonLabel(cadence: PositionTableCadence): string {
+  if (cadence === "monthly") return "Monatlich";
+  if (cadence === "yearly") return "Jaehrlich";
+  if (cadence === "once") return "Einmalig";
+  return "Ohne Rhythmus";
+}
+
+function positionCadenceGroupLabel(mode: PositionTableMode): string {
+  return mode === "income" ? "Einnahmen-Rhythmus" : "Ausgaben-Rhythmus";
+}
+
+function positionModeEmptyLabel(mode: PositionTableMode, cadence: PositionTableCadence | null = null): string {
+  if (mode === "income") {
+    if (cadence === "yearly") return "jaehrliche Einnahmen";
+    if (cadence === "once") return "einmalige Einnahmen";
+    return "monatliche Einnahmen";
+  }
+  if (mode === "reserve") return "Ruecklagen";
+  if (mode === "savings") return "Sparpositionen";
+  if (cadence === "yearly") return "jaehrliche Ausgaben";
+  if (cadence === "once") return "einmalige Ausgaben";
+  if (cadence === "none") return "Ausgaben ohne Rhythmus";
+  return "monatliche Ausgaben";
+}
+
+function addPositionButtonLabel(mode: PositionTableMode, cadence: PositionTableCadence | null = null): string {
+  if (mode === "income") {
+    if (cadence === "yearly") return "Jaehrliche Einnahme hinzufuegen";
+    if (cadence === "once") return "Einmalige Einnahme hinzufuegen";
+    return "Monatliche Einnahme hinzufuegen";
+  }
   if (mode === "reserve") return "Ruecklage hinzufuegen";
   if (mode === "savings") return "Sparposition hinzufuegen";
-  if (expenseSubmode === "once") return "Einmalige Ausgabe hinzufuegen";
-  return "Ausgabe hinzufuegen";
+  if (cadence === "yearly") return "Jaehrliche Ausgabe hinzufuegen";
+  if (cadence === "once") return "Einmalige Ausgabe hinzufuegen";
+  if (cadence === "none") return "Ausgabe ohne Rhythmus hinzufuegen";
+  return "Monatliche Ausgabe hinzufuegen";
+}
+
+function newPositionName(mode: PositionTableMode, cadence: PositionTableCadence | null = null): string {
+  if (mode === "income") {
+    if (cadence === "yearly") return "Neue jaehrliche Einnahme";
+    if (cadence === "once") return "Neue einmalige Einnahme";
+    return "Neue monatliche Einnahme";
+  }
+  if (mode === "reserve") return "Neue Ruecklage";
+  if (mode === "savings") return "Neue Sparrate";
+  if (cadence === "yearly") return "Neue jaehrliche Ausgabe";
+  if (cadence === "once") return "Neue einmalige Ausgabe";
+  if (cadence === "none") return "Neue Ausgabe ohne Rhythmus";
+  return "Neue monatliche Ausgabe";
 }
 
 function renderAccountYearTables(): void {
@@ -7067,25 +7130,16 @@ function finiteNumber(value: unknown, fallback: number): number {
 }
 
 function addPosition(): string {
-  const isIncome = selectedPositionMode === "income";
-  const isReserve = selectedPositionMode === "reserve";
-  const isSavings = selectedPositionMode === "savings";
-  const isExpenseOnce = selectedPositionMode === "expense" && selectedExpenseSubmode === "once";
-  const flow = isIncome ? "income" : "expense";
-  const name = isIncome
-    ? "Neue Einnahme"
-    : isReserve
-      ? "Neue Ruecklage"
-      : isSavings
-        ? "Neue Sparrate"
-        : isExpenseOnce
-          ? "Neue Einmalige Ausgabe"
-          : "Neue Ausgabe";
-  const type = isIncome ? "incomeMonthly" : isReserve ? "reserve" : isSavings ? "savings" : "temporary";
-  const payoutType: ReservePosition["payoutType"] = isExpenseOnce ? "once" : "monthly";
+  const cadence = activePositionCadence();
+  const type = typeForPositionTableSelection(selectedPositionMode, cadence);
+  const payoutType = payoutTypeForPositionTableSelection(selectedPositionMode, cadence);
+  const flow = flowForType(type);
+  const isIncome = flow === "income";
+  const isOnce = payoutType === "once";
+  const name = newPositionName(selectedPositionMode, cadence);
   const payoutMonth = isIncome ? 1 : 12;
-  const startMonth = isExpenseOnce ? payoutMonth : 1;
-  const endMonth = isExpenseOnce ? payoutMonth : 12;
+  const startMonth = isOnce ? payoutMonth : 1;
+  const endMonth = isOnce ? payoutMonth : 12;
   const id = createId();
   state.positions = [
     ...state.positions,
@@ -7263,22 +7317,24 @@ function setReserveChartAdjustment(adjustment: ReserveChartAdjustment): void {
   showReserveChartPopup();
 }
 
-function setSelectedPositionMode(mode: PositionTableMode, expenseSubmode?: ExpenseSubmode): void {
+function setSelectedPositionMode(mode: PositionTableMode): void {
   selectedPositionMode = mode;
-  if (mode !== "expense") {
-    selectedExpenseSubmode = "regular";
-  } else if (expenseSubmode) {
-    selectedExpenseSubmode = expenseSubmode;
-  }
+  renderPositions();
+}
+
+function setSelectedPositionCadence(cadence: PositionTableCadence): void {
+  const cadences = positionCadencesForTableMode(selectedPositionMode);
+  if (!cadences.includes(cadence)) return;
+  if (selectedPositionMode === "income") selectedIncomeCadence = cadence;
+  if (selectedPositionMode === "expense") selectedExpenseCadence = cadence;
   renderPositions();
 }
 
 function positionTableSourcePositions(): ReservePosition[] {
-  if (selectedPositionMode !== "expense") return state.positions;
+  const cadence = activePositionCadence();
   return state.positions.filter((position) => {
-    if (positionTableMode(position) !== "expense") return false;
-    if (selectedExpenseSubmode === "once") return position.payoutType === "once";
-    return position.payoutType !== "once";
+    if (positionTableMode(position) !== selectedPositionMode) return false;
+    return positionMatchesTableCadence(position, selectedPositionMode, cadence);
   });
 }
 

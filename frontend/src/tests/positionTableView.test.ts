@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultAppState, defaultPositionTableViewState } from "../data/defaults";
+import {
+  payoutTypeForPositionTableSelection,
+  positionCadencesForTableMode,
+  typeForPositionTableSelection
+} from "../lib/positionKinds";
 import { positionTableColumnsForMode, positionTableRows } from "../lib/positionTableView";
 import type { PositionTableView, ReservePosition } from "../types";
 
@@ -20,6 +25,28 @@ function expensePosition(id: string, updates: Partial<ReservePosition> = {}): Re
     payoutYear: 2026,
     payoutMonth: 12,
     payoutDay: 31,
+    interestBearing: false,
+    cashback: false,
+    ...updates
+  };
+}
+
+function incomePosition(id: string, updates: Partial<ReservePosition> = {}): ReservePosition {
+  return {
+    id,
+    flow: "income",
+    active: true,
+    visible: true,
+    name: id,
+    icon: "wallet",
+    type: "incomeMonthly",
+    amount: 0,
+    startMonth: 1,
+    endMonth: 12,
+    payoutType: "monthly",
+    payoutYear: 2026,
+    payoutMonth: 1,
+    payoutDay: 1,
     interestBearing: false,
     cashback: false,
     ...updates
@@ -51,6 +78,52 @@ describe("position table view", () => {
 
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((position) => position.payoutType === "monthly")).toBe(true);
+  });
+
+  it("filters income rows by payout cadence", () => {
+    const positions = [
+      incomePosition("monthly", { payoutType: "monthly", type: "incomeMonthly" }),
+      incomePosition("yearly", { payoutType: "yearly", type: "incomeYearly" }),
+      incomePosition("once", { payoutType: "once", type: "incomeTemporary" })
+    ];
+
+    expect(positionTableRows(positions, "income", view({}), "monthly").map((position) => position.id)).toEqual(["monthly"]);
+    expect(positionTableRows(positions, "income", view({}), "yearly").map((position) => position.id)).toEqual(["yearly"]);
+    expect(positionTableRows(positions, "income", view({}), "once").map((position) => position.id)).toEqual(["once"]);
+  });
+
+  it("filters expense rows by payout cadence including no rhythm", () => {
+    const positions = [
+      expensePosition("monthly", { payoutType: "monthly" }),
+      expensePosition("yearly", { payoutType: "yearly" }),
+      expensePosition("once", { payoutType: "once" }),
+      expensePosition("none", { payoutType: "none" })
+    ];
+
+    expect(positionTableRows(positions, "expense", view({}), "monthly").map((position) => position.id)).toEqual(["monthly"]);
+    expect(positionTableRows(positions, "expense", view({}), "yearly").map((position) => position.id)).toEqual(["yearly"]);
+    expect(positionTableRows(positions, "expense", view({}), "once").map((position) => position.id)).toEqual(["once"]);
+    expect(positionTableRows(positions, "expense", view({}), "none").map((position) => position.id)).toEqual(["none"]);
+  });
+
+  it("only exposes cadence subviews for income and expenses", () => {
+    expect(positionCadencesForTableMode("income")).toEqual(["monthly", "yearly", "once"]);
+    expect(positionCadencesForTableMode("expense")).toEqual(["monthly", "yearly", "once", "none"]);
+    expect(positionCadencesForTableMode("reserve")).toEqual([]);
+    expect(positionCadencesForTableMode("savings")).toEqual([]);
+  });
+
+  it("maps new positions to the active table section and cadence", () => {
+    expect(typeForPositionTableSelection("income", "monthly")).toBe("incomeMonthly");
+    expect(payoutTypeForPositionTableSelection("income", "monthly")).toBe("monthly");
+    expect(typeForPositionTableSelection("income", "yearly")).toBe("incomeYearly");
+    expect(payoutTypeForPositionTableSelection("income", "yearly")).toBe("yearly");
+    expect(typeForPositionTableSelection("income", "once")).toBe("incomeTemporary");
+    expect(payoutTypeForPositionTableSelection("income", "once")).toBe("once");
+    expect(typeForPositionTableSelection("expense", "none")).toBe("temporary");
+    expect(payoutTypeForPositionTableSelection("expense", "none")).toBe("none");
+    expect(typeForPositionTableSelection("reserve", null)).toBe("reserve");
+    expect(typeForPositionTableSelection("savings", null)).toBe("savings");
   });
 
   it("filters label values through the existing icon labels", () => {

@@ -128,11 +128,12 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("grunddatenSettingsContent");
   });
 
-  it("renders the expense submode switch host in the cost reserve toolbar", () => {
+  it("renders the position cadence switch host in the cost reserve section", () => {
     const html = renderAppShell();
 
-    expect(html).toContain('id="expenseSubmodeSwitchHost"');
+    expect(html).toContain('id="positionCadenceSwitchHost"');
     expect(html).toContain('data-action="show-expense-positions"');
+    expect(html).not.toContain('id="expenseSubmodeSwitchHost"');
     expect(html).not.toContain('data-action="show-expense-regular"');
     expect(html).not.toContain('data-action="show-expense-once"');
   });

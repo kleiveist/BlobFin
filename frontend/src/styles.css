@@ -244,19 +244,27 @@ button:focus-visible {
   width: fit-content;
 }
 
-.expense-submode-switch-host:not(:empty) {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(104px, 1fr));
+.position-cadence-switch-host:not(:empty) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 10px;
 }
 
-.expense-submode-switch {
-  grid-column: 2;
+.position-cadence-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
-.expense-submode-switch .position-mode-button {
-  width: 100%;
-  min-width: 0;
+.position-cadence-switch {
+  min-height: 34px;
+}
+
+.position-cadence-switch .position-mode-button {
+  min-width: 116px;
+  padding-block: 7px;
 }
 
 .position-mode-button {
@@ -1154,6 +1162,10 @@ button:focus-visible {
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.position-table-wrap + .button-row {
+  margin-top: 6px;
 }
 
 table {

@@ -155,7 +155,6 @@ export function renderAppShell(): string {
                 <button class="position-mode-button" type="button" data-action="show-reserve-positions" aria-pressed="false">Ruecklagen</button>
                 <button class="position-mode-button" type="button" data-action="show-savings-positions" aria-pressed="false">Sparen</button>
               </div>
-              <div id="expenseSubmodeSwitchHost" class="expense-submode-switch-host"></div>
             </div>
           </div>
           <div class="button-row">
@@ -173,6 +172,7 @@ export function renderAppShell(): string {
             <span id="exportStatus" class="export-status" aria-live="polite"></span>
           </div>
         </div>
+        <div id="positionCadenceSwitchHost" class="position-cadence-switch-host"></div>
         <div id="positionTableControls" class="position-table-controls"></div>
         <div class="table-wrap position-table-wrap">
           <table class="position-table">

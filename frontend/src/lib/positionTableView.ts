@@ -1,7 +1,7 @@
 import { MONTHS } from "../data/defaults";
 import { labelForPayout, labelForType, normalizeHeader, numberValue } from "./format";
 import { normalizePositionIcon, positionIconLabel } from "./positionIcons";
-import { positionTableMode, type PositionTableMode } from "./positionKinds";
+import { positionMatchesTableCadence, positionTableMode, type PositionTableCadence, type PositionTableMode } from "./positionKinds";
 import type {
   PositionTableFilter,
   PositionTableFilterColumn,
@@ -133,9 +133,12 @@ export function isPositionTableColumnInMode(
 export function positionTableRows(
   positions: ReservePosition[],
   mode: PositionTableMode,
-  view: PositionTableView
+  view: PositionTableView,
+  cadence: PositionTableCadence | null = null
 ): ReservePosition[] {
-  const baseRows = positions.filter((position) => positionTableMode(position) === mode);
+  const baseRows = positions.filter(
+    (position) => positionTableMode(position) === mode && positionMatchesTableCadence(position, mode, cadence)
+  );
   const selectedLabels = new Set(view.selectedLabels.map((label) => normalizePositionIcon(label)));
   const labelRows = selectedLabels.size
     ? baseRows.filter((position) => selectedLabels.has(normalizePositionIcon(position.icon)))
