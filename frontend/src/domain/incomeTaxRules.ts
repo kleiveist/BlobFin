@@ -98,10 +98,11 @@ export const INCOME_TAX_RULE_LABEL_ALIASES: Record<string, string> = {
   ehrenamtspauschale: "volunteer_allowance"
 };
 
+export const CAPITAL_GAINS_TAX_RULE_LABELS = new Set(["dividends", "asset_income"]);
+
 export const SIDE_INCOME_TAX_RULE_LABELS = new Set([
   "garage_parking_rental",
   "side_income",
-  "asset_income",
   "fees",
   "freelance",
   "self_employed",
@@ -124,6 +125,17 @@ export function evaluateIncomeTaxAndContributionRules(input: IncomeTaxRuleInput)
 
   if (label === "child_youth_jobs") {
     return locked("incomeTaxRules.childYouthJobs.locked");
+  }
+
+  if (isCapitalGainsTaxRuleLabel(label)) {
+    return {
+      taxFieldsEnabled: true,
+      contributionFieldsEnabled: false,
+      taxableAmount: annualAmount,
+      contributionRelevantAmount: 0,
+      status: "partially_enabled",
+      reasonKey: "incomeTaxRules.capitalGains.enabled"
+    };
   }
 
   if (label === "severance_payment") {
@@ -194,6 +206,10 @@ export function normalizeIncomeTaxRuleLabel(label: string | undefined): string {
   const normalized = String(label ?? "").trim();
   const key = incomeTaxRuleLabelKey(normalized);
   return INCOME_TAX_RULE_LABEL_ALIASES[normalized] ?? INCOME_TAX_RULE_LABEL_ALIASES[key] ?? normalized;
+}
+
+export function isCapitalGainsTaxRuleLabel(label: string | undefined): boolean {
+  return CAPITAL_GAINS_TAX_RULE_LABELS.has(normalizeIncomeTaxRuleLabel(label));
 }
 
 function incomeTaxRuleLabelKey(value: string): string {

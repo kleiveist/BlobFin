@@ -312,11 +312,73 @@ describe("storage", () => {
     expect(loaded.incomeTracker.yearlyEntries[0].label).toBe("child_youth_jobs");
     expect(loaded.incomeTracker.settings.selectedYearlyLabels).toEqual(["child_youth_jobs"]);
     expect(loaded.incomeTracker.yearlyEntries[0].taxAdjustment).toEqual({ type: "refund", amount: null });
+    expect(loaded.incomeTracker.yearlyEntries[0].capitalGainsAllowance).toBe(null);
+    expect(loaded.incomeTracker.yearlyEntries[0].capitalGainsChurchTaxEnabled).toBe(false);
+    expect(loaded.incomeTracker.yearlyEntries[0].capitalGainsChurchTaxRatePercent).toBe(9);
+    expect(loaded.incomeTracker.yearlyEntries[0].taxDeductionItems.capitalGainsTax).toBe(null);
+    expect(loaded.incomeTracker.yearlyEntries[0].taxDeductionItems.capitalGainsSolidaritySurcharge).toBe(null);
+    expect(loaded.incomeTracker.yearlyEntries[0].taxDeductionItems.capitalGainsChurchTax).toBe(null);
     expect(loaded.incomeTracker.yearlyEntries[0].employmentContext).toBe("job_loss");
     expect(loaded.incomeTracker.yearlyEntries[0].minijobType).toBe("commercial");
     expect(loaded.incomeTracker.yearlyEntries[0].considerPensionInsurance).toBe(false);
     expect(loaded.incomeTracker.yearlyEntries[0].isRvExempt).toBe(false);
     expect(loaded.incomeTracker.yearlyEntries[0].studentEmploymentMode).toBe("minijob");
     expect(loaded.incomeTracker.yearlyEntries[0].requiresManualTaxReview).toBe(false);
+  });
+
+  it("loads saved capital gains tax fields", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        incomeTracker: {
+          ...state.incomeTracker,
+          yearlyEntries: [
+            {
+              id: "capital-income",
+              active: true,
+              visible: true,
+              year: 2026,
+              label: "dividends",
+              person: "household",
+              annualNetIncome: null,
+              annualGrossIncome: 250,
+              taxesAndDeductions: 52.75,
+              taxDeductionItems: {
+                wageTax: null,
+                solidaritySurcharge: null,
+                churchTax: null,
+                capitalGainsTax: 50,
+                capitalGainsSolidaritySurcharge: 2.75,
+                capitalGainsChurchTax: 0,
+                pensionInsurance: null,
+                healthInsurance: null,
+                careInsurance: null,
+                unemploymentInsurance: null,
+                employerPensionInsurance: null
+              },
+              taxAdjustment: { type: "refund", amount: null },
+              capitalGainsAllowance: 50,
+              capitalGainsChurchTaxEnabled: true,
+              capitalGainsChurchTaxRatePercent: 8,
+              employer: "",
+              note: "",
+              source: "annual_statement"
+            }
+          ]
+        }
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.incomeTracker.yearlyEntries[0].capitalGainsAllowance).toBe(50);
+    expect(loaded.incomeTracker.yearlyEntries[0].capitalGainsChurchTaxEnabled).toBe(true);
+    expect(loaded.incomeTracker.yearlyEntries[0].capitalGainsChurchTaxRatePercent).toBe(8);
+    expect(loaded.incomeTracker.yearlyEntries[0].taxDeductionItems.capitalGainsTax).toBe(50);
+    expect(loaded.incomeTracker.yearlyEntries[0].taxDeductionItems.capitalGainsSolidaritySurcharge).toBe(2.75);
+    expect(loaded.incomeTracker.yearlyEntries[0].taxDeductionItems.capitalGainsChurchTax).toBe(0);
   });
 });

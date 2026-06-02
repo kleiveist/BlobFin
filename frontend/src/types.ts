@@ -259,6 +259,9 @@ export interface IncomeYearEntry {
   taxesAndDeductions: number | null;
   taxDeductionItems: IncomeTaxDeductionItems;
   taxAdjustment: IncomeTaxAdjustment;
+  capitalGainsAllowance: number | null;
+  capitalGainsChurchTaxEnabled: boolean;
+  capitalGainsChurchTaxRatePercent: number;
   employmentContext?: IncomeEmploymentContext;
   minijobType?: IncomeMinijobType;
   considerPensionInsurance?: boolean;
@@ -276,6 +279,9 @@ export interface IncomeTaxDeductionItems {
   wageTax: number | null;
   solidaritySurcharge: number | null;
   churchTax: number | null;
+  capitalGainsTax: number | null;
+  capitalGainsSolidaritySurcharge: number | null;
+  capitalGainsChurchTax: number | null;
   pensionInsurance: number | null;
   healthInsurance: number | null;
   careInsurance: number | null;

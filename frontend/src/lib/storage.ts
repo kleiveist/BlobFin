@@ -12,6 +12,7 @@ import {
   defaultRealEstateFinancingSettings,
   defaultRepaymentSourceToggles
 } from "../data/defaults";
+import { DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT } from "../domain/incomeTracker";
 import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
 import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
@@ -62,6 +63,9 @@ const INCOME_TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
   "wageTax",
   "solidaritySurcharge",
   "churchTax",
+  "capitalGainsTax",
+  "capitalGainsSolidaritySurcharge",
+  "capitalGainsChurchTax",
   "pensionInsurance",
   "healthInsurance",
   "careInsurance",
@@ -559,6 +563,9 @@ function normalizeIncomeYearEntry(value: unknown): IncomeYearEntry {
     taxesAndDeductions: nullableNumberOrDefault(entry.taxesAndDeductions, null),
     taxDeductionItems: normalizeIncomeTaxDeductionItems(entry.taxDeductionItems),
     taxAdjustment: normalizeIncomeTaxAdjustment(entry.taxAdjustment),
+    capitalGainsAllowance: nullableNumberOrDefault(entry.capitalGainsAllowance, null),
+    capitalGainsChurchTaxEnabled: booleanOrDefault(entry.capitalGainsChurchTaxEnabled, false),
+    capitalGainsChurchTaxRatePercent: normalizeCapitalGainsChurchTaxRate(entry.capitalGainsChurchTaxRatePercent),
     employmentContext: normalizeIncomeEmploymentContext(entry.employmentContext),
     minijobType: normalizeIncomeMinijobType(entry.minijobType),
     considerPensionInsurance: booleanOrDefault(entry.considerPensionInsurance, false),
@@ -581,6 +588,9 @@ function normalizeIncomeTaxDeductionItems(value: unknown): IncomeTaxDeductionIte
       wageTax: null,
       solidaritySurcharge: null,
       churchTax: null,
+      capitalGainsTax: null,
+      capitalGainsSolidaritySurcharge: null,
+      capitalGainsChurchTax: null,
       pensionInsurance: null,
       healthInsurance: null,
       careInsurance: null,
@@ -588,6 +598,12 @@ function normalizeIncomeTaxDeductionItems(value: unknown): IncomeTaxDeductionIte
       employerPensionInsurance: null
     }
   );
+}
+
+function normalizeCapitalGainsChurchTaxRate(value: unknown): number {
+  return numberOrDefault(value, DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT) === 8
+    ? 8
+    : DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT;
 }
 
 function normalizeIncomeTaxAdjustment(value: unknown): IncomeTaxAdjustment {

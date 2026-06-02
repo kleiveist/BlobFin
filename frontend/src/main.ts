@@ -12,6 +12,10 @@ import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/
 import {
   buildIncomeChartModel,
   buildIncomeTrackerModel,
+  applyCapitalGainsTaxToEntries,
+  capitalGainsTaxBreakdown,
+  CAPITAL_GAINS_ALLOWANCE_LIMIT,
+  DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT,
   emptyIncomeTaxAdjustment,
   emptyIncomeTaxDeductionItems,
   incomeTaxDeductionItemsTotal,
@@ -25,6 +29,7 @@ import {
 import {
   SIDE_INCOME_TAX_RULE_LABELS,
   evaluateIncomeTaxAndContributionRules,
+  isCapitalGainsTaxRuleLabel,
   normalizeIncomeTaxRuleLabel,
   taxRuleConfigForYear,
   type IncomeTaxRuleResult
@@ -154,10 +159,26 @@ const INCOME_TAX_DEDUCTION_ROWS: Array<{
   nr: string;
   label: string;
   category: IncomeTaxDeductionCategory;
+  capitalOnly?: boolean;
 }> = [
   { field: "wageTax", nr: "4", label: "Einbehaltene Lohnsteuer von 3.", category: "taxes" },
   { field: "solidaritySurcharge", nr: "5", label: "Einbehaltener Solidaritaetszuschlag von 3.", category: "taxes" },
   { field: "churchTax", nr: "6", label: "Einbehaltene Kirchensteuer des Arbeitnehmers von 3.", category: "taxes" },
+  { field: "capitalGainsTax", nr: "KAP", label: "Kapitalertragsteuer", category: "taxes", capitalOnly: true },
+  {
+    field: "capitalGainsSolidaritySurcharge",
+    nr: "KAP",
+    label: "Solidaritaetszuschlag zur Kapitalertragsteuer",
+    category: "taxes",
+    capitalOnly: true
+  },
+  {
+    field: "capitalGainsChurchTax",
+    nr: "KAP",
+    label: "Kirchensteuer zur Kapitalertragsteuer",
+    category: "taxes",
+    capitalOnly: true
+  },
   { field: "employerPensionInsurance", nr: "22", label: "Arbeitgeberbeitraege zur gesetzlichen RV", category: "employer_social" },
   { field: "pensionInsurance", nr: "23", label: "Arbeitnehmerbeitraege zur gesetzlichen RV", category: "social" },
   { field: "healthInsurance", nr: "25", label: "Arbeitnehmerbeitraege zur gesetzlichen KV", category: "social" },
@@ -198,6 +219,10 @@ const INCOME_MINIJOB_TYPE_OPTIONS: Array<{ value: IncomeMinijobType; label: stri
 const INCOME_STUDENT_EMPLOYMENT_MODE_OPTIONS: Array<{ value: IncomeStudentEmploymentMode; label: string }> = [
   { value: "minijob", label: "Minijob" },
   { value: "short_term", label: "Kurzfristige Beschaeftigung" }
+];
+const CAPITAL_GAINS_CHURCH_TAX_RATE_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 9, label: "9%" },
+  { value: 8, label: "8%" }
 ];
 const CAREER_MILESTONE_TYPE_OPTIONS: Array<{ type: string; icon: string; description: string }> = [
   { type: "Ausbildung", icon: "education", description: "Ausbildung, Schule oder Qualifikation gestartet" },
@@ -440,6 +465,7 @@ function sanitizeAppState(appState: AppState): AppState {
     return result;
   }, {});
   const investment = investmentByAccountId[selectedInvestmentAccountId] ?? defaultInvestmentSettingsForNewAccount();
+  const incomeTracker = appState.incomeTracker ?? defaultIncomeTrackerState();
 
   investmentAccountContextId = selectedInvestmentAccountId;
   return {
@@ -459,7 +485,10 @@ function sanitizeAppState(appState: AppState): AppState {
     positions,
     investmentByAccountId,
     investment,
-    incomeTracker: appState.incomeTracker ?? defaultIncomeTrackerState()
+    incomeTracker: {
+      ...incomeTracker,
+      yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules(incomeTracker.yearlyEntries)
+    }
   };
 }
 
@@ -1350,18 +1379,14 @@ function incomeTaxDialogCanOpen(entry: IncomeYearEntry, rule = incomeTaxRuleForE
   return rule.status !== "locked" || incomeYearLabel(entry.label) === "minijob";
 }
 
-function incomeGrossFieldLocked(
-  entry: IncomeYearEntry,
-  entries: IncomeYearEntry[] = state.incomeTracker.yearlyEntries
-): boolean {
-  return incomeTaxRuleForEntry(entry, entries).status === "locked";
-}
-
 function incomeTaxDeductionRowEnabled(
   entry: IncomeYearEntry,
   rule: IncomeTaxRuleResult,
   row: (typeof INCOME_TAX_DEDUCTION_ROWS)[number]
 ): boolean {
+  const capitalRow = incomeTaxDeductionRowIsCapital(row);
+  if (isCapitalGainsTaxRuleLabel(incomeYearLabel(entry.label))) return capitalRow;
+  if (capitalRow) return false;
   if (!incomeTaxCategoryEnabled(rule, row.category)) return false;
   const minijobRvOnly =
     !rule.taxFieldsEnabled &&
@@ -1375,11 +1400,37 @@ function incomeTaxDeductionRowEnabled(
   return row.field === "pensionInsurance";
 }
 
-function sanitizeIncomeYearEntriesWithTaxRules(entries: IncomeYearEntry[]): IncomeYearEntry[] {
-  return entries.map((entry) => sanitizeIncomeYearEntryWithTaxRules(entry, entries));
+function incomeTaxDeductionRowIsCapital(row: (typeof INCOME_TAX_DEDUCTION_ROWS)[number]): boolean {
+  return Boolean(row.capitalOnly);
 }
 
-function sanitizeIncomeYearEntryWithTaxRules(entry: IncomeYearEntry, entries: IncomeYearEntry[]): IncomeYearEntry {
+function incomeCapitalGainsAllowanceUsedBefore(entry: IncomeYearEntry, entries: IncomeYearEntry[] = state.incomeTracker.yearlyEntries): number {
+  let used = 0;
+  for (const item of entries) {
+    if (item.id === entry.id) break;
+    if (!item.active || item.year !== entry.year || !isCapitalGainsTaxRuleLabel(incomeYearLabel(item.label))) continue;
+    used += numberValue(item.capitalGainsAllowance);
+  }
+  return clamp(roundCurrency(used), 0, CAPITAL_GAINS_ALLOWANCE_LIMIT);
+}
+
+function incomeCapitalGainsAllowanceRemainingBefore(entry: IncomeYearEntry, entries: IncomeYearEntry[] = state.incomeTracker.yearlyEntries): number {
+  return roundCurrency(CAPITAL_GAINS_ALLOWANCE_LIMIT - incomeCapitalGainsAllowanceUsedBefore(entry, entries));
+}
+
+function sanitizeIncomeYearEntriesWithTaxRules(entries: IncomeYearEntry[]): IncomeYearEntry[] {
+  const capitalSanitizedEntries = applyCapitalGainsTaxToEntries(entries);
+  return capitalSanitizedEntries.map((entry) => sanitizeIncomeYearEntryWithTaxRules(entry, capitalSanitizedEntries));
+}
+
+function sanitizeIncomeYearEntryWithTaxRules(
+  entry: IncomeYearEntry,
+  entries: IncomeYearEntry[]
+): IncomeYearEntry {
+  if (isCapitalGainsTaxRuleLabel(incomeYearLabel(entry.label))) {
+    return entry;
+  }
+
   const rule = incomeTaxRuleForEntry(entry, entries);
   const grossLocked = rule.status === "locked";
   if (rule.taxFieldsEnabled && rule.contributionFieldsEnabled && !grossLocked) return entry;
@@ -1396,6 +1447,15 @@ function sanitizeIncomeYearEntryWithTaxRules(entry: IncomeYearEntry, entries: In
     taxAdjustment: rule.taxFieldsEnabled ? entry.taxAdjustment : emptyIncomeTaxAdjustment(),
     taxesAndDeductions: incomeTaxDeductionItemsTotal(taxDeductionItems)
   };
+}
+
+function capitalGainsChurchTaxRate(value: number | null | undefined): number {
+  return value === 8 ? 8 : DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT;
+}
+
+function roundCurrency(value: number): number {
+  const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 function renderIncomeLiveUpdate(collection?: string, id?: string, field?: string): void {
@@ -1432,7 +1492,9 @@ function incomeTaxRuleStructuralField(field: string | undefined): boolean {
     field === "shortTermEmploymentDays" ||
     field === "shortTermEmploymentMonths" ||
     field === "studentEmploymentMode" ||
-    field === "requiresManualTaxReview"
+    field === "requiresManualTaxReview" ||
+    field === "capitalGainsChurchTaxEnabled" ||
+    field === "capitalGainsChurchTaxRatePercent"
   );
 }
 
@@ -1618,6 +1680,7 @@ function renderIncomeTaxDialog(): void {
   const employerSocialTotal = incomeTaxDeductionCategoryTotal(entry, "employer_social");
   const total = incomeYearEntryTaxDeductions(entry);
   const rule = incomeTaxRuleForEntry(entry);
+  const capitalMode = isCapitalGainsTaxRuleLabel(incomeYearLabel(entry.label));
   root.innerHTML = `
     <div class="income-tax-dialog-backdrop" role="presentation">
       <div class="income-tax-dialog" role="dialog" aria-modal="true" aria-label="Steuer- und Abgabenpositionen">
@@ -1630,7 +1693,10 @@ function renderIncomeTaxDialog(): void {
         </div>
         ${incomeTaxRulePanel(entry, rule)}
         ${incomeTaxRuleContextControls(entry)}
-        <div class="table-wrap">
+        ${
+          capitalMode
+            ? incomeCapitalGainsTaxSection(entry)
+            : `<div class="table-wrap">
           <table class="income-table income-tax-table">
             <thead>
               <tr>
@@ -1640,7 +1706,7 @@ function renderIncomeTaxDialog(): void {
               </tr>
             </thead>
             <tbody>
-              ${INCOME_TAX_DEDUCTION_ROWS.map(
+              ${INCOME_TAX_DEDUCTION_ROWS.filter((row) => !incomeTaxDeductionRowIsCapital(row)).map(
                 (row) => {
                   const enabled = incomeTaxDeductionRowEnabled(entry, rule, row);
                   const lockedReason = enabled ? "" : incomeTaxLockedRowReason(entry, row, rule);
@@ -1662,7 +1728,8 @@ function renderIncomeTaxDialog(): void {
               ).join("")}
             </tbody>
           </table>
-        </div>
+        </div>`
+        }
         <div class="income-tax-summary">
           <div>
             <span>Kategorie</span>
@@ -1685,7 +1752,10 @@ function renderIncomeTaxDialog(): void {
             <strong id="incomeTaxDialogGrandTotal">${total === null ? "-" : money(total)}</strong>
           </div>
         </div>
-        <div class="income-tax-adjustment ${rule.taxFieldsEnabled ? "" : "locked"}">
+        ${
+          capitalMode
+            ? ""
+            : `<div class="income-tax-adjustment ${rule.taxFieldsEnabled ? "" : "locked"}">
           <div>
             <strong>Steuernachzahlung oder Rueckerstattung</strong>
             <span>${escapeHtml(
@@ -1720,11 +1790,77 @@ function renderIncomeTaxDialog(): void {
               disabled: !rule.taxFieldsEnabled
             })}
           </div>
-        </div>
+        </div>`
+        }
         <div class="button-row">
           <button class="button" type="button" data-action="income-close-tax-dialog">Fertig</button>
         </div>
       </div>
+    </div>
+  `;
+}
+
+function incomeCapitalGainsTaxSection(entry: IncomeYearEntry): string {
+  const breakdown = capitalGainsTaxBreakdown(entry);
+  const remainingBefore = incomeCapitalGainsAllowanceRemainingBefore(entry);
+  const enteredAllowance = numberValue(entry.capitalGainsAllowance);
+  const remainingAfter = Math.max(0, remainingBefore - (entry.active ? enteredAllowance : 0));
+  const allowanceMax = entry.active ? Math.max(0, remainingBefore) : CAPITAL_GAINS_ALLOWANCE_LIMIT;
+  const allowanceLocked = entry.active && allowanceMax <= 0 && enteredAllowance <= 0;
+  const allowanceTitle = allowanceLocked
+    ? "Der Sparer-Pauschbetrag ist fuer dieses Jahr bereits durch vorherige Kapitalpositionen verbraucht."
+    : `Maximal verfuegbar fuer diesen Eintrag: ${money(allowanceMax)}.`;
+  return `
+    <section class="income-capital-tax-panel">
+      <div class="income-capital-tax-head">
+        <div>
+          <strong>Kapitalertragsteuer</strong>
+          <span>Sparer-Pauschbetrag wird pro Jahr bis ${money(CAPITAL_GAINS_ALLOWANCE_LIMIT)} in Eintragsreihenfolge verbraucht.</span>
+        </div>
+        <strong>${money(breakdown.totalTax)}</strong>
+      </div>
+      <div class="income-capital-tax-controls">
+        <label>
+          <span>Geltend gemachter Freibetrag</span>
+          ${incomeNumberInput("yearlyEntries", entry.id, "capitalGainsAllowance", entry.capitalGainsAllowance, {
+            min: 0,
+            max: allowanceMax,
+            disabled: allowanceLocked,
+            title: allowanceTitle
+          })}
+          <small>${escapeHtml(allowanceTitle)}</small>
+        </label>
+        ${incomeInlineCheckbox(entry, "capitalGainsChurchTaxEnabled", Boolean(entry.capitalGainsChurchTaxEnabled), "Kirchensteuerpflichtig")}
+        <label>
+          <span>Kirchensteuersatz</span>
+          ${incomeSelect(
+            "yearlyEntries",
+            entry.id,
+            "capitalGainsChurchTaxRatePercent",
+            CAPITAL_GAINS_CHURCH_TAX_RATE_OPTIONS,
+            capitalGainsChurchTaxRate(entry.capitalGainsChurchTaxRatePercent)
+          )}
+        </label>
+      </div>
+      <div class="income-capital-tax-grid">
+        ${incomeCapitalTaxMetric("Kapitalertrag", money(breakdown.capitalIncome))}
+        ${incomeCapitalTaxMetric("Verbrauch vor diesem Eintrag", money(CAPITAL_GAINS_ALLOWANCE_LIMIT - remainingBefore))}
+        ${incomeCapitalTaxMetric("Verbleibend nach diesem Eintrag", money(remainingAfter))}
+        ${incomeCapitalTaxMetric("Steuerpflichtiger Betrag", money(breakdown.taxableAmount))}
+        ${incomeCapitalTaxMetric("Kapitalertragsteuer", money(breakdown.capitalGainsTax))}
+        ${incomeCapitalTaxMetric("Solidaritaetszuschlag", money(breakdown.solidaritySurcharge))}
+        ${incomeCapitalTaxMetric("Kirchensteuer", money(breakdown.churchTax))}
+        ${incomeCapitalTaxMetric("Gesamtsteuer", money(breakdown.totalTax))}
+      </div>
+    </section>
+  `;
+}
+
+function incomeCapitalTaxMetric(label: string, value: string): string {
+  return `
+    <div class="income-capital-tax-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </div>
   `;
 }
@@ -1753,6 +1889,7 @@ function incomeTaxRulePanel(entry: IncomeYearEntry, rule: IncomeTaxRuleResult): 
         ${label === "minijob" || label === "student_newspaper_delivery" ? `<span>Minijob-Grenze ${entry.year}: <strong>${money(config.minijobMonthlyLimit)} / Monat</strong></span>` : ""}
         ${label === "volunteer_allowance" ? `<span>Ehrenamtspauschale ${entry.year}: <strong>${money(config.volunteerAllowance)} / Jahr</strong></span>` : ""}
         ${label === "trainer_allowance" ? `<span>Übungsleiterpauschale ${entry.year}: <strong>${money(config.trainerAllowance)} / Jahr</strong></span>` : ""}
+        ${isCapitalGainsTaxRuleLabel(label) ? `<span>Sparer-Pauschbetrag ${entry.year}: <strong>${money(CAPITAL_GAINS_ALLOWANCE_LIMIT)} / Jahr</strong></span>` : ""}
       </div>
     </section>
   `;
@@ -1865,6 +2002,7 @@ function incomeTaxRuleReasonText(reasonKey: string): string {
     "incomeTaxRules.severance.earnedClaim": "Zahlungen fuer bereits entstandene Ansprueche sind zur manuellen Pruefung freigegeben.",
     "incomeTaxRules.garage.locked": "Nebeneinkuenfte liegen innerhalb der konfigurierten Freigrenze.",
     "incomeTaxRules.garage.sideIncomeExceeded": "Schwelle ueberschritten - manuelle Steuerposition moeglich.",
+    "incomeTaxRules.capitalGains.enabled": "Kapitalertraege werden ueber Sparer-Pauschbetrag, Kapitalertragsteuer, Soli und optionale Kirchensteuer berechnet.",
     "incomeTaxRules.volunteer.locked": "Bis zur Ehrenamtspauschale ist keine Steuer-/Abgabenposition erforderlich.",
     "incomeTaxRules.volunteer.allowanceExceeded": "Ehrenamtspauschale ueberschritten - nur der Mehrbetrag ist steuerlich relevant.",
     "incomeTaxRules.trainer.locked": "Bis zum Übungsleiterfreibetrag ist keine Steuer-/Abgabenposition erforderlich.",
@@ -3130,6 +3268,9 @@ function addIncomeYearlyEntry(): void {
         taxesAndDeductions: null,
         taxDeductionItems: emptyIncomeTaxDeductionItems(),
         taxAdjustment: emptyIncomeTaxAdjustment(),
+        capitalGainsAllowance: null,
+        capitalGainsChurchTaxEnabled: false,
+        capitalGainsChurchTaxRatePercent: DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT,
         employmentContext: "job_loss",
         minijobType: "commercial",
         considerPensionInsurance: false,
@@ -3230,6 +3371,11 @@ function updateIncomeYearEntry(entry: IncomeYearEntry, field: string, value: str
   }
   if (field === "taxAdjustment.amount") {
     return { ...entry, taxAdjustment: { ...entry.taxAdjustment, amount: nullableInputNumber(value) } };
+  }
+  if (field === "capitalGainsAllowance") return { ...entry, capitalGainsAllowance: nullableInputNumber(value) };
+  if (field === "capitalGainsChurchTaxEnabled") return { ...entry, capitalGainsChurchTaxEnabled: value === "true" };
+  if (field === "capitalGainsChurchTaxRatePercent") {
+    return { ...entry, capitalGainsChurchTaxRatePercent: capitalGainsChurchTaxRate(nullableInputNumber(value)) };
   }
   if (field.startsWith("taxDeductionItems.")) {
     const itemField = field.replace("taxDeductionItems.", "");
@@ -3353,6 +3499,9 @@ function incomeTrackerCsv(model: IncomeTrackerModel): string {
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxesAndDeductions", csvValue(entry.taxesAndDeductions), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxAdjustmentType", entry.taxAdjustment.type, entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "taxAdjustmentAmount", csvValue(entry.taxAdjustment.amount), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "capitalGainsAllowance", csvValue(entry.capitalGainsAllowance), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "capitalGainsChurchTaxEnabled", String(entry.capitalGainsChurchTaxEnabled), entry.source]);
+    rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "capitalGainsChurchTaxRatePercent", csvValue(entry.capitalGainsChurchTaxRatePercent), entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "employmentContext", entry.employmentContext ?? "job_loss", entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "minijobType", entry.minijobType ?? "commercial", entry.source]);
     rows.push(["yearly", entry.id, String(entry.year), "", entry.person, "considerPensionInsurance", String(Boolean(entry.considerPensionInsurance)), entry.source]);
@@ -3441,6 +3590,9 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
           taxesAndDeductions: null,
           taxDeductionItems: emptyIncomeTaxDeductionItems(),
           taxAdjustment: emptyIncomeTaxAdjustment(),
+          capitalGainsAllowance: null,
+          capitalGainsChurchTaxEnabled: false,
+          capitalGainsChurchTaxRatePercent: DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT,
           employmentContext: "job_loss",
           minijobType: "commercial",
           considerPensionInsurance: false,
@@ -3478,6 +3630,12 @@ function incomeTrackerEntriesFromCsvRows(rows: string[][]): {
         entry.taxAdjustment = { ...entry.taxAdjustment, type: incomeTaxAdjustmentType(value) };
       } else if (fieldKey === "taxadjustmentamount") {
         entry.taxAdjustment = { ...entry.taxAdjustment, amount: incomeCsvNumber(value) };
+      } else if (fieldKey === "capitalgainsallowance") {
+        entry.capitalGainsAllowance = incomeCsvNumber(value);
+      } else if (fieldKey === "capitalgainschurchtaxenabled") {
+        entry.capitalGainsChurchTaxEnabled = incomeCsvBoolean(value, false);
+      } else if (fieldKey === "capitalgainschurchtaxratepercent") {
+        entry.capitalGainsChurchTaxRatePercent = capitalGainsChurchTaxRate(incomeCsvNumber(value));
       } else if (fieldKey === "employmentcontext") {
         entry.employmentContext = incomeEmploymentContext(value);
       } else if (fieldKey === "minijobtype") {
@@ -3538,6 +3696,8 @@ function incomeCsvYearlyEntryHasData(entry: IncomeYearEntry): boolean {
     entry.annualNetIncome !== null ||
     entry.annualGrossIncome !== null ||
     entry.taxesAndDeductions !== null ||
+    entry.capitalGainsAllowance !== null ||
+    entry.capitalGainsChurchTaxEnabled ||
     incomeTaxDeductionItemsTotal(entry.taxDeductionItems) !== null ||
     incomeTaxDeductionItemsHaveData(entry.taxDeductionItems) ||
     entry.taxAdjustment.amount !== null
@@ -3577,6 +3737,9 @@ function incomeCsvYearOrNull(value: string): number | null {
 
 function incomeTaxDeductionFieldFromCsv(value: string): IncomeTaxDeductionField | null {
   const text = value.toLowerCase();
+  if (text.includes("kirchensteuer zur kapitalertragsteuer")) return "capitalGainsChurchTax";
+  if (text.includes("solidar") && text.includes("kapitalertragsteuer")) return "capitalGainsSolidaritySurcharge";
+  if (text.includes("kapitalertragsteuer")) return "capitalGainsTax";
   if (text.startsWith("4 ") || text.includes("lohnsteuer")) return "wageTax";
   if (text.startsWith("5 ") || text.includes("solidar")) return "solidaritySurcharge";
   if (text.startsWith("6 ") || text.includes("kirchensteuer")) return "churchTax";

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyCapitalGainsTaxToEntries,
+  applyCapitalGainsTaxToEntry,
   buildIncomeChartModel,
   buildIncomeTrackerModel,
   emptyIncomeTaxAdjustment,
@@ -32,6 +34,9 @@ function yearlyEntry(overrides: Partial<IncomeYearEntry> = {}): IncomeYearEntry 
       healthInsurance: 2000
     },
     taxAdjustment: emptyIncomeTaxAdjustment(),
+    capitalGainsAllowance: null,
+    capitalGainsChurchTaxEnabled: false,
+    capitalGainsChurchTaxRatePercent: 9,
     employmentContext: "job_loss",
     minijobType: "commercial",
     considerPensionInsurance: false,
@@ -147,6 +152,89 @@ describe("income tracker tax adjustment", () => {
   });
 });
 
+describe("income tracker capital gains tax", () => {
+  it("calculates capital gains tax and soli after the entered allowance", () => {
+    const entry = applyCapitalGainsTaxToEntry(
+      yearlyEntry({
+        label: "dividends",
+        annualGrossIncome: 250,
+        capitalGainsAllowance: 50
+      })
+    );
+
+    expect(entry.taxDeductionItems.capitalGainsTax).toBe(50);
+    expect(entry.taxDeductionItems.capitalGainsSolidaritySurcharge).toBe(2.75);
+    expect(entry.taxDeductionItems.capitalGainsChurchTax).toBe(0);
+    expect(incomeYearEntryTaxDeductions(entry)).toBe(52.75);
+    expect(incomeYearEntryCalculatedNetIncome(entry)).toBe(197.25);
+  });
+
+  it("allows an entered allowance above the income and produces no tax", () => {
+    const entry = applyCapitalGainsTaxToEntry(
+      yearlyEntry({
+        label: "asset_income",
+        annualGrossIncome: 445,
+        capitalGainsAllowance: 500
+      })
+    );
+
+    expect(entry.capitalGainsAllowance).toBe(500);
+    expect(entry.taxDeductionItems.capitalGainsTax).toBe(0);
+    expect(entry.taxDeductionItems.capitalGainsSolidaritySurcharge).toBe(0);
+    expect(entry.taxDeductionItems.capitalGainsChurchTax).toBe(0);
+    expect(incomeYearEntryTaxDeductions(entry)).toBe(0);
+    expect(incomeYearEntryCalculatedNetIncome(entry)).toBe(445);
+  });
+
+  it("calculates optional church tax with 8 and 9 percent rates", () => {
+    const eightPercent = applyCapitalGainsTaxToEntry(
+      yearlyEntry({
+        label: "dividends",
+        annualGrossIncome: 1000,
+        capitalGainsChurchTaxEnabled: true,
+        capitalGainsChurchTaxRatePercent: 8
+      })
+    );
+    const ninePercent = applyCapitalGainsTaxToEntry(
+      yearlyEntry({
+        label: "dividends",
+        annualGrossIncome: 1000,
+        capitalGainsChurchTaxEnabled: true,
+        capitalGainsChurchTaxRatePercent: 9
+      })
+    );
+
+    expect(eightPercent.taxDeductionItems.capitalGainsTax).toBeCloseTo(245.1, 2);
+    expect(eightPercent.taxDeductionItems.capitalGainsSolidaritySurcharge).toBeCloseTo(13.48, 2);
+    expect(eightPercent.taxDeductionItems.capitalGainsChurchTax).toBeCloseTo(19.61, 2);
+    expect(ninePercent.taxDeductionItems.capitalGainsTax).toBeCloseTo(244.5, 2);
+    expect(ninePercent.taxDeductionItems.capitalGainsSolidaritySurcharge).toBeCloseTo(13.45, 2);
+    expect(ninePercent.taxDeductionItems.capitalGainsChurchTax).toBeCloseTo(22.01, 2);
+  });
+
+  it("caps active capital gains allowances at 1000 EUR per year in entry order", () => {
+    const entries = applyCapitalGainsTaxToEntries([
+      yearlyEntry({ id: "first", label: "dividends", annualGrossIncome: 600, capitalGainsAllowance: 600 }),
+      yearlyEntry({ id: "second", label: "asset_income", annualGrossIncome: 500, capitalGainsAllowance: 500 }),
+      yearlyEntry({ id: "third", label: "dividends", annualGrossIncome: 100, capitalGainsAllowance: 100 })
+    ]);
+
+    expect(entries.map((entry) => entry.capitalGainsAllowance)).toEqual([600, 400, null]);
+    expect(entries[1].taxDeductionItems.capitalGainsTax).toBe(25);
+    expect(entries[2].taxDeductionItems.capitalGainsTax).toBe(25);
+  });
+
+  it("does not let inactive capital gains entries consume the yearly allowance", () => {
+    const entries = applyCapitalGainsTaxToEntries([
+      yearlyEntry({ id: "inactive", active: false, label: "dividends", annualGrossIncome: 800, capitalGainsAllowance: 800 }),
+      yearlyEntry({ id: "active", label: "asset_income", annualGrossIncome: 800, capitalGainsAllowance: 800 })
+    ]);
+
+    expect(entries.map((entry) => entry.capitalGainsAllowance)).toEqual([800, 800]);
+    expect(entries[1].taxDeductionItems.capitalGainsTax).toBe(0);
+  });
+});
+
 describe("income tracker tax and contribution rules", () => {
   it("locks all tax and contribution fields for pocket money", () => {
     const rule = evaluateIncomeTaxAndContributionRules({
@@ -170,6 +258,20 @@ describe("income tracker tax and contribution rules", () => {
     expect(rule.taxFieldsEnabled).toBe(true);
     expect(rule.contributionFieldsEnabled).toBe(false);
     expect(rule.warningKey).toBe("incomeTaxRules.severance.warning");
+  });
+
+  it("uses a dedicated capital gains rule for dividends and asset income", () => {
+    for (const label of ["dividends", "asset_income"]) {
+      const rule = evaluateIncomeTaxAndContributionRules({
+        label,
+        annualAmount: 250,
+        year: 2026
+      });
+
+      expect(rule.taxFieldsEnabled).toBe(true);
+      expect(rule.contributionFieldsEnabled).toBe(false);
+      expect(rule.reasonKey).toBe("incomeTaxRules.capitalGains.enabled");
+    }
   });
 
   it("always locks social contributions for garage parking rental and unlocks taxes after the side-income threshold", () => {

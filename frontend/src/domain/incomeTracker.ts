@@ -7,6 +7,7 @@ import type {
   IncomeTrackerState,
   IncomeYearEntry
 } from "../types";
+import { isCapitalGainsTaxRuleLabel } from "./incomeTaxRules";
 
 export const INCOME_SOURCE_LABELS: Record<IncomeResolvedSource, string> = {
   annual_statement: "bestaetigt durch Jahresentgeltabrechnung",
@@ -84,18 +85,42 @@ const TAX_DEDUCTION_FIELDS: IncomeTaxDeductionField[] = [
   "wageTax",
   "solidaritySurcharge",
   "churchTax",
+  "capitalGainsTax",
+  "capitalGainsSolidaritySurcharge",
+  "capitalGainsChurchTax",
   "pensionInsurance",
   "healthInsurance",
   "careInsurance",
   "unemploymentInsurance"
 ];
-const TAX_DEDUCTION_TAX_FIELDS: IncomeTaxDeductionField[] = ["wageTax", "solidaritySurcharge", "churchTax"];
+const TAX_DEDUCTION_TAX_FIELDS: IncomeTaxDeductionField[] = [
+  "wageTax",
+  "solidaritySurcharge",
+  "churchTax",
+  "capitalGainsTax",
+  "capitalGainsSolidaritySurcharge",
+  "capitalGainsChurchTax"
+];
 const TAX_DEDUCTION_SOCIAL_FIELDS: IncomeTaxDeductionField[] = [
   "pensionInsurance",
   "healthInsurance",
   "careInsurance",
   "unemploymentInsurance"
 ];
+export const CAPITAL_GAINS_ALLOWANCE_LIMIT = 1000;
+export const CAPITAL_GAINS_TAX_PERCENT = 25;
+export const CAPITAL_GAINS_SOLIDARITY_SURCHARGE_PERCENT = 5.5;
+export const DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT = 9;
+
+export interface CapitalGainsTaxBreakdown {
+  capitalIncome: number;
+  allowance: number;
+  taxableAmount: number;
+  capitalGainsTax: number;
+  solidaritySurcharge: number;
+  churchTax: number;
+  totalTax: number;
+}
 
 export function buildIncomeTrackerModel(tracker: IncomeTrackerState, options: IncomeTrackerModelOptions = {}): IncomeTrackerModel {
   const years = buildYearAnalyses(tracker);
@@ -223,6 +248,83 @@ export function incomeTaxDeductionItemsSocialTotal(items: IncomeTaxDeductionItem
   return incomeTaxDeductionFieldTotal(items, TAX_DEDUCTION_SOCIAL_FIELDS);
 }
 
+export function capitalGainsTaxBreakdown(entry: IncomeYearEntry): CapitalGainsTaxBreakdown {
+  const capitalIncome = Math.max(0, numberValue(entry.annualGrossIncome ?? entry.annualNetIncome));
+  const allowance = Math.max(0, numberValue(entry.capitalGainsAllowance));
+  const taxableAmount = roundCents(Math.max(0, capitalIncome - allowance));
+  const churchRate = normalizedCapitalGainsChurchTaxRate(entry.capitalGainsChurchTaxRatePercent);
+  const capitalGainsTax = entry.capitalGainsChurchTaxEnabled
+    ? roundCents(taxableAmount / (4 + churchRate / 100))
+    : roundCents((taxableAmount * CAPITAL_GAINS_TAX_PERCENT) / 100);
+  const solidaritySurcharge = roundCents((capitalGainsTax * CAPITAL_GAINS_SOLIDARITY_SURCHARGE_PERCENT) / 100);
+  const churchTax = entry.capitalGainsChurchTaxEnabled ? roundCents((capitalGainsTax * churchRate) / 100) : 0;
+  return {
+    capitalIncome,
+    allowance,
+    taxableAmount,
+    capitalGainsTax,
+    solidaritySurcharge,
+    churchTax,
+    totalTax: roundCents(capitalGainsTax + solidaritySurcharge + churchTax)
+  };
+}
+
+export function applyCapitalGainsTaxToEntry(entry: IncomeYearEntry): IncomeYearEntry {
+  if (!isCapitalGainsTaxRuleLabel(entry.label)) return clearCapitalGainsTaxItems(entry);
+  const breakdown = capitalGainsTaxBreakdown(entry);
+  const taxDeductionItems = {
+    ...entry.taxDeductionItems,
+    wageTax: null,
+    solidaritySurcharge: null,
+    churchTax: null,
+    pensionInsurance: null,
+    healthInsurance: null,
+    careInsurance: null,
+    unemploymentInsurance: null,
+    employerPensionInsurance: null,
+    capitalGainsTax: breakdown.capitalGainsTax,
+    capitalGainsSolidaritySurcharge: breakdown.solidaritySurcharge,
+    capitalGainsChurchTax: breakdown.churchTax
+  };
+  return {
+    ...entry,
+    capitalGainsChurchTaxRatePercent: normalizedCapitalGainsChurchTaxRate(entry.capitalGainsChurchTaxRatePercent),
+    taxDeductionItems,
+    taxAdjustment: emptyIncomeTaxAdjustment(),
+    taxesAndDeductions: incomeTaxDeductionItemsTotal(taxDeductionItems)
+  };
+}
+
+export function applyCapitalGainsTaxToEntries(entries: IncomeYearEntry[]): IncomeYearEntry[] {
+  const allowanceUsedByYear = new Map<number, number>();
+  return entries.map((entry) => {
+    if (!isCapitalGainsTaxRuleLabel(entry.label)) {
+      return applyCapitalGainsTaxToEntry({
+        ...entry,
+        capitalGainsAllowance: null,
+        capitalGainsChurchTaxEnabled: false,
+        capitalGainsChurchTaxRatePercent: DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT
+      });
+    }
+
+    const used = allowanceUsedByYear.get(entry.year) ?? 0;
+    const maxAllowance = entry.active ? Math.max(0, CAPITAL_GAINS_ALLOWANCE_LIMIT - used) : CAPITAL_GAINS_ALLOWANCE_LIMIT;
+    const sanitizedEntry = applyCapitalGainsTaxToEntry({
+      ...entry,
+      capitalGainsAllowance: capitalGainsAllowanceValue(entry.capitalGainsAllowance, maxAllowance),
+      capitalGainsChurchTaxEnabled: Boolean(entry.capitalGainsChurchTaxEnabled),
+      capitalGainsChurchTaxRatePercent: normalizedCapitalGainsChurchTaxRate(entry.capitalGainsChurchTaxRatePercent)
+    });
+    if (sanitizedEntry.active) {
+      allowanceUsedByYear.set(
+        sanitizedEntry.year,
+        clampCurrency((allowanceUsedByYear.get(sanitizedEntry.year) ?? 0) + numberValue(sanitizedEntry.capitalGainsAllowance))
+      );
+    }
+    return sanitizedEntry;
+  });
+}
+
 export function emptyIncomeTaxAdjustment(): IncomeTaxAdjustment {
   return {
     type: "refund",
@@ -241,12 +343,49 @@ export function emptyIncomeTaxDeductionItems(): IncomeTaxDeductionItems {
     wageTax: null,
     solidaritySurcharge: null,
     churchTax: null,
+    capitalGainsTax: null,
+    capitalGainsSolidaritySurcharge: null,
+    capitalGainsChurchTax: null,
     pensionInsurance: null,
     healthInsurance: null,
     careInsurance: null,
     unemploymentInsurance: null,
     employerPensionInsurance: null
   };
+}
+
+function clearCapitalGainsTaxItems(entry: IncomeYearEntry): IncomeYearEntry {
+  if (
+    entry.taxDeductionItems.capitalGainsTax === null &&
+    entry.taxDeductionItems.capitalGainsSolidaritySurcharge === null &&
+    entry.taxDeductionItems.capitalGainsChurchTax === null
+  ) {
+    return entry;
+  }
+  const taxDeductionItems = {
+    ...entry.taxDeductionItems,
+    capitalGainsTax: null,
+    capitalGainsSolidaritySurcharge: null,
+    capitalGainsChurchTax: null
+  };
+  return {
+    ...entry,
+    taxDeductionItems,
+    taxesAndDeductions: incomeTaxDeductionItemsTotal(taxDeductionItems)
+  };
+}
+
+function capitalGainsAllowanceValue(value: number | null | undefined, maxAllowance: number): number | null {
+  const allowance = Math.min(Math.max(0, roundCents(numberValue(value ?? null))), Math.max(0, maxAllowance));
+  return allowance > 0 ? allowance : null;
+}
+
+function clampCurrency(value: number): number {
+  return Math.min(Math.max(0, roundCents(value)), CAPITAL_GAINS_ALLOWANCE_LIMIT);
+}
+
+function normalizedCapitalGainsChurchTaxRate(value: number | null | undefined): number {
+  return value === 8 ? 8 : DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT;
 }
 
 function buildYearAnalyses(tracker: IncomeTrackerState): IncomeYearAnalysis[] {

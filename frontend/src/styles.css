@@ -3869,6 +3869,88 @@ tfoot th {
   min-width: 0;
 }
 
+.income-capital-tax-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.income-capital-tax-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--row-border);
+  padding-bottom: 8px;
+}
+
+.income-capital-tax-head div {
+  display: grid;
+  gap: 3px;
+}
+
+.income-capital-tax-head strong {
+  color: var(--text);
+  font-weight: 950;
+}
+
+.income-capital-tax-head span,
+.income-capital-tax-controls small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 780;
+}
+
+.income-capital-tax-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, auto) minmax(130px, 160px);
+  gap: 10px;
+}
+
+.income-capital-tax-controls label {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.income-capital-tax-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.income-capital-tax-metric {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--row-border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  padding: 8px;
+}
+
+.income-capital-tax-metric span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.income-capital-tax-metric strong {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .income-tax-row-locked {
   background: var(--surface-muted);
   color: var(--muted);
@@ -4298,11 +4380,13 @@ tfoot th {
 }
 
 .income-analysis-dialog {
+  --income-analysis-panel-min-height: 420px;
   display: grid;
   gap: 12px;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  height: min(840px, calc(100vh - 32px));
   width: min(1180px, 100%);
-  max-height: min(840px, calc(100vh - 32px));
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -4371,6 +4455,8 @@ tfoot th {
 .income-analysis-metrics article {
   display: grid;
   gap: 4px;
+  grid-template-rows: auto minmax(24px, auto) auto;
+  min-height: 78px;
   border: 1px solid var(--row-border);
   border-radius: 8px;
   background: var(--surface-soft);
@@ -4388,18 +4474,24 @@ tfoot th {
   color: var(--text);
   font-size: 1rem;
   font-weight: 950;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .income-analysis-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.75fr);
   gap: 12px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .income-analysis-chart-card,
 .income-analysis-detail-card {
   min-width: 0;
+  height: 100%;
+  min-height: var(--income-analysis-panel-min-height);
   border: 1px solid var(--row-border);
   border-radius: 8px;
   background: var(--surface-soft);
@@ -4407,13 +4499,17 @@ tfoot th {
 }
 
 .income-analysis-chart-card {
-  min-height: 330px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .income-analysis-detail-card {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: stretch;
   gap: 10px;
+  overflow: hidden;
 }
 
 .income-analysis-detail-card h3 {
@@ -4422,7 +4518,8 @@ tfoot th {
 
 .income-analysis-pie-wrap {
   display: grid;
-  min-height: 300px;
+  height: 100%;
+  min-height: 0;
   place-items: center;
 }
 
@@ -4464,13 +4561,16 @@ tfoot th {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
   gap: 10px;
-  min-height: 300px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .income-analysis-bar-column {
   display: grid;
-  grid-template-rows: minmax(190px, 1fr) auto auto;
+  grid-template-rows: minmax(0, 1fr) 42px 34px;
   gap: 5px;
+  min-height: 0;
   min-width: 0;
   text-align: center;
 }
@@ -4491,7 +4591,11 @@ tfoot th {
 
 .income-analysis-bar-column span,
 .income-analysis-bar-column strong {
+  align-items: center;
+  display: flex;
+  justify-content: center;
   min-width: 0;
+  overflow: hidden;
   overflow-wrap: anywhere;
   font-size: 0.76rem;
   font-weight: 850;
@@ -4504,12 +4608,17 @@ tfoot th {
 .income-analysis-svg-wrap {
   display: grid;
   gap: 8px;
-  min-height: 300px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .income-analysis-svg {
+  display: block;
+  height: 100%;
+  min-height: 0;
   width: 100%;
-  min-height: 270px;
 }
 
 .income-analysis-svg .axis,
@@ -4564,16 +4673,26 @@ tfoot th {
 
 .income-analysis-breakdown {
   display: grid;
+  align-content: start;
   gap: 6px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .income-analysis-line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto) 52px;
   align-items: center;
   gap: 8px;
+  min-height: 40px;
   border-bottom: 1px solid var(--row-border);
   padding: 7px 0;
+}
+
+.income-analysis-line span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .income-analysis-line strong,
@@ -4589,8 +4708,10 @@ tfoot th {
 
 .income-analysis-total {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 44px;
   border-radius: 8px;
   background: var(--surface-muted);
   padding: 10px;
@@ -4599,7 +4720,8 @@ tfoot th {
 
 .income-analysis-empty {
   display: grid;
-  min-height: 280px;
+  height: 100%;
+  min-height: 0;
   place-items: center;
   color: var(--muted);
   font-size: 0.9rem;
@@ -4910,7 +5032,9 @@ tfoot th {
   }
 
   .income-tax-rule-panel,
-  .income-tax-context-controls {
+  .income-tax-context-controls,
+  .income-capital-tax-controls,
+  .income-capital-tax-grid {
     grid-template-columns: 1fr;
   }
 }
