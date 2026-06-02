@@ -84,12 +84,14 @@ describe("position table view", () => {
     const positions = [
       incomePosition("monthly", { payoutType: "monthly", type: "incomeMonthly" }),
       incomePosition("yearly", { payoutType: "yearly", type: "incomeYearly" }),
-      incomePosition("once", { payoutType: "once", type: "incomeTemporary" })
+      incomePosition("once", { payoutType: "once", type: "incomeTemporary" }),
+      incomePosition("none", { payoutType: "none", type: "incomeTemporary" })
     ];
 
     expect(positionTableRows(positions, "income", view({}), "monthly").map((position) => position.id)).toEqual(["monthly"]);
     expect(positionTableRows(positions, "income", view({}), "yearly").map((position) => position.id)).toEqual(["yearly"]);
     expect(positionTableRows(positions, "income", view({}), "once").map((position) => position.id)).toEqual(["once"]);
+    expect(positionTableRows(positions, "income", view({}), "none").map((position) => position.id)).toEqual(["none"]);
   });
 
   it("filters expense rows by payout cadence including no rhythm", () => {
@@ -106,11 +108,42 @@ describe("position table view", () => {
     expect(positionTableRows(positions, "expense", view({}), "none").map((position) => position.id)).toEqual(["none"]);
   });
 
-  it("only exposes cadence subviews for income and expenses", () => {
-    expect(positionCadencesForTableMode("income")).toEqual(["monthly", "yearly", "once"]);
+  it("exposes cadence subviews for all position sections", () => {
+    expect(positionCadencesForTableMode("income")).toEqual(["monthly", "yearly", "once", "none"]);
     expect(positionCadencesForTableMode("expense")).toEqual(["monthly", "yearly", "once", "none"]);
-    expect(positionCadencesForTableMode("reserve")).toEqual([]);
-    expect(positionCadencesForTableMode("savings")).toEqual([]);
+    expect(positionCadencesForTableMode("reserve")).toEqual(["fixed", "monthly"]);
+    expect(positionCadencesForTableMode("savings")).toEqual(["monthly", "yearly", "once", "none"]);
+  });
+
+  it("filters reserve rows by fixed or reserve type", () => {
+    const positions = [
+      expensePosition("fixed", { type: "fixed", payoutType: "none" }),
+      expensePosition("reserve-yearly", { type: "reserve", payoutType: "yearly" }),
+      expensePosition("expense", { type: "temporary", payoutType: "monthly" })
+    ];
+
+    expect(positionTableRows(positions, "reserve", view({}), "fixed").map((position) => position.id)).toEqual(["fixed"]);
+    expect(positionTableRows(positions, "reserve", view({}), "monthly").map((position) => position.id)).toEqual([
+      "reserve-yearly"
+    ]);
+  });
+
+  it("filters savings rows by payout cadence", () => {
+    const positions = [
+      expensePosition("monthly", { type: "savings", payoutType: "monthly" }),
+      expensePosition("yearly", { type: "savings", payoutType: "yearly" }),
+      expensePosition("once", { type: "savings", payoutType: "once" }),
+      expensePosition("none", { type: "savings", payoutType: "none" })
+    ];
+
+    expect(positionTableRows(positions, "savings", view({}), "monthly").map((position) => position.id)).toEqual([
+      "monthly"
+    ]);
+    expect(positionTableRows(positions, "savings", view({}), "yearly").map((position) => position.id)).toEqual([
+      "yearly"
+    ]);
+    expect(positionTableRows(positions, "savings", view({}), "once").map((position) => position.id)).toEqual(["once"]);
+    expect(positionTableRows(positions, "savings", view({}), "none").map((position) => position.id)).toEqual(["none"]);
   });
 
   it("maps new positions to the active table section and cadence", () => {
@@ -120,10 +153,18 @@ describe("position table view", () => {
     expect(payoutTypeForPositionTableSelection("income", "yearly")).toBe("yearly");
     expect(typeForPositionTableSelection("income", "once")).toBe("incomeTemporary");
     expect(payoutTypeForPositionTableSelection("income", "once")).toBe("once");
+    expect(typeForPositionTableSelection("income", "none")).toBe("incomeTemporary");
+    expect(payoutTypeForPositionTableSelection("income", "none")).toBe("none");
     expect(typeForPositionTableSelection("expense", "none")).toBe("temporary");
     expect(payoutTypeForPositionTableSelection("expense", "none")).toBe("none");
-    expect(typeForPositionTableSelection("reserve", null)).toBe("reserve");
-    expect(typeForPositionTableSelection("savings", null)).toBe("savings");
+    expect(typeForPositionTableSelection("reserve", "fixed")).toBe("fixed");
+    expect(payoutTypeForPositionTableSelection("reserve", "fixed")).toBe("none");
+    expect(typeForPositionTableSelection("reserve", "monthly")).toBe("reserve");
+    expect(payoutTypeForPositionTableSelection("reserve", "monthly")).toBe("monthly");
+    expect(typeForPositionTableSelection("savings", "yearly")).toBe("savings");
+    expect(payoutTypeForPositionTableSelection("savings", "yearly")).toBe("yearly");
+    expect(typeForPositionTableSelection("savings", "none")).toBe("savings");
+    expect(payoutTypeForPositionTableSelection("savings", "none")).toBe("none");
   });
 
   it("filters label values through the existing icon labels", () => {

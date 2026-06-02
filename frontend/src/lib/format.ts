@@ -81,7 +81,7 @@ export function labelForPayout(type: PayoutType, flow: PositionFlow = "expense")
   if (type === "monthly") return "monatlich";
   if (type === "yearly") return "jaehrlich";
   if (type === "once") return "einmalig";
-  return flow === "income" ? "kein Eingang" : "kein Abgang";
+  return flow === "income" ? "ohne Rhythmus" : "kein Abgang";
 }
 
 export function makeHeaderLabel(name: string): string {

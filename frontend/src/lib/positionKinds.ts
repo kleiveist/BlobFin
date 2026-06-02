@@ -9,12 +9,14 @@ import type {
 } from "../types";
 
 export type { PositionTableMode };
-export type PositionTableCadence = PayoutType;
+export type PositionTableCadence = PayoutType | "fixed";
 
 export const INCOME_POSITION_TYPES: IncomePositionType[] = ["incomeMonthly", "incomeYearly", "incomeTemporary"];
 export const EXPENSE_POSITION_TYPES: ExpensePositionType[] = ["fixed", "reserve", "temporary", "savings"];
-export const INCOME_POSITION_CADENCES: PositionTableCadence[] = ["monthly", "yearly", "once"];
-export const EXPENSE_POSITION_CADENCES: PositionTableCadence[] = ["monthly", "yearly", "once", "none"];
+export const INCOME_POSITION_CADENCES: PayoutType[] = ["monthly", "yearly", "once", "none"];
+export const EXPENSE_POSITION_CADENCES: PayoutType[] = ["monthly", "yearly", "once", "none"];
+export const RESERVE_POSITION_CADENCES: PositionTableCadence[] = ["fixed", "monthly"];
+export const SAVINGS_POSITION_CADENCES: PayoutType[] = ["monthly", "yearly", "once", "none"];
 
 export function isIncomeType(type: PositionType): type is IncomePositionType {
   return INCOME_POSITION_TYPES.includes(type as IncomePositionType);
@@ -50,6 +52,8 @@ export function positionTableMode(position: Pick<ReservePosition, "flow" | "type
 export function positionCadencesForTableMode(mode: PositionTableMode): PositionTableCadence[] {
   if (mode === "income") return [...INCOME_POSITION_CADENCES];
   if (mode === "expense") return [...EXPENSE_POSITION_CADENCES];
+  if (mode === "reserve") return [...RESERVE_POSITION_CADENCES];
+  if (mode === "savings") return [...SAVINGS_POSITION_CADENCES];
   return [];
 }
 
@@ -58,8 +62,15 @@ export function positionMatchesTableCadence(
   mode: PositionTableMode,
   cadence: PositionTableCadence | null | undefined
 ): boolean {
-  if (!cadence || (mode !== "income" && mode !== "expense")) return true;
-  return positionTableMode(position) === mode && position.payoutType === cadence;
+  if (!cadence) return true;
+  if (positionTableMode(position) !== mode) return false;
+  if (mode === "reserve") {
+    if (cadence === "fixed") return position.type === "fixed";
+    if (cadence === "monthly") return position.type === "reserve";
+    return false;
+  }
+  if (mode === "savings") return cadence !== "fixed" && position.payoutType === cadence;
+  return cadence !== "fixed" && position.payoutType === cadence;
 }
 
 export function typeForPositionTableSelection(
@@ -68,10 +79,10 @@ export function typeForPositionTableSelection(
 ): PositionType {
   if (mode === "income") {
     if (cadence === "yearly") return "incomeYearly";
-    if (cadence === "once") return "incomeTemporary";
+    if (cadence === "once" || cadence === "none") return "incomeTemporary";
     return "incomeMonthly";
   }
-  if (mode === "reserve") return "reserve";
+  if (mode === "reserve") return cadence === "fixed" ? "fixed" : "reserve";
   if (mode === "savings") return "savings";
   return "temporary";
 }
@@ -80,8 +91,11 @@ export function payoutTypeForPositionTableSelection(
   mode: PositionTableMode,
   cadence: PositionTableCadence | null | undefined
 ): PayoutType {
+  if (cadence === "fixed") return "none";
   if (mode === "expense" && cadence && EXPENSE_POSITION_CADENCES.includes(cadence)) return cadence;
   if (mode === "income" && cadence && INCOME_POSITION_CADENCES.includes(cadence)) return cadence;
+  if (mode === "reserve") return cadence === "monthly" ? "monthly" : "none";
+  if (mode === "savings" && cadence && SAVINGS_POSITION_CADENCES.includes(cadence)) return cadence;
   return "monthly";
 }
 

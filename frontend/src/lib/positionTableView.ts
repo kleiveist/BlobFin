@@ -347,7 +347,7 @@ function positionTypeOptionsForMode(mode: PositionTableMode): PositionTableSelec
 
 function payoutTypeOptionsForMode(mode: PositionTableMode): PositionTableSelectOption[] {
   const payoutTypes: ReservePosition["payoutType"][] =
-    mode === "income" ? ["monthly", "yearly", "once"] : ["none", "monthly", "yearly", "once"];
+    mode === "income" ? ["monthly", "yearly", "once", "none"] : ["none", "monthly", "yearly", "once"];
   const flow = mode === "income" ? "income" : "expense";
   return payoutTypes.map((value) => ({ value, label: labelForPayout(value, flow) }));
 }

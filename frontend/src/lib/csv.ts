@@ -133,7 +133,9 @@ export function positionsFromCsvRows(rows: string[][]): ReservePosition[] {
       if (position.flow === "income") {
         position.interestBearing = false;
         position.cashback = false;
-        if (position.payoutType === "none") position.payoutType = defaultIncomePayoutType(position.type);
+        if (position.payoutType === "none" && position.type !== "incomeTemporary") {
+          position.payoutType = defaultIncomePayoutType(position.type);
+        }
       }
       if (position.flow === "expense" && position.type !== "temporary") position.cashback = false;
       if (position.payoutType === "once" && position.type !== "savings") {
@@ -321,8 +323,9 @@ function parseTypeValue(value: unknown): PositionType {
 
 function parsePayoutValue(value: unknown, flow: PositionFlow = "expense"): PayoutType {
   const normalized = normalizeHeader(value);
-  if (["keinabgang", "keineingang", "keiner", "none", "nein", ""].includes(normalized)) {
-    return flow === "income" ? "monthly" : "none";
+  if (normalized === "") return flow === "income" ? "monthly" : "none";
+  if (["keinabgang", "keineingang", "keiner", "ohnerhythmus", "none", "nein"].includes(normalized)) {
+    return "none";
   }
   if (["monatlich", "monthly"].includes(normalized)) return "monthly";
   if (["jaehrlich", "jahrlich", "yearly", "annual"].includes(normalized)) return "yearly";

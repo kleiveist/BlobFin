@@ -909,7 +909,9 @@ function normalizePositions(
       if (position.flow === "income") {
         position.interestBearing = false;
         position.cashback = false;
-        if (position.payoutType === "none") position.payoutType = defaultIncomePayoutType(position.type);
+        if (position.payoutType === "none" && position.type !== "incomeTemporary") {
+          position.payoutType = defaultIncomePayoutType(position.type);
+        }
       }
       return position;
     })

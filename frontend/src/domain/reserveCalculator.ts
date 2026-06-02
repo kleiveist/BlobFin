@@ -181,7 +181,7 @@ export function calculatePlannedIncomeForSingleMonth(
 function isIncomeActiveInMonth(position: ReservePosition, year: number, monthNumber: number): boolean {
   if (!isActiveInMonth(position, monthNumber)) return false;
   const payoutYear = Number(position.payoutYear || year);
-  if (position.type === "incomeTemporary") return year === payoutYear;
+  if (position.type === "incomeTemporary" || position.payoutType === "none") return year === payoutYear;
   return year >= payoutYear;
 }
 

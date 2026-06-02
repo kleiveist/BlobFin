@@ -300,6 +300,39 @@ describe("reserve calculator", () => {
     expect(summary.yearlyRemaining).toBe(25700);
   });
 
+  it("calculates income without rhythm only in its configured year and month range", () => {
+    const state = defaultAppState();
+    state.positions = [
+      {
+        id: "three-month-income",
+        flow: "income",
+        active: true,
+        visible: true,
+        name: "Three Month Income",
+        type: "incomeTemporary",
+        amount: 750,
+        startMonth: 3,
+        endMonth: 5,
+        payoutType: "none",
+        payoutYear: state.settings.year,
+        payoutMonth: 3,
+        payoutDay: 1,
+        interestBearing: false,
+        cashback: false
+      }
+    ];
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+    const nextYear = calculateReserveSummary({ ...state.settings, year: state.settings.year + 1 }, state.positions);
+
+    expect(summary.rows[1].plannedIncome).toBe(0);
+    expect(summary.rows[2].plannedIncome).toBe(750);
+    expect(summary.rows[4].plannedIncome).toBe(750);
+    expect(summary.rows[5].plannedIncome).toBe(0);
+    expect(summary.totalPlannedIncome).toBe(2250);
+    expect(nextYear.totalPlannedIncome).toBe(0);
+  });
+
   it("calculates hidden positions without showing them in year table columns", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>

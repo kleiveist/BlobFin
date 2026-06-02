@@ -26,6 +26,8 @@ The handle at the left side of a row can be used to reorder positions. The order
 
 Each table section (`Einnahmen`, `Ausgaben`, `Ruecklagen`, `Sparen`) keeps its own filters and sorting. These table view settings are saved and restored when the app is opened again.
 
+The rhythm buttons above the table narrow the active section and choose the default for new rows. `Ruecklagen` uses `Fixbestand` and `Monatlich`; `Sparen` uses `Monatlich`, `Jaehrlich`, `Einmalig`, and `Ohne Rhythmus`.
+
 Filters and sorting only change the editable position table. The yearly calculation, yearly table, investment planning, and CSV export continue to use all positions.
 
 Active filters and sorting are shown as chips above the table. Removing a chip clears that single filter or sort order; `Zuruecksetzen` clears the current section's full table view. Manual drag reordering is disabled while a filter or sort order is active.
@@ -56,11 +58,12 @@ Savings rows:
 ## Payout Cadence
 
 - `Kein Abgang`: expense position is accumulated or shown without a scheduled payout.
+- `Ohne Rhythmus`: temporary income is counted monthly only between `Start` and `Ende` in the configured `Jahr`.
 - `Monatlich`: amount is considered every active month.
 - `Jaehrlich`: amount is considered in the configured payout month.
 - `Einmalig`: amount is considered only once in the configured year and month.
 
-For one-time expense payouts, `Start` and `Ende` are replaced by `Abgangsjahr`. For one-time income rows, `Start` and `Ende` are disabled and the `Jahr` field decides the matching year. One-time rows do not appear as yearly table columns. They can still be used for cashback when the row is a temporary expense position with cashback enabled.
+For one-time expense payouts, `Start` and `Ende` are replaced by `Abgangsjahr`. For one-time income rows, `Start` and `Ende` are disabled and the `Jahr` field decides the matching year. Income rows without rhythm keep `Start` and `Ende` editable, so a same-height income can be planned for a short range such as three months. One-time rows do not appear as yearly table columns. They can still be used for cashback when the row is a temporary expense position with cashback enabled.
 
 ## Interest
 

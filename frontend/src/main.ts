@@ -378,6 +378,8 @@ let exportStatusTimeoutId: number | undefined;
 let selectedPositionMode: PositionTableMode = "expense";
 let selectedIncomeCadence: PositionTableCadence = "monthly";
 let selectedExpenseCadence: PositionTableCadence = "monthly";
+let selectedReserveCadence: PositionTableCadence = "fixed";
+let selectedSavingsCadence: PositionTableCadence = "monthly";
 let showResultMaxNeeded = false;
 let reserveChartOpen = false;
 let reserveChartCategory: ReserveChartCategory = "all";
@@ -5677,10 +5679,13 @@ function togglePositionTableSort(column: PositionTableFilterColumn): void {
 function activePositionCadence(): PositionTableCadence | null {
   if (selectedPositionMode === "income") return selectedIncomeCadence;
   if (selectedPositionMode === "expense") return selectedExpenseCadence;
+  if (selectedPositionMode === "reserve") return selectedReserveCadence;
+  if (selectedPositionMode === "savings") return selectedSavingsCadence;
   return null;
 }
 
 function positionCadenceButtonLabel(cadence: PositionTableCadence): string {
+  if (cadence === "fixed") return "Fixbestand";
   if (cadence === "monthly") return "Monatlich";
   if (cadence === "yearly") return "Jaehrlich";
   if (cadence === "once") return "Einmalig";
@@ -5688,17 +5693,29 @@ function positionCadenceButtonLabel(cadence: PositionTableCadence): string {
 }
 
 function positionCadenceGroupLabel(mode: PositionTableMode): string {
-  return mode === "income" ? "Einnahmen-Rhythmus" : "Ausgaben-Rhythmus";
+  if (mode === "income") return "Einnahmen-Rhythmus";
+  if (mode === "reserve") return "Ruecklagen-Vorauswahl";
+  if (mode === "savings") return "Sparen-Rhythmus";
+  return "Ausgaben-Rhythmus";
 }
 
 function positionModeEmptyLabel(mode: PositionTableMode, cadence: PositionTableCadence | null = null): string {
   if (mode === "income") {
     if (cadence === "yearly") return "jaehrliche Einnahmen";
     if (cadence === "once") return "einmalige Einnahmen";
+    if (cadence === "none") return "Einnahmen ohne Rhythmus";
     return "monatliche Einnahmen";
   }
-  if (mode === "reserve") return "Ruecklagen";
-  if (mode === "savings") return "Sparpositionen";
+  if (mode === "reserve") {
+    if (cadence === "fixed") return "Fixbestaende";
+    return "monatliche Ruecklagen";
+  }
+  if (mode === "savings") {
+    if (cadence === "yearly") return "jaehrliche Sparpositionen";
+    if (cadence === "once") return "einmalige Sparpositionen";
+    if (cadence === "none") return "Sparpositionen ohne Rhythmus";
+    return "monatliche Sparpositionen";
+  }
   if (cadence === "yearly") return "jaehrliche Ausgaben";
   if (cadence === "once") return "einmalige Ausgaben";
   if (cadence === "none") return "Ausgaben ohne Rhythmus";
@@ -5709,10 +5726,16 @@ function addPositionButtonLabel(mode: PositionTableMode, cadence: PositionTableC
   if (mode === "income") {
     if (cadence === "yearly") return "Jaehrliche Einnahme hinzufuegen";
     if (cadence === "once") return "Einmalige Einnahme hinzufuegen";
+    if (cadence === "none") return "Einnahme ohne Rhythmus hinzufuegen";
     return "Monatliche Einnahme hinzufuegen";
   }
-  if (mode === "reserve") return "Ruecklage hinzufuegen";
-  if (mode === "savings") return "Sparposition hinzufuegen";
+  if (mode === "reserve") return cadence === "fixed" ? "Fixbestand hinzufuegen" : "Monatliche Ruecklage hinzufuegen";
+  if (mode === "savings") {
+    if (cadence === "yearly") return "Jaehrliche Sparposition hinzufuegen";
+    if (cadence === "once") return "Einmalige Sparposition hinzufuegen";
+    if (cadence === "none") return "Sparposition ohne Rhythmus hinzufuegen";
+    return "Monatliche Sparposition hinzufuegen";
+  }
   if (cadence === "yearly") return "Jaehrliche Ausgabe hinzufuegen";
   if (cadence === "once") return "Einmalige Ausgabe hinzufuegen";
   if (cadence === "none") return "Ausgabe ohne Rhythmus hinzufuegen";
@@ -5723,10 +5746,16 @@ function newPositionName(mode: PositionTableMode, cadence: PositionTableCadence 
   if (mode === "income") {
     if (cadence === "yearly") return "Neue jaehrliche Einnahme";
     if (cadence === "once") return "Neue einmalige Einnahme";
+    if (cadence === "none") return "Neue Einnahme ohne Rhythmus";
     return "Neue monatliche Einnahme";
   }
-  if (mode === "reserve") return "Neue Ruecklage";
-  if (mode === "savings") return "Neue Sparrate";
+  if (mode === "reserve") return cadence === "fixed" ? "Neuer Fixbestand" : "Neue monatliche Ruecklage";
+  if (mode === "savings") {
+    if (cadence === "yearly") return "Neue jaehrliche Sparposition";
+    if (cadence === "once") return "Neue einmalige Sparposition";
+    if (cadence === "none") return "Neue Sparposition ohne Rhythmus";
+    return "Neue monatliche Sparposition";
+  }
   if (cadence === "yearly") return "Neue jaehrliche Ausgabe";
   if (cadence === "once") return "Neue einmalige Ausgabe";
   if (cadence === "none") return "Neue Ausgabe ohne Rhythmus";
@@ -7006,14 +7035,14 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
             next.cashback = false;
             if (value === "incomeMonthly") next.payoutType = "monthly";
             if (value === "incomeYearly") next.payoutType = "yearly";
-            if (value === "incomeTemporary" && next.payoutType === "none") next.payoutType = "monthly";
           }
           if (next.flow === "expense" && next.type !== "temporary") next.cashback = false;
         }
         break;
       case "payoutType":
         if (value === "none" || value === "monthly" || value === "yearly" || value === "once") {
-          next.payoutType = positionFlow(next) === "income" && value === "none" ? "monthly" : value;
+          next.payoutType = value;
+          if (positionFlow(next) === "income" && value === "none") next.type = "incomeTemporary";
           if (next.payoutType === "once") {
             next.payoutYear = Number(next.payoutYear || state.settings.year);
             if (next.type !== "savings") {
@@ -7060,7 +7089,7 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
     if (positionFlow(next) === "income") {
       next.interestBearing = false;
       next.cashback = false;
-      if (next.payoutType === "none") next.payoutType = "monthly";
+      if (next.payoutType === "none") next.type = "incomeTemporary";
     }
 
     return sanitizePosition(next, state.settings.year);
@@ -7115,6 +7144,7 @@ function normalizePayoutType(
   type: ReservePosition["type"]
 ): ReservePosition["payoutType"] {
   if (value === "monthly" || value === "yearly" || value === "once") return value;
+  if (value === "none" && flow === "income" && type === "incomeTemporary") return value;
   if (value === "none" && flow === "expense") return value;
   if (flow === "income" && type === "incomeYearly") return "yearly";
   return "monthly";
@@ -7327,6 +7357,8 @@ function setSelectedPositionCadence(cadence: PositionTableCadence): void {
   if (!cadences.includes(cadence)) return;
   if (selectedPositionMode === "income") selectedIncomeCadence = cadence;
   if (selectedPositionMode === "expense") selectedExpenseCadence = cadence;
+  if (selectedPositionMode === "reserve") selectedReserveCadence = cadence;
+  if (selectedPositionMode === "savings") selectedSavingsCadence = cadence;
   renderPositions();
 }
 
