@@ -66,6 +66,7 @@ describe("position table view", () => {
     expect(columnNames("reserve")).toContain("type");
     expect(columnNames("expense")).not.toContain("type");
     expect(columnNames("savings")).not.toContain("type");
+    expect(columnNames("savings")).toContain("endMonth");
   });
 
   it("filters expenses by monthly payout cadence", () => {

@@ -215,6 +215,38 @@ describe("reserve calculator", () => {
     expect(laterYear.totalPlannedOutflow).toBe(2400);
   });
 
+  it("limits savings without rhythm to the configured year and month range", () => {
+    const state = defaultAppState();
+    state.positions = [
+      {
+        id: "limited-savings",
+        flow: "expense",
+        active: true,
+        visible: true,
+        name: "Limited Savings",
+        type: "savings",
+        amount: 250,
+        startMonth: 1,
+        endMonth: 3,
+        payoutType: "none",
+        payoutYear: state.settings.year,
+        payoutMonth: 12,
+        payoutDay: 14,
+        interestBearing: false,
+        cashback: false
+      }
+    ];
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+    const nextYear = calculateReserveSummary({ ...state.settings, year: state.settings.year + 1 }, state.positions);
+
+    expect(summary.rows[0].plannedOutflow).toBe(250);
+    expect(summary.rows[2].plannedOutflow).toBe(250);
+    expect(summary.rows[3].plannedOutflow).toBe(0);
+    expect(summary.totalPlannedOutflow).toBe(750);
+    expect(nextYear.totalPlannedOutflow).toBe(0);
+  });
+
   it("calculates monthly, yearly, and temporary income positions as planned income", () => {
     const state = defaultAppState();
     state.positions = [

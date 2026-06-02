@@ -58,12 +58,12 @@ Savings rows:
 ## Payout Cadence
 
 - `Kein Abgang`: expense position is accumulated or shown without a scheduled payout.
-- `Ohne Rhythmus`: temporary income is counted monthly only between `Start` and `Ende` in the configured `Jahr`.
+- `Ohne Rhythmus`: temporary income and savings positions are counted monthly only between `Start` and `Ende` in the configured `Jahr`.
 - `Monatlich`: amount is considered every active month.
 - `Jaehrlich`: amount is considered in the configured payout month.
 - `Einmalig`: amount is considered only once in the configured year and month.
 
-For one-time expense payouts, `Start` and `Ende` are replaced by `Abgangsjahr`. For one-time income rows, `Start` and `Ende` are disabled and the `Jahr` field decides the matching year. Income rows without rhythm keep `Start` and `Ende` editable, so a same-height income can be planned for a short range such as three months. One-time rows do not appear as yearly table columns. They can still be used for cashback when the row is a temporary expense position with cashback enabled.
+For one-time expense payouts, `Start` and `Ende` are replaced by `Abgangsjahr`. For one-time income rows, `Start` and `Ende` are disabled and the `Jahr` field decides the matching year. Income and savings rows without rhythm keep `Start` and `Ende` editable, so a same-height income or savings rate can be planned for a short range such as three months. One-time rows do not appear as yearly table columns. They can still be used for cashback when the row is a temporary expense position with cashback enabled.
 
 ## Interest
 

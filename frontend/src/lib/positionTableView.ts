@@ -63,8 +63,9 @@ export function positionTableColumnsForMode(mode: PositionTableMode): PositionTa
 
   if (mode === "savings") {
     configs.push(
-      { column: "payoutYear", label: "Abgangsjahr", kind: "number" },
-      { column: "startMonth", label: "Anfang Monat", kind: "select" }
+      { column: "payoutYear", label: "Jahr", kind: "number" },
+      { column: "startMonth", label: "Anfang Monat", kind: "select" },
+      { column: "endMonth", label: "Ende", kind: "select" }
     );
   } else {
     configs.push(
@@ -349,7 +350,10 @@ function payoutTypeOptionsForMode(mode: PositionTableMode): PositionTableSelectO
   const payoutTypes: ReservePosition["payoutType"][] =
     mode === "income" ? ["monthly", "yearly", "once", "none"] : ["none", "monthly", "yearly", "once"];
   const flow = mode === "income" ? "income" : "expense";
-  return payoutTypes.map((value) => ({ value, label: labelForPayout(value, flow) }));
+  return payoutTypes.map((value) => ({
+    value,
+    label: mode === "savings" && value === "none" ? "ohne Rhythmus" : labelForPayout(value, flow)
+  }));
 }
 
 function payoutTypeSortOrder(type: ReservePosition["payoutType"]): number {

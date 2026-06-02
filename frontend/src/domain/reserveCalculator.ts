@@ -13,6 +13,13 @@ export function isActiveInMonth(position: ReservePosition, monthNumber: number):
 export function isSavingsActiveInMonth(position: ReservePosition, year: number, monthNumber: number): boolean {
   if (!position.active || position.type !== "savings") return false;
   const startYear = Number(position.payoutYear || year);
+  if (position.payoutType === "none") {
+    return (
+      year === startYear &&
+      monthNumber >= Number(position.startMonth || 1) &&
+      monthNumber <= Number(position.endMonth || 12)
+    );
+  }
   if (year < startYear) return false;
   return year > startYear || monthNumber >= Number(position.startMonth || 1);
 }

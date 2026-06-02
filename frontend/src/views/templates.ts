@@ -757,6 +757,7 @@ export function positionIconSelect(position: ReservePosition): string {
 
 export function payoutSelect(position: ReservePosition): string {
   const flow = positionFlow(position);
+  const noneLabel = position.type === "savings" ? "ohne Rhythmus" : labelForPayout("none", flow);
   if (flow === "income") {
     return `
       <select data-position-id="${position.id}" data-position-field="payoutType">
@@ -770,7 +771,7 @@ export function payoutSelect(position: ReservePosition): string {
 
   return `
     <select data-position-id="${position.id}" data-position-field="payoutType">
-      <option value="none" ${position.payoutType === "none" ? "selected" : ""}>${labelForPayout("none", flow)}</option>
+      <option value="none" ${position.payoutType === "none" ? "selected" : ""}>${noneLabel}</option>
       <option value="monthly" ${position.payoutType === "monthly" ? "selected" : ""}>${labelForPayout("monthly", flow)}</option>
       <option value="yearly" ${position.payoutType === "yearly" ? "selected" : ""}>${labelForPayout("yearly", flow)}</option>
       <option value="once" ${position.payoutType === "once" ? "selected" : ""}>${labelForPayout("once", flow)}</option>

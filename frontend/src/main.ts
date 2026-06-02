@@ -4574,7 +4574,7 @@ function renderPositions(): void {
           }" data-position-field="amount" /></td>
           ${isIncome ? incomeDateCells(position) : expenseDateCells(position)}
           <td>${payoutSelect(position)}</td>
-          <td>${monthSelect(position.id, "payoutMonth", position.payoutMonth)}</td>
+          ${positionTableShowsPayoutMonthColumn(position) ? `<td>${monthSelect(position.id, "payoutMonth", position.payoutMonth)}</td>` : ""}
           <td class="day-cell"><input class="small-input day-input" type="number" min="1" max="31" step="1" value="${
             position.payoutDay
           }" data-position-id="${position.id}" data-position-field="payoutDay" /></td>
@@ -5407,8 +5407,15 @@ function positionSortChip(sort: NonNullable<PositionTableView["sort"]>): string 
 function renderPositionTableHead(): void {
   const head = document.querySelector<HTMLTableSectionElement>("#positionsHead");
   if (!head) return;
+  const savingsWithoutRhythm = selectedPositionMode === "savings" && activePositionCadence() === "none";
   const dateHeaders =
-    selectedPositionMode === "savings"
+    savingsWithoutRhythm
+      ? [
+          positionSortableHeader("payoutYear", "Jahr"),
+          positionSortableHeader("startMonth", "Start"),
+          positionSortableHeader("endMonth", "Ende")
+        ].join("")
+      : selectedPositionMode === "savings"
       ? [
           positionSortableHeader(
             "payoutYear",
@@ -5440,7 +5447,7 @@ function renderPositionTableHead(): void {
       ${dateHeaders}
       ${selectedPositionMode === "income" ? positionSortableHeader("payoutYear", "Jahr") : ""}
       ${positionSortableHeader("payoutType", timingLabel)}
-      ${positionSortableHeader("payoutMonth", monthLabel)}
+      ${savingsWithoutRhythm ? "" : positionSortableHeader("payoutMonth", monthLabel)}
       ${positionSortableHeader("payoutDay", "Tag", "day-col")}
       ${
         selectedPositionMode !== "income"
@@ -5478,6 +5485,10 @@ function positionTableColumnCount(mode: PositionTableMode): number {
 
 function positionTableShowsTypeColumn(mode: PositionTableMode): boolean {
   return mode === "income" || mode === "reserve";
+}
+
+function positionTableShowsPayoutMonthColumn(position: ReservePosition): boolean {
+  return !(selectedPositionMode === "savings" && position.type === "savings" && position.payoutType === "none");
 }
 
 function positionDragHandle(positionId: string, locked: boolean): string {
@@ -6228,6 +6239,11 @@ function investmentPositionAmountText(position: ReservePosition): string {
   if (position.payoutType === "once") {
     return `${money(position.amount)} einmalig (${monthName(position.payoutMonth)} ${intNumber(position.payoutYear)})`;
   }
+  if (position.type === "savings" && position.payoutType === "none") {
+    return `${money(position.amount)} ohne Rhythmus (${monthName(position.startMonth)} bis ${monthName(
+      position.endMonth
+    )} ${intNumber(position.payoutYear)})`;
+  }
   const startText =
     position.type === "savings" ? ` ab ${monthName(position.startMonth)} ${intNumber(position.payoutYear)}` : "";
   if (position.payoutType === "yearly") {
@@ -6410,6 +6426,18 @@ function monthRangeDateCells(position: ReservePosition): string {
 }
 
 function savingsDateCells(position: ReservePosition): string {
+  if (position.payoutType === "none") {
+    return `
+      <td>
+        <input class="small-input payout-year-input" type="number" min="2000" max="2200" step="1" value="${
+          position.payoutYear
+        }" data-position-id="${position.id}" data-position-field="payoutYear" />
+      </td>
+      <td>${monthSelect(position.id, "startMonth", position.startMonth)}</td>
+      <td>${monthSelect(position.id, "endMonth", position.endMonth)}</td>
+    `;
+  }
+
   return `
     <td>
       <div class="date-detail-cell">
@@ -7069,7 +7097,7 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
         break;
     }
 
-    if (next.type !== "savings" && next.startMonth > next.endMonth) {
+    if ((next.type !== "savings" || next.payoutType === "none") && next.startMonth > next.endMonth) {
       const startMonth = next.startMonth;
       next.startMonth = next.endMonth;
       next.endMonth = startMonth;
@@ -7102,7 +7130,7 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
   let startMonth = finiteIntegerInRange(position.startMonth, 1, 12, 1);
   let endMonth = finiteIntegerInRange(position.endMonth, 1, 12, 12);
 
-  if (type !== "savings" && startMonth > endMonth) {
+  if ((type !== "savings" || payoutType === "none") && startMonth > endMonth) {
     const previousStart = startMonth;
     startMonth = endMonth;
     endMonth = previousStart;
