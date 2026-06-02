@@ -59,14 +59,19 @@ function view(overrides: Partial<PositionTableView>): PositionTableView {
 
 describe("position table view", () => {
   it("only exposes the type column for sections with multiple position types", () => {
-    const columnNames = (mode: Parameters<typeof positionTableColumnsForMode>[0]) =>
-      positionTableColumnsForMode(mode).map((column) => column.column);
+    const columnNames = (
+      mode: Parameters<typeof positionTableColumnsForMode>[0],
+      cadence?: Parameters<typeof positionTableColumnsForMode>[1]
+    ) => positionTableColumnsForMode(mode, cadence).map((column) => column.column);
 
     expect(columnNames("income")).toContain("type");
     expect(columnNames("reserve")).toContain("type");
     expect(columnNames("expense")).not.toContain("type");
     expect(columnNames("savings")).not.toContain("type");
     expect(columnNames("savings")).toContain("endMonth");
+    expect(columnNames("income", "once")).not.toContain("startMonth");
+    expect(columnNames("income", "once")).not.toContain("endMonth");
+    expect(columnNames("income", "once")).toContain("payoutYear");
   });
 
   it("filters expenses by monthly payout cadence", () => {

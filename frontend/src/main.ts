@@ -4528,7 +4528,7 @@ function renderPositions(): void {
   if (!basePositions.length) {
     body.innerHTML = `
       <tr>
-        <td class="position-empty" colspan="${positionTableColumnCount(selectedPositionMode)}">
+        <td class="position-empty" colspan="${positionTableColumnCount(selectedPositionMode, activePositionCadence())}">
           Noch keine ${positionModeEmptyLabel(selectedPositionMode, activePositionCadence())} angelegt.
         </td>
       </tr>
@@ -4540,7 +4540,7 @@ function renderPositions(): void {
   if (!positions.length) {
     body.innerHTML = `
       <tr>
-        <td class="position-empty" colspan="${positionTableColumnCount(selectedPositionMode)}">
+        <td class="position-empty" colspan="${positionTableColumnCount(selectedPositionMode, activePositionCadence())}">
           Keine Positionen fuer aktuelle Filter.
         </td>
       </tr>
@@ -5241,9 +5241,10 @@ function renderPositionTableControls(basePositions: ReservePosition[], sourcePos
   syncPositionFilterToggle();
   const view = currentPositionTableView();
   const draft = normalizedPositionFilterDraft();
-  const columns = positionTableColumnsForMode(selectedPositionMode);
-  const selectedConfig = positionTableColumnConfig(selectedPositionMode, draft.column) ?? columns[0];
-  const operators = positionTableOperatorsForColumn(selectedPositionMode, selectedConfig.column);
+  const cadence = activePositionCadence();
+  const columns = positionTableColumnsForMode(selectedPositionMode, cadence);
+  const selectedConfig = positionTableColumnConfig(selectedPositionMode, draft.column, cadence) ?? columns[0];
+  const operators = positionTableOperatorsForColumn(selectedPositionMode, selectedConfig.column, cadence);
   const options = positionTableSelectOptions(selectedPositionMode, selectedConfig.column, sourcePositions);
   const labelOptions = positionTableLabelOptions(sourcePositions, selectedPositionMode);
   const active = hasActivePositionTableView(view);
@@ -5407,9 +5408,12 @@ function positionSortChip(sort: NonNullable<PositionTableView["sort"]>): string 
 function renderPositionTableHead(): void {
   const head = document.querySelector<HTMLTableSectionElement>("#positionsHead");
   if (!head) return;
+  const incomeOnce = positionTableHidesIncomeMonthRange();
   const savingsWithoutRhythm = selectedPositionMode === "savings" && activePositionCadence() === "none";
   const dateHeaders =
-    savingsWithoutRhythm
+    incomeOnce
+      ? ""
+      : savingsWithoutRhythm
       ? [
           positionSortableHeader("payoutYear", "Jahr"),
           positionSortableHeader("startMonth", "Start"),
@@ -5479,12 +5483,19 @@ function positionSortableHeader(column: PositionTableFilterColumn, label: string
   `;
 }
 
-function positionTableColumnCount(mode: PositionTableMode): number {
-  return (mode === "income" ? 14 : 15) - (positionTableShowsTypeColumn(mode) ? 0 : 1);
+function positionTableColumnCount(mode: PositionTableMode, cadence: PositionTableCadence | null = null): number {
+  let count = (mode === "income" ? 14 : 15) - (positionTableShowsTypeColumn(mode) ? 0 : 1);
+  if (mode === "income" && cadence === "once") count -= 2;
+  if (mode === "savings" && cadence === "none") count -= 1;
+  return count;
 }
 
 function positionTableShowsTypeColumn(mode: PositionTableMode): boolean {
   return mode === "income" || mode === "reserve";
+}
+
+function positionTableHidesIncomeMonthRange(): boolean {
+  return selectedPositionMode === "income" && activePositionCadence() === "once";
 }
 
 function positionTableShowsPayoutMonthColumn(position: ReservePosition): boolean {
@@ -5511,7 +5522,10 @@ function currentPositionTableView(): PositionTableView {
 }
 
 function normalizeCurrentPositionTableViewColumns(): void {
-  const availableColumns = new Set(positionTableColumnsForMode(selectedPositionMode).map((config) => config.column));
+  const cadence = activePositionCadence();
+  const availableColumns = new Set(
+    positionTableColumnsForMode(selectedPositionMode, cadence).map((config) => config.column)
+  );
   updateCurrentPositionTableView((view) => ({
     ...view,
     filters: view.filters.filter((filter) => availableColumns.has(filter.column)),
@@ -5549,9 +5563,10 @@ function defaultPositionFilterDraft(mode: PositionTableMode): PositionFilterDraf
 
 function normalizedPositionFilterDraft(): PositionFilterDraft {
   const draft = positionFilterDrafts[selectedPositionMode] ?? defaultPositionFilterDraft(selectedPositionMode);
-  const config = positionTableColumnConfig(selectedPositionMode, draft.column);
+  const cadence = activePositionCadence();
+  const config = positionTableColumnConfig(selectedPositionMode, draft.column, cadence);
   const column = config ? draft.column : "name";
-  const operators = positionTableOperatorsForColumn(selectedPositionMode, column);
+  const operators = positionTableOperatorsForColumn(selectedPositionMode, column, cadence);
   const operator = operators.includes(draft.operator) ? draft.operator : operators[0];
   const normalized = { column, operator, value: draft.value };
   positionFilterDrafts = {
@@ -5565,12 +5580,13 @@ function updatePositionFilterDraft(field: keyof PositionFilterDraft, value: stri
   const current = normalizedPositionFilterDraft();
   if (field === "column") {
     const column = value as PositionTableFilterColumn;
-    const nextColumn = positionTableColumnConfig(selectedPositionMode, column) ? column : current.column;
+    const cadence = activePositionCadence();
+    const nextColumn = positionTableColumnConfig(selectedPositionMode, column, cadence) ? column : current.column;
     positionFilterDrafts = {
       ...positionFilterDrafts,
       [selectedPositionMode]: {
         column: nextColumn,
-        operator: positionTableOperatorsForColumn(selectedPositionMode, nextColumn)[0],
+        operator: positionTableOperatorsForColumn(selectedPositionMode, nextColumn, cadence)[0],
         value: ""
       }
     };
@@ -5580,7 +5596,11 @@ function updatePositionFilterDraft(field: keyof PositionFilterDraft, value: stri
 
   if (field === "operator") {
     const operator = value as PositionTableFilterOperator;
-    const operators = positionTableOperatorsForColumn(selectedPositionMode, current.column);
+    const operators = positionTableOperatorsForColumn(
+      selectedPositionMode,
+      current.column,
+      activePositionCadence()
+    );
     positionFilterDrafts = {
       ...positionFilterDrafts,
       [selectedPositionMode]: {
@@ -5619,8 +5639,9 @@ function currentPositionFilterDraftFromControls(): PositionFilterDraft {
   const operatorInput = document.querySelector<HTMLSelectElement>('[data-position-filter-draft="operator"]');
   const valueInput = document.querySelector<HTMLInputElement | HTMLSelectElement>('[data-position-filter-draft="value"]');
   const column = (columnInput?.value || draft.column) as PositionTableFilterColumn;
-  const nextColumn = positionTableColumnConfig(selectedPositionMode, column) ? column : draft.column;
-  const operators = positionTableOperatorsForColumn(selectedPositionMode, nextColumn);
+  const cadence = activePositionCadence();
+  const nextColumn = positionTableColumnConfig(selectedPositionMode, column, cadence) ? column : draft.column;
+  const operators = positionTableOperatorsForColumn(selectedPositionMode, nextColumn, cadence);
   const operator = (operatorInput?.value || draft.operator) as PositionTableFilterOperator;
   return {
     column: nextColumn,
@@ -5674,7 +5695,7 @@ function hidePositionFilterPopup(): void {
 }
 
 function togglePositionTableSort(column: PositionTableFilterColumn): void {
-  if (!positionTableColumnConfig(selectedPositionMode, column)) return;
+  if (!positionTableColumnConfig(selectedPositionMode, column, activePositionCadence())) return;
   updateCurrentPositionTableView((view) => {
     if (view.sort?.column !== column) return { ...view, sort: { column, direction: "asc" } };
     if (view.sort.direction === "asc") return { ...view, sort: { column, direction: "desc" } };
@@ -6455,6 +6476,16 @@ function savingsDateCells(position: ReservePosition): string {
 }
 
 function incomeDateCells(position: ReservePosition): string {
+  if (positionTableHidesIncomeMonthRange()) {
+    return `
+      <td>
+        <input class="small-input payout-year-input" type="number" min="2000" max="2200" step="1" value="${
+          position.payoutYear
+        }" data-position-id="${position.id}" data-position-field="payoutYear" />
+      </td>
+    `;
+  }
+
   const disabled = position.payoutType === "once";
   return `
     <td>${monthSelect(position.id, "startMonth", position.startMonth, disabled)}</td>

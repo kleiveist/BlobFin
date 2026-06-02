@@ -47,9 +47,14 @@ export function emptyPositionTableView(): PositionTableView {
   return { filters: [], sort: null, selectedLabels: [] };
 }
 
-export function positionTableColumnsForMode(mode: PositionTableMode): PositionTableColumnConfig[] {
+export function positionTableColumnsForMode(
+  mode: PositionTableMode,
+  cadence: PositionTableCadence | null = null
+): PositionTableColumnConfig[] {
   const timingLabel = mode === "income" ? "Eingang" : mode === "savings" ? "Transfer" : "Abgang";
   const monthLabel = mode === "income" ? "Eingangsmonat" : mode === "savings" ? "Transfermonat" : "Abgangsmonat";
+  const hideIncomeMonthRange = mode === "income" && cadence === "once";
+  const hidePayoutMonth = mode === "savings" && cadence === "none";
   const configs: PositionTableColumnConfig[] = [
     { column: "active", label: "Aktiv", kind: "select" },
     { column: "visible", label: "View", kind: "select" },
@@ -68,22 +73,24 @@ export function positionTableColumnsForMode(mode: PositionTableMode): PositionTa
       { column: "endMonth", label: "Ende", kind: "select" }
     );
   } else {
+    if (!hideIncomeMonthRange) {
+      configs.push(
+        { column: "startMonth", label: "Start", kind: "select" },
+        { column: "endMonth", label: "Ende", kind: "select" }
+      );
+    }
     configs.push(
-      { column: "startMonth", label: "Start", kind: "select" },
-      { column: "endMonth", label: "Ende", kind: "select" }
+      {
+        column: "payoutYear",
+        label: mode === "income" ? "Jahr" : "Abgangsjahr",
+        kind: "number"
+      }
     );
-    configs.push({
-      column: "payoutYear",
-      label: mode === "income" ? "Jahr" : "Abgangsjahr",
-      kind: "number"
-    });
   }
 
-  configs.push(
-    { column: "payoutType", label: timingLabel, kind: "select" },
-    { column: "payoutMonth", label: monthLabel, kind: "select" },
-    { column: "payoutDay", label: "Tag", kind: "number" }
-  );
+  configs.push({ column: "payoutType", label: timingLabel, kind: "select" });
+  if (!hidePayoutMonth) configs.push({ column: "payoutMonth", label: monthLabel, kind: "select" });
+  configs.push({ column: "payoutDay", label: "Tag", kind: "number" });
 
   if (mode !== "income") {
     configs.push(
@@ -97,16 +104,18 @@ export function positionTableColumnsForMode(mode: PositionTableMode): PositionTa
 
 export function positionTableColumnConfig(
   mode: PositionTableMode,
-  column: PositionTableFilterColumn
+  column: PositionTableFilterColumn,
+  cadence: PositionTableCadence | null = null
 ): PositionTableColumnConfig | undefined {
-  return positionTableColumnsForMode(mode).find((config) => config.column === column);
+  return positionTableColumnsForMode(mode, cadence).find((config) => config.column === column);
 }
 
 export function positionTableOperatorsForColumn(
   mode: PositionTableMode,
-  column: PositionTableFilterColumn
+  column: PositionTableFilterColumn,
+  cadence: PositionTableCadence | null = null
 ): PositionTableFilterOperator[] {
-  const kind = positionTableColumnConfig(mode, column)?.kind;
+  const kind = positionTableColumnConfig(mode, column, cadence)?.kind;
   if (kind === "text") return ["contains"];
   if (kind === "number") return ["eq", "gte", "lte"];
   return ["eq"];
