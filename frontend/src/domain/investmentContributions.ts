@@ -16,8 +16,11 @@ export function oneTimeInvestmentContributionForMonth(
   year: number,
   month: number
 ): number {
-  if (!isOneTimePayoutInMonth(position, year, month)) return 0;
-  return Number(position.amount);
+  if (position.payoutType === "once") {
+    return isOneTimePayoutInMonth(position, year, month) ? Number(position.amount) : 0;
+  }
+  if (position.payoutType === "none") return investmentContributionForMonth(position, year, month);
+  return 0;
 }
 
 export function selectedMonthlyPattern(
@@ -85,6 +88,7 @@ export function selectedRecurringInvestmentContributionForProjectionYear(
   let total = 0;
   for (let month = 1; month <= 12; month += 1) {
     total += selectedInvestmentPositions(positions, settings).reduce((sum, position) => {
+      if (position.payoutType === "once" || position.payoutType === "none") return sum;
       return sum + investmentContributionForMonth(position, calendarYear, month);
     }, 0);
   }

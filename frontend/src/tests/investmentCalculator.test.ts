@@ -304,6 +304,34 @@ describe("investment calculator", () => {
     expect(projection.wealthAtRetirement).toBeGreaterThan(1200);
   });
 
+  it("treats savings without rhythm as one-time contributions in their configured year range", () => {
+    const state = defaultAppState();
+    state.positions = state.positions.map((position) =>
+      position.id === "investitionsrate"
+        ? {
+            ...position,
+            amount: 50,
+            startMonth: 1,
+            endMonth: 6,
+            payoutType: "none",
+            payoutYear: state.settings.year
+          }
+        : position
+    );
+    state.investment = {
+      ...state.investment,
+      percentageWithdrawalRatePercent: 0
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.monthlyRate).toBe(0);
+    expect(projection.annualSavingsRate).toBe(0);
+    expect(projection.totalContribution).toBe(300);
+    expect(projection.recurringContributionAtRetirement).toBe(0);
+    expect(projection.oneTimeContributionAtRetirement).toBe(300);
+  });
+
   it("includes one-time investment contributions paid before the planning year", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>

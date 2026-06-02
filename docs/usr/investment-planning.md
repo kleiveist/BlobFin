@@ -9,10 +9,11 @@ The `Investment- und Auszahlungsplanung` section separates a normal `Depot`, an 
 
 Only positions with `Art = Sparrate` appear under `Investierbare Positionen`.
 
-Recurring savings positions contribute to the regular annual savings rate. One-time savings positions are handled differently:
+Monthly and yearly savings positions contribute to the recurring annual savings rate. One-time savings positions and savings positions without rhythm are handled differently:
 
 - they can be selected as investable positions,
-- they are added once in their configured payout year and month,
+- one-time positions are added once in their configured payout year and month,
+- positions without rhythm are added only in their configured year and active month range,
 - they do not increase the displayed recurring `Jaehrliche Sparrate`.
 
 Two additional investment toggles can be enabled per depot:
@@ -22,7 +23,7 @@ Two additional investment toggles can be enabled per depot:
 
 Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depot at a time. Savings positions already used by another depot are hidden in the current tab.
 
-If a selected recurring savings position starts in a future year, the displayed monthly and yearly savings rate uses the first active contribution year in the saving phase. One-time savings positions still count toward the projection wealth, but not toward the running savings-rate display.
+If a selected recurring savings position starts in a future year, the displayed monthly and yearly savings rate uses the first active contribution year in the saving phase. One-time savings positions and savings positions without rhythm still count toward the projection wealth, but not toward the running savings-rate display.
 
 ## Age And Timeline Fields
 

@@ -227,19 +227,21 @@ export function renderAppShell(): string {
               <h3>Jahresnettoeinkommen-Tracker</h3>
               <p>Hauptbereich zur Erfassung und Pflege der Einkommensdaten.</p>
             </div>
-            <div class="position-mode-switch income-tab-switch" role="tablist" aria-label="Einkommen Eingaben">
-              <button class="position-mode-button" type="button" data-action="income-tab-yearly" aria-pressed="true">
-                Jahreswerte
-              </button>
-              <button class="position-mode-button" type="button" data-action="income-tab-milestones" aria-pressed="false">
-                Meilensteine
-              </button>
-              <button class="position-mode-button" type="button" data-action="income-tab-settings" aria-pressed="false">
-                Annahmen
-              </button>
-              <button class="position-mode-button" type="button" data-action="income-open-analysis" aria-label="Weltgrafik Analyse Dashboard oeffnen">
-                Weltgrafik
-              </button>
+            <div class="position-mode-stack income-mode-stack">
+              <div class="position-mode-switch position-table-switch income-tab-switch" role="tablist" aria-label="Einkommen Eingaben">
+                <button class="position-mode-button" type="button" data-action="income-tab-yearly" aria-pressed="true">
+                  Jahreswerte
+                </button>
+                <button class="position-mode-button" type="button" data-action="income-tab-milestones" aria-pressed="false">
+                  Meilensteine
+                </button>
+                <button class="position-mode-button" type="button" data-action="income-tab-settings" aria-pressed="false">
+                  Annahmen
+                </button>
+                <button class="position-mode-button" type="button" data-action="income-open-analysis" aria-label="Weltgrafik Analyse Dashboard oeffnen">
+                  Weltgrafik
+                </button>
+              </div>
             </div>
 
             <div id="incomeYearlyTab" class="income-tab-panel">
