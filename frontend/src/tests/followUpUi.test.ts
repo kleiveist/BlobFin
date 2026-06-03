@@ -382,7 +382,10 @@ describe("follow-up ui rendering", () => {
     expect(compact).toContain('class="combined-wealth-summary-label">Cash</span>');
     expect(compact).toContain('class="combined-wealth-summary-value">10300 EUR</strong>');
     expect(compact).toContain('class="combined-wealth-summary-value">20600 EUR</strong>');
-    expect(compact).toContain('class="combined-wealth-summary-value">303000 EUR</strong>');
+    expect(compact).toContain('class="combined-wealth-summary-label">Nettovermoegen</span>');
+    expect(compact).not.toContain('class="combined-wealth-summary-label">Immobilienwert</span>');
+    expect(chart).toContain("wealth-line-overlay property");
+    expect(chart).toContain("Immobilienwert brutto");
     expect(chart).not.toContain("wealth-column-value");
     expect(chart).not.toContain("wealth-column-year");
     expect(chart).not.toContain('class="wealth-x-axis"');

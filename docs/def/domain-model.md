@@ -24,7 +24,7 @@ Important fields:
 
 `InvestmentSettings` contains separate normal-depot, retirement-depot, and child-depot selections, special interest/cashback investment toggles, retirement depot settings, age settings, return, tax, inflation, reserve/bequest, and percentage withdrawal settings.
 
-`RealEstateFinancingSettings` contains project cost, financing assumptions, annual property value growth, selected payment sources, sale year, and the explicit purchase activation flag. Combined wealth calculations only include property value, debt, repayment effects, and sale proceeds when that activation flag is enabled. The combined net wealth uses property equity (`property value - remaining debt`), not the full gross property value. When the purchase flag is disabled, repayment sources are not redirected into real estate and remain liquid through the cash/depot path.
+`RealEstateFinancingSettings` contains project cost, financing assumptions, annual property value growth, selected payment sources, sale year, and the purchase activation flag. Enabling the real estate module in combined wealth marks the scenario as bought/planned. Combined wealth calculations only include property value, debt, repayment effects, and sale proceeds for an activated real estate scenario. The combined net wealth uses property equity (`property value - remaining debt`), not the full gross property value. When the purchase flag is disabled, repayment sources are not redirected into real estate and remain liquid through the cash/depot path.
 
 ## Reserve Calculation
 

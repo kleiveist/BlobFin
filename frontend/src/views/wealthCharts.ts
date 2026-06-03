@@ -175,9 +175,6 @@ export function renderCombinedWealthChart(input: CombinedWealthChartInput): stri
           ${renderCombinedSummaryValue("Rente p.a.", selectedPoint.pensionIncome, input.formatMoney)}
           ${renderCombinedSummaryValue("Rentensparen", selectedPoint.pensionSavingsValue, input.formatMoney)}
           ${renderCombinedSummaryValue("Steuern", selectedPoint.taxValue, input.formatMoney)}
-          ${renderCombinedSummaryValue("Immobilienwert", selectedPoint.propertyValue, input.formatMoney)}
-          ${renderCombinedSummaryValue("Immobilienschuld", selectedPoint.propertyDebt, input.formatMoney)}
-          ${renderCombinedSummaryValue("Immobilien-Eigenkapital", selectedPoint.propertyEquity, input.formatMoney)}
           ${renderCombinedSummaryValue("Nettovermoegen", selectedPoint.totalNetWealth, input.formatMoney)}
         </div>
         <div class="combined-wealth-line-controls" aria-label="Kumulierte Linien">
@@ -492,9 +489,6 @@ function renderCombinedSummaryValue(
     | "Rente p.a."
     | "Rentensparen"
     | "Steuern"
-    | "Immobilienwert"
-    | "Immobilienschuld"
-    | "Immobilien-Eigenkapital"
     | "Nettovermoegen",
   value: number,
   formatMoney: (value: number) => string

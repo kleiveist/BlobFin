@@ -117,7 +117,11 @@ function normalizeState(value: unknown): AppState {
   const planningAccounts = normalizePlanningAccounts(value.planningAccounts, legacyPositions, settings.year);
   const ui = normalizeAppUiState(value.ui, planningAccounts);
   const positions = positionsForPlanningAccount(planningAccounts, ui.selectedPlanningAccountId, legacyPositions);
-  const realEstate = normalizeRealEstateFinancingSettings(value.realEstate);
+  const combinedWealth = normalizeCombinedWealthToggles(value.combinedWealth);
+  const realEstate = normalizeRealEstatePurchaseActivation(
+    normalizeRealEstateFinancingSettings(value.realEstate),
+    combinedWealth
+  );
   const normalizedInvestment = normalizeInvestmentSettings(value.investment);
   if (!hasPlanningEndDate(value.settings)) {
     settings = {
@@ -139,7 +143,7 @@ function normalizeState(value: unknown): AppState {
     planningAccounts,
     ui,
     realEstate,
-    combinedWealth: normalizeCombinedWealthToggles(value.combinedWealth),
+    combinedWealth,
     statutoryPension: normalizeStatutoryPensionSettings(value.statutoryPension),
     incomeTracker: normalizeIncomeTrackerState(value.incomeTracker),
     positions,
@@ -556,6 +560,48 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
       fallback.includeWithdrawalGainAsPaymentSource
     )
   };
+}
+
+function normalizeRealEstatePurchaseActivation(
+  realEstate: RealEstateFinancingSettings,
+  combinedWealth: CombinedWealthToggles
+): RealEstateFinancingSettings {
+  if (realEstate.purchaseActivated || !combinedWealth.includeRealEstateFinancing) return realEstate;
+  return hasCustomRealEstateScenario(realEstate) ? { ...realEstate, purchaseActivated: true } : realEstate;
+}
+
+function hasCustomRealEstateScenario(realEstate: RealEstateFinancingSettings): boolean {
+  const fallback = defaultRealEstateFinancingSettings();
+  const numericFields: Array<keyof RealEstateFinancingSettings> = [
+    "purchasePrice",
+    "constructionOrRenovationCosts",
+    "landCosts",
+    "additionalPurchaseCosts",
+    "notaryCosts",
+    "landRegistryCosts",
+    "brokerCosts",
+    "transferTax",
+    "modernizationReserve",
+    "movingAndSetupCosts",
+    "safetyBuffer",
+    "interestRatePercent",
+    "financingStartAge",
+    "propertyValueGrowthPercent"
+  ];
+  const numericChanged = numericFields.some((field) => Number(realEstate[field]) !== Number(fallback[field]));
+  return (
+    numericChanged ||
+    realEstate.plannedSaleYear !== fallback.plannedSaleYear ||
+    realEstate.estimatedSaleValue !== fallback.estimatedSaleValue ||
+    realEstate.equityCapitalSourceIds.length > 0 ||
+    realEstate.monthlyPaymentSourceIds.length > 0 ||
+    realEstate.specialRepaymentSourceIds.length > 0 ||
+    realEstate.includeWithdrawalGainAsPaymentSource ||
+    realEstate.repaymentSources.useDepotSavingsRateAsRepayment ||
+    realEstate.repaymentSources.useLegacySavingsRateAsRepayment ||
+    realEstate.repaymentSources.useNetGainAsRepayment ||
+    realEstate.repaymentSources.useWithdrawalGainAsRepayment
+  );
 }
 
 function normalizeRepaymentSourceToggles(value: unknown): RepaymentSourceToggle {

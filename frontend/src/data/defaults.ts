@@ -313,7 +313,7 @@ export function defaultCombinedWealthToggles(): CombinedWealthToggles {
     includeDepotDevelopment: true,
     includeSharedDepotDevelopment: false,
     includeWithdrawals: false,
-    includeRealEstateFinancing: true,
+    includeRealEstateFinancing: false,
     includeRealEstateValueTrend: false,
     includeStatutoryPension: true,
     cashAccountId: "default-account",

@@ -353,6 +353,30 @@ describe("storage", () => {
     expect(loaded.realEstate.purchaseActivated).toBe(false);
   });
 
+  it("activates saved custom real estate scenarios when the combined module is enabled", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        realEstate: {
+          ...state.realEstate,
+          purchaseActivated: false,
+          purchasePrice: state.realEstate.purchasePrice + 50000
+        },
+        combinedWealth: {
+          ...state.combinedWealth,
+          includeRealEstateFinancing: true
+        }
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.realEstate.purchaseActivated).toBe(true);
+  });
+
   it("uses the new combined module defaults when saved values are missing", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();
@@ -372,7 +396,7 @@ describe("storage", () => {
     expect(loaded.combinedWealth.includeDepotDevelopment).toBe(true);
     expect(loaded.combinedWealth.includeSharedDepotDevelopment).toBe(false);
     expect(loaded.combinedWealth.includeWithdrawals).toBe(false);
-    expect(loaded.combinedWealth.includeRealEstateFinancing).toBe(true);
+    expect(loaded.combinedWealth.includeRealEstateFinancing).toBe(false);
     expect(loaded.combinedWealth.includeRealEstateValueTrend).toBe(false);
   });
 

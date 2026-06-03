@@ -1510,10 +1510,15 @@ function renderCalculations(
   const combinedDepotProjections = combinedDepotProjectionInputs(combinedLeadAccount);
   const combinedBirthYear = combinedLeadSettings?.birthYear ?? state.settings.year;
   const combinedRetirementBirthYear = combinedLeadSettings?.retirementBirthYear ?? state.settings.year;
+  const combinedRealEstateStartYear = realEstateFinancingStartYear(
+    state.settings.year,
+    combinedBirthYear,
+    state.realEstate.financingStartAge
+  );
   renderStatutoryPensionCalculations(combinedBirthYear);
   renderCombinedModuleControls();
   const combinedRealEstateProjectionYears = currentCombinedRealEstateProjectionYears(
-    financingStartYear,
+    combinedRealEstateStartYear,
     combinedStandardProjection,
     combinedRetirementProjection,
     combinedBirthYear,
@@ -1533,10 +1538,10 @@ function renderCalculations(
   const combinedRealEstateActive = state.realEstate.purchaseActivated && state.combinedWealth.includeRealEstateFinancing;
   const combinedRealEstate = combinedRealEstateActive
     ? calculateRealEstateFinancing(
-        financingStartYear,
+        combinedRealEstateStartYear,
         state.realEstate,
         realEstateSourceSchedule(
-          financingStartYear,
+          combinedRealEstateStartYear,
           combinedRealEstateProjectionYears,
           state.ui.selectedRealEstateAccountIds
         ),
@@ -1545,7 +1550,7 @@ function renderCalculations(
           maxProjectionYears: combinedRealEstateProjectionYears
         }
       )
-    : inactiveCombinedRealEstateResult(financingStartYear);
+    : inactiveCombinedRealEstateResult(combinedRealEstateStartYear);
   const combinedYears = calculateCombinedWealthYears(
     combinedRealEstate,
     combinedDepotProjections,
@@ -7413,6 +7418,12 @@ function updateRealEstateField(field: RealEstateField, value: string): void {
 }
 
 function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
+  if (key === "includeRealEstateFinancing" && checked && !state.realEstate.purchaseActivated) {
+    state.realEstate = {
+      ...state.realEstate,
+      purchaseActivated: true
+    };
+  }
   state.combinedWealth = {
     ...state.combinedWealth,
     [key]: checked
