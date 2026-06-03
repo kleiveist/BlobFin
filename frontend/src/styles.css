@@ -3074,47 +3074,77 @@ tfoot th {
 .statutory-pension-overlay-bar {
   align-items: center;
   border-radius: 8px;
-  color: #fff;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
   left: 0;
   min-width: 120px;
   overflow: hidden;
-  padding: 0 12px;
   position: absolute;
   text-shadow: 0 1px 2px rgba(20, 24, 28, 0.28);
 }
 
 .statutory-pension-overlay-bar.optimistic {
-  background: #2e6d84;
+  background: rgba(46, 109, 132, 0.34);
   height: 72px;
   top: 10px;
   z-index: 1;
 }
 
 .statutory-pension-overlay-bar.base {
-  background: #3b866d;
+  background: rgba(59, 134, 109, 0.34);
   height: 56px;
   top: 32px;
   z-index: 2;
 }
 
 .statutory-pension-overlay-bar.pessimistic {
-  background: #b4554d;
+  background: rgba(180, 85, 77, 0.34);
   height: 40px;
   top: 52px;
   z-index: 3;
 }
 
-.statutory-pension-overlay-bar span,
-.statutory-pension-overlay-bar strong {
+.statutory-pension-overlay-net {
+  align-items: center;
+  border-radius: 8px;
+  color: #fff;
+  display: flex;
+  gap: 10px;
+  height: 100%;
+  justify-content: space-between;
+  min-width: 90px;
+  padding: 0 12px;
+}
+
+.statutory-pension-overlay-bar.optimistic .statutory-pension-overlay-net {
+  background: #2e6d84;
+}
+
+.statutory-pension-overlay-bar.base .statutory-pension-overlay-net {
+  background: #3b866d;
+}
+
+.statutory-pension-overlay-bar.pessimistic .statutory-pension-overlay-net {
+  background: #b4554d;
+}
+
+.statutory-pension-overlay-gross {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 850;
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  text-shadow: none;
+}
+
+.statutory-pension-overlay-net span,
+.statutory-pension-overlay-net strong,
+.statutory-pension-overlay-gross {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.statutory-pension-overlay-bar strong {
+.statutory-pension-overlay-net strong {
   font-variant-numeric: tabular-nums;
 }
 

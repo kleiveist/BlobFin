@@ -262,6 +262,9 @@ export interface StatutoryPensionScenarioSettings {
   retirementAge: number;
   incomeMode: StatutoryPensionIncomeMode;
   annualPensionIncreasePercent: number;
+  taxRatePercent: number;
+  healthInsurancePercent: number;
+  careInsurancePercent: number;
 }
 
 export interface StatutoryPensionSettings {

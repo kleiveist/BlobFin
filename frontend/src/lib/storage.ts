@@ -564,7 +564,14 @@ function normalizeStatutoryPensionScenario(
       numberOrDefault(value.annualPensionIncreasePercent, fallback.annualPensionIncreasePercent),
       0.1,
       2
-    )
+    ),
+    taxRatePercent: clampNumber(numberOrDefault(value.taxRatePercent, fallback.taxRatePercent), 0, 50),
+    healthInsurancePercent: clampNumber(
+      numberOrDefault(value.healthInsurancePercent, fallback.healthInsurancePercent),
+      0,
+      20
+    ),
+    careInsurancePercent: clampNumber(numberOrDefault(value.careInsurancePercent, fallback.careInsurancePercent), 0, 10)
   };
 }
 

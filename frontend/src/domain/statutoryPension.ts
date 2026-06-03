@@ -28,6 +28,16 @@ export interface StatutoryPensionScenarioResult {
   projectedAdditionalPoints: number;
   projectedTotalPoints: number;
   projectedMonthlyPension: number;
+  grossMonthlyPension: number;
+  taxableSharePercent: number;
+  taxRatePercent: number;
+  healthInsurancePercent: number;
+  careInsurancePercent: number;
+  incomeTaxMonthly: number;
+  healthInsuranceMonthly: number;
+  careInsuranceMonthly: number;
+  totalDeductionsMonthly: number;
+  netMonthlyPension: number;
   fallbackToConstantIncome: boolean;
 }
 
@@ -154,6 +164,16 @@ function statutoryPensionScenarioResults(input: {
       input.settings.projectionPensionValue *
         Math.pow(1 + clamp(scenario.annualPensionIncreasePercent, 0.1, 2) / 100, futureYears)
     );
+    const grossMonthlyPension = roundCents(projectedTotalPoints * projectedPensionValue);
+    const taxableSharePercent = statutoryPensionTaxableSharePercent(retirementYear);
+    const taxRatePercent = clamp(scenario.taxRatePercent, 0, 50);
+    const healthInsurancePercent = clamp(scenario.healthInsurancePercent, 0, 20);
+    const careInsurancePercent = clamp(scenario.careInsurancePercent, 0, 10);
+    const incomeTaxMonthly = roundCents((grossMonthlyPension * taxableSharePercent * taxRatePercent) / 10000);
+    const healthInsuranceMonthly = roundCents((grossMonthlyPension * healthInsurancePercent) / 100);
+    const careInsuranceMonthly = roundCents((grossMonthlyPension * careInsurancePercent) / 100);
+    const totalDeductionsMonthly = roundCents(incomeTaxMonthly + healthInsuranceMonthly + careInsuranceMonthly);
+    const netMonthlyPension = roundCents(Math.max(0, grossMonthlyPension - totalDeductionsMonthly));
     return {
       id,
       label: SCENARIO_LABELS[id],
@@ -164,10 +184,25 @@ function statutoryPensionScenarioResults(input: {
       projectedPensionValue,
       projectedAdditionalPoints,
       projectedTotalPoints,
-      projectedMonthlyPension: roundCents(projectedTotalPoints * projectedPensionValue),
+      projectedMonthlyPension: grossMonthlyPension,
+      grossMonthlyPension,
+      taxableSharePercent,
+      taxRatePercent,
+      healthInsurancePercent,
+      careInsurancePercent,
+      incomeTaxMonthly,
+      healthInsuranceMonthly,
+      careInsuranceMonthly,
+      totalDeductionsMonthly,
+      netMonthlyPension,
       fallbackToConstantIncome
     };
   });
+}
+
+export function statutoryPensionTaxableSharePercent(retirementYear: number): number {
+  if (retirementYear <= 2026) return 84;
+  return Math.min(100, roundPrecision(84 + (retirementYear - 2026) * 0.5, 1));
 }
 
 function projectedScenarioPoints(input: {

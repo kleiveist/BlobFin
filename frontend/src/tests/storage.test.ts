@@ -322,8 +322,14 @@ describe("storage", () => {
     expect(loaded.statutoryPension.contributionRatePercent).toBe(18.6);
     expect(loaded.statutoryPension.averageAnnualIncome).toBe(51944);
     expect(loaded.statutoryPension.scenarios.pessimistic.incomeMode).toBe("constant");
+    expect(loaded.statutoryPension.scenarios.pessimistic.taxRatePercent).toBe(20);
+    expect(loaded.statutoryPension.scenarios.pessimistic.healthInsurancePercent).toBe(10.75);
+    expect(loaded.statutoryPension.scenarios.pessimistic.careInsurancePercent).toBe(5);
     expect(loaded.statutoryPension.scenarios.base.incomeMode).toBe("income_projection");
     expect(loaded.statutoryPension.scenarios.optimistic.retirementAge).toBe(72);
+    expect(loaded.statutoryPension.scenarios.optimistic.taxRatePercent).toBe(10);
+    expect(loaded.statutoryPension.scenarios.optimistic.healthInsurancePercent).toBe(8.75);
+    expect(loaded.statutoryPension.scenarios.optimistic.careInsurancePercent).toBe(3.6);
   });
 
   it("persists statutory pension scenario settings", () => {
@@ -333,7 +339,10 @@ describe("storage", () => {
     state.statutoryPension.scenarios.base = {
       retirementAge: 70,
       incomeMode: "constant",
-      annualPensionIncreasePercent: 1.5
+      annualPensionIncreasePercent: 1.5,
+      taxRatePercent: 18,
+      healthInsurancePercent: 9,
+      careInsurancePercent: 4
     };
 
     saveState(state, storage);
@@ -343,6 +352,9 @@ describe("storage", () => {
     expect(loaded.statutoryPension.scenarios.base.retirementAge).toBe(70);
     expect(loaded.statutoryPension.scenarios.base.incomeMode).toBe("constant");
     expect(loaded.statutoryPension.scenarios.base.annualPensionIncreasePercent).toBe(1.5);
+    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(18);
+    expect(loaded.statutoryPension.scenarios.base.healthInsurancePercent).toBe(9);
+    expect(loaded.statutoryPension.scenarios.base.careInsurancePercent).toBe(4);
   });
 
   it("adds missing income yearly entry defaults to saved yearly entries", () => {
