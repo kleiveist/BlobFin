@@ -2225,6 +2225,14 @@ tfoot th {
   background: #64748b;
 }
 
+.chart-popup-dot.health {
+  background: #2e6d84;
+}
+
+.chart-popup-dot.care {
+  background: #b87514;
+}
+
 .investment-legend {
   display: flex;
   align-items: center;
@@ -3024,6 +3032,39 @@ tfoot th {
   grid-template-columns: minmax(145px, 200px) minmax(160px, 1fr) minmax(70px, auto);
 }
 
+.statutory-pension-tax-button {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.statutory-pension-tax-button:hover {
+  border-color: var(--accent);
+}
+
+.statutory-pension-tax-button span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.statutory-pension-tax-button strong {
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .statutory-pension-scenario-results {
   display: grid;
   gap: 4px;
@@ -3063,43 +3104,50 @@ tfoot th {
   background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 14px;
+  padding: 16px;
 }
 
 .statutory-pension-overlay-track {
-  min-height: 122px;
-  position: relative;
+  display: grid;
+  gap: 14px;
+}
+
+.statutory-pension-overlay-row {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.statutory-pension-overlay-row-head {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.statutory-pension-overlay-row-head strong {
+  font-size: 0.86rem;
 }
 
 .statutory-pension-overlay-bar {
-  align-items: center;
   border-radius: 8px;
-  left: 0;
-  min-width: 120px;
+  height: 38px;
+  min-width: 150px;
   overflow: hidden;
-  position: absolute;
-  text-shadow: 0 1px 2px rgba(20, 24, 28, 0.28);
+  position: relative;
 }
 
 .statutory-pension-overlay-bar.optimistic {
-  background: rgba(46, 109, 132, 0.34);
-  height: 72px;
-  top: 10px;
-  z-index: 1;
+  background: rgba(46, 109, 132, 0.22);
 }
 
 .statutory-pension-overlay-bar.base {
-  background: rgba(59, 134, 109, 0.34);
-  height: 56px;
-  top: 32px;
-  z-index: 2;
+  background: rgba(59, 134, 109, 0.22);
 }
 
 .statutory-pension-overlay-bar.pessimistic {
-  background: rgba(180, 85, 77, 0.34);
-  height: 40px;
-  top: 52px;
-  z-index: 3;
+  background: rgba(180, 85, 77, 0.22);
 }
 
 .statutory-pension-overlay-net {
@@ -3110,8 +3158,10 @@ tfoot th {
   gap: 10px;
   height: 100%;
   justify-content: space-between;
-  min-width: 90px;
+  min-width: 118px;
   padding: 0 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .statutory-pension-overlay-bar.optimistic .statutory-pension-overlay-net {
@@ -3127,18 +3177,27 @@ tfoot th {
 }
 
 .statutory-pension-overlay-gross {
-  color: var(--text);
+  color: var(--muted);
   font-size: 0.78rem;
+  font-weight: 850;
+  text-align: right;
+}
+
+.statutory-pension-overlay-gross-label {
+  color: var(--muted);
+  font-size: 0.76rem;
   font-weight: 850;
   position: absolute;
   right: 10px;
-  top: 8px;
-  text-shadow: none;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 0;
 }
 
 .statutory-pension-overlay-net span,
 .statutory-pension-overlay-net strong,
-.statutory-pension-overlay-gross {
+.statutory-pension-overlay-gross,
+.statutory-pension-overlay-gross-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3179,6 +3238,232 @@ tfoot th {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 750;
+}
+
+.statutory-pension-tax-backdrop {
+  background: rgba(31, 37, 40, 0.35);
+  display: grid;
+  inset: 0;
+  padding: 16px;
+  place-items: center;
+  position: fixed;
+  z-index: 48;
+}
+
+:root[data-theme="dark"] .statutory-pension-tax-backdrop {
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.statutory-pension-tax-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(31, 37, 40, 0.22);
+  display: grid;
+  gap: 12px;
+  max-height: min(720px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 12px;
+  width: min(640px, 100%);
+}
+
+.statutory-pension-tax-head {
+  align-items: start;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-bottom: 10px;
+}
+
+.statutory-pension-tax-head div {
+  display: grid;
+  gap: 3px;
+}
+
+.statutory-pension-tax-head span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.statutory-pension-tax-head strong {
+  font-size: 1rem;
+}
+
+.statutory-pension-tax-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statutory-pension-tax-sliders {
+  display: grid;
+  gap: 10px;
+}
+
+.statutory-pension-year-chart {
+  --chart-border: var(--border);
+  --chart-field: var(--surface);
+  --chart-text: var(--text);
+  --chart-muted: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  overflow: hidden;
+  padding: 12px;
+  position: relative;
+}
+
+.statutory-pension-year-head {
+  display: grid;
+  gap: 4px;
+}
+
+.statutory-pension-year-head h3,
+.statutory-pension-year-head p {
+  margin-bottom: 0;
+}
+
+.statutory-pension-year-head p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.statutory-pension-year-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 86px minmax(0, 1fr);
+  min-height: 288px;
+}
+
+.statutory-pension-year-y-axis {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.74rem;
+  font-weight: 800;
+  grid-template-rows: auto 1fr auto;
+  min-height: 220px;
+  padding-top: 18px;
+  text-align: right;
+}
+
+.statutory-pension-year-plot-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.statutory-pension-year-plot {
+  align-items: end;
+  background:
+    linear-gradient(to bottom, transparent 0, transparent calc(50% - 1px), var(--row-border) calc(50% - 1px), var(--row-border) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(to bottom, var(--row-border), var(--row-border) 1px, transparent 1px),
+    linear-gradient(to top, var(--row-border), var(--row-border) 1px, transparent 1px);
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(var(--statutory-pension-year-count, 1), minmax(26px, 1fr));
+  min-height: 220px;
+  min-width: max(100%, calc(var(--statutory-pension-year-count, 1) * 34px));
+  padding: 18px 8px 0;
+}
+
+.statutory-pension-year-bar {
+  align-items: stretch;
+  align-self: stretch;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 5px;
+  grid-template-rows: 20px minmax(140px, 1fr) 20px;
+  min-width: 0;
+  padding: 4px 2px;
+}
+
+.statutory-pension-year-bar:hover,
+.statutory-pension-year-bar:focus-visible {
+  background: var(--highlight);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.statutory-pension-year-value {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+}
+
+.statutory-pension-year-track {
+  align-items: end;
+  align-self: end;
+  background: var(--surface-muted);
+  border-radius: 6px 6px 2px 2px;
+  display: flex;
+  height: 100%;
+  min-height: 140px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px;
+}
+
+.statutory-pension-year-fill {
+  align-self: end;
+  background: #3b866d;
+  border-radius: 4px 4px 1px 1px;
+  display: block;
+  min-height: 1px;
+  width: 100%;
+}
+
+.statutory-pension-year-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statutory-pension-year-x-axis {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  grid-column: 2;
+  text-align: center;
+}
+
+.statutory-pension-year-legend {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  font-weight: 750;
+  gap: 12px;
+  grid-column: 2;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.legend-dot.statutory-pension-net,
+.chart-popup-dot.statutory-pension-net {
+  background: #3b866d;
+}
+
+.statutory-pension-year-popup {
+  width: min(340px, calc(100% - 24px));
 }
 
 .chart-inline-metrics {
@@ -5481,7 +5766,8 @@ tfoot th {
 
   .statutory-pension-head,
   .statutory-pension-scenarios,
-  .statutory-pension-overlay-legend {
+  .statutory-pension-overlay-legend,
+  .statutory-pension-tax-summary {
     grid-template-columns: 1fr;
   }
 

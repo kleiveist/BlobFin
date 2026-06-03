@@ -40,7 +40,8 @@ import {
   type IncomeTaxRuleResult
 } from "./domain/incomeTaxRules";
 import {
-  buildStatutoryPensionModel
+  buildStatutoryPensionModel,
+  type StatutoryPensionModel
 } from "./domain/statutoryPension";
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
 import {
@@ -148,7 +149,11 @@ import {
   renderRealEstateTrendChart
 } from "./views/wealthCharts";
 import { monthSelect, payoutSelect, positionIconSelect, positionTypeSelect, renderAppShell } from "./views/templates";
-import { renderStatutoryPensionHtml } from "./views/statutoryPensionView";
+import {
+  renderStatutoryPensionHtml,
+  renderStatutoryPensionTaxPopupHtml,
+  renderStatutoryPensionYearPopupHtml
+} from "./views/statutoryPensionView";
 
 const root = requireRootElement();
 const INTEREST_INVESTMENT_POSITION_ID = "__account-interest-investment";
@@ -408,6 +413,8 @@ let positionFilterPopupOpen = false;
 let selectedRealEstateYear: number | null = null;
 let latestRealEstateResult: RealEstateFinancingResult | null = null;
 let selectedCombinedWealthYear: number | null = null;
+let latestStatutoryPensionModel: StatutoryPensionModel | null = null;
+let statutoryPensionTaxPopupScenarioId: StatutoryPensionScenarioId | null = null;
 let accountDialog: AccountDialogState = null;
 normalizeInvestmentBounds();
 applyInitialRoute();
@@ -724,6 +731,7 @@ function setActiveSection(section: AppSectionId, options: { updateHistory?: bool
     pushSectionHistory(activeSection);
   }
   hideThemeSettings();
+  hideStatutoryPensionTaxPopup();
 }
 
 function updateModuleVisibility(): void {
@@ -813,6 +821,16 @@ function bindEvents(): void {
       renderPositions();
       renderPositionCostDialogTotals(target.dataset.positionCostPositionId);
       saveState(state);
+      return;
+    }
+
+    if (target.dataset.statutoryPensionScenario && target.dataset.statutoryPensionScenarioField) {
+      updateStatutoryPensionScenarioField(
+        target.dataset.statutoryPensionScenario as StatutoryPensionScenarioId,
+        target.dataset.statutoryPensionScenarioField,
+        target.value
+      );
+      renderAll();
       return;
     }
 
@@ -933,6 +951,16 @@ function bindEvents(): void {
 
   root.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
+    const statutoryPensionYearButton = target?.closest<HTMLButtonElement>("button[data-statutory-pension-year]");
+    if (statutoryPensionYearButton) {
+      event.preventDefault();
+      showStatutoryPensionYearPopup(
+        numberValue(statutoryPensionYearButton.dataset.statutoryPensionYear || ""),
+        event.clientX,
+        event.clientY
+      );
+      return;
+    }
     const button = target?.closest<HTMLButtonElement>("button[data-action]");
     if (!button) {
       if (positionIconPicker && !target?.closest("#positionIconPicker")) {
@@ -1073,6 +1101,15 @@ function bindEvents(): void {
       setReserveChartAdjustment(action.replace("set-reserve-chart-adjustment-", "") as ReserveChartAdjustment);
     }
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
+    if (action === "close-statutory-pension-year-popup") hideStatutoryPensionYearPopup();
+    if (action === "open-statutory-pension-tax-popup") {
+      openStatutoryPensionTaxPopup(button.dataset.statutoryPensionScenario as StatutoryPensionScenarioId);
+      return;
+    }
+    if (action === "close-statutory-pension-tax-popup") {
+      closeStatutoryPensionTaxPopup();
+      return;
+    }
     if (action === "toggle-theme-settings") toggleThemeSettings();
     if (action === "toggle-settings-grunddaten") toggleSettingsGrunddaten();
     if (action === "close-theme-settings") hideThemeSettings();
@@ -1164,6 +1201,8 @@ function bindEvents(): void {
     if (event.key === "Escape") {
       hideThemeSettings();
       hideInvestmentChartPopup();
+      hideStatutoryPensionYearPopup();
+      closeStatutoryPensionTaxPopup();
       hideReserveChartPopup();
       hidePositionFilterPopup();
       closePlanningAccountDialog();
@@ -4497,13 +4536,33 @@ function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
 function renderStatutoryPensionCalculations(birthYear: number): void {
   const host = document.querySelector<HTMLDivElement>("#statutoryPensionSection");
   if (!host) return;
+  hideStatutoryPensionYearPopup();
   const model = buildStatutoryPensionModel({
     tracker: state.incomeTracker,
     settings: state.statutoryPension,
     currentYear: state.settings.year,
     birthYear
   });
+  latestStatutoryPensionModel = model;
   host.innerHTML = renderStatutoryPensionHtml(model, state.statutoryPension);
+  renderStatutoryPensionTaxPopup(model);
+}
+
+function renderStatutoryPensionTaxPopup(model: StatutoryPensionModel): void {
+  const host = document.querySelector<HTMLDivElement>("#statutoryPensionTaxPopup");
+  if (!host) return;
+  if (!statutoryPensionTaxPopupScenarioId) {
+    host.innerHTML = "";
+    host.hidden = true;
+    return;
+  }
+  const html = renderStatutoryPensionTaxPopupHtml(model, statutoryPensionTaxPopupScenarioId);
+  if (!html) {
+    hideStatutoryPensionTaxPopup();
+    return;
+  }
+  host.innerHTML = html;
+  host.hidden = false;
 }
 
 function renderPositions(): void {
@@ -8124,6 +8183,17 @@ function showRealEstateChartPopup(
   positionChartPopup(popup, card, clientX, clientY);
 }
 
+function showStatutoryPensionYearPopup(year: number, clientX: number, clientY: number): void {
+  const point = latestStatutoryPensionModel?.annualPensionYears.find((entry) => entry.year === year);
+  const popup = document.querySelector<HTMLDivElement>("#statutoryPensionYearPopup");
+  const card = popup?.closest<HTMLElement>(".statutory-pension-year-chart");
+  if (!point || !popup || !card) return;
+
+  popup.innerHTML = renderStatutoryPensionYearPopupHtml(point);
+  popup.hidden = false;
+  positionChartPopup(popup, card, clientX, clientY);
+}
+
 function positionChartPopup(popup: HTMLDivElement, card: HTMLElement, clientX: number, clientY: number): void {
   popup.style.left = "12px";
   popup.style.top = "12px";
@@ -8168,6 +8238,35 @@ function hideInvestmentChartPopup(): void {
   )) {
     popup.hidden = true;
   }
+}
+
+function hideStatutoryPensionYearPopup(): void {
+  const popup = document.querySelector<HTMLDivElement>("#statutoryPensionYearPopup");
+  if (popup) popup.hidden = true;
+}
+
+function openStatutoryPensionTaxPopup(value: string | undefined): void {
+  const scenarioId = statutoryPensionScenarioIdFromValue(value);
+  if (!scenarioId) return;
+  statutoryPensionTaxPopupScenarioId = scenarioId;
+  renderAll();
+}
+
+function closeStatutoryPensionTaxPopup(): void {
+  hideStatutoryPensionTaxPopup();
+}
+
+function hideStatutoryPensionTaxPopup(): void {
+  statutoryPensionTaxPopupScenarioId = null;
+  const host = document.querySelector<HTMLDivElement>("#statutoryPensionTaxPopup");
+  if (!host) return;
+  host.innerHTML = "";
+  host.hidden = true;
+}
+
+function statutoryPensionScenarioIdFromValue(value: string | undefined): StatutoryPensionScenarioId | null {
+  if (value === "pessimistic" || value === "base" || value === "optimistic") return value;
+  return null;
 }
 
 function buildDepotAssetProjection(

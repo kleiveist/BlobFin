@@ -8,7 +8,12 @@ import {
 } from "../domain/statutoryPension";
 import { emptyIncomeTaxAdjustment, emptyIncomeTaxDeductionItems } from "../domain/incomeTracker";
 import type { IncomeTrackerState, IncomeYearEntry } from "../types";
-import { renderStatutoryPensionHtml } from "../views/statutoryPensionView";
+import { renderAppShell } from "../views/templates";
+import {
+  renderStatutoryPensionHtml,
+  renderStatutoryPensionTaxPopupHtml,
+  renderStatutoryPensionYearPopupHtml
+} from "../views/statutoryPensionView";
 
 function yearlyEntry(overrides: Partial<IncomeYearEntry> = {}): IncomeYearEntry {
   return {
@@ -45,6 +50,10 @@ function tracker(entries: IncomeYearEntry[]): IncomeTrackerState {
       selectedYearlyLabels: []
     }
   };
+}
+
+function count(value: string, needle: string): number {
+  return value.split(needle).length - 1;
 }
 
 describe("statutory pension model", () => {
@@ -165,6 +174,20 @@ describe("statutory pension model", () => {
     expect(model.scenarios[1].fallbackToConstantIncome).toBe(true);
   });
 
+  it("uses the planned deduction defaults for all scenarios", () => {
+    const settings = defaultStatutoryPensionSettings();
+
+    expect(settings.scenarios.optimistic.taxRatePercent).toBe(10);
+    expect(settings.scenarios.optimistic.healthInsurancePercent).toBe(8.75);
+    expect(settings.scenarios.optimistic.careInsurancePercent).toBe(3.6);
+    expect(settings.scenarios.base.taxRatePercent).toBe(12);
+    expect(settings.scenarios.base.healthInsurancePercent).toBe(10.75);
+    expect(settings.scenarios.base.careInsurancePercent).toBe(5.6);
+    expect(settings.scenarios.pessimistic.taxRatePercent).toBe(15);
+    expect(settings.scenarios.pessimistic.healthInsurancePercent).toBe(13.75);
+    expect(settings.scenarios.pessimistic.careInsurancePercent).toBe(8.6);
+  });
+
   it("calculates the taxable pension share by retirement year", () => {
     expect(statutoryPensionTaxableSharePercent(2026)).toBe(84);
     expect(statutoryPensionTaxableSharePercent(2058)).toBe(100);
@@ -210,7 +233,89 @@ describe("statutory pension model", () => {
     );
   });
 
-  it("renders deduction sliders, gross net legend and overlay bars", () => {
+  it("calculates annual pension years from active contribution years with base deductions", () => {
+    const settings = defaultStatutoryPensionSettings();
+    settings.contributionRatePercent = 20;
+    settings.averageAnnualIncome = 50000;
+    settings.projectionPensionValue = 50;
+    settings.annualContributionCeilingGross = 100000;
+    settings.scenarios.base = {
+      ...settings.scenarios.base,
+      retirementAge: 67,
+      taxRatePercent: 20,
+      healthInsurancePercent: 10,
+      careInsurancePercent: 5
+    };
+
+    const model = buildStatutoryPensionModel({
+      tracker: tracker([
+        yearlyEntry({
+          id: "inactive-2024",
+          active: false,
+          year: 2024,
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 5000,
+            employerPensionInsurance: 5000
+          }
+        }),
+        yearlyEntry({
+          id: "capital-2025",
+          label: "dividends",
+          year: 2025,
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 5000,
+            employerPensionInsurance: 5000
+          }
+        }),
+        yearlyEntry({
+          id: "first-rv-2026",
+          year: 2026,
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 5000,
+            employerPensionInsurance: 5000
+          }
+        }),
+        yearlyEntry({
+          id: "second-rv-2028",
+          year: 2028,
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 2500,
+            employerPensionInsurance: 2500
+          }
+        })
+      ]),
+      settings,
+      currentYear: 2060,
+      birthYear: 1993
+    });
+
+    expect(model.annualPensionYears.map((year) => year.year)).toEqual([2026, 2028]);
+    expect(model.annualPensionYears[0]).toMatchObject({
+      employeeContribution: 5000,
+      employerContribution: 5000,
+      totalContribution: 10000,
+      relevantGrossIncome: 50000,
+      pensionPoints: 1,
+      grossMonthlyPension: 50,
+      taxableSharePercent: 100,
+      incomeTaxMonthly: 10,
+      healthInsuranceMonthly: 5,
+      careInsuranceMonthly: 2.5,
+      netMonthlyPension: 32.5
+    });
+    expect(model.annualPensionYears[1]).toMatchObject({
+      relevantGrossIncome: 25000,
+      pensionPoints: 0.5,
+      grossMonthlyPension: 25,
+      netMonthlyPension: 16.25
+    });
+  });
+
+  it("renders tax buttons, gross net legend and separated overlay bars", () => {
     const settings = defaultStatutoryPensionSettings();
     const model = buildStatutoryPensionModel({
       tracker: tracker([
@@ -229,17 +334,88 @@ describe("statutory pension model", () => {
     const html = renderStatutoryPensionHtml(model, settings);
 
     expect(html).toContain('type="range"');
-    expect(html).toContain('data-statutory-pension-scenario-field="taxRatePercent"');
-    expect(html).toContain('data-statutory-pension-scenario-field="healthInsurancePercent"');
-    expect(html).toContain('data-statutory-pension-scenario-field="careInsurancePercent"');
+    expect(html).toContain('data-action="open-statutory-pension-tax-popup"');
+    expect(html).toContain('data-statutory-pension-scenario="base"');
+    expect(count(html, 'data-action="open-statutory-pension-tax-popup"')).toBe(3);
+    expect(html).toContain("Steuerlast");
+    expect(html).not.toContain('data-statutory-pension-scenario-field="taxRatePercent"');
+    expect(html).not.toContain('data-statutory-pension-scenario-field="healthInsurancePercent"');
+    expect(html).not.toContain('data-statutory-pension-scenario-field="careInsurancePercent"');
     expect(html).toContain("Monatsrente brutto");
     expect(html).toContain("Steuer:");
     expect(html).toContain("Krankenversicherung:");
     expect(html).toContain("Pflegeversicherung:");
     expect(html).toContain("Monatsrente netto");
     expect(html).toContain("Besteuerungsanteil");
+    expect(html).toContain("statutory-pension-overlay-row");
     expect(html).toContain("statutory-pension-overlay-bar");
     expect(html).toContain("statutory-pension-overlay-net");
     expect(html).toContain("statutory-pension-overlay-gross");
+    expect(html).toContain("statutory-pension-overlay-gross-label");
+    expect(html).toContain("Netto-Rente nach Beitragsjahr");
+    expect(html).toContain("statutory-pension-year-bar");
+    expect(html).toContain('data-statutory-pension-year="2026"');
+    expect(html).toContain('id="statutoryPensionYearPopup"');
+  });
+
+  it("renders the tax popup host and popup sliders separately", () => {
+    const settings = defaultStatutoryPensionSettings();
+    const model = buildStatutoryPensionModel({
+      tracker: tracker([
+        yearlyEntry({
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 5152.2,
+            employerPensionInsurance: 5152.2
+          }
+        })
+      ]),
+      settings,
+      currentYear: 2026,
+      birthYear: 1990
+    });
+    const popup = renderStatutoryPensionTaxPopupHtml(model, "base");
+
+    expect(renderAppShell()).toContain('id="statutoryPensionTaxPopup"');
+    expect(popup).toContain("Basis");
+    expect(popup).toContain("Brutto-Monatsrente");
+    expect(popup).toContain("Abzuege gesamt");
+    expect(popup).toContain("Netto-Monatsrente");
+    expect(popup).toContain('data-action="close-statutory-pension-tax-popup"');
+    expect(popup).toContain('data-statutory-pension-scenario-field="taxRatePercent"');
+    expect(popup).toContain('data-statutory-pension-scenario-field="healthInsurancePercent"');
+    expect(popup).toContain('data-statutory-pension-scenario-field="careInsurancePercent"');
+  });
+
+  it("renders annual pension year popup details", () => {
+    const settings = defaultStatutoryPensionSettings();
+    const model = buildStatutoryPensionModel({
+      tracker: tracker([
+        yearlyEntry({
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 5152.2,
+            employerPensionInsurance: 5152.2
+          }
+        })
+      ]),
+      settings,
+      currentYear: 2026,
+      birthYear: 1990
+    });
+    const popup = renderStatutoryPensionYearPopupHtml(model.annualPensionYears[0]);
+
+    expect(popup).toContain("Beitragsjahr");
+    expect(popup).toContain("Brutto");
+    expect(popup).toContain("Netto");
+    expect(popup).toContain("Besteuerungsanteil");
+    expect(popup).toContain("Steuerbetrag");
+    expect(popup).toContain("Krankenversicherung");
+    expect(popup).toContain("Pflegeversicherung");
+    expect(popup).toContain("Rentenpunkte");
+    expect(popup).toContain("Arbeitnehmerbeitrag");
+    expect(popup).toContain("Arbeitgeberbeitrag");
+    expect(popup).toContain("rentenrelevantes Brutto");
+    expect(popup).toContain('data-action="close-statutory-pension-year-popup"');
   });
 });

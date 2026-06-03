@@ -680,6 +680,7 @@ export function renderAppShell(): string {
             </div>
           </div>
         </div>
+        <div id="statutoryPensionTaxPopup" hidden></div>
       </section>
 
       <section class="panel combined-wealth-panel" data-module-section="combined_wealth">

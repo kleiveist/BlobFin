@@ -322,14 +322,51 @@ describe("storage", () => {
     expect(loaded.statutoryPension.contributionRatePercent).toBe(18.6);
     expect(loaded.statutoryPension.averageAnnualIncome).toBe(51944);
     expect(loaded.statutoryPension.scenarios.pessimistic.incomeMode).toBe("constant");
-    expect(loaded.statutoryPension.scenarios.pessimistic.taxRatePercent).toBe(20);
-    expect(loaded.statutoryPension.scenarios.pessimistic.healthInsurancePercent).toBe(10.75);
-    expect(loaded.statutoryPension.scenarios.pessimistic.careInsurancePercent).toBe(5);
+    expect(loaded.statutoryPension.scenarios.pessimistic.taxRatePercent).toBe(15);
+    expect(loaded.statutoryPension.scenarios.pessimistic.healthInsurancePercent).toBe(13.75);
+    expect(loaded.statutoryPension.scenarios.pessimistic.careInsurancePercent).toBe(8.6);
     expect(loaded.statutoryPension.scenarios.base.incomeMode).toBe("income_projection");
+    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(12);
+    expect(loaded.statutoryPension.scenarios.base.healthInsurancePercent).toBe(10.75);
+    expect(loaded.statutoryPension.scenarios.base.careInsurancePercent).toBe(5.6);
     expect(loaded.statutoryPension.scenarios.optimistic.retirementAge).toBe(72);
     expect(loaded.statutoryPension.scenarios.optimistic.taxRatePercent).toBe(10);
     expect(loaded.statutoryPension.scenarios.optimistic.healthInsurancePercent).toBe(8.75);
     expect(loaded.statutoryPension.scenarios.optimistic.careInsurancePercent).toBe(3.6);
+  });
+
+  it("adds new statutory pension deduction fallbacks to saved scenarios", () => {
+    const storage = new MemoryStorage();
+    const legacyState = defaultAppState();
+    delete (legacyState.statutoryPension.scenarios.pessimistic as Partial<
+      typeof legacyState.statutoryPension.scenarios.pessimistic
+    >).taxRatePercent;
+    delete (legacyState.statutoryPension.scenarios.pessimistic as Partial<
+      typeof legacyState.statutoryPension.scenarios.pessimistic
+    >).healthInsurancePercent;
+    delete (legacyState.statutoryPension.scenarios.pessimistic as Partial<
+      typeof legacyState.statutoryPension.scenarios.pessimistic
+    >).careInsurancePercent;
+    delete (legacyState.statutoryPension.scenarios.base as Partial<
+      typeof legacyState.statutoryPension.scenarios.base
+    >).taxRatePercent;
+    delete (legacyState.statutoryPension.scenarios.base as Partial<
+      typeof legacyState.statutoryPension.scenarios.base
+    >).healthInsurancePercent;
+    delete (legacyState.statutoryPension.scenarios.base as Partial<
+      typeof legacyState.statutoryPension.scenarios.base
+    >).careInsurancePercent;
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.statutoryPension.scenarios.pessimistic.taxRatePercent).toBe(15);
+    expect(loaded.statutoryPension.scenarios.pessimistic.healthInsurancePercent).toBe(13.75);
+    expect(loaded.statutoryPension.scenarios.pessimistic.careInsurancePercent).toBe(8.6);
+    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(12);
+    expect(loaded.statutoryPension.scenarios.base.healthInsurancePercent).toBe(10.75);
+    expect(loaded.statutoryPension.scenarios.base.careInsurancePercent).toBe(5.6);
+    expect(loaded.statutoryPension.scenarios.optimistic.taxRatePercent).toBe(10);
   });
 
   it("persists statutory pension scenario settings", () => {

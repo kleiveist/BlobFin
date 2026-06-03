@@ -328,17 +328,17 @@ export function defaultStatutoryPensionSettings(): StatutoryPensionSettings {
         retirementAge: 67,
         incomeMode: "constant",
         annualPensionIncreasePercent: 0.1,
-        taxRatePercent: 20,
-        healthInsurancePercent: 10.75,
-        careInsurancePercent: 5
+        taxRatePercent: 15,
+        healthInsurancePercent: 13.75,
+        careInsurancePercent: 8.6
       },
       base: {
         retirementAge: 67,
         incomeMode: "income_projection",
         annualPensionIncreasePercent: 1,
-        taxRatePercent: 15,
-        healthInsurancePercent: 9.75,
-        careInsurancePercent: 4.2
+        taxRatePercent: 12,
+        healthInsurancePercent: 10.75,
+        careInsurancePercent: 5.6
       },
       optimistic: {
         retirementAge: 72,

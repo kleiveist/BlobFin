@@ -1,5 +1,5 @@
 import type { StatutoryPensionModel } from "../domain/statutoryPension";
-import { escapeHtml, money, percent } from "../lib/format";
+import { escapeHtml, intNumber, money, percent } from "../lib/format";
 import type { StatutoryPensionScenarioId, StatutoryPensionSettings } from "../types";
 
 export function renderStatutoryPensionHtml(model: StatutoryPensionModel, settings: StatutoryPensionSettings): string {
@@ -47,12 +47,101 @@ export function renderStatutoryPensionHtml(model: StatutoryPensionModel, setting
           ${model.scenarios.map(statutoryPensionScenarioCard).join("")}
         </div>
         ${statutoryPensionScenarioOverlayChart(model)}
+        ${statutoryPensionAnnualYearChart(model)}
       `
           : `<div class="chart-empty statutory-pension-empty">
         Noch keine RV-Beitraege vorhanden. Erfasse im Jahresnettoeinkommen unter Steuer- und Abgabenpositionen Arbeitnehmer- und Arbeitgeberbeitraege zur Rentenversicherung.
       </div>`
       }
     </div>
+  `;
+}
+
+export function renderStatutoryPensionYearPopupHtml(
+  year: StatutoryPensionModel["annualPensionYears"][number]
+): string {
+  return `
+    <div class="chart-popup-head">
+      <div>
+        <span>Beitragsjahr</span>
+        <strong>${escapeHtml(intNumber(year.year))}</strong>
+      </div>
+      <button class="chart-popup-close" type="button" data-action="close-statutory-pension-year-popup" aria-label="Popup schliessen">x</button>
+    </div>
+    <div class="chart-popup-list">
+      ${statutoryPensionPopupSection("Rentenanspruch", [
+        statutoryPensionPopupLine("gross", "Brutto", money(year.grossMonthlyPension)),
+        statutoryPensionPopupTotalLine("Netto", money(year.netMonthlyPension))
+      ])}
+      ${statutoryPensionPopupSection("Abzuege Basis-Szenario", [
+        statutoryPensionPopupLine("red", "Besteuerungsanteil", percent(year.taxableSharePercent)),
+        statutoryPensionPopupLine("red", "Steuerbetrag", money(year.incomeTaxMonthly)),
+        statutoryPensionPopupLine("health", "Krankenversicherung", money(year.healthInsuranceMonthly)),
+        statutoryPensionPopupLine("care", "Pflegeversicherung", money(year.careInsuranceMonthly))
+      ])}
+      ${statutoryPensionPopupSection("Beitraege und Punkte", [
+        statutoryPensionPopupLine("purple", "Rentenpunkte", statutoryPensionDecimal(year.pensionPoints, 4)),
+        statutoryPensionPopupLine("grey", "Arbeitnehmerbeitrag", money(year.employeeContribution)),
+        statutoryPensionPopupLine("orange", "Arbeitgeberbeitrag", money(year.employerContribution)),
+        statutoryPensionPopupLine("gross", "rentenrelevantes Brutto", money(year.relevantGrossIncome))
+      ])}
+    </div>
+  `;
+}
+
+function statutoryPensionAnnualYearChart(model: StatutoryPensionModel): string {
+  if (!model.annualPensionYears.length) return "";
+  const maxNetPension = Math.max(1, ...model.annualPensionYears.map((year) => year.netMonthlyPension));
+  const columnCount = Math.max(1, model.annualPensionYears.length);
+  return `
+    <div class="statutory-pension-year-chart">
+      <div class="statutory-pension-year-head">
+        <h3>Netto-Rente nach Beitragsjahr</h3>
+        <p>Einzelner Netto-Monatsanspruch je Beitragsjahr mit den Abzuegen des Basis-Szenarios.</p>
+      </div>
+      <div class="statutory-pension-year-grid" aria-label="Netto-Monatsrente nach Beitragsjahr">
+        <div class="statutory-pension-year-y-axis" aria-hidden="true">
+          <span>${escapeHtml(money(maxNetPension))}</span>
+          <span>${escapeHtml(money(maxNetPension / 2))}</span>
+          <span>0 EUR</span>
+        </div>
+        <div class="statutory-pension-year-plot-scroll">
+          <div class="statutory-pension-year-plot" role="list" style="--statutory-pension-year-count:${columnCount};">
+            ${model.annualPensionYears
+              .map((year) => statutoryPensionAnnualYearBar(year, maxNetPension))
+              .join("")}
+          </div>
+        </div>
+        <div class="statutory-pension-year-x-axis" aria-hidden="true">Jahr</div>
+        <div class="statutory-pension-year-legend" aria-hidden="true">
+          <span class="legend-item"><span class="legend-dot statutory-pension-net"></span> Netto-Monatsrente</span>
+        </div>
+      </div>
+      <div id="statutoryPensionYearPopup" class="investment-chart-popup statutory-pension-year-popup" role="dialog" aria-label="Rentenjahrdetails" hidden></div>
+    </div>
+  `;
+}
+
+function statutoryPensionAnnualYearBar(
+  year: StatutoryPensionModel["annualPensionYears"][number],
+  maxNetPension: number
+): string {
+  const height = year.netMonthlyPension > 0 ? Math.max(2, (year.netMonthlyPension / maxNetPension) * 100) : 0;
+  const valueLabel = money(year.netMonthlyPension);
+  return `
+    <button
+      class="statutory-pension-year-bar"
+      type="button"
+      role="listitem"
+      data-statutory-pension-year="${escapeHtml(String(year.year))}"
+      title="${escapeHtml(`${year.year}: ${valueLabel}`)}"
+    >
+      <span class="statutory-pension-year-value">${escapeHtml(valueLabel)}</span>
+      <span class="statutory-pension-year-track">
+        <span class="statutory-pension-year-fill" style="height:${height.toFixed(2)}%;"></span>
+      </span>
+      <span class="statutory-pension-year-label">${escapeHtml(String(year.year))}</span>
+    </button>
   `;
 }
 
@@ -91,36 +180,7 @@ function statutoryPensionScenarioCard(scenario: StatutoryPensionModel["scenarios
           2,
           percent(scenario.annualPensionIncreasePercent)
         )}
-        ${statutoryPensionScenarioRangeField(
-          scenario.id,
-          "taxRatePercent",
-          "Steuerquote %",
-          scenario.taxRatePercent,
-          0.1,
-          0,
-          50,
-          percent(scenario.taxRatePercent)
-        )}
-        ${statutoryPensionScenarioRangeField(
-          scenario.id,
-          "healthInsurancePercent",
-          "Krankenversicherung %",
-          scenario.healthInsurancePercent,
-          0.05,
-          0,
-          20,
-          percent(scenario.healthInsurancePercent)
-        )}
-        ${statutoryPensionScenarioRangeField(
-          scenario.id,
-          "careInsurancePercent",
-          "Pflegeversicherung %",
-          scenario.careInsurancePercent,
-          0.05,
-          0,
-          10,
-          percent(scenario.careInsurancePercent)
-        )}
+        ${statutoryPensionScenarioTaxButton(scenario)}
       </div>
       <div class="statutory-pension-scenario-results">
         <span>Monatsrente brutto <strong>${escapeHtml(money(scenario.grossMonthlyPension))}</strong></span>
@@ -137,6 +197,64 @@ function statutoryPensionScenarioCard(scenario: StatutoryPensionModel["scenarios
   `;
 }
 
+export function renderStatutoryPensionTaxPopupHtml(
+  model: StatutoryPensionModel,
+  scenarioId: StatutoryPensionScenarioId
+): string {
+  const scenario = model.scenarios.find((item) => item.id === scenarioId);
+  if (!scenario) return "";
+  return `
+    <div class="statutory-pension-tax-backdrop" role="presentation">
+      <div class="statutory-pension-tax-dialog" role="dialog" aria-modal="true" aria-labelledby="statutoryPensionTaxPopupTitle">
+        <div class="statutory-pension-tax-head">
+          <div>
+            <span>Steuerlast</span>
+            <strong id="statutoryPensionTaxPopupTitle">${escapeHtml(scenario.label)}</strong>
+          </div>
+          <button class="chart-popup-close" type="button" data-action="close-statutory-pension-tax-popup" aria-label="Steuerlast schliessen">x</button>
+        </div>
+        <div class="statutory-pension-tax-summary">
+          ${statutoryPensionMetric("Brutto-Monatsrente", money(scenario.grossMonthlyPension))}
+          ${statutoryPensionMetric("Abzuege gesamt", money(scenario.totalDeductionsMonthly))}
+          ${statutoryPensionMetric("Netto-Monatsrente", money(scenario.netMonthlyPension))}
+        </div>
+        <div class="statutory-pension-tax-sliders">
+          ${statutoryPensionScenarioRangeField(
+            scenario.id,
+            "taxRatePercent",
+            "Steuerquote %",
+            scenario.taxRatePercent,
+            0.1,
+            0,
+            50,
+            percent(scenario.taxRatePercent)
+          )}
+          ${statutoryPensionScenarioRangeField(
+            scenario.id,
+            "healthInsurancePercent",
+            "Krankenversicherung %",
+            scenario.healthInsurancePercent,
+            0.05,
+            0,
+            20,
+            percent(scenario.healthInsurancePercent)
+          )}
+          ${statutoryPensionScenarioRangeField(
+            scenario.id,
+            "careInsurancePercent",
+            "Pflegeversicherung %",
+            scenario.careInsurancePercent,
+            0.05,
+            0,
+            10,
+            percent(scenario.careInsurancePercent)
+          )}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function statutoryPensionScenarioOverlayChart(model: StatutoryPensionModel): string {
   const scenarioById = new Map(model.scenarios.map((scenario) => [scenario.id, scenario]));
   const maxMonthlyPension = Math.max(1, ...model.scenarios.map((scenario) => scenario.grossMonthlyPension));
@@ -149,12 +267,18 @@ function statutoryPensionScenarioOverlayChart(model: StatutoryPensionModel): str
       const grossWidth = Math.max(8, (scenario.grossMonthlyPension / maxMonthlyPension) * 100);
       const netWidth = scenario.grossMonthlyPension > 0 ? Math.max(4, (scenario.netMonthlyPension / scenario.grossMonthlyPension) * 100) : 0;
       return `
-        <div class="statutory-pension-overlay-bar ${id}" style="width: ${grossWidth.toFixed(2)}%;">
-          <div class="statutory-pension-overlay-net" style="width: ${netWidth.toFixed(2)}%;">
-            <span>${escapeHtml(scenario.label)} netto</span>
-            <strong>${escapeHtml(money(scenario.netMonthlyPension))}</strong>
+        <div class="statutory-pension-overlay-row ${id}">
+          <div class="statutory-pension-overlay-row-head">
+            <strong>${escapeHtml(scenario.label)}</strong>
+            <span class="statutory-pension-overlay-gross">Brutto ${escapeHtml(money(scenario.grossMonthlyPension))}</span>
           </div>
-          <span class="statutory-pension-overlay-gross">Brutto ${escapeHtml(money(scenario.grossMonthlyPension))}</span>
+          <div class="statutory-pension-overlay-bar ${id}" style="width: ${grossWidth.toFixed(2)}%;">
+            <span class="statutory-pension-overlay-gross-label">Brutto</span>
+            <div class="statutory-pension-overlay-net" style="width: ${netWidth.toFixed(2)}%;">
+              <span>Netto</span>
+              <strong>${escapeHtml(money(scenario.netMonthlyPension))}</strong>
+            </div>
+          </div>
         </div>
       `;
     })
@@ -184,13 +308,28 @@ function statutoryPensionScenarioOverlayChart(model: StatutoryPensionModel): str
     <div class="statutory-pension-overlay">
       <div>
         <h3>Renten-Szenarien im Vergleich</h3>
-        <p>Die Balken liegen uebereinander: Brutto als Hintergrund, Netto nach Steuer, Kranken- und Pflegeversicherung im Vordergrund.</p>
+        <p>Brutto liegt als heller Hintergrundbalken, Netto nach Steuer, Kranken- und Pflegeversicherung als kraeftiger Vorderbalken darueber.</p>
       </div>
       <div class="statutory-pension-overlay-chart" role="img" aria-label="Ueberlagerte Brutto- und Netto-Monatsrenten der drei Rentenszenarien">
         <div class="statutory-pension-overlay-track">${barHtml}</div>
       </div>
       <div class="statutory-pension-overlay-legend">${legendHtml}</div>
     </div>
+  `;
+}
+
+function statutoryPensionScenarioTaxButton(scenario: StatutoryPensionModel["scenarios"][number]): string {
+  return `
+    <button
+      class="statutory-pension-tax-button"
+      type="button"
+      data-action="open-statutory-pension-tax-popup"
+      data-statutory-pension-scenario="${escapeHtml(scenario.id)}"
+      aria-haspopup="dialog"
+    >
+      <span>Steuerlast</span>
+      <strong>${escapeHtml(percent(statutoryPensionTaxLoadPercent(scenario)))}</strong>
+    </button>
   `;
 }
 
@@ -239,6 +378,37 @@ function statutoryPensionScenarioRangeField(
 
 function statutoryPensionMetric(label: string, value: string): string {
   return `<div class="statutory-pension-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function statutoryPensionPopupLine(color: string, label: string, value: string): string {
+  return `
+    <div class="chart-popup-line">
+      <span><i class="chart-popup-dot ${escapeHtml(color)}"></i>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function statutoryPensionPopupTotalLine(label: string, value: string): string {
+  return `
+    <div class="chart-popup-line chart-popup-total">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function statutoryPensionPopupSection(title: string, lines: string[]): string {
+  return `
+    <div class="chart-popup-section">
+      <div class="chart-popup-section-title">${escapeHtml(title)}</div>
+      ${lines.join("")}
+    </div>
+  `;
+}
+
+function statutoryPensionTaxLoadPercent(scenario: StatutoryPensionModel["scenarios"][number]): number {
+  return scenario.taxRatePercent + scenario.healthInsurancePercent + scenario.careInsurancePercent;
 }
 
 function statutoryPensionDecimal(value: number, decimals: number): string {

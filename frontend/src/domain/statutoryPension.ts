@@ -17,6 +17,15 @@ export interface StatutoryPensionContributionYear {
   pensionPoints: number;
 }
 
+export interface StatutoryPensionAnnualPensionYear extends StatutoryPensionContributionYear {
+  grossMonthlyPension: number;
+  taxableSharePercent: number;
+  incomeTaxMonthly: number;
+  healthInsuranceMonthly: number;
+  careInsuranceMonthly: number;
+  netMonthlyPension: number;
+}
+
 export interface StatutoryPensionScenarioResult {
   id: StatutoryPensionScenarioId;
   label: string;
@@ -52,6 +61,7 @@ export interface StatutoryPensionModel {
   currentMonthlyPension: number;
   projectedMonthlyPensionTodayValue: number;
   contributionYears: StatutoryPensionContributionYear[];
+  annualPensionYears: StatutoryPensionAnnualPensionYear[];
   scenarios: StatutoryPensionScenarioResult[];
 }
 
@@ -82,6 +92,15 @@ export function buildStatutoryPensionModel(input: {
   const latestMonthlyPensionIncrease = roundCents(latestPensionPointsPerYear * input.settings.projectionPensionValue);
   const currentMonthlyPension = roundCents(pensionPoints * input.settings.currentPensionValue);
   const projectedMonthlyPensionTodayValue = roundCents(pensionPoints * input.settings.projectionPensionValue);
+  const scenarios = statutoryPensionScenarioResults({
+    tracker: input.tracker,
+    settings: input.settings,
+    currentYear: input.currentYear,
+    birthYear: input.birthYear,
+    basePoints: pensionPoints,
+    latestRelevantGrossIncome
+  });
+  const baseScenario = scenarios.find((scenario) => scenario.id === "base") ?? scenarios[0];
 
   return {
     employeeContributionTotal,
@@ -94,14 +113,8 @@ export function buildStatutoryPensionModel(input: {
     currentMonthlyPension,
     projectedMonthlyPensionTodayValue,
     contributionYears,
-    scenarios: statutoryPensionScenarioResults({
-      tracker: input.tracker,
-      settings: input.settings,
-      currentYear: input.currentYear,
-      birthYear: input.birthYear,
-      basePoints: pensionPoints,
-      latestRelevantGrossIncome
-    })
+    annualPensionYears: statutoryPensionAnnualPensionYears(contributionYears, baseScenario),
+    scenarios
   };
 }
 
@@ -135,6 +148,35 @@ export function statutoryPensionContributionYears(
     years.set(entry.year, existing);
   }
   return [...years.values()].sort((first, second) => first.year - second.year);
+}
+
+export function statutoryPensionAnnualPensionYears(
+  contributionYears: StatutoryPensionContributionYear[],
+  baseScenario: Pick<
+    StatutoryPensionScenarioResult,
+    "projectedPensionValue" | "taxableSharePercent" | "taxRatePercent" | "healthInsurancePercent" | "careInsurancePercent"
+  >
+): StatutoryPensionAnnualPensionYear[] {
+  return contributionYears.map((year) => {
+    const grossMonthlyPension = roundCents(year.pensionPoints * baseScenario.projectedPensionValue);
+    const incomeTaxMonthly = roundCents(
+      (grossMonthlyPension * baseScenario.taxableSharePercent * baseScenario.taxRatePercent) / 10000
+    );
+    const healthInsuranceMonthly = roundCents((grossMonthlyPension * baseScenario.healthInsurancePercent) / 100);
+    const careInsuranceMonthly = roundCents((grossMonthlyPension * baseScenario.careInsurancePercent) / 100);
+    const netMonthlyPension = roundCents(
+      Math.max(0, grossMonthlyPension - incomeTaxMonthly - healthInsuranceMonthly - careInsuranceMonthly)
+    );
+    return {
+      ...year,
+      grossMonthlyPension,
+      taxableSharePercent: baseScenario.taxableSharePercent,
+      incomeTaxMonthly,
+      healthInsuranceMonthly,
+      careInsuranceMonthly,
+      netMonthlyPension
+    };
+  });
 }
 
 function statutoryPensionScenarioResults(input: {

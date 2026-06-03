@@ -535,11 +535,17 @@ function normalizeStatutoryPensionSettings(value: unknown): StatutoryPensionSett
   const fallback = defaultStatutoryPensionSettings();
   if (!isRecord(value)) return fallback;
   return {
-    contributionRatePercent: numberOrDefault(value.contributionRatePercent, fallback.contributionRatePercent),
-    averageAnnualIncome: numberOrDefault(value.averageAnnualIncome, fallback.averageAnnualIncome),
-    currentPensionValue: numberOrDefault(value.currentPensionValue, fallback.currentPensionValue),
-    projectionPensionValue: numberOrDefault(value.projectionPensionValue, fallback.projectionPensionValue),
-    annualContributionCeilingGross: numberOrDefault(
+    contributionRatePercent: statutoryPensionNumberOrFallback(
+      value.contributionRatePercent,
+      fallback.contributionRatePercent
+    ),
+    averageAnnualIncome: statutoryPensionNumberOrFallback(value.averageAnnualIncome, fallback.averageAnnualIncome),
+    currentPensionValue: statutoryPensionNumberOrFallback(value.currentPensionValue, fallback.currentPensionValue),
+    projectionPensionValue: statutoryPensionNumberOrFallback(
+      value.projectionPensionValue,
+      fallback.projectionPensionValue
+    ),
+    annualContributionCeilingGross: statutoryPensionNumberOrFallback(
       value.annualContributionCeilingGross,
       fallback.annualContributionCeilingGross
     ),
@@ -558,21 +564,33 @@ function normalizeStatutoryPensionScenario(
 ): StatutoryPensionScenarioSettings {
   const value = isRecord(scenarios) && isRecord(scenarios[id]) ? scenarios[id] : {};
   return {
-    retirementAge: clampNumber(numberOrDefault(value.retirementAge, fallback.retirementAge), 67, 72),
+    retirementAge: clampNumber(statutoryPensionNumberOrFallback(value.retirementAge, fallback.retirementAge), 67, 72),
     incomeMode: normalizeStatutoryPensionIncomeMode(value.incomeMode, fallback.incomeMode),
     annualPensionIncreasePercent: clampNumber(
-      numberOrDefault(value.annualPensionIncreasePercent, fallback.annualPensionIncreasePercent),
+      statutoryPensionNumberOrFallback(
+        value.annualPensionIncreasePercent,
+        fallback.annualPensionIncreasePercent
+      ),
       0.1,
       2
     ),
-    taxRatePercent: clampNumber(numberOrDefault(value.taxRatePercent, fallback.taxRatePercent), 0, 50),
+    taxRatePercent: clampNumber(statutoryPensionNumberOrFallback(value.taxRatePercent, fallback.taxRatePercent), 0, 50),
     healthInsurancePercent: clampNumber(
-      numberOrDefault(value.healthInsurancePercent, fallback.healthInsurancePercent),
+      statutoryPensionNumberOrFallback(value.healthInsurancePercent, fallback.healthInsurancePercent),
       0,
       20
     ),
-    careInsurancePercent: clampNumber(numberOrDefault(value.careInsurancePercent, fallback.careInsurancePercent), 0, 10)
+    careInsurancePercent: clampNumber(
+      statutoryPensionNumberOrFallback(value.careInsurancePercent, fallback.careInsurancePercent),
+      0,
+      10
+    )
   };
+}
+
+function statutoryPensionNumberOrFallback(value: unknown, fallback: number): number {
+  if (value === null || value === undefined || value === "") return fallback;
+  return numberOrDefault(value, fallback);
 }
 
 function normalizeStatutoryPensionIncomeMode(
