@@ -847,7 +847,7 @@ function bindEvents(): void {
 
     if (target.dataset.combinedNumber) {
       updateCombinedNumber(target.dataset.combinedNumber as CombinedNumberKey, target.value);
-      renderAll();
+      saveState(state);
       return;
     }
 
@@ -894,7 +894,8 @@ function bindEvents(): void {
         target.dataset.statutoryPensionScenarioField,
         target.value
       );
-      renderAll();
+      syncStatutoryPensionRangeLabel(target);
+      saveState(state);
       return;
     }
 
@@ -7336,6 +7337,26 @@ function updateStatutoryPensionScenarioField(
       [scenarioId]: nextScenario
     }
   };
+}
+
+function syncStatutoryPensionRangeLabel(input: HTMLInputElement | HTMLSelectElement): void {
+  const scenarioId = statutoryPensionScenarioIdFromValue(input.dataset.statutoryPensionScenario);
+  const field = input.dataset.statutoryPensionScenarioField;
+  const scenario = scenarioId ? state.statutoryPension.scenarios[scenarioId] : null;
+  const label = input.parentElement?.querySelector<HTMLElement>("strong");
+  if (!scenario || !field || !label) return;
+  if (field === "retirementAge") {
+    label.textContent = String(scenario.retirementAge);
+    return;
+  }
+  if (
+    field === "annualPensionIncreasePercent" ||
+    field === "taxRatePercent" ||
+    field === "healthInsurancePercent" ||
+    field === "careInsurancePercent"
+  ) {
+    label.textContent = percent(scenario[field]);
+  }
 }
 
 function toggleCombinedModule(key: CombinedToggleKey | undefined): void {

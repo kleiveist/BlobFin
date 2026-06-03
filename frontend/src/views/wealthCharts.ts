@@ -24,6 +24,18 @@ export interface VerticalBarSegment {
   overlay?: boolean;
 }
 
+interface VerticalChartPoint {
+  year: number;
+  selected: boolean;
+  financingEnd?: boolean;
+  action: string;
+  chartKind?: string;
+  value: number;
+  valueLabel: string;
+  barTotal: number;
+  segments: VerticalBarSegment[];
+}
+
 export interface RealEstateRepaymentSegmentInput {
   point: RealEstateFinancingYear;
   totalLoanCost?: number;
@@ -117,10 +129,14 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
     1,
     ...input.points.map(
       (point) =>
-        Math.max(0, point.cashValue) +
-        Math.max(0, point.depotValue) +
-        Math.max(0, point.pensionSavingsValue) +
-        Math.max(0, point.propertyValue)
+        Math.max(
+          Math.max(0, point.cashValue) +
+            Math.max(0, point.depotValue) +
+            Math.max(0, point.pensionConsumed) +
+            Math.max(0, point.pensionSavingsValue) +
+            Math.max(0, point.propertyValue),
+          Math.max(0, point.pensionConsumed)
+        )
     )
   );
 
@@ -131,6 +147,7 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
       <div class="combined-wealth-summary" aria-hidden="true">
         ${renderCombinedSummaryValue("Cash", selectedPoint.cashValue, input.formatMoney)}
         ${renderCombinedSummaryValue("Depot", selectedPoint.depotValue, input.formatMoney)}
+        ${renderCombinedSummaryValue("Rente p.a.", selectedPoint.pensionIncome, input.formatMoney)}
         ${renderCombinedSummaryValue("Rentensparen", selectedPoint.pensionSavingsValue, input.formatMoney)}
         ${renderCombinedSummaryValue("Immobilienwert", selectedPoint.propertyValue, input.formatMoney)}
       </div>
@@ -153,6 +170,7 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
     legend: [
       { className: "cash", label: "Cash" },
       { className: "depot", label: "Depot" },
+      { className: "pension-consumed", label: "Verbrauchte Rente" },
       { className: "pension", label: "Gesparte Rente" },
       { className: "property", label: "Immobilienwert" }
     ],
@@ -165,11 +183,13 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
       barTotal:
         Math.max(0, point.cashValue) +
         Math.max(0, point.depotValue) +
+        Math.max(0, point.pensionConsumed) +
         Math.max(0, point.pensionSavingsValue) +
         Math.max(0, point.propertyValue),
       segments: [
         { className: "cash", label: "Cash", value: Math.max(0, point.cashValue) },
         { className: "depot", label: "Depot", value: Math.max(0, point.depotValue) },
+        { className: "pension-consumed", label: "Verbrauchte Rente", value: Math.max(0, point.pensionConsumed) },
         { className: "pension", label: "Gesparte Rente", value: Math.max(0, point.pensionSavingsValue) },
         { className: "property", label: "Immobilienwert", value: Math.max(0, point.propertyValue) }
       ]
@@ -317,17 +337,7 @@ function renderVerticalChart(input: {
   showColumnYear?: boolean;
   showXAxisLabel?: boolean;
   legend: Array<{ className: string; label: string }>;
-  points: Array<{
-    year: number;
-    selected: boolean;
-    financingEnd?: boolean;
-    action: string;
-    chartKind?: string;
-    value: number;
-    valueLabel: string;
-    barTotal: number;
-    segments: VerticalBarSegment[];
-  }>;
+  points: VerticalChartPoint[];
 }): string {
   const columnCount = Math.max(1, input.points.length);
   const showColumnValue = input.showColumnValue ?? true;
@@ -363,17 +373,7 @@ function wealthDetailLine(label: string, value: string): string {
 }
 
 function renderVerticalBar(
-  point: {
-    year: number;
-    selected: boolean;
-    financingEnd?: boolean;
-    action: string;
-    chartKind?: string;
-    value: number;
-    valueLabel: string;
-    barTotal: number;
-    segments: VerticalBarSegment[];
-  },
+  point: VerticalChartPoint,
   maxValue: number,
   showValue: boolean,
   showYear: boolean
@@ -410,7 +410,7 @@ function renderVerticalBar(
 }
 
 function renderCombinedSummaryValue(
-  label: "Cash" | "Depot" | "Rentensparen" | "Immobilienwert",
+  label: "Cash" | "Depot" | "Rente p.a." | "Rentensparen" | "Immobilienwert",
   value: number,
   formatMoney: (value: number) => string
 ): string {

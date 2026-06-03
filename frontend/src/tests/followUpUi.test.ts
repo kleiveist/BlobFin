@@ -261,7 +261,7 @@ describe("follow-up ui rendering", () => {
       formatMoney: String
     });
     const combined = renderCombinedWealthChart({
-      points: [combinedYear],
+      points: [{ ...combinedYear, pensionIncome: 12000, pensionConsumed: 12000 }],
       selectedYear: 2026,
       formatMoney: String
     });
@@ -277,6 +277,8 @@ describe("follow-up ui rendering", () => {
     expect(trend).toContain('data-chart-kind="trend"');
     expect(trend).toContain('data-financing-end="true"');
     expect(combined).toContain("wealth-vertical-chart");
+    expect(combined).toContain("Verbrauchte Rente");
+    expect(combined).toContain("wealth-column-segment pension-consumed");
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");
   });
 
