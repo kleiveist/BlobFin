@@ -173,6 +173,21 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("grunddatenSettingsContent");
   });
 
+  it("renders the start page base data popup and read-only investment end date", () => {
+    const html = renderAppShell();
+
+    expect(html).toContain('data-action="open-base-data-popup"');
+    expect(html).toContain('id="baseDataPopup"');
+    expect(html).toContain('data-action="close-base-data-popup"');
+    expect(count(html, 'data-setting="year"')).toBeGreaterThanOrEqual(2);
+    expect(count(html, 'data-setting="interestRatePercent"')).toBeGreaterThanOrEqual(2);
+    expect(count(html, 'data-setting="cashbackRatePercent"')).toBeGreaterThanOrEqual(2);
+    expect(count(html, 'data-setting="endDate"')).toBeGreaterThanOrEqual(3);
+    expect(html).toContain('id="investmentEndDate"');
+    expect(html).toContain('data-force-disabled="true"');
+    expect(html).not.toContain('data-investment="payoutEndAge"');
+  });
+
   it("renders the position cadence switch host in the cost reserve section", () => {
     const html = renderAppShell();
 

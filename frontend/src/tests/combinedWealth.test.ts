@@ -445,6 +445,11 @@ describe("combined wealth", () => {
     expect(result[result.length - 1].year).toBe(2027);
   });
 
+  it("caps the combined horizon at the global planning end year", () => {
+    expect(combinedWealthHorizonYears(2026, 2060, 2070, 2040)).toBe(15);
+    expect(combinedWealthHorizonYears(2026, 2060, 2070, 2024)).toBe(1);
+  });
+
   it("models withdrawal impact as negative liquidity effect", () => {
     const payoutProjection = projection(
       [point(30, "saving", 10000), point(31, "payout", 9000), point(32, "payout", 8000)],

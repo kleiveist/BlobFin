@@ -20,7 +20,7 @@ Important fields:
 - `cashback`: whether cashback is calculated.
 - `payoutYear`, `payoutMonth`, `payoutDay`: payout timing.
 
-`PlanningSettings` contains the planning year, account interest rate, cashback rate, and emergency fund value. The legacy `monthlyNetIncome` setting is migrated into an income position and no longer drives calculations directly.
+`PlanningSettings` contains the planning year, account interest rate, cashback rate, global planning end date, and emergency fund value. The legacy `monthlyNetIncome` setting is migrated into an income position and no longer drives calculations directly.
 
 `InvestmentSettings` contains separate normal-depot, retirement-depot, and child-depot selections, special interest/cashback investment toggles, retirement depot settings, age settings, return, tax, inflation, reserve/bequest, and percentage withdrawal settings.
 

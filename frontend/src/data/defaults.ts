@@ -41,6 +41,7 @@ export function defaultPlanningSettings(): PlanningSettings {
     monthlyNetIncome: 0,
     interestRatePercent: 2,
     cashbackRatePercent: 1,
+    endDate: "2088-12-31",
     emergencyFund: 0
   };
 }

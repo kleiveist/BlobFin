@@ -30,7 +30,7 @@ If a selected recurring savings position starts in a future year, the displayed 
 - `Geburtsjahr`: used with the planning year to calculate today's age. In the `Kinderdepot`, the value is limited to children up to the fixed payout age of 18.
 - `Startalter Grafik`: first age shown in the chart.
 - `Rentenalter`: derived from payout end age and payout duration. This value is shared by `Depot` and `Altersvorsorgedepot`.
-- `Endalter`: last age in the projection. This value is shared by `Depot` and `Altersvorsorgedepot`.
+- `Enddatum`: read-only planning endpoint from `Grunddaten`. Change it centrally through the base data popup or settings.
 - `Auszahlungsalter`: fixed at 18 for the `Kinderdepot`.
 - `Entnahme ab Alter`: age when percentage withdrawals begin. This appears only in the normal `Depot` tab.
 - `Prozent-Entnahme p. a.`: annual percentage withdrawal rate. This appears only in the normal `Depot` tab.
@@ -91,6 +91,6 @@ Click a bar to open a popup for that year. The popup shows:
 - `Monatlicher Zugewinn durch Entnahme`: monthly percentage withdrawal split into the remaining recurring monthly investment rate after offset and the remaining net withdrawal, floored at zero.
 - `Monatliche Rente netto`: simulated net monthly payout over the payout period.
 - `Reales Vermoegen zur Rente`: retirement wealth adjusted for inflation.
-- `Reserve/Erbe zum Endalter`: projected remaining depot value at the end age based on the configured reserve/bequest percentage.
+- `Reserve/Erbe zum Enddatum`: projected remaining depot value at the global planning endpoint based on the configured reserve/bequest percentage.
 - `Realisierte Steuern bis Rente`: taxes realized before retirement through percentage withdrawals.
 - `Offene Steuer bei Verkauf zur Rente`: estimated tax on unrealized gains if the whole depot were sold at retirement.

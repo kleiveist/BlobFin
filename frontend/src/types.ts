@@ -102,6 +102,7 @@ export interface PlanningSettings {
   monthlyNetIncome: number;
   interestRatePercent: number;
   cashbackRatePercent: number;
+  endDate: string;
   emergencyFund: number;
 }
 

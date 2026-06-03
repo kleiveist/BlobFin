@@ -2493,6 +2493,26 @@ tfoot th {
   padding: 44px;
 }
 
+.landing-hero-actions {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 3;
+}
+
+.landing-base-data-button {
+  box-shadow: var(--shadow);
+}
+
+.base-data-popup {
+  position: fixed;
+  top: 112px;
+  right: max(20px, calc((100vw - 1680px) / 2 + 20px));
+  z-index: 1000;
+  max-height: calc(100vh - 136px);
+  overflow: auto;
+}
+
 .landing-hero::before {
   content: "";
   position: absolute;
@@ -6301,7 +6321,24 @@ tfoot th {
 @media (max-width: 680px) {
   .landing-hero {
     min-height: 360px;
-    padding: 22px;
+    padding: 84px 22px 22px;
+  }
+
+  .landing-hero-actions {
+    left: 22px;
+    right: 22px;
+  }
+
+  .landing-base-data-button {
+    width: 100%;
+  }
+
+  .base-data-popup {
+    left: 22px;
+    right: 22px;
+    top: 76px;
+    width: auto;
+    max-height: calc(100vh - 96px);
   }
 
   .landing-hero-copy h2 {

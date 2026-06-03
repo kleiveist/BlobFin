@@ -47,7 +47,8 @@ export function buildAssetProjection(
   const retirementAge = payoutStartAge(settings);
   const startAge = Math.min(settings.chartStartAge, retirementAge);
   const hasPayoutPhase = settings.payoutYears > 0 && settings.payoutEndAge > retirementAge;
-  const endAge = hasPayoutPhase ? Math.max(settings.payoutEndAge, retirementAge + 1) : retirementAge;
+  const requestedEndAge = Math.max(0, settings.payoutEndAge);
+  const endAge = hasPayoutPhase ? Math.max(requestedEndAge, retirementAge + 1) : Math.max(requestedEndAge, startAge);
   const savingMonths = Math.max(0, Math.round((retirementAge - simulationStartAge) * 12));
   const contributionDisplayYearIndex = recurringContributionDisplayYearIndex(
     positions,

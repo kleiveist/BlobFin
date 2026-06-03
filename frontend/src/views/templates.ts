@@ -54,9 +54,10 @@ export function renderAppShell(): string {
             </button>
             <div id="grunddatenSettingsContent" class="settings-accordion-content">
               <div class="field-grid settings-field-grid">
-                ${numberField("year", "Jahr", "setting", "year", { min: 2000, max: 2100, step: 1 })}
-                ${numberField("interestRatePercent", "Jahreszins Konto in %", "setting", "interestRatePercent", { min: 0, step: 0.01 })}
-                ${numberField("cashbackRatePercent", "Cashback in %", "setting", "cashbackRatePercent", { min: 0, step: 0.01 })}
+                ${numberField("settingsYear", "Jahr", "setting", "year", { min: 2000, max: 2100, step: 1 })}
+                ${numberField("settingsInterestRatePercent", "Jahreszins Konto in %", "setting", "interestRatePercent", { min: 0, step: 0.01 })}
+                ${numberField("settingsCashbackRatePercent", "Cashback in %", "setting", "cashbackRatePercent", { min: 0, step: 0.01 })}
+                ${dateField("settingsEndDate", "Enddatum", "endDate")}
               </div>
             </div>
             <div class="settings-popover-subhead"><strong>Darstellung</strong></div>
@@ -460,7 +461,7 @@ export function renderAppShell(): string {
                   step: 1,
                   depotScope: "child"
                 })}
-                ${numberField("payoutEndAge", "Endalter", "investment", "payoutEndAge", { min: 70, max: 110, step: 1, depotScope: "standard retirement" })}
+                ${dateField("investmentEndDate", "Enddatum", "endDate", { depotScope: "standard retirement", disabled: true })}
                 ${numberField("retirementDepotChildren", "Kindergeldberechtigte Kinder", "investment", "retirementDepotChildren", { min: 0, max: 20, step: 1, depotScope: "retirement" })}
                 ${numberField("percentageWithdrawalStartAge", "Entnahme ab Alter", "investment", "percentageWithdrawalStartAge", { min: 0, max: 110, step: 1, depotScope: "standard" })}
                 ${numberField("percentageWithdrawalRatePercent", "Prozent-Entnahme p. a.", "investment", "percentageWithdrawalRatePercent", { min: 0, max: 20, step: 0.1, depotScope: "standard" })}
@@ -537,7 +538,7 @@ export function renderAppShell(): string {
                 ${detailLine("Ansparzeit", "detailSavingMonths")}
                 ${detailLine("Monatliche gleichmaessige Entnahme netto", "detailMonthlyPension")}
                 ${detailLine("Monatliche gleichmaessige Entnahme real", "detailRealMonthlyPension")}
-                ${detailLine("Reserve/Erbe zum Endalter", "detailBequestReserve")}
+                ${detailLine("Reserve/Erbe zum Enddatum", "detailBequestReserve")}
                 ${detailLine("Gewaehlte Monatsrate", "detailSelectedMonthlyRate")}
                 </div>
               </div>
@@ -882,6 +883,23 @@ export function monthSelect(id: string, field: keyof ReservePosition, value: num
 function LandingHero(): string {
   return `
     <div class="landing-hero">
+      <div class="landing-hero-actions">
+        <button class="button secondary landing-base-data-button" type="button" data-action="open-base-data-popup">
+          Grunddaten
+        </button>
+      </div>
+      <div id="baseDataPopup" class="settings-popover base-data-popup" role="dialog" aria-label="Grunddaten" hidden>
+        <div class="settings-popover-head">
+          <strong>Grunddaten</strong>
+          <button class="chart-popup-close" type="button" data-action="close-base-data-popup" aria-label="Grunddaten schliessen">x</button>
+        </div>
+        <div class="field-grid settings-field-grid">
+          ${numberField("baseDataYear", "Jahr", "setting", "year", { min: 2000, max: 2100, step: 1 })}
+          ${numberField("baseDataInterestRatePercent", "Jahreszins Konto in %", "setting", "interestRatePercent", { min: 0, step: 0.01 })}
+          ${numberField("baseDataCashbackRatePercent", "Cashback in %", "setting", "cashbackRatePercent", { min: 0, step: 0.01 })}
+          ${dateField("baseDataEndDate", "Enddatum", "endDate")}
+        </div>
+      </div>
       <div class="landing-hero-graphic" aria-hidden="true">
         <div class="landing-dashboard">
           <span class="landing-dashboard-line wide"></span>
@@ -1099,6 +1117,22 @@ function numberField(
       <input id="${id}" type="number" min="${options.min}" ${options.max ? `max="${options.max}"` : ""} step="${
         options.step
       }" ${dataAttr} />
+    </label>
+  `;
+}
+
+function dateField(
+  id: string,
+  label: string,
+  key: string,
+  options: { depotScope?: string; disabled?: boolean } = {}
+): string {
+  const depotScopeAttr = options.depotScope ? `data-depot-scope="${options.depotScope}"` : "";
+  const forceDisabled = options.disabled ? 'data-force-disabled="true"' : "";
+  return `
+    <label class="field" for="${id}" ${depotScopeAttr}>
+      <span>${label}</span>
+      <input id="${id}" type="date" data-setting="${key}" ${forceDisabled} ${options.disabled ? "disabled" : ""} />
     </label>
   `;
 }

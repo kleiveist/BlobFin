@@ -174,8 +174,16 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
   return years;
 }
 
-export function combinedWealthHorizonYears(startYear: number, standardEndYear: number, retirementEndYear: number): number {
-  const endYear = Math.max(startYear, standardEndYear, retirementEndYear);
+export function combinedWealthHorizonYears(
+  startYear: number,
+  standardEndYear: number,
+  retirementEndYear: number,
+  planningEndYear?: number
+): number {
+  const rawEndYear = Math.max(startYear, standardEndYear, retirementEndYear);
+  const endYear = Number.isFinite(planningEndYear)
+    ? Math.min(rawEndYear, Math.max(startYear, Math.round(planningEndYear as number)))
+    : rawEndYear;
   return Math.max(1, Math.round(endYear - startYear + 1));
 }
 

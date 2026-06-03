@@ -39,6 +39,7 @@ npm run dev
 - Income, expenses, reserves, and savings rates are maintained in the `Einnahmen`, `Ausgaben`, `Ruecklagen`, and `Sparen` tables inside `Kosten- und Ruecklagenpositionen`.
 - `Jahreszins Konto in %`: account interest rate for positions with the `Zinsen` checkbox enabled.
 - `Cashback in %`: cashback rate for temporary positions with the `Cashback` checkbox enabled.
+- `Enddatum`: global planning end point used by investment, withdrawal, and combined wealth projections.
 
 ## Automatic Saving
 

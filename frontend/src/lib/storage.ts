@@ -109,7 +109,7 @@ export function resetStoredState(storage: Storage = localStorage): AppState {
 function normalizeState(value: unknown): AppState {
   const fallback = defaultAppState();
   if (!isRecord(value)) return fallback;
-  const settings = normalizePlanningSettings(value.settings);
+  let settings = normalizePlanningSettings(value.settings);
   const legacyPositions = migrateMonthlyNetIncomePosition(
     settings,
     normalizePositions(value.positions, fallback.positions, settings.year)
@@ -119,6 +119,12 @@ function normalizeState(value: unknown): AppState {
   const positions = positionsForPlanningAccount(planningAccounts, ui.selectedPlanningAccountId, legacyPositions);
   const realEstate = normalizeRealEstateFinancingSettings(value.realEstate);
   const normalizedInvestment = normalizeInvestmentSettings(value.investment);
+  if (!hasPlanningEndDate(value.settings)) {
+    settings = {
+      ...settings,
+      endDate: planningEndDateFromInvestment(normalizedInvestment, settings.year)
+    };
+  }
   const investmentByAccountId = normalizeInvestmentByAccountId(
     value.investmentByAccountId,
     planningAccounts,
@@ -146,12 +152,15 @@ function normalizeState(value: unknown): AppState {
 function normalizeLegacyState(value: unknown): AppState {
   const fallback = defaultAppState();
   if (!isRecord(value)) return fallback;
+  const investment = normalizeLegacyInvestmentSettings(value.investmentSettings);
+  const year = numberOrDefault(value.year, fallback.settings.year);
   const settings = {
     ...defaultPlanningSettings(),
-    year: numberOrDefault(value.year, fallback.settings.year),
+    year,
     monthlyNetIncome: numberOrDefault(value.monthlyNetIncome, fallback.settings.monthlyNetIncome),
     interestRatePercent: numberOrDefault(value.interestRate, fallback.settings.interestRatePercent),
     cashbackRatePercent: numberOrDefault(value.cashbackRate, fallback.settings.cashbackRatePercent),
+    endDate: normalizePlanningEndDate(value.endDate, planningEndDateFromInvestment(investment, year), year),
     emergencyFund: 0
   };
   const legacyPositions = migrateMonthlyNetIncomePosition(
@@ -161,7 +170,6 @@ function normalizeLegacyState(value: unknown): AppState {
   const planningAccounts = normalizePlanningAccounts(undefined, legacyPositions, settings.year);
   const ui = normalizeAppUiState(undefined, planningAccounts);
   const positions = positionsForPlanningAccount(planningAccounts, ui.selectedPlanningAccountId, legacyPositions);
-  const investment = normalizeLegacyInvestmentSettings(value.investmentSettings);
   const investmentByAccountId = normalizeInvestmentByAccountId(
     undefined,
     planningAccounts,
@@ -244,13 +252,71 @@ function normalizeThemeMode(value: unknown, fallback: ThemeMode): ThemeMode {
 function normalizePlanningSettings(value: unknown): PlanningSettings {
   const fallback = defaultPlanningSettings();
   if (!isRecord(value)) return fallback;
+  const year = numberOrDefault(value.year, fallback.year);
   return {
-    year: numberOrDefault(value.year, fallback.year),
+    year,
     monthlyNetIncome: numberOrDefault(value.monthlyNetIncome, fallback.monthlyNetIncome),
     interestRatePercent: numberOrDefault(value.interestRatePercent, fallback.interestRatePercent),
     cashbackRatePercent: numberOrDefault(value.cashbackRatePercent, fallback.cashbackRatePercent),
+    endDate: normalizePlanningEndDate(value.endDate, fallback.endDate, year),
     emergencyFund: 0
   };
+}
+
+function hasPlanningEndDate(value: unknown): boolean {
+  return isRecord(value) && validPlanningEndDate(value.endDate);
+}
+
+function normalizePlanningEndDate(value: unknown, fallback: string, minYear: number): string {
+  const fallbackParts = planningEndDateParts(fallback) ?? {
+    year: defaultPlanningSettings().year,
+    month: 12,
+    day: 31
+  };
+  const parsed = planningEndDateParts(value) ?? fallbackParts;
+  const minimumYear = Math.round(minYear);
+  if (parsed.year < minimumYear) {
+    return `${clampYear(minimumYear, 2000, 2200)}-12-31`;
+  }
+  const year = clampYear(parsed.year, 2000, 2200);
+  return `${year}-${String(parsed.month).padStart(2, "0")}-${String(parsed.day).padStart(2, "0")}`;
+}
+
+function validPlanningEndDate(value: unknown): boolean {
+  return planningEndDateParts(value) !== null;
+}
+
+function planningEndDateParts(value: unknown): { year: number; month: number; day: number } | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { year: Math.round(value), month: 12, day: 31 };
+  }
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const yearOnly = /^(\d{4})$/.exec(trimmed);
+  if (yearOnly) {
+    return { year: Number(yearOnly[1]), month: 12, day: 31 };
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || month < 1 || month > 12) return null;
+  const maxDay = new Date(year, month, 0).getDate();
+  if (day < 1 || day > maxDay) return null;
+  return { year, month, day };
+}
+
+function planningEndDateFromInvestment(investment: InvestmentSettings, fallbackYear: number): string {
+  const endYear = Math.max(
+    Math.round(fallbackYear),
+    Math.round(numberOrDefault(investment.birthYear, fallbackYear) + numberOrDefault(investment.payoutEndAge, 0))
+  );
+  return `${clampYear(endYear, 2000, 2200)}-12-31`;
+}
+
+function clampYear(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function normalizePlanningAccounts(

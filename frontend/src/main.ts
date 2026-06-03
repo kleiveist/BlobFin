@@ -284,6 +284,7 @@ const CAREER_MILESTONE_IMPACT_OPTIONS: Array<{ value: CareerMilestoneImpact; lab
   { value: "negative", label: "negativ" }
 ];
 const INCOME_PROJECTION_MODES: IncomeProjectionMode[] = ["off", "historical_average", "manual"];
+type NumericPlanningSetting = Exclude<keyof PlanningSettings, "endDate">;
 type NumericInvestmentSetting =
   | "birthYear"
   | "chartStartAge"
@@ -1073,6 +1074,9 @@ function bindEvents(): void {
       if (!target?.closest("#combinedWealthChartPopup")) {
         hideCombinedWealthPopup();
       }
+      if (!target?.closest("#baseDataPopup")) {
+        hideBaseDataPopup();
+      }
       return;
     }
 
@@ -1098,6 +1102,13 @@ function bindEvents(): void {
     }
     if (action !== "close-combined-wealth-popup" && !button.closest("#combinedWealthChartPopup")) {
       hideCombinedWealthPopup();
+    }
+    if (
+      action !== "open-base-data-popup" &&
+      action !== "close-base-data-popup" &&
+      !button.closest("#baseDataPopup")
+    ) {
+      hideBaseDataPopup();
     }
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
@@ -1237,6 +1248,8 @@ function bindEvents(): void {
     if (action === "toggle-theme-settings") toggleThemeSettings();
     if (action === "toggle-settings-grunddaten") toggleSettingsGrunddaten();
     if (action === "close-theme-settings") hideThemeSettings();
+    if (action === "open-base-data-popup") openBaseDataPopup();
+    if (action === "close-base-data-popup") hideBaseDataPopup();
     if (action === "open-position-icon-picker") showPositionIconPicker(button);
     if (action === "close-position-icon-picker") hidePositionIconPicker();
     if (action === "select-position-icon") {
@@ -1334,6 +1347,7 @@ function bindEvents(): void {
       hideThemeSettings();
       hideInvestmentChartPopup();
       hideCombinedWealthPopup();
+      hideBaseDataPopup();
       hideStatutoryPensionYearPopup();
       hideStatutoryPensionProjectionYearPopup();
       closeStatutoryPensionTaxPopup();
@@ -1375,6 +1389,7 @@ function renderAll(): void {
   renderPositionCostDialog();
   renderInvestmentIncludeList(reserve);
   renderCalculations(reserve, activeReserve);
+  syncPlanningInputsFromState();
   syncRealEstateInputsFromState();
   syncCombinedToggleInputsFromState();
   syncInvestmentInputsFromState();
@@ -1553,7 +1568,7 @@ function syncInvestmentProjectionLabels(depot: InvestmentDepotKey): void {
     "detailRealMonthlyPensionLabel",
     isChild ? "Monatliche Auszahlung real" : "Monatliche gleichmaessige Entnahme real"
   );
-  setText("detailBequestReserveLabel", isChild ? "Reserve zum Auszahlungsalter" : "Reserve/Erbe zum Endalter");
+  setText("detailBequestReserveLabel", isChild ? "Reserve zum Auszahlungsalter" : "Reserve/Erbe zum Enddatum");
 }
 
 function renderIncomeTracker(): void {
@@ -4415,16 +4430,22 @@ function realEstateActualPaymentStartYear(result: RealEstateFinancingResult): nu
 function currentRealEstateProjectionYears(startYear: number, investmentEndAge: number): number {
   const investmentEndYear = state.investment.birthYear + Math.floor(investmentEndAge);
   const saleYear = state.realEstate.plannedSaleYear;
-  const projectionEndYear = saleYear !== null && saleYear >= startYear ? Math.round(saleYear) : investmentEndYear;
+  const rawProjectionEndYear = saleYear !== null && saleYear >= startYear ? Math.round(saleYear) : investmentEndYear;
+  const projectionEndYear = Math.min(rawProjectionEndYear, planningEndYear());
   return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
 }
 
 function currentRealEstateMaximumProjectionYears(startYear: number): number {
   const saleYear = state.realEstate.plannedSaleYear;
+  const globalProjectionYears = clamp(
+    Math.round(planningEndYear() - startYear + 1),
+    1,
+    MAX_REAL_ESTATE_PROJECTION_YEARS
+  );
   if (saleYear !== null && saleYear >= startYear) {
-    return clamp(Math.round(saleYear - startYear + 1), 1, MAX_REAL_ESTATE_PROJECTION_YEARS);
+    return Math.min(clamp(Math.round(saleYear - startYear + 1), 1, MAX_REAL_ESTATE_PROJECTION_YEARS), globalProjectionYears);
   }
-  return MAX_REAL_ESTATE_PROJECTION_YEARS;
+  return globalProjectionYears;
 }
 
 function currentCombinedRealEstateProjectionYears(
@@ -4438,8 +4459,9 @@ function currentCombinedRealEstateProjectionYears(
   const retirementEndYear = retirementBirthYear + Math.floor(retirementProjection.endAge);
   const combinedEndYear = Math.max(standardEndYear, retirementEndYear);
   const saleYear = state.realEstate.plannedSaleYear;
-  const projectionEndYear =
+  const rawProjectionEndYear =
     saleYear !== null && saleYear >= startYear ? Math.min(Math.round(saleYear), combinedEndYear) : combinedEndYear;
+  const projectionEndYear = Math.min(rawProjectionEndYear, planningEndYear());
   return clamp(Math.round(projectionEndYear - startYear + 1), 1, 80);
 }
 
@@ -4490,7 +4512,7 @@ function realEstateWithdrawalProfiles(accountIds: string[] | null = null): RealE
     const reserve = calculateReserveSummary(state.settings, account.yearlyRows);
     const projection = buildDepotAssetProjection(reserve, "standard", account.id);
     const withdrawalStartYear = realEstateWithdrawalStartYear(projection, settings);
-    const withdrawalEndYear = settings.birthYear + Math.floor(projection.endAge);
+    const withdrawalEndYear = Math.min(planningEndYear(), settings.birthYear + Math.floor(projection.endAge));
     const depotSavingsRateAvailable = realEstateDepotSavingsRateAvailable(projection);
     return {
       accountId: account.id,
@@ -4588,7 +4610,8 @@ function calculateCombinedWealthYears(
   const horizonYears = combinedWealthHorizonYears(
     state.settings.year,
     Math.max(depotEndYear, realEstateEndYear),
-    pensionEndYear
+    pensionEndYear,
+    planningEndYear()
   );
 
   const cashContribution = combinedCashContribution(horizonYears, selectedCombinedCashPlanningAccount());
@@ -7114,19 +7137,23 @@ function incomeDateCells(position: ReservePosition): string {
 }
 
 function syncAllInputsFromState(): void {
-  for (const key of Object.keys(state.settings) as Array<keyof PlanningSettings>) {
-    setInputValue(`[data-setting="${key}"]`, state.settings[key]);
-  }
+  syncPlanningInputsFromState();
   syncRealEstateInputsFromState();
   syncCombinedToggleInputsFromState();
   syncInvestmentInputsFromState();
   syncThemeControls();
 }
 
+function syncPlanningInputsFromState(): void {
+  for (const key of Object.keys(state.settings) as Array<keyof PlanningSettings>) {
+    setInputValue(`[data-setting="${key}"]`, state.settings[key]);
+  }
+}
+
 function syncInvestmentInputsFromState(): void {
   syncInvestmentInputBounds();
   const depot = activeInvestmentDepot();
-  const settings = depotInvestmentSettings(depot);
+  const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettings(depot));
   for (const key of inputInvestmentFields()) {
     setInputValue(`[data-investment="${key}"]`, settings[key]);
   }
@@ -7137,7 +7164,7 @@ function syncInvestmentInputsFromState(): void {
 
 function syncInvestmentInputBounds(): void {
   const depot = activeInvestmentDepot();
-  const settings = depotInvestmentSettings(depot);
+  const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettings(depot));
   const retirementAge = calculatePayoutStartAge(settings);
   const chartStartAge = settings.chartStartAge;
   const retirementMin = RETIREMENT_DEPOT_MIN_AGE;
@@ -7524,10 +7551,65 @@ function syncSettingsAccordionState(): void {
 }
 
 function updatePlanningSetting(field: keyof PlanningSettings, value: string): void {
+  if (field === "endDate") {
+    state.settings = {
+      ...state.settings,
+      endDate: normalizePlanningEndDate(value, state.settings.year)
+    };
+    return;
+  }
+
   state.settings = {
     ...state.settings,
-    [field]: clamp(numberValue(value), settingMin(field), settingMax(field))
+    [field]: planningSettingNumberValue(field, value)
   };
+  state.settings = {
+    ...state.settings,
+    endDate: normalizePlanningEndDate(state.settings.endDate, state.settings.year)
+  };
+}
+
+function planningSettingNumberValue(field: NumericPlanningSetting, value: string): number {
+  const numericValue = clamp(numberValue(value), settingMin(field), settingMax(field));
+  return field === "year" ? Math.round(numericValue) : numericValue;
+}
+
+function normalizePlanningEndDate(value: unknown, minYear: number): string {
+  const fallbackYear = clamp(Math.round(minYear), settingMin("year"), 2200);
+  const parsed = planningDateParts(value);
+  if (!parsed) return `${fallbackYear}-12-31`;
+  if (parsed.year < fallbackYear) return `${fallbackYear}-12-31`;
+  const year = clamp(parsed.year, settingMin("year"), 2200);
+  return `${year}-${String(parsed.month).padStart(2, "0")}-${String(parsed.day).padStart(2, "0")}`;
+}
+
+function planningDateParts(value: unknown): { year: number; month: number; day: number } | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { year: Math.round(value), month: 12, day: 31 };
+  }
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const yearOnly = /^(\d{4})$/.exec(trimmed);
+  if (yearOnly) {
+    return { year: Number(yearOnly[1]), month: 12, day: 31 };
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || month < 1 || month > 12) return null;
+  const maxDay = new Date(year, month, 0).getDate();
+  if (day < 1 || day > maxDay) return null;
+  return { year, month, day };
+}
+
+function planningEndYear(): number {
+  return planningDateParts(state.settings.endDate)?.year ?? state.settings.year;
+}
+
+function planningEndAgeForBirthYear(birthYear: number): number {
+  return clamp(planningEndYear() - Math.round(birthYear), 0, investmentMax("payoutEndAge"));
 }
 
 function updateInvestmentSetting(field: keyof InvestmentSettings, value: string): void {
@@ -7559,8 +7641,8 @@ function updateSharedPayoutEndAge(value: string): void {
 function currentSharedRetirementAge(): number {
   return Math.max(
     RETIREMENT_DEPOT_MIN_AGE,
-    calculatePayoutStartAge(depotInvestmentSettings("standard")),
-    calculatePayoutStartAge(depotInvestmentSettings("retirement"))
+    calculatePayoutStartAge(investmentSettingsWithGlobalEndDate(depotInvestmentSettings("standard"))),
+    calculatePayoutStartAge(investmentSettingsWithGlobalEndDate(depotInvestmentSettings("retirement")))
   );
 }
 
@@ -7718,9 +7800,9 @@ function depotInvestmentSettingsForBase(depot: InvestmentDepotKey, settings: Inv
     includeAccountCashback: settings.retirementIncludeAccountCashback,
     birthYear: settings.retirementBirthYear,
     chartStartAge: settings.retirementChartStartAge,
-    payoutEndAge: settings.payoutEndAge,
+    payoutEndAge: settings.retirementPayoutEndAge,
     payoutYears: settings.retirementPayoutYears,
-    percentageWithdrawalStartAge: settings.payoutEndAge - settings.retirementPayoutYears,
+    percentageWithdrawalStartAge: settings.retirementPayoutEndAge - settings.retirementPayoutYears,
     percentageWithdrawalRatePercent: 0,
     investmentReturnPercent: settings.retirementInvestmentReturnPercent,
     capitalGainsTaxPercent: settings.retirementCapitalGainsTaxPercent,
@@ -7776,14 +7858,30 @@ function updateDepotInvestmentSettings(depot: InvestmentDepotKey, updates: Parti
 }
 
 function updateRetirementAge(value: string): void {
-  const payoutEndAge = state.investment.payoutEndAge;
-  const retirementAge = clampRetirementAge(numberValue(value), payoutEndAge);
-  const payoutYears = payoutYearsForRetirementAge(payoutEndAge, retirementAge);
+  const standardPayoutEndAge = numericInvestmentValue(
+    "payoutEndAge",
+    String(Math.max(investmentMin("payoutEndAge"), planningEndAgeForBirthYear(state.investment.birthYear)))
+  );
+  const retirementPayoutEndAge = numericInvestmentValue(
+    "payoutEndAge",
+    String(Math.max(investmentMin("payoutEndAge"), planningEndAgeForBirthYear(state.investment.retirementBirthYear)))
+  );
+  const retirementAge = clamp(
+    numberValue(value),
+    RETIREMENT_DEPOT_MIN_AGE,
+    Math.min(
+      retirementAgeMaxForPayoutEndAge(standardPayoutEndAge),
+      retirementAgeMaxForPayoutEndAge(retirementPayoutEndAge)
+    )
+  );
+  const payoutYears = payoutYearsForRetirementAge(standardPayoutEndAge, retirementAge);
+  const retirementPayoutYears = payoutYearsForRetirementAge(retirementPayoutEndAge, retirementAge);
   state.investment = {
     ...state.investment,
-    retirementPayoutEndAge: payoutEndAge,
+    payoutEndAge: standardPayoutEndAge,
+    retirementPayoutEndAge,
     payoutYears,
-    retirementPayoutYears: payoutYears
+    retirementPayoutYears
   };
   normalizeInvestmentBounds();
 }
@@ -8191,6 +8289,7 @@ function resetState(): void {
   applyTheme();
   syncAllInputsFromState();
   hideThemeSettings();
+  hideBaseDataPopup();
   renderAll();
 }
 
@@ -8215,6 +8314,7 @@ function toggleThemeSettings(): void {
   if (!panel) return;
   panel.hidden = !panel.hidden;
   if (!panel.hidden) {
+    hideBaseDataPopup();
     syncSettingsAccordionState();
   }
   syncThemeControls();
@@ -8225,6 +8325,19 @@ function hideThemeSettings(): void {
   if (panel) panel.hidden = true;
   syncThemeControls();
   updateModuleVisibility();
+}
+
+function openBaseDataPopup(): void {
+  const popup = document.querySelector<HTMLDivElement>("#baseDataPopup");
+  if (!popup) return;
+  hideThemeSettings();
+  syncPlanningInputsFromState();
+  popup.hidden = false;
+}
+
+function hideBaseDataPopup(): void {
+  const popup = document.querySelector<HTMLDivElement>("#baseDataPopup");
+  if (popup) popup.hidden = true;
 }
 
 function syncThemeControls(): void {
@@ -8393,8 +8506,9 @@ function setRangeLabel(key: keyof InvestmentSettings, value: string): void {
 }
 
 function setInputValue(selector: string, value: number | string | string[]): void {
-  const input = document.querySelector<HTMLInputElement | HTMLSelectElement>(selector);
-  if (input) input.value = String(value);
+  for (const input of document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(selector)) {
+    input.value = String(value);
+  }
 }
 
 function setInputBounds(selector: string, min: number, max: number): void {
@@ -8722,7 +8836,7 @@ function investmentSettingsForProjection(
   depot: InvestmentDepotKey,
   accountId: string
 ): InvestmentSettings {
-  const settings = depotInvestmentSettingsForAccount(depot, accountId);
+  const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettingsForAccount(depot, accountId));
   const includedIds = new Set(settings.includedIds);
   if (settings.includeAccountInterest && summary.totalInterest > 0) {
     includedIds.add(INTEREST_INVESTMENT_POSITION_ID);
@@ -8733,6 +8847,23 @@ function investmentSettingsForProjection(
   return {
     ...settings,
     includedIds: Array.from(includedIds)
+  };
+}
+
+function investmentSettingsWithGlobalEndDate(settings: InvestmentSettings): InvestmentSettings {
+  if (settings.activeDepot === "child") return settings;
+  const payoutEndAge = planningEndAgeForBirthYear(settings.birthYear);
+  const preferredPayoutStartAge = Math.max(0, settings.payoutEndAge - settings.payoutYears);
+  const payoutYears = Math.max(
+    0,
+    Math.min(investmentMax("payoutYears"), Math.round(payoutEndAge - preferredPayoutStartAge))
+  );
+  return {
+    ...settings,
+    payoutEndAge,
+    retirementPayoutEndAge: payoutEndAge,
+    payoutYears,
+    retirementPayoutYears: payoutYears
   };
 }
 
@@ -8860,30 +8991,33 @@ function normalizeInvestmentBounds(): void {
   nextInvestment.activeDepot = INVESTMENT_DEPOTS.includes(nextInvestment.activeDepot)
     ? nextInvestment.activeDepot
     : "standard";
-  const payoutEndAgeSource =
-    nextInvestment.activeDepot === "retirement" ? nextInvestment.retirementPayoutEndAge : nextInvestment.payoutEndAge;
-  const sharedPayoutEndAge = numericInvestmentValue(
+  const standardPayoutEndAge = numericInvestmentValue(
     "payoutEndAge",
-    String(payoutEndAgeSource)
+    String(Math.max(investmentMin("payoutEndAge"), planningEndAgeForBirthYear(nextInvestment.birthYear)))
+  );
+  const retirementPayoutEndAge = numericInvestmentValue(
+    "payoutEndAge",
+    String(Math.max(investmentMin("payoutEndAge"), planningEndAgeForBirthYear(nextInvestment.retirementBirthYear)))
   );
   nextInvestment = {
     ...nextInvestment,
-    payoutEndAge: sharedPayoutEndAge,
-    retirementPayoutEndAge: sharedPayoutEndAge
+    payoutEndAge: standardPayoutEndAge,
+    retirementPayoutEndAge
   };
   const sharedRetirementAge = clampRetirementAge(
     Math.max(
       RETIREMENT_DEPOT_MIN_AGE,
       nextInvestment.payoutEndAge - nextInvestment.payoutYears,
-      nextInvestment.payoutEndAge - nextInvestment.retirementPayoutYears
+      nextInvestment.retirementPayoutEndAge - nextInvestment.retirementPayoutYears
     ),
-    sharedPayoutEndAge
+    Math.min(standardPayoutEndAge, retirementPayoutEndAge)
   );
-  const sharedPayoutYears = payoutYearsForRetirementAge(sharedPayoutEndAge, sharedRetirementAge);
+  const standardPayoutYears = payoutYearsForRetirementAge(standardPayoutEndAge, sharedRetirementAge);
+  const retirementPayoutYears = payoutYearsForRetirementAge(retirementPayoutEndAge, sharedRetirementAge);
   nextInvestment = {
     ...nextInvestment,
-    payoutYears: sharedPayoutYears,
-    retirementPayoutYears: sharedPayoutYears
+    payoutYears: standardPayoutYears,
+    retirementPayoutYears
   };
 
   const standardRetirementAge = calculatePayoutStartAge({
@@ -8904,9 +9038,9 @@ function normalizeInvestmentBounds(): void {
     retirementDepotEnabled: true,
     birthYear: nextInvestment.retirementBirthYear,
     chartStartAge: nextInvestment.retirementChartStartAge,
-    payoutEndAge: nextInvestment.payoutEndAge,
+    payoutEndAge: nextInvestment.retirementPayoutEndAge,
     payoutYears: nextInvestment.retirementPayoutYears,
-    percentageWithdrawalStartAge: nextInvestment.payoutEndAge - nextInvestment.retirementPayoutYears,
+    percentageWithdrawalStartAge: nextInvestment.retirementPayoutEndAge - nextInvestment.retirementPayoutYears,
     percentageWithdrawalRatePercent: 0,
     investmentReturnPercent: nextInvestment.retirementInvestmentReturnPercent,
     capitalGainsTaxPercent: nextInvestment.retirementCapitalGainsTaxPercent,
@@ -8935,8 +9069,8 @@ function normalizeInvestmentBounds(): void {
   );
   state.investment = {
     ...nextInvestment,
-    payoutEndAge: sharedPayoutEndAge,
-    retirementPayoutEndAge: sharedPayoutEndAge,
+    payoutEndAge: standardPayoutEndAge,
+    retirementPayoutEndAge,
     chartStartAge: standardChartStartAge,
     percentageWithdrawalStartAge: clamp(
       nextInvestment.percentageWithdrawalStartAge,

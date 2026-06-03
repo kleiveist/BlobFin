@@ -40,6 +40,48 @@ describe("storage", () => {
     expect(state.ui.activeSection).toBe("home");
   });
 
+  it("starts with a global planning end date in the base settings", () => {
+    const state = defaultAppState();
+
+    expect(state.settings.endDate).toBe("2088-12-31");
+  });
+
+  it("keeps a saved global planning end date", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    state.settings.endDate = "2044-06-30";
+
+    saveState(state, storage);
+    const loaded = loadState(storage);
+
+    expect(loaded.settings.endDate).toBe("2044-06-30");
+  });
+
+  it("migrates missing global planning end date from investment end age", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const legacyState = {
+      ...state,
+      settings: {
+        year: state.settings.year,
+        monthlyNetIncome: state.settings.monthlyNetIncome,
+        interestRatePercent: state.settings.interestRatePercent,
+        cashbackRatePercent: state.settings.cashbackRatePercent,
+        emergencyFund: state.settings.emergencyFund
+      },
+      investment: {
+        ...state.investment,
+        birthYear: 1980,
+        payoutEndAge: 90
+      }
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.settings.endDate).toBe("2070-12-31");
+  });
+
   it("persists combined app section ids", () => {
     const storage = new MemoryStorage();
 

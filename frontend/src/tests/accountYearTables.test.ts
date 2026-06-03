@@ -9,6 +9,7 @@ const settings: PlanningSettings = {
   monthlyNetIncome: 0,
   interestRatePercent: 0,
   cashbackRatePercent: 0,
+  endDate: "2088-12-31",
   emergencyFund: 0
 };
 
