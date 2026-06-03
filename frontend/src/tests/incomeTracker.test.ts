@@ -186,6 +186,30 @@ describe("income tracker capital gains tax", () => {
     expect(incomeYearEntryCalculatedNetIncome(entry)).toBe(445);
   });
 
+  it("removes social contribution fields from capital gains entries", () => {
+    const entry = applyCapitalGainsTaxToEntry(
+      yearlyEntry({
+        label: "dividends",
+        annualGrossIncome: 1000,
+        taxDeductionItems: {
+          ...emptyIncomeTaxDeductionItems(),
+          capitalGainsTax: 20,
+          pensionInsurance: 100,
+          healthInsurance: 80,
+          careInsurance: 20,
+          unemploymentInsurance: 10,
+          employerPensionInsurance: 120
+        }
+      })
+    );
+
+    expect(entry.taxDeductionItems.pensionInsurance).toBeNull();
+    expect(entry.taxDeductionItems.healthInsurance).toBeNull();
+    expect(entry.taxDeductionItems.careInsurance).toBeNull();
+    expect(entry.taxDeductionItems.unemploymentInsurance).toBeNull();
+    expect(entry.taxDeductionItems.employerPensionInsurance).toBeNull();
+  });
+
   it("calculates optional church tax with 8 and 9 percent rates", () => {
     const eightPercent = applyCapitalGainsTaxToEntry(
       yearlyEntry({

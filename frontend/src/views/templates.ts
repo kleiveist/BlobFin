@@ -4,7 +4,7 @@ import { normalizePositionIcon, positionIconLabel, positionIconSvg } from "../li
 import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
-type OverviewIconName = "income" | "portfolio" | "table" | "investment" | "property" | "combine" | "account";
+type OverviewIconName = "income" | "portfolio" | "table" | "investment" | "property" | "combine" | "account" | "pension";
 
 interface OverviewCardConfig {
   sectionId: string;
@@ -94,6 +94,16 @@ export function renderAppShell(): string {
               badge: "Einkommen"
             },
             {
+              sectionId: "statutory_pension",
+              title: "Gesetzliche Rente",
+              subtitle: "Rentenpunkte und Szenarien",
+              description:
+                "RV-Beitraege aus dem Jahresnettoeinkommen auswerten und Rentenszenarien vergleichen.",
+              actionLabel: "Rente oeffnen",
+              icon: "pension",
+              badge: "Rente"
+            },
+            {
               sectionId: "planning_scenarios",
               title: "Planungen und Szenarien",
               subtitle: "Positionen, Jahrestabelle und Investmentplanung",
@@ -121,7 +131,7 @@ export function renderAppShell(): string {
                 "Konten, Depotentwicklung, Entnahmen und Immobilien in einem Vermoegenspfad vergleichen.",
               actionLabel: "Vermoegen oeffnen",
               icon: "combine",
-              badge: "Vergleich"
+              badge: "Vermoegen"
             }
           ],
           "module",
@@ -658,10 +668,24 @@ export function renderAppShell(): string {
         </div>
       </section>
 
+      <section class="panel statutory-pension-panel" data-module-section="statutory_pension">
+        ${moduleTopBar("Gesetzliche Rente", "Rentenpunkte und Szenarien")}
+        <div id="statutoryPensionSection">
+          <div class="statutory-pension-section">
+            <h2>Gesetzliche Rente</h2>
+            <div class="statutory-pension-scenarios">
+              <span>Pessimistisch</span>
+              <span>Basis</span>
+              <span>Optimistisch</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel combined-wealth-panel" data-module-section="combined_wealth">
         ${moduleTopBar("Vermoegen", "Vermoegensvarianten / Kombination")}
         <div class="section-heading">
-          <h2>Vermoegensvarianten / Kombination</h2>
+          <h2>Vermoegen</h2>
         </div>
         <div class="combined-wealth-grid">
           <section class="combined-wealth-card">
@@ -899,7 +923,9 @@ function overviewIcon(icon: OverviewIconName): string {
     combine:
       '<path d="M7 7h5a5 5 0 0 1 5 5v5" /><path d="m14 14 3 3 3-3" /><path d="M17 7h-5a5 5 0 0 0-5 5v5" /><path d="m4 14 3 3 3-3" />',
     account:
-      '<rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h8" /><path d="M8 13h5" /><path d="M8 17h7" />'
+      '<rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h8" /><path d="M8 13h5" /><path d="M8 17h7" />',
+    pension:
+      '<path d="M6 19V7" /><path d="M18 19V7" /><path d="M4 19h16" /><path d="M4 7h16" /><path d="M8 7a4 4 0 0 1 8 0" /><path d="M9 12h6" /><path d="M9 15h4" />'
   };
   return `
     <span class="overview-card-icon" aria-hidden="true">

@@ -11,6 +11,7 @@ export type AppSectionId =
   | "income"
   | "planning_scenarios"
   | "real_estate_financing"
+  | "statutory_pension"
   | "combined_wealth";
 export type PlanningAccountType = "cost_reserve" | "annual_table" | "mixed";
 export type RealEstateLocale = "de" | "en";
@@ -254,6 +255,24 @@ export interface CombinedWealthToggles {
   includeRealEstateValueTrend: boolean;
 }
 
+export type StatutoryPensionScenarioId = "pessimistic" | "base" | "optimistic";
+export type StatutoryPensionIncomeMode = "constant" | "income_projection";
+
+export interface StatutoryPensionScenarioSettings {
+  retirementAge: number;
+  incomeMode: StatutoryPensionIncomeMode;
+  annualPensionIncreasePercent: number;
+}
+
+export interface StatutoryPensionSettings {
+  contributionRatePercent: number;
+  averageAnnualIncome: number;
+  currentPensionValue: number;
+  projectionPensionValue: number;
+  annualContributionCeilingGross: number;
+  scenarios: Record<StatutoryPensionScenarioId, StatutoryPensionScenarioSettings>;
+}
+
 export interface IncomeYearEntry {
   id: string;
   active: boolean;
@@ -348,6 +367,7 @@ export interface AppState {
   ui: AppUiState;
   realEstate: RealEstateFinancingSettings;
   combinedWealth: CombinedWealthToggles;
+  statutoryPension: StatutoryPensionSettings;
   incomeTracker: IncomeTrackerState;
   positions: ReservePosition[];
   investmentByAccountId: Record<string, InvestmentSettings>;

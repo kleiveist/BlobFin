@@ -43,7 +43,7 @@ describe("storage", () => {
   it("persists combined app section ids", () => {
     const storage = new MemoryStorage();
 
-    for (const section of ["income", "planning_scenarios"] as const) {
+    for (const section of ["income", "planning_scenarios", "real_estate_financing", "combined_wealth", "statutory_pension"] as const) {
       const state = defaultAppState();
       state.ui.activeSection = section;
 
@@ -308,6 +308,41 @@ describe("storage", () => {
     expect(loaded.combinedWealth.includeWithdrawals).toBe(false);
     expect(loaded.combinedWealth.includeRealEstateFinancing).toBe(true);
     expect(loaded.combinedWealth.includeRealEstateValueTrend).toBe(false);
+  });
+
+  it("uses default statutory pension settings when saved values are missing", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const legacyState = { ...state };
+    delete (legacyState as Partial<typeof state>).statutoryPension;
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.statutoryPension.contributionRatePercent).toBe(18.6);
+    expect(loaded.statutoryPension.averageAnnualIncome).toBe(51944);
+    expect(loaded.statutoryPension.scenarios.pessimistic.incomeMode).toBe("constant");
+    expect(loaded.statutoryPension.scenarios.base.incomeMode).toBe("income_projection");
+    expect(loaded.statutoryPension.scenarios.optimistic.retirementAge).toBe(72);
+  });
+
+  it("persists statutory pension scenario settings", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    state.statutoryPension.contributionRatePercent = 19;
+    state.statutoryPension.scenarios.base = {
+      retirementAge: 70,
+      incomeMode: "constant",
+      annualPensionIncreasePercent: 1.5
+    };
+
+    saveState(state, storage);
+    const loaded = loadState(storage);
+
+    expect(loaded.statutoryPension.contributionRatePercent).toBe(19);
+    expect(loaded.statutoryPension.scenarios.base.retirementAge).toBe(70);
+    expect(loaded.statutoryPension.scenarios.base.incomeMode).toBe("constant");
+    expect(loaded.statutoryPension.scenarios.base.annualPensionIncreasePercent).toBe(1.5);
   });
 
   it("adds missing income yearly entry defaults to saved yearly entries", () => {

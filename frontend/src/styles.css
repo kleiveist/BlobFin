@@ -2629,7 +2629,7 @@ tfoot th {
 }
 
 .landing-main-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .overview-card {
@@ -2919,6 +2919,236 @@ tfoot th {
   border-radius: 8px;
   min-width: 0;
   padding: 12px;
+}
+
+.statutory-pension-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.statutory-pension-section {
+  display: grid;
+  gap: 12px;
+}
+
+.statutory-pension-head {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(300px, 1.4fr);
+}
+
+.statutory-pension-head h3,
+.statutory-pension-head p {
+  margin-bottom: 0;
+}
+
+.statutory-pension-head p:not(.eyebrow) {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.statutory-pension-basis-grid,
+.statutory-pension-metrics,
+.statutory-pension-scenarios {
+  display: grid;
+  gap: 10px;
+}
+
+.statutory-pension-basis-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.statutory-pension-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.statutory-pension-metric,
+.statutory-pension-formula,
+.statutory-pension-scenario {
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.statutory-pension-metric {
+  display: grid;
+  gap: 4px;
+}
+
+.statutory-pension-metric span,
+.statutory-pension-formula span,
+.statutory-pension-scenario-results span,
+.statutory-pension-scenario small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.statutory-pension-metric strong,
+.statutory-pension-scenario-head span {
+  font-variant-numeric: tabular-nums;
+}
+
+.statutory-pension-formula {
+  display: grid;
+  gap: 6px;
+}
+
+.statutory-pension-scenarios {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statutory-pension-scenario {
+  display: grid;
+  gap: 10px;
+}
+
+.statutory-pension-scenario-head {
+  display: grid;
+  gap: 4px;
+}
+
+.statutory-pension-scenario-head span {
+  color: var(--accent-strong);
+  font-weight: 900;
+}
+
+.statutory-pension-scenario-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.statutory-pension-range {
+  grid-template-columns: minmax(145px, 200px) minmax(160px, 1fr) minmax(70px, auto);
+}
+
+.statutory-pension-scenario-results {
+  display: grid;
+  gap: 4px;
+}
+
+.statutory-pension-scenario-results span {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.statutory-pension-empty {
+  margin: 0;
+}
+
+.statutory-pension-overlay {
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.statutory-pension-overlay h3,
+.statutory-pension-overlay p {
+  margin-bottom: 0;
+}
+
+.statutory-pension-overlay p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.statutory-pension-overlay-chart {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.statutory-pension-overlay-track {
+  min-height: 122px;
+  position: relative;
+}
+
+.statutory-pension-overlay-bar {
+  align-items: center;
+  border-radius: 8px;
+  color: #fff;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  left: 0;
+  min-width: 120px;
+  overflow: hidden;
+  padding: 0 12px;
+  position: absolute;
+  text-shadow: 0 1px 2px rgba(20, 24, 28, 0.28);
+}
+
+.statutory-pension-overlay-bar.optimistic {
+  background: #2e6d84;
+  height: 72px;
+  top: 10px;
+  z-index: 1;
+}
+
+.statutory-pension-overlay-bar.base {
+  background: #3b866d;
+  height: 56px;
+  top: 32px;
+  z-index: 2;
+}
+
+.statutory-pension-overlay-bar.pessimistic {
+  background: #b4554d;
+  height: 40px;
+  top: 52px;
+  z-index: 3;
+}
+
+.statutory-pension-overlay-bar span,
+.statutory-pension-overlay-bar strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statutory-pension-overlay-bar strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.statutory-pension-overlay-legend {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statutory-pension-overlay-legend-card {
+  border: 1px solid var(--row-border);
+  border-left-width: 5px;
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
+.statutory-pension-overlay-legend-card.pessimistic {
+  border-left-color: #b4554d;
+}
+
+.statutory-pension-overlay-legend-card.base {
+  border-left-color: #3b866d;
+}
+
+.statutory-pension-overlay-legend-card.optimistic {
+  border-left-color: #2e6d84;
+}
+
+.statutory-pension-overlay-legend-card span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
 }
 
 .chart-inline-metrics {
@@ -5217,6 +5447,12 @@ tfoot th {
   .combined-wealth-ticks {
     gap: 1px;
     grid-template-columns: repeat(var(--wealth-chart-count, 1), minmax(12px, 1fr));
+  }
+
+  .statutory-pension-head,
+  .statutory-pension-scenarios,
+  .statutory-pension-overlay-legend {
+    grid-template-columns: 1fr;
   }
 
   .income-chart-grid,

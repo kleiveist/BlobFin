@@ -71,17 +71,25 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('data-action="open-section-planning_scenarios"');
     expect(html).toContain('data-action="open-section-real_estate_financing"');
     expect(html).toContain('data-action="open-section-combined_wealth"');
+    expect(html).toContain('data-action="open-section-statutory_pension"');
     expect(html).not.toContain('data-action="open-section-income_tracking"');
     expect(html).not.toContain('data-action="open-section-income_status"');
     expect(html).not.toContain('data-action="open-section-income_charts"');
     expect(html).not.toContain('data-action="open-section-cost_reserve_positions"');
     expect(html).not.toContain('data-action="open-section-year_table"');
     expect(html).not.toContain('data-action="open-section-investment_planning"');
-    expect(count(html, 'class="overview-card module-overview-card"')).toBe(4);
+    expect(count(html, 'class="overview-card module-overview-card"')).toBe(5);
+    expect(html.indexOf("Jahresnettoeinkommen")).toBeLessThan(html.indexOf("Gesetzliche Rente"));
+    expect(html.indexOf("Gesetzliche Rente")).toBeLessThan(html.indexOf("Planungen und Szenarien"));
     expect(html).toContain("Jahresnettoeinkommen");
     expect(html).toContain("Planungen und Szenarien");
     expect(html).toContain("Immobilien");
     expect(html).toContain("Vermoegen");
+    expect(html).toContain("Vermoegen oeffnen");
+    expect(html).toContain("Gesetzliche Rente");
+    expect(html).toContain("Rente oeffnen");
+    expect(html).not.toContain("Vermoegen und Altersvorsorge");
+    expect(html).not.toContain("Vorsorge oeffnen");
   });
 
   it("structures income as one combined page with insights before status", () => {
@@ -112,6 +120,32 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("Kosten- und Ruecklagenpositionen");
     expect(html).toContain("Jahrestabellen pro Konto");
     expect(html).toContain("Investment- und Auszahlungsplanung");
+  });
+
+  it("renders statutory pension as its own page outside combined wealth", () => {
+    const html = renderAppShell();
+    const statutoryPageIndex = html.indexOf('data-module-section="statutory_pension"');
+    const pensionIndex = html.indexOf('id="statutoryPensionSection"');
+    const combinedIndex = html.indexOf('data-module-section="combined_wealth"');
+    const accountsIndex = html.indexOf("Konten aktivieren");
+    const modulesIndex = html.indexOf("Module aktivieren");
+    const chartIndex = html.indexOf('id="combinedWealthChart"');
+
+    expect(statutoryPageIndex).toBeGreaterThan(-1);
+    expect(pensionIndex).toBeGreaterThan(-1);
+    expect(combinedIndex).toBeGreaterThan(-1);
+    expect(accountsIndex).toBeGreaterThan(-1);
+    expect(modulesIndex).toBeGreaterThan(-1);
+    expect(chartIndex).toBeGreaterThan(-1);
+    expect(statutoryPageIndex).toBeLessThan(pensionIndex);
+    expect(pensionIndex).toBeLessThan(combinedIndex);
+    expect(combinedIndex).toBeLessThan(accountsIndex);
+    expect(combinedIndex).toBeLessThan(modulesIndex);
+    expect(combinedIndex).toBeLessThan(chartIndex);
+    expect(html).toContain("Gesetzliche Rente");
+    expect(html).toContain("Pessimistisch");
+    expect(html).toContain("Basis");
+    expect(html).toContain("Optimistisch");
   });
 
   it("renders the world graphic action inside the combined income page", () => {

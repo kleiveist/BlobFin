@@ -9,7 +9,8 @@ import type {
   PositionTableViewState,
   RealEstateFinancingSettings,
   RepaymentSourceToggle,
-  ReservePosition
+  ReservePosition,
+  StatutoryPensionSettings
 } from "../types";
 
 export const MONTHS = [
@@ -315,6 +316,33 @@ export function defaultCombinedWealthToggles(): CombinedWealthToggles {
   };
 }
 
+export function defaultStatutoryPensionSettings(): StatutoryPensionSettings {
+  return {
+    contributionRatePercent: 18.6,
+    averageAnnualIncome: 51944,
+    currentPensionValue: 40.79,
+    projectionPensionValue: 42.52,
+    annualContributionCeilingGross: 101400,
+    scenarios: {
+      pessimistic: {
+        retirementAge: 67,
+        incomeMode: "constant",
+        annualPensionIncreasePercent: 0.1
+      },
+      base: {
+        retirementAge: 67,
+        incomeMode: "income_projection",
+        annualPensionIncreasePercent: 1
+      },
+      optimistic: {
+        retirementAge: 72,
+        incomeMode: "income_projection",
+        annualPensionIncreasePercent: 2
+      }
+    }
+  };
+}
+
 export function defaultIncomeTrackerState(): IncomeTrackerState {
   return {
     yearlyEntries: [],
@@ -339,6 +367,7 @@ export function defaultAppState(): AppState {
     ui: defaultAppUiState(),
     realEstate: defaultRealEstateFinancingSettings(),
     combinedWealth: defaultCombinedWealthToggles(),
+    statutoryPension: defaultStatutoryPensionSettings(),
     incomeTracker: defaultIncomeTrackerState(),
     positions: planningAccounts[0].yearlyRows,
     investmentByAccountId: {

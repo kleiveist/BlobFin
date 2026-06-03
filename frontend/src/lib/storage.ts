@@ -10,7 +10,8 @@ import {
   defaultPlanningSettings,
   defaultPositionTableViewState,
   defaultRealEstateFinancingSettings,
-  defaultRepaymentSourceToggles
+  defaultRepaymentSourceToggles,
+  defaultStatutoryPensionSettings
 } from "../data/defaults";
 import { DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT } from "../domain/incomeTracker";
 import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
@@ -56,6 +57,10 @@ import type {
   RealEstateFinancingSettings,
   RepaymentSourceToggle,
   ReservePosition,
+  StatutoryPensionIncomeMode,
+  StatutoryPensionScenarioId,
+  StatutoryPensionScenarioSettings,
+  StatutoryPensionSettings,
   ThemeMode
 } from "../types";
 
@@ -127,6 +132,7 @@ function normalizeState(value: unknown): AppState {
     ui,
     realEstate,
     combinedWealth: normalizeCombinedWealthToggles(value.combinedWealth),
+    statutoryPension: normalizeStatutoryPensionSettings(value.statutoryPension),
     incomeTracker: normalizeIncomeTrackerState(value.incomeTracker),
     positions,
     investmentByAccountId,
@@ -168,6 +174,7 @@ function normalizeLegacyState(value: unknown): AppState {
     ui,
     realEstate: defaultRealEstateFinancingSettings(),
     combinedWealth: defaultCombinedWealthToggles(),
+    statutoryPension: defaultStatutoryPensionSettings(),
     incomeTracker: defaultIncomeTrackerState(),
     positions,
     investmentByAccountId,
@@ -398,6 +405,7 @@ function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSecti
   if (
     value === "home" ||
     value === "real_estate_financing" ||
+    value === "statutory_pension" ||
     value === "combined_wealth"
   ) {
     return value;
@@ -521,6 +529,50 @@ function normalizeCombinedWealthToggles(value: unknown): CombinedWealthToggles {
     includeRealEstateFinancing: booleanOrDefault(value.includeRealEstateFinancing, fallback.includeRealEstateFinancing),
     includeRealEstateValueTrend: booleanOrDefault(value.includeRealEstateValueTrend, fallback.includeRealEstateValueTrend)
   };
+}
+
+function normalizeStatutoryPensionSettings(value: unknown): StatutoryPensionSettings {
+  const fallback = defaultStatutoryPensionSettings();
+  if (!isRecord(value)) return fallback;
+  return {
+    contributionRatePercent: numberOrDefault(value.contributionRatePercent, fallback.contributionRatePercent),
+    averageAnnualIncome: numberOrDefault(value.averageAnnualIncome, fallback.averageAnnualIncome),
+    currentPensionValue: numberOrDefault(value.currentPensionValue, fallback.currentPensionValue),
+    projectionPensionValue: numberOrDefault(value.projectionPensionValue, fallback.projectionPensionValue),
+    annualContributionCeilingGross: numberOrDefault(
+      value.annualContributionCeilingGross,
+      fallback.annualContributionCeilingGross
+    ),
+    scenarios: {
+      pessimistic: normalizeStatutoryPensionScenario(value.scenarios, "pessimistic", fallback.scenarios.pessimistic),
+      base: normalizeStatutoryPensionScenario(value.scenarios, "base", fallback.scenarios.base),
+      optimistic: normalizeStatutoryPensionScenario(value.scenarios, "optimistic", fallback.scenarios.optimistic)
+    }
+  };
+}
+
+function normalizeStatutoryPensionScenario(
+  scenarios: unknown,
+  id: StatutoryPensionScenarioId,
+  fallback: StatutoryPensionScenarioSettings
+): StatutoryPensionScenarioSettings {
+  const value = isRecord(scenarios) && isRecord(scenarios[id]) ? scenarios[id] : {};
+  return {
+    retirementAge: clampNumber(numberOrDefault(value.retirementAge, fallback.retirementAge), 67, 72),
+    incomeMode: normalizeStatutoryPensionIncomeMode(value.incomeMode, fallback.incomeMode),
+    annualPensionIncreasePercent: clampNumber(
+      numberOrDefault(value.annualPensionIncreasePercent, fallback.annualPensionIncreasePercent),
+      0.1,
+      2
+    )
+  };
+}
+
+function normalizeStatutoryPensionIncomeMode(
+  value: unknown,
+  fallback: StatutoryPensionIncomeMode
+): StatutoryPensionIncomeMode {
+  return value === "constant" || value === "income_projection" ? value : fallback;
 }
 
 function normalizeIncomeTrackerState(value: unknown): IncomeTrackerState {
@@ -999,6 +1051,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function numberOrDefault(value: unknown, fallback: number): number {
   const parsed = Number(String(value ?? "").replace(",", "."));
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function nullableNumberOrDefault(value: unknown, fallback: number | null): number | null {
