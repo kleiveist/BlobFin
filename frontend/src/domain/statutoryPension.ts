@@ -26,6 +26,42 @@ export interface StatutoryPensionAnnualPensionYear extends StatutoryPensionContr
   netMonthlyPension: number;
 }
 
+export interface StatutoryPensionProjectedScenarioYear {
+  scenarioId: StatutoryPensionScenarioId;
+  label: string;
+  year: number;
+  age: number;
+  yearsFromToday: number;
+  retirementAge: number;
+  retirementYear: number;
+  projectedGrossIncome: number;
+  employeeContribution: number;
+  employerContribution: number;
+  totalContribution: number;
+  pensionPoints: number;
+  projectedAdditionalPoints: number;
+  projectedTotalPoints: number;
+  projectedPensionValue: number;
+  grossMonthlyPension: number;
+  taxableSharePercent: number;
+  taxRatePercent: number;
+  healthInsurancePercent: number;
+  careInsurancePercent: number;
+  incomeTaxMonthly: number;
+  healthInsuranceMonthly: number;
+  careInsuranceMonthly: number;
+  totalDeductionsMonthly: number;
+  netMonthlyPension: number;
+  fallbackToConstantIncome: boolean;
+  afterRetirementYear: boolean;
+}
+
+export interface StatutoryPensionProjectedAnnualPensionYear {
+  year: number;
+  age: number;
+  scenarios: Record<StatutoryPensionScenarioId, StatutoryPensionProjectedScenarioYear>;
+}
+
 export interface StatutoryPensionScenarioResult {
   id: StatutoryPensionScenarioId;
   label: string;
@@ -62,6 +98,7 @@ export interface StatutoryPensionModel {
   projectedMonthlyPensionTodayValue: number;
   contributionYears: StatutoryPensionContributionYear[];
   annualPensionYears: StatutoryPensionAnnualPensionYear[];
+  projectedAnnualPensionYears: StatutoryPensionProjectedAnnualPensionYear[];
   scenarios: StatutoryPensionScenarioResult[];
 }
 
@@ -115,6 +152,15 @@ export function buildStatutoryPensionModel(input: {
     projectedMonthlyPensionTodayValue,
     contributionYears,
     annualPensionYears: statutoryPensionAnnualPensionYears(contributionYears, baseScenario),
+    projectedAnnualPensionYears: statutoryPensionProjectedAnnualPensionYears({
+      tracker: input.tracker,
+      settings: input.settings,
+      currentYear: input.currentYear,
+      birthYear: input.birthYear,
+      basePoints: pensionPoints,
+      latestRelevantGrossIncome,
+      scenarios
+    }),
     scenarios
   };
 }
@@ -178,6 +224,50 @@ export function statutoryPensionAnnualPensionYears(
       netMonthlyPension
     };
   });
+}
+
+export function statutoryPensionProjectedAnnualPensionYears(input: {
+  tracker: IncomeTrackerState;
+  settings: StatutoryPensionSettings;
+  currentYear: number;
+  birthYear: number;
+  basePoints: number;
+  latestRelevantGrossIncome: number;
+  scenarios: StatutoryPensionScenarioResult[];
+}): StatutoryPensionProjectedAnnualPensionYear[] {
+  const incomeProjectionRate = trackerProjectionRate(input.tracker);
+  const finalYear = Math.max(input.currentYear, ...input.scenarios.map((scenario) => scenario.retirementYear));
+  const scenarioById = new Map(input.scenarios.map((scenario) => [scenario.id, scenario]));
+  const years: StatutoryPensionProjectedAnnualPensionYear[] = [];
+
+  for (let year = input.currentYear; year <= finalYear; year += 1) {
+    const yearsFromToday = Math.max(0, year - input.currentYear);
+    const scenarios = (["pessimistic", "base", "optimistic"] as const).reduce(
+      (result, id) => {
+        const scenario = scenarioById.get(id);
+        if (!scenario) return result;
+        result[id] = statutoryPensionProjectedScenarioYear({
+          scenario,
+          settings: input.settings,
+          year,
+          age: year - input.birthYear,
+          yearsFromToday,
+          incomeProjectionRate,
+          basePoints: input.basePoints,
+          latestRelevantGrossIncome: input.latestRelevantGrossIncome
+        });
+        return result;
+      },
+      {} as Record<StatutoryPensionScenarioId, StatutoryPensionProjectedScenarioYear>
+    );
+    years.push({
+      year,
+      age: year - input.birthYear,
+      scenarios
+    });
+  }
+
+  return years;
 }
 
 function statutoryPensionScenarioResults(input: {
@@ -250,6 +340,93 @@ function statutoryPensionScenarioResults(input: {
 export function statutoryPensionTaxableSharePercent(retirementYear: number): number {
   if (retirementYear <= 2026) return 84;
   return Math.min(100, roundPrecision(84 + (retirementYear - 2026) * 0.5, 1));
+}
+
+function statutoryPensionProjectedScenarioYear(input: {
+  scenario: StatutoryPensionScenarioResult;
+  settings: StatutoryPensionSettings;
+  year: number;
+  age: number;
+  yearsFromToday: number;
+  incomeProjectionRate: number | null;
+  basePoints: number;
+  latestRelevantGrossIncome: number;
+}): StatutoryPensionProjectedScenarioYear {
+  const useProjection = input.scenario.incomeMode === "income_projection" && input.incomeProjectionRate !== null;
+  const incomeGrowthRate = useProjection ? input.incomeProjectionRate ?? 0 : 0;
+  const projectedGrossIncome = projectedGrossIncomeForYear({
+    yearsFromToday: input.yearsFromToday,
+    startingGrossIncome: input.latestRelevantGrossIncome,
+    incomeGrowthRate,
+    settings: input.settings
+  });
+  const pensionPoints = input.yearsFromToday > 0 ? roundPrecision(projectedGrossIncome / averageAnnualIncome(input.settings), 4) : 0;
+  const totalContribution = input.yearsFromToday > 0 ? roundCents(projectedGrossIncome * contributionRate(input.settings)) : 0;
+  const employeeContribution = roundCents(totalContribution / 2);
+  const employerContribution = roundCents(totalContribution - employeeContribution);
+  const projectedAdditionalPoints = projectedScenarioPoints({
+    years: input.yearsFromToday,
+    startingGrossIncome: input.latestRelevantGrossIncome,
+    incomeGrowthRate,
+    settings: input.settings
+  });
+  const projectedTotalPoints = roundPrecision(input.basePoints + projectedAdditionalPoints, 4);
+  const projectedPensionValue = roundCents(
+    input.settings.projectionPensionValue *
+      Math.pow(1 + input.scenario.annualPensionIncreasePercent / 100, input.yearsFromToday)
+  );
+  const grossMonthlyPension = roundCents(projectedTotalPoints * projectedPensionValue);
+  const taxableSharePercent = statutoryPensionTaxableSharePercent(input.year);
+  const incomeTaxMonthly = roundCents((grossMonthlyPension * taxableSharePercent * input.scenario.taxRatePercent) / 10000);
+  const healthInsuranceMonthly = roundCents((grossMonthlyPension * input.scenario.healthInsurancePercent) / 100);
+  const careInsuranceMonthly = roundCents((grossMonthlyPension * input.scenario.careInsurancePercent) / 100);
+  const totalDeductionsMonthly = roundCents(incomeTaxMonthly + healthInsuranceMonthly + careInsuranceMonthly);
+  const netMonthlyPension = roundCents(Math.max(0, grossMonthlyPension - totalDeductionsMonthly));
+
+  return {
+    scenarioId: input.scenario.id,
+    label: input.scenario.label,
+    year: input.year,
+    age: input.age,
+    yearsFromToday: input.yearsFromToday,
+    retirementAge: input.scenario.retirementAge,
+    retirementYear: input.scenario.retirementYear,
+    projectedGrossIncome,
+    employeeContribution,
+    employerContribution,
+    totalContribution,
+    pensionPoints,
+    projectedAdditionalPoints,
+    projectedTotalPoints,
+    projectedPensionValue,
+    grossMonthlyPension,
+    taxableSharePercent,
+    taxRatePercent: input.scenario.taxRatePercent,
+    healthInsurancePercent: input.scenario.healthInsurancePercent,
+    careInsurancePercent: input.scenario.careInsurancePercent,
+    incomeTaxMonthly,
+    healthInsuranceMonthly,
+    careInsuranceMonthly,
+    totalDeductionsMonthly,
+    netMonthlyPension,
+    fallbackToConstantIncome: input.scenario.fallbackToConstantIncome,
+    afterRetirementYear: input.year > input.scenario.retirementYear
+  };
+}
+
+function projectedGrossIncomeForYear(input: {
+  yearsFromToday: number;
+  startingGrossIncome: number;
+  incomeGrowthRate: number;
+  settings: StatutoryPensionSettings;
+}): number {
+  if (input.startingGrossIncome <= 0) return 0;
+  return roundCents(
+    Math.min(
+      input.settings.annualContributionCeilingGross,
+      input.startingGrossIncome * Math.pow(1 + input.incomeGrowthRate, input.yearsFromToday)
+    )
+  );
 }
 
 function projectedScenarioPoints(input: {

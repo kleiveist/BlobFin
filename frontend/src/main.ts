@@ -152,6 +152,7 @@ import {
 import { monthSelect, payoutSelect, positionIconSelect, positionTypeSelect, renderAppShell } from "./views/templates";
 import {
   renderStatutoryPensionHtml,
+  renderStatutoryPensionProjectionYearPopupHtml,
   renderStatutoryPensionTaxPopupHtml,
   renderStatutoryPensionYearPopupHtml
 } from "./views/statutoryPensionView";
@@ -952,6 +953,18 @@ function bindEvents(): void {
 
   root.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
+    const statutoryPensionProjectionButton = target?.closest<HTMLButtonElement>(
+      "button[data-statutory-pension-projection-year]"
+    );
+    if (statutoryPensionProjectionButton) {
+      event.preventDefault();
+      showStatutoryPensionProjectionYearPopup(
+        numberValue(statutoryPensionProjectionButton.dataset.statutoryPensionProjectionYear || ""),
+        event.clientX,
+        event.clientY
+      );
+      return;
+    }
     const statutoryPensionYearButton = target?.closest<HTMLButtonElement>("button[data-statutory-pension-year]");
     if (statutoryPensionYearButton) {
       event.preventDefault();
@@ -976,6 +989,12 @@ function bindEvents(): void {
       if (positionFilterPopupOpen && !target?.closest("#positionFilterPopup")) {
         hidePositionFilterPopup();
       }
+      if (!target?.closest("#statutoryPensionYearPopup")) {
+        hideStatutoryPensionYearPopup();
+      }
+      if (!target?.closest("#statutoryPensionProjectionYearPopup")) {
+        hideStatutoryPensionProjectionYearPopup();
+      }
       return;
     }
 
@@ -992,6 +1011,12 @@ function bindEvents(): void {
     }
     if (positionFilterPopupOpen && action !== "toggle-position-filter" && !button.closest("#positionFilterPopup")) {
       hidePositionFilterPopup();
+    }
+    if (action !== "close-statutory-pension-year-popup" && !button.closest("#statutoryPensionYearPopup")) {
+      hideStatutoryPensionYearPopup();
+    }
+    if (action !== "close-statutory-pension-projection-popup" && !button.closest("#statutoryPensionProjectionYearPopup")) {
+      hideStatutoryPensionProjectionYearPopup();
     }
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
@@ -1103,6 +1128,7 @@ function bindEvents(): void {
     }
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
     if (action === "close-statutory-pension-year-popup") hideStatutoryPensionYearPopup();
+    if (action === "close-statutory-pension-projection-popup") hideStatutoryPensionProjectionYearPopup();
     if (action === "open-statutory-pension-tax-popup") {
       openStatutoryPensionTaxPopup(button.dataset.statutoryPensionScenario as StatutoryPensionScenarioId);
       return;
@@ -1203,6 +1229,7 @@ function bindEvents(): void {
       hideThemeSettings();
       hideInvestmentChartPopup();
       hideStatutoryPensionYearPopup();
+      hideStatutoryPensionProjectionYearPopup();
       closeStatutoryPensionTaxPopup();
       hideReserveChartPopup();
       hidePositionFilterPopup();
@@ -4538,6 +4565,7 @@ function renderStatutoryPensionCalculations(birthYear: number): void {
   const host = document.querySelector<HTMLDivElement>("#statutoryPensionSection");
   if (!host) return;
   hideStatutoryPensionYearPopup();
+  hideStatutoryPensionProjectionYearPopup();
   const model = buildStatutoryPensionModel({
     tracker: state.incomeTracker,
     settings: state.statutoryPension,
@@ -8195,6 +8223,17 @@ function showStatutoryPensionYearPopup(year: number, clientX: number, clientY: n
   positionChartPopup(popup, card, clientX, clientY);
 }
 
+function showStatutoryPensionProjectionYearPopup(year: number, clientX: number, clientY: number): void {
+  const point = latestStatutoryPensionModel?.projectedAnnualPensionYears.find((entry) => entry.year === year);
+  const popup = document.querySelector<HTMLDivElement>("#statutoryPensionProjectionYearPopup");
+  const card = popup?.closest<HTMLElement>(".statutory-pension-year-chart");
+  if (!point || !popup || !card) return;
+
+  popup.innerHTML = renderStatutoryPensionProjectionYearPopupHtml(point);
+  popup.hidden = false;
+  positionChartPopup(popup, card, clientX, clientY);
+}
+
 function positionChartPopup(popup: HTMLDivElement, card: HTMLElement, clientX: number, clientY: number): void {
   popup.style.left = "12px";
   popup.style.top = "12px";
@@ -8243,6 +8282,11 @@ function hideInvestmentChartPopup(): void {
 
 function hideStatutoryPensionYearPopup(): void {
   const popup = document.querySelector<HTMLDivElement>("#statutoryPensionYearPopup");
+  if (popup) popup.hidden = true;
+}
+
+function hideStatutoryPensionProjectionYearPopup(): void {
+  const popup = document.querySelector<HTMLDivElement>("#statutoryPensionProjectionYearPopup");
   if (popup) popup.hidden = true;
 }
 
