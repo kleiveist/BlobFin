@@ -253,6 +253,50 @@ describe("combined wealth", () => {
     expect(result[0].propertyDebt).toBe(0);
   });
 
+  it("does not include property value from value trend without financing activation", () => {
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 1,
+      cashStartValue: 0,
+      yearlyCashDelta: 0,
+      depotProjection: projection([point(30, "saving", 10000)], 0, 65),
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateYears: [
+        {
+          year: 2026,
+          propertyValue: 300000,
+          loanStart: 200000,
+          interestPaid: 0,
+          interestDue: 0,
+          interestShortfall: 0,
+          monthlyPaymentFromSavings: 0,
+          monthlyPaymentFromWithdrawalGain: 0,
+          monthlyPaymentAvailable: 0,
+          principalFromMonthlyPayment: 0,
+          principalPaid: 0,
+          specialRepayment: 0,
+          additionalRepayment: 0,
+          additionalRepaymentBreakdown: zeroAdditionalRepayment,
+          loanEnd: 198000,
+          propertyEquity: 102000,
+          netPropertyWealth: 102000
+        }
+      ],
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeRealEstateFinancing: false,
+        includeRealEstateValueTrend: true
+      }
+    });
+
+    expect(result[0].propertyValue).toBe(0);
+    expect(result[0].propertyDebt).toBe(0);
+    expect(result[0].totalNetWealth).toBe(10000);
+  });
+
   it("uses the supplied real estate projection through the combined end year", () => {
     const depot = projection([point(30, "saving", 10000), point(31, "saving", 11000), point(32, "saving", 12000)], 0, 65);
     const realEstate: RealEstateFinancingYear[] = [
@@ -443,6 +487,97 @@ describe("combined wealth", () => {
     expect(horizonYears).toBe(2);
     expect(result).toHaveLength(2);
     expect(result[result.length - 1].year).toBe(2027);
+  });
+
+  it("moves net property sale proceeds into cash and stops property values", () => {
+    const realEstate: RealEstateFinancingYear[] = [
+      {
+        year: 2026,
+        propertyValue: 300000,
+        loanStart: 210000,
+        interestPaid: 0,
+        interestDue: 0,
+        interestShortfall: 0,
+        monthlyPaymentFromSavings: 0,
+        monthlyPaymentFromWithdrawalGain: 0,
+        monthlyPaymentAvailable: 0,
+        principalFromMonthlyPayment: 0,
+        principalPaid: 0,
+        specialRepayment: 0,
+        additionalRepayment: 0,
+        additionalRepaymentBreakdown: zeroAdditionalRepayment,
+        loanEnd: 200000,
+        propertyEquity: 100000,
+        netPropertyWealth: 100000
+      },
+      {
+        year: 2027,
+        propertyValue: 320000,
+        loanStart: 200000,
+        interestPaid: 0,
+        interestDue: 0,
+        interestShortfall: 0,
+        monthlyPaymentFromSavings: 0,
+        monthlyPaymentFromWithdrawalGain: 0,
+        monthlyPaymentAvailable: 0,
+        principalFromMonthlyPayment: 0,
+        principalPaid: 0,
+        specialRepayment: 0,
+        additionalRepayment: 0,
+        additionalRepaymentBreakdown: zeroAdditionalRepayment,
+        loanEnd: 180000,
+        propertyEquity: 140000,
+        netPropertyWealth: 140000
+      },
+      {
+        year: 2028,
+        propertyValue: 340000,
+        loanStart: 180000,
+        interestPaid: 0,
+        interestDue: 0,
+        interestShortfall: 0,
+        monthlyPaymentFromSavings: 0,
+        monthlyPaymentFromWithdrawalGain: 0,
+        monthlyPaymentAvailable: 0,
+        principalFromMonthlyPayment: 0,
+        principalPaid: 0,
+        specialRepayment: 0,
+        additionalRepayment: 0,
+        additionalRepaymentBreakdown: zeroAdditionalRepayment,
+        loanEnd: 160000,
+        propertyEquity: 180000,
+        netPropertyWealth: 180000
+      }
+    ];
+
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 3,
+      cashStartValue: 1000,
+      yearlyCashDelta: 0,
+      depotProjection: projection([point(30, "saving", 10000), point(31, "saving", 11000), point(32, "saving", 12000)], 0, 65),
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateSaleYear: 2027,
+      realEstateYears: realEstate,
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeRealEstateFinancing: true,
+        includeRealEstateValueTrend: true
+      }
+    });
+
+    expect(result[0].cashValue).toBe(1000);
+    expect(result[0].propertyValue).toBe(300000);
+    expect(result[0].propertyDebt).toBe(200000);
+    expect(result[1].cashValue).toBe(141000);
+    expect(result[1].propertyValue).toBe(0);
+    expect(result[1].propertyDebt).toBe(0);
+    expect(result[2].cashValue).toBe(141000);
+    expect(result[2].propertyValue).toBe(0);
+    expect(result[2].propertyDebt).toBe(0);
   });
 
   it("caps the combined horizon at the global planning end year", () => {

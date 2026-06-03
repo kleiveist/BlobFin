@@ -42,6 +42,10 @@ For the retirement depot, the retirement age is floored at 65. It can still be s
 
 The child depot is an accumulation-only projection through age 18, so monthly retirement or withdrawal metrics are not shown there.
 
+## Combined Real Estate Activation
+
+The combined wealth path only includes real estate when `Immobilie gekauft / Kauf geplant` is active in the real estate financing data. The sale year only affects an activated real estate scenario. On sale, the net sale proceeds after remaining debt are transferred into cash and no property value is continued after that year.
+
 ## Retirement Depot Allowances
 
 The implemented allowance model follows the communicated 2027 reform logic used in the app:

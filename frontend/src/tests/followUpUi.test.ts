@@ -232,6 +232,9 @@ describe("follow-up ui rendering", () => {
     const html = renderAppShell();
 
     expect(html).not.toContain("Strategie und Annahmen");
+    expect(count(html, 'data-real-estate-field="purchaseActivated"')).toBe(1);
+    expect(html).toContain("Immobilie gekauft / Kauf geplant");
+    expect(html).toContain('id="combinedRealEstateActivationMetric"');
     expect(html).not.toContain('data-real-estate-field="equityCapital"');
     expect(html).not.toContain('data-real-estate-field="loanAmount"');
     expect(html).not.toContain('data-real-estate-field="targetTermYears"');

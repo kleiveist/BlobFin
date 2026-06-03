@@ -205,6 +205,22 @@ input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
+.toggle-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 9px 10px;
+}
+
+.toggle-line strong {
+  font-size: 0.82rem;
+}
+
 input[type="range"] {
   padding: 0;
   border: 0;
@@ -1832,7 +1848,8 @@ tfoot th {
 }
 
 .include-transfer-toggle.blocked,
-.include-item.blocked {
+.include-item.blocked,
+.combined-module-switch.blocked {
   opacity: 0.58;
 }
 

@@ -27,6 +27,8 @@ interface BuildCombinedWealthSeriesInput {
   cashStartValue: number;
   yearlyCashDelta: number;
   yearlyCashDeltas?: number[];
+  realEstateSaleYear?: number | null;
+  realEstateEstimatedSaleValue?: number | null;
   depotProjection?: AssetProjection;
   sharedDepotProjection?: AssetProjection;
   depotBirthYear?: number;
@@ -64,7 +66,13 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
       cumulativeCashValue = roundMoney(cumulativeCashValue + cashDeltaForYearOffset(input, yearOffset));
     }
     const realEstate = realEstateByYear.get(year);
-    const allocation = input.toggles.includeRealEstateFinancing ? realEstate?.additionalRepaymentBreakdown : undefined;
+    const realEstateSaleActive = realEstateSaleActiveForYear(input, realEstate, year);
+    const realEstateSaleProceeds = realEstateSaleActive ? realEstateSaleProceedsForYear(input, realEstate) : 0;
+    if (realEstateSaleProceeds !== 0) {
+      cumulativeCashValue = roundMoney(cumulativeCashValue + realEstateSaleProceeds);
+    }
+    const realEstateActiveForYear = input.toggles.includeRealEstateFinancing && !realEstateSoldByYear(input, year);
+    const allocation = realEstateActiveForYear ? realEstate?.additionalRepaymentBreakdown : undefined;
     redirectedCashRepayment = roundMoney(
       redirectedCashRepayment + (allocation?.withdrawalGain ?? 0) + (allocation?.legacySavingsRate ?? 0) + (allocation?.netGain ?? 0)
     );
@@ -129,11 +137,11 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
     cumulativeTaxValue = roundMoney(cumulativeTaxValue + taxValue);
 
     const propertyValue =
-      input.toggles.includeRealEstateValueTrend || input.toggles.includeRealEstateFinancing
+      realEstateActiveForYear && (input.toggles.includeRealEstateValueTrend || input.toggles.includeRealEstateFinancing)
         ? roundMoney(realEstate?.propertyValue ?? 0)
         : 0;
-    const propertyDebt = input.toggles.includeRealEstateFinancing ? roundMoney(realEstate?.loanEnd ?? 0) : 0;
-    const propertyLoanStart = input.toggles.includeRealEstateFinancing ? roundMoney(realEstate?.loanStart ?? 0) : 0;
+    const propertyDebt = realEstateActiveForYear ? roundMoney(realEstate?.loanEnd ?? 0) : 0;
+    const propertyLoanStart = realEstateActiveForYear ? roundMoney(realEstate?.loanStart ?? 0) : 0;
     const propertyEquity = roundMoney(propertyValue - propertyDebt);
 
     const totalGrossAssets = roundMoney(
@@ -254,6 +262,35 @@ function annualPensionTaxForYear(pension: CombinedWealthPensionInput | undefined
 function pensionSavingsRate(pension: CombinedWealthPensionInput | undefined): number {
   if (!pension?.enabled) return 0;
   return Math.max(0, Math.min(100, pension.savingsRatePercent));
+}
+
+function realEstateSaleActiveForYear(
+  input: BuildCombinedWealthSeriesInput,
+  realEstate: RealEstateFinancingYear | undefined,
+  year: number
+): realEstate is RealEstateFinancingYear {
+  if (!input.toggles.includeRealEstateFinancing || !realEstate) return false;
+  if (input.realEstateSaleYear === null || input.realEstateSaleYear === undefined) return false;
+  return year === Math.round(input.realEstateSaleYear);
+}
+
+function realEstateSoldByYear(input: BuildCombinedWealthSeriesInput, year: number): boolean {
+  if (!input.toggles.includeRealEstateFinancing) return false;
+  if (input.realEstateSaleYear === null || input.realEstateSaleYear === undefined) return false;
+  return year >= Math.round(input.realEstateSaleYear);
+}
+
+function realEstateSaleProceedsForYear(
+  input: BuildCombinedWealthSeriesInput,
+  realEstate: RealEstateFinancingYear
+): number {
+  const saleValue =
+    input.realEstateEstimatedSaleValue !== null &&
+    input.realEstateEstimatedSaleValue !== undefined &&
+    Number.isFinite(input.realEstateEstimatedSaleValue)
+      ? Math.max(0, input.realEstateEstimatedSaleValue)
+      : Math.max(0, realEstate.propertyValue);
+  return roundMoney(saleValue - Math.max(0, realEstate.loanEnd));
 }
 
 function roundMoney(value: number): number {

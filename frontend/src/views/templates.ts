@@ -615,6 +615,7 @@ export function renderAppShell(): string {
             <div class="field-grid wide">
               ${realEstateNumberField("financingStartAge", "Finanzierung ab Alter", { step: 1 })}
               ${realEstateNumberField("plannedSaleYear", "Verkaufsjahr", { step: 1, nullable: true })}
+              ${realEstateBooleanField("purchaseActivated", "Immobilie gekauft / Kauf geplant")}
             </div>
             <div class="real-estate-slider-grid">
               ${realEstateAssumptionControl("interestRatePercent", "Zinssatz", 0, 10, 0.05)}
@@ -765,7 +766,7 @@ export function renderAppShell(): string {
                     ${combinedModuleIcon("property")}
                     <span>
                       <strong>Immobilien</strong>
-                      <small>Wert, Schuld und Eigenkapital bleiben aus der bestehenden Immobilienlogik.</small>
+                      <small>Wert, Schuld und Verkaufserloes gelten nur bei aktiviertem Immobilienkauf.</small>
                     </span>
                   </div>
                   <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeRealEstateFinancing" aria-pressed="false">
@@ -774,7 +775,7 @@ export function renderAppShell(): string {
                 </div>
                 <div class="combined-module-metrics">
                   <span>Datenquelle <strong>Immobilienfinanzierung</strong></span>
-                  <span>Berechnung <strong>Wert, Schuld, Eigenkapital</strong></span>
+                  <span>Status <strong id="combinedRealEstateActivationMetric">-</strong></span>
                 </div>
               </article>
             </div>
@@ -1037,6 +1038,19 @@ function realEstateNumberField(
   `;
 }
 
+function realEstateBooleanField(key: string, label: string): string {
+  const englishLabel = realEstateEnglishLabel(key, label);
+  return `
+    <label class="field real-estate-toggle-field">
+      <span data-real-estate-label-key="${key}" data-label-de="${label}" data-label-en="${englishLabel}">${label}</span>
+      <span class="toggle-line">
+        <input type="checkbox" data-real-estate-field="${key}" />
+        <strong>Ja</strong>
+      </span>
+    </label>
+  `;
+}
+
 function realEstateAssumptionControl(
   key: string,
   label: string,
@@ -1077,6 +1091,7 @@ function realEstateEnglishLabel(key: string, fallback: string): string {
     initialRepaymentPercent: "Initial repayment in %",
     targetTermYears: "Target term (years)",
     financingStartAge: "Financing start age",
+    purchaseActivated: "Real estate bought / purchase planned",
     financingEndAge: "Paid off by age",
     financingYears: "Financing period (years)",
     plannedSaleYear: "Sale year",

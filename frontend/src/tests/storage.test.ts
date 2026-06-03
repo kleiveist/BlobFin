@@ -46,6 +46,12 @@ describe("storage", () => {
     expect(state.settings.endDate).toBe("2088-12-31");
   });
 
+  it("does not activate real estate purchase by default", () => {
+    const state = defaultAppState();
+
+    expect(state.realEstate.purchaseActivated).toBe(false);
+  });
+
   it("keeps a saved global planning end date", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();
@@ -327,6 +333,24 @@ describe("storage", () => {
     expect(loaded.ui.selectedRealEstateWithdrawalGainAccountIds).toEqual(loaded.ui.selectedRealEstateAccountIds);
     expect(loaded.ui.selectedCombinedAccountIds).toEqual(state.planningAccounts.map((account) => account.id));
     expect(loaded.ui.selectedCombinedLeadInvestmentAccountId).toBe(loaded.ui.selectedInvestmentAccountId);
+  });
+
+  it("does not activate real estate purchase when saved states miss the activation flag", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const legacyRealEstate = { ...state.realEstate };
+    delete (legacyRealEstate as Partial<typeof legacyRealEstate>).purchaseActivated;
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        realEstate: legacyRealEstate
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.realEstate.purchaseActivated).toBe(false);
   });
 
   it("uses the new combined module defaults when saved values are missing", () => {

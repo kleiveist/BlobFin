@@ -504,6 +504,7 @@ function normalizeRealEstateFinancingSettings(value: unknown): RealEstateFinanci
   const legacyEndAge = financingStartAge > 0 ? financingStartAge + financingYears : fallback.financingEndAge;
   return {
     locale: "de",
+    purchaseActivated: booleanOrDefault(value.purchaseActivated, fallback.purchaseActivated),
     purchasePrice: numberOrDefault(value.purchasePrice, fallback.purchasePrice),
     constructionOrRenovationCosts: numberOrDefault(
       value.constructionOrRenovationCosts,

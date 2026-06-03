@@ -167,6 +167,7 @@ export interface InvestmentSettings {
 
 export interface RealEstateFinancingSettings {
   locale: RealEstateLocale;
+  purchaseActivated: boolean;
   purchasePrice: number;
   constructionOrRenovationCosts: number;
   landCosts: number;

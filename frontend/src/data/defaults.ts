@@ -253,6 +253,7 @@ export function defaultPlanningAccounts(): PlanningAccount[] {
 export function defaultRealEstateFinancingSettings(): RealEstateFinancingSettings {
   return {
     locale: "de",
+    purchaseActivated: false,
     purchasePrice: 360000,
     constructionOrRenovationCosts: 0,
     landCosts: 0,

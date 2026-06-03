@@ -24,6 +24,8 @@ Important fields:
 
 `InvestmentSettings` contains separate normal-depot, retirement-depot, and child-depot selections, special interest/cashback investment toggles, retirement depot settings, age settings, return, tax, inflation, reserve/bequest, and percentage withdrawal settings.
 
+`RealEstateFinancingSettings` contains project cost, financing assumptions, selected payment sources, sale year, and the explicit purchase activation flag. Combined wealth calculations only include property value, debt, repayment effects, and sale proceeds when that activation flag is enabled.
+
 ## Reserve Calculation
 
 Implemented in `frontend/src/domain/reserveCalculator.ts`.

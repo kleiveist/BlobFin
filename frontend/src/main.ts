@@ -841,7 +841,8 @@ function bindEvents(): void {
     }
 
     if (target.dataset.realEstateField) {
-      updateRealEstateField(target.dataset.realEstateField as RealEstateField, target.value);
+      const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
+      updateRealEstateField(target.dataset.realEstateField as RealEstateField, value);
       renderAll();
       return;
     }
@@ -927,7 +928,8 @@ function bindEvents(): void {
     }
 
     if (target.dataset.realEstateField) {
-      updateRealEstateField(target.dataset.realEstateField as RealEstateField, target.value);
+      const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
+      updateRealEstateField(target.dataset.realEstateField as RealEstateField, value);
       renderAll();
       return;
     }
@@ -1528,15 +1530,22 @@ function renderCalculations(
     }
   );
   renderRealEstateCalculations(realEstate, realEstateProjectionYears);
-  const combinedRealEstate = calculateRealEstateFinancing(
-    financingStartYear,
-    state.realEstate,
-    realEstateSourceSchedule(financingStartYear, combinedRealEstateProjectionYears, state.ui.selectedRealEstateAccountIds),
-    {
-      projectionYears: combinedRealEstateProjectionYears,
-      maxProjectionYears: combinedRealEstateProjectionYears
-    }
-  );
+  const combinedRealEstateActive = state.realEstate.purchaseActivated && state.combinedWealth.includeRealEstateFinancing;
+  const combinedRealEstate = combinedRealEstateActive
+    ? calculateRealEstateFinancing(
+        financingStartYear,
+        state.realEstate,
+        realEstateSourceSchedule(
+          financingStartYear,
+          combinedRealEstateProjectionYears,
+          state.ui.selectedRealEstateAccountIds
+        ),
+        {
+          projectionYears: combinedRealEstateProjectionYears,
+          maxProjectionYears: combinedRealEstateProjectionYears
+        }
+      )
+    : inactiveCombinedRealEstateResult(financingStartYear);
   const combinedYears = calculateCombinedWealthYears(
     combinedRealEstate,
     combinedDepotProjections,
@@ -4622,11 +4631,38 @@ function calculateCombinedWealthYears(
     cashStartValue: cashContribution.cashStartValue,
     yearlyCashDelta: cashContribution.yearlyCashDelta,
     yearlyCashDeltas: cashContribution.yearlyCashDeltas,
+    realEstateSaleYear: state.realEstate.purchaseActivated && state.combinedWealth.includeRealEstateFinancing
+      ? state.realEstate.plannedSaleYear
+      : null,
+    realEstateEstimatedSaleValue: state.realEstate.estimatedSaleValue,
     depotProjections,
     pension,
     realEstateYears: realEstate.years,
     toggles: state.combinedWealth
   });
+}
+
+function inactiveCombinedRealEstateResult(startYear: number): RealEstateFinancingResult {
+  return {
+    years: [],
+    months: [],
+    startLoanAmount: 0,
+    equityCapital: 0,
+    monthlyPayment: 0,
+    derivedInitialRepaymentPercent: 0,
+    annualSpecialRepayment: 0,
+    effectivePropertyStartValue: 0,
+    totalProjectCost: 0,
+    totalInterestDue: 0,
+    totalInterestPaid: 0,
+    totalInterestShortfall: 0,
+    totalLoanCost: 0,
+    financingYears: 0,
+    projectionYears: 0,
+    financingEndYear: startYear,
+    projectionEndYear: startYear,
+    validationErrors: []
+  };
 }
 
 function combinedDepotProjectionInputs(account: PlanningAccount | null): CombinedWealthDepotProjection[] {
@@ -5124,6 +5160,14 @@ function renderCombinedModuleControls(): void {
   const cashPreview = combinedCashContribution(1, cashAccount);
   setText("combinedCashSourceMetric", cashAccount?.name ?? "-");
   setText("combinedCashRateMetric", money(cashPreview.yearlyCashDelta));
+  setText(
+    "combinedRealEstateActivationMetric",
+    state.realEstate.purchaseActivated
+      ? state.realEstate.plannedSaleYear
+        ? `aktiv bis Verkauf ${intNumber(state.realEstate.plannedSaleYear)}`
+        : "aktiv"
+      : "Kauf nicht aktiviert"
+  );
   setInputValue('[data-combined-number="statutoryPensionMonthlyAmount"]', state.combinedWealth.statutoryPensionMonthlyAmount);
   setInputValue(
     '[data-combined-number="statutoryPensionSavingsRatePercent"]',
@@ -7240,6 +7284,11 @@ function syncRealEstateInputsFromState(): void {
       if (control) control.value = String(value);
       continue;
     }
+    if (field === "purchaseActivated") {
+      const control = document.querySelector<HTMLInputElement>(selector);
+      if (control) control.checked = Boolean(value);
+      continue;
+    }
     if (
       field === "locale" ||
       field === "repaymentSources" ||
@@ -7279,16 +7328,19 @@ function syncCombinedToggleInputsFromState(): void {
     if (typeof value !== "boolean") continue;
     const control = document.querySelector<HTMLElement>(`[data-combined-toggle="${key}"]`);
     const card = document.querySelector<HTMLElement>(`[data-combined-module-card="${key}"]`);
-    card?.classList.toggle("active", value);
+    const purchaseMissing = key === "includeRealEstateFinancing" && value && !state.realEstate.purchaseActivated;
+    const effectiveValue = purchaseMissing ? false : value;
+    card?.classList.toggle("active", effectiveValue);
     if (!control) continue;
     if (control instanceof HTMLInputElement) {
-      control.checked = value;
+      control.checked = effectiveValue;
       continue;
     }
-    control.classList.toggle("active", value);
-    control.setAttribute("aria-pressed", String(value));
+    control.classList.toggle("active", effectiveValue);
+    control.classList.toggle("blocked", purchaseMissing);
+    control.setAttribute("aria-pressed", String(effectiveValue));
     const status = control.querySelector<HTMLElement>("[data-combined-toggle-status]");
-    if (status) status.textContent = value ? "Aktiv" : "Aus";
+    if (status) status.textContent = purchaseMissing ? "Kauf aus" : value ? "Aktiv" : "Aus";
   }
 }
 
@@ -7301,6 +7353,14 @@ function updateRealEstateField(field: RealEstateField, value: string): void {
     field === "specialRepaymentSourceIds" ||
     field === "includeWithdrawalGainAsPaymentSource"
   ) {
+    return;
+  }
+  if (field === "purchaseActivated") {
+    state.realEstate = {
+      ...state.realEstate,
+      purchaseActivated: value === "true"
+    };
+    resetRealEstateDetailSelection();
     return;
   }
   if (field === "specialRepaymentRhythm") {
