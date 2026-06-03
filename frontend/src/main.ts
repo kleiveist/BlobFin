@@ -4718,11 +4718,12 @@ function combinedCashContribution(horizonYears: number, account: PlanningAccount
         { ...state.settings, year: state.settings.year + yearOffset },
         account.yearlyRows
       );
+      const inactiveRealEstateCash = realEstateInactiveCashFallbackForYear(account, state.settings.year + yearOffset);
       if (yearOffset === 0) {
-        cashStartValue = summary.yearEndBalance;
-        yearlyCashDelta = summary.yearlyRemaining;
+        cashStartValue = summary.yearEndBalance + inactiveRealEstateCash;
+        yearlyCashDelta = summary.yearlyRemaining + inactiveRealEstateCash;
       }
-      yearlyCashDeltas[yearOffset] = summary.yearlyRemaining;
+      yearlyCashDeltas[yearOffset] = summary.yearlyRemaining + inactiveRealEstateCash;
     }
   }
 
@@ -4731,6 +4732,28 @@ function combinedCashContribution(horizonYears: number, account: PlanningAccount
   }
 
   return { cashStartValue, yearlyCashDelta, yearlyCashDeltas };
+}
+
+function realEstateInactiveCashFallbackForYear(account: PlanningAccount, year: number): number {
+  if (state.realEstate.purchaseActivated || !state.combinedWealth.includeRealEstateFinancing) return 0;
+  const selected = new Map<string, ReservePosition>();
+  for (const kind of ["equityCapital", "monthlyPayment", "specialRepayment"] as const) {
+    for (const position of selectedRealEstateSourcePositions(kind, [account])) {
+      selected.set(position.id, position);
+    }
+  }
+  let total = 0;
+  for (const position of selected.values()) {
+    for (let month = 1; month <= 12; month += 1) {
+      total += realEstateFallbackContributionForMonth(position, year, month);
+    }
+  }
+  return Math.max(0, total);
+}
+
+function realEstateFallbackContributionForMonth(position: ReservePosition, year: number, month: number): number {
+  if (position.payoutType === "once") return oneTimeInvestmentContributionForMonth(position, year, month);
+  return investmentContributionForMonth(position, year, month);
 }
 
 function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
@@ -7307,12 +7330,13 @@ function syncRealEstateInputsFromState(): void {
     setInputValue(selector, value as number | string);
   }
 
-  const ranges: Array<RealEstateField> = ["interestRatePercent"];
+  const ranges: Array<RealEstateField> = ["interestRatePercent", "propertyValueGrowthPercent"];
   for (const field of ranges) {
     setInputValue(`[data-real-estate-range="${field}"]`, state.realEstate[field] as number);
   }
 
   setText("realEstateInterestRatePercentValue", percent(realEstate.interestRatePercent));
+  setText("realEstatePropertyValueGrowthPercentValue", percent(realEstate.propertyValueGrowthPercent));
 }
 
 function syncRealEstateLocaleLabels(locale: RealEstateFinancingSettings["locale"]): void {

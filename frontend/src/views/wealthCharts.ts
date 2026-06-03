@@ -142,6 +142,8 @@ export function renderCombinedWealthChart(input: CombinedWealthChartInput): stri
     pensionConsumedCumulative: true,
     taxCumulative: true
   };
+  const showPropertyValueLine = input.points.some((point) => point.propertyValue > 0);
+  const showPropertyDebtLine = input.points.some((point) => point.propertyDebt > 0);
   const maxValue = Math.max(
     1,
     ...input.points.map(
@@ -152,9 +154,12 @@ export function renderCombinedWealthChart(input: CombinedWealthChartInput): stri
             Math.max(0, point.pensionConsumed) +
             Math.max(0, point.pensionSavingsValue) +
             Math.max(0, point.taxValue) +
-            Math.max(0, point.propertyValue),
+            Math.max(0, point.propertyEquity),
           Math.max(0, point.pensionConsumedValue),
-          Math.max(0, point.cumulativeTaxValue)
+          Math.max(0, point.cumulativeTaxValue),
+          Math.max(0, point.totalNetWealth),
+          Math.max(0, point.propertyValue),
+          Math.max(0, point.propertyDebt)
         )
     )
   );
@@ -171,6 +176,9 @@ export function renderCombinedWealthChart(input: CombinedWealthChartInput): stri
           ${renderCombinedSummaryValue("Rentensparen", selectedPoint.pensionSavingsValue, input.formatMoney)}
           ${renderCombinedSummaryValue("Steuern", selectedPoint.taxValue, input.formatMoney)}
           ${renderCombinedSummaryValue("Immobilienwert", selectedPoint.propertyValue, input.formatMoney)}
+          ${renderCombinedSummaryValue("Immobilienschuld", selectedPoint.propertyDebt, input.formatMoney)}
+          ${renderCombinedSummaryValue("Immobilien-Eigenkapital", selectedPoint.propertyEquity, input.formatMoney)}
+          ${renderCombinedSummaryValue("Nettovermoegen", selectedPoint.totalNetWealth, input.formatMoney)}
         </div>
         <div class="combined-wealth-line-controls" aria-label="Kumulierte Linien">
           ${renderCombinedLineToggle({
@@ -213,9 +221,29 @@ export function renderCombinedWealthChart(input: CombinedWealthChartInput): stri
       { className: "pension-consumed", label: "Verbrauchte Rente" },
       { className: "pension", label: "Gesparte Rente" },
       { className: "tax", label: "Steuern" },
-      { className: "property", label: "Immobilienwert" }
+      { className: "equity", label: "Immobilien-Eigenkapital" },
+      ...(showPropertyValueLine ? [{ className: "property", label: "Immobilienwert brutto" }] : []),
+      ...(showPropertyDebtLine ? [{ className: "debt", label: "Immobilienschuld" }] : [])
     ],
     lines: [
+      showPropertyValueLine ? {
+        className: "property",
+        label: "Immobilienwert brutto",
+        points: input.points.map((point) => ({
+          year: point.year,
+          value: Math.max(0, point.propertyValue),
+          valueLabel: input.formatMoney(point.propertyValue)
+        }))
+      } : null,
+      showPropertyDebtLine ? {
+        className: "debt",
+        label: "Immobilienschuld",
+        points: input.points.map((point) => ({
+          year: point.year,
+          value: Math.max(0, point.propertyDebt),
+          valueLabel: input.formatMoney(point.propertyDebt)
+        }))
+      } : null,
       lineVisibility.pensionConsumedCumulative ? {
         className: "pension-consumed-cumulative",
         label: "Verbrauchte Rente kumuliert",
@@ -239,17 +267,17 @@ export function renderCombinedWealthChart(input: CombinedWealthChartInput): stri
       year: point.year,
       selected: input.selectedYear === point.year,
       action: "select-combined-wealth-year",
-      value: point.totalGrossAssets,
-      valueLabel: input.formatMoney(point.totalGrossAssets),
+      value: point.totalNetWealth,
+      valueLabel: input.formatMoney(point.totalNetWealth),
       barTotal:
         Math.max(0, point.cashValue) +
         Math.max(0, point.depotValue) +
         Math.max(0, point.pensionConsumed) +
         Math.max(0, point.pensionSavingsValue) +
         Math.max(0, point.taxValue) +
-        Math.max(0, point.propertyValue),
+        Math.max(0, point.propertyEquity),
       segments: [
-        { className: "property", label: "Immobilienwert", value: Math.max(0, point.propertyValue) },
+        { className: "equity", label: "Immobilien-Eigenkapital", value: Math.max(0, point.propertyEquity) },
         { className: "cash", label: "Cash", value: Math.max(0, point.cashValue) },
         { className: "depot", label: "Depot", value: Math.max(0, point.depotValue) },
         { className: "pension-consumed", label: "Verbrauchte Rente", value: Math.max(0, point.pensionConsumed) },
@@ -286,7 +314,7 @@ export function renderCombinedWealthLifeSummary(input: {
         <span>Lebenszusammenfassung</span>
         <strong>${input.formatInt(firstYear.year)} bis ${input.formatInt(finalYear.year)}</strong>
       </div>
-      ${wealthDetailLine("Gesamtes aufgebautes Vermoegen", input.formatMoney(finalYear.totalGrossAssets))}
+      ${wealthDetailLine("Bruttovermoegen inkl. Immobilienwert", input.formatMoney(finalYear.totalGrossAssets))}
       ${wealthDetailLine("Verbrauchte Rentenzahlungen", input.formatMoney(pensionConsumed))}
       ${wealthDetailLine("Gesparte Rentenanteile", input.formatMoney(pensionSaved))}
       ${wealthDetailLine("Gezahlte Steuern und Abgaben", input.formatMoney(totalTaxesAndDeductions))}
@@ -326,6 +354,9 @@ export function renderCombinedWealthPopup(input: {
       ${chartPopupLine("pension", "Gesparte Rente", input.formatMoney(input.selected.pensionSavingsValue))}
       ${chartPopupLine("tax", "Steuern", input.formatMoney(input.selected.taxValue))}
       ${chartPopupLine("property", "Immobilienwert", input.formatMoney(input.selected.propertyValue))}
+      ${chartPopupLine("debt", "Immobilienschuld", input.formatMoney(input.selected.propertyDebt))}
+      ${chartPopupLine("equity", "Immobilien-Eigenkapital", input.formatMoney(input.selected.propertyEquity))}
+      ${chartPopupLine("net", "Nettovermoegen", input.formatMoney(input.selected.totalNetWealth))}
     </div>
   `;
 }
@@ -455,7 +486,16 @@ function renderVerticalBar(
 }
 
 function renderCombinedSummaryValue(
-  label: "Cash" | "Depot" | "Rente p.a." | "Rentensparen" | "Steuern" | "Immobilienwert",
+  label:
+    | "Cash"
+    | "Depot"
+    | "Rente p.a."
+    | "Rentensparen"
+    | "Steuern"
+    | "Immobilienwert"
+    | "Immobilienschuld"
+    | "Immobilien-Eigenkapital"
+    | "Nettovermoegen",
   value: number,
   formatMoney: (value: number) => string
 ): string {

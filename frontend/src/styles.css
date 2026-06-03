@@ -2242,6 +2242,10 @@ tfoot th {
   background: #64748b;
 }
 
+.chart-popup-dot.net {
+  background: #16a34a;
+}
+
 .chart-popup-dot.health {
   background: #2e6d84;
 }
@@ -3611,6 +3615,10 @@ tfoot th {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
+.real-estate-slider-grid.two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .real-estate-source-grid {
   display: grid;
   gap: 12px;
@@ -4245,6 +4253,16 @@ tfoot th {
 
 .wealth-line-overlay.pension-consumed-cumulative {
   color: #086a61;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.7));
+}
+
+.wealth-line-overlay.property {
+  color: #5f88e8;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.7));
+}
+
+.wealth-line-overlay.debt {
+  color: #ff5b63;
   filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.7));
 }
 
@@ -6254,6 +6272,10 @@ tfoot th {
 
   .account-year-table-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .real-estate-slider-grid.two-columns {
+    grid-template-columns: 1fr;
   }
 
   .wealth-bar-row {

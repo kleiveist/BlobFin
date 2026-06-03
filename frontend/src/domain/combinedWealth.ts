@@ -149,7 +149,7 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
     );
     const totalDebt = roundMoney(Math.max(0, propertyDebt));
     const totalNetWealth = roundMoney(
-      cashValue + depotValue + Math.max(0, propertyValue) - totalDebt + withdrawalImpact + cumulativePensionSavings
+      cashValue + depotValue + propertyEquity + withdrawalImpact + cumulativePensionSavings
     );
 
     years.push({

@@ -617,8 +617,9 @@ export function renderAppShell(): string {
               ${realEstateNumberField("plannedSaleYear", "Verkaufsjahr", { step: 1, nullable: true })}
               ${realEstateBooleanField("purchaseActivated", "Immobilie gekauft / Kauf geplant")}
             </div>
-            <div class="real-estate-slider-grid">
+            <div class="real-estate-slider-grid two-columns">
               ${realEstateAssumptionControl("interestRatePercent", "Zinssatz", 0, 10, 0.05)}
+              ${realEstateAssumptionControl("propertyValueGrowthPercent", "Immobilienwertzuwachs in % pro Jahr", 0, 10, 0.05)}
             </div>
             <div class="chart-inline-metrics">
               ${chartMetric("realEstateCalculatedEndAgeMetric", "Bezahlt bis Alter")}

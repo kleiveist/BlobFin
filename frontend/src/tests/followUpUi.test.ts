@@ -262,7 +262,8 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('id="realEstatePropertyValueMetric"');
     expect(html).not.toContain('id="realEstatePropertyEquityMetric"');
     expect(count(html, 'data-real-estate-field="propertyValueGrowthPercent"')).toBe(0);
-    expect(count(html, 'data-real-estate-range="propertyValueGrowthPercent"')).toBe(0);
+    expect(count(html, 'data-real-estate-range="propertyValueGrowthPercent"')).toBe(1);
+    expect(html).toContain("Immobilienwertzuwachs in % pro Jahr");
     expect(count(html, 'data-real-estate-field="inflationRatePercent"')).toBe(0);
     expect(count(html, 'data-real-estate-range="inflationRatePercent"')).toBe(0);
     expect(html).toContain('id="realEstateChartPopup"');
@@ -320,7 +321,15 @@ describe("follow-up ui rendering", () => {
     expect(combined).toContain("wealth-line-overlay tax-cumulative");
     expect(combined).not.toContain("legend-dot pension-consumed-cumulative");
     expect(combined).not.toContain("legend-dot tax-cumulative");
-    expect(combined.indexOf("wealth-column-segment property")).toBeLessThan(
+    expect(combined).toContain("Immobilien-Eigenkapital");
+    expect(combined).toContain("Immobilienschuld");
+    expect(combined).toContain("Nettovermoegen");
+    expect(combined).toContain("wealth-column-segment equity");
+    expect(combined).toContain("wealth-line-overlay property");
+    expect(combined).toContain("wealth-line-overlay debt");
+    expect(combined).toContain("Immobilienwert brutto");
+    expect(combined).not.toContain("wealth-column-segment property");
+    expect(combined.indexOf("wealth-column-segment equity")).toBeLessThan(
       combined.indexOf("wealth-column-segment cash")
     );
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");

@@ -40,7 +40,8 @@ npm run dev
 - `Jahreszins Konto in %`: account interest rate for positions with the `Zinsen` checkbox enabled.
 - `Cashback in %`: cashback rate for temporary positions with the `Cashback` checkbox enabled.
 - `Enddatum`: global planning end point used by investment, withdrawal, and combined wealth projections.
-- `Immobilie gekauft / Kauf geplant`: activates real estate as a combined wealth component. Without this switch, property value, debt, and repayment do not affect the combined wealth path.
+- `Immobilie gekauft / Kauf geplant`: activates real estate as a combined wealth component. Without this switch, property value, debt, and repayment do not affect the combined wealth path; planned payment sources remain liquid through cash/depot planning.
+- `Immobilienwertzuwachs in % pro Jahr`: controls the optional annual gross property value growth used by the real estate path.
 
 ## Automatic Saving
 

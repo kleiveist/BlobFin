@@ -91,7 +91,7 @@ const defaultToggles: CombinedWealthToggles = {
 };
 
 describe("combined wealth", () => {
-  it("aggregates cash, depot and property values", () => {
+  it("aggregates cash, depot and property equity for net wealth", () => {
     const depot = projection([point(30, "saving", 10000), point(31, "saving", 12000)], 0, 65);
     const shared = projection([point(30, "saving", 3000), point(31, "saving", 5000)], 0, 65);
     const realEstate: RealEstateFinancingYear[] = [
@@ -151,7 +151,10 @@ describe("combined wealth", () => {
     expect(result[0].cashValue).toBe(20000);
     expect(result[0].depotValue).toBe(13000);
     expect(result[0].propertyDebt).toBe(205000);
-    expect(result[0].totalNetWealth).toBeGreaterThan(0);
+    expect(result[0].propertyValue).toBe(300000);
+    expect(result[0].propertyEquity).toBe(95000);
+    expect(result[0].totalGrossAssets).toBe(333000);
+    expect(result[0].totalNetWealth).toBe(128000);
   });
 
   it("adds annual depot and pension taxes and keeps a cumulative tax value", () => {
@@ -294,6 +297,7 @@ describe("combined wealth", () => {
 
     expect(result[0].propertyValue).toBe(0);
     expect(result[0].propertyDebt).toBe(0);
+    expect(result[0].propertyEquity).toBe(0);
     expect(result[0].totalNetWealth).toBe(10000);
   });
 
@@ -686,6 +690,64 @@ describe("combined wealth", () => {
     expect(result[0].redirectedDepotRepayment).toBe(2400);
     expect(result[0].cashValue).toBe(6400);
     expect(result[0].depotValue).toBe(9600);
+  });
+
+  it("keeps repayment sources liquid when real estate financing is inactive", () => {
+    const depot = projection([point(30, "saving", 12000)], 0, 65);
+    const realEstate: RealEstateFinancingYear[] = [
+      {
+        year: 2026,
+        propertyValue: 300000,
+        loanStart: 200000,
+        interestPaid: 0,
+        interestDue: 0,
+        interestShortfall: 0,
+        monthlyPaymentFromSavings: 0,
+        monthlyPaymentFromWithdrawalGain: 0,
+        monthlyPaymentAvailable: 0,
+        principalFromMonthlyPayment: 0,
+        principalPaid: 0,
+        specialRepayment: 0,
+        additionalRepayment: 6000,
+        additionalRepaymentBreakdown: {
+          withdrawalGain: 1200,
+          depotSavingsRate: 2400,
+          legacySavingsRate: 1200,
+          netGain: 1200,
+          totalAdditionalRepayment: 6000
+        },
+        loanEnd: 194000,
+        propertyEquity: 106000,
+        netPropertyWealth: 106000
+      }
+    ];
+
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 1,
+      cashStartValue: 10000,
+      yearlyCashDelta: 0,
+      depotProjection: depot,
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateYears: realEstate,
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeWithdrawals: false,
+        includeRealEstateFinancing: false,
+        includeRealEstateValueTrend: false
+      }
+    });
+
+    expect(result[0].redirectedCashRepayment).toBe(0);
+    expect(result[0].redirectedDepotRepayment).toBe(0);
+    expect(result[0].cashValue).toBe(10000);
+    expect(result[0].depotValue).toBe(12000);
+    expect(result[0].propertyValue).toBe(0);
+    expect(result[0].propertyDebt).toBe(0);
+    expect(result[0].propertyEquity).toBe(0);
   });
 
   it("covers negative cash years from the standard depot and floors cash at zero", () => {
