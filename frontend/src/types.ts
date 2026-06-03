@@ -5,6 +5,7 @@ export type PositionType = ExpensePositionType | IncomePositionType;
 export type PayoutType = "none" | "monthly" | "yearly" | "once";
 export type ThemeMode = "light" | "dark";
 export type InvestmentDepotKey = "standard" | "retirement" | "child";
+export type CombinedWealthDepotKey = InvestmentDepotKey;
 export type PositionTableMode = PositionFlow | "reserve" | "savings";
 export type AppSectionId =
   | "home"
@@ -253,6 +254,12 @@ export interface CombinedWealthToggles {
   includeWithdrawals: boolean;
   includeRealEstateFinancing: boolean;
   includeRealEstateValueTrend: boolean;
+  includeStatutoryPension: boolean;
+  cashAccountId: string | null;
+  depotKeys: CombinedWealthDepotKey[];
+  statutoryPensionScenario: StatutoryPensionScenarioId;
+  statutoryPensionMonthlyAmount: number;
+  statutoryPensionSavingsRatePercent: number;
 }
 
 export type StatutoryPensionScenarioId = "pessimistic" | "base" | "optimistic";
@@ -352,11 +359,17 @@ export interface CombinedWealthYear {
   year: number;
   cashValue: number;
   depotValue: number;
+  depotBreakdown: Array<{ id: CombinedWealthDepotKey; label: string; value: number }>;
   withdrawalImpact: number;
   redirectedCashRepayment: number;
   redirectedDepotRepayment: number;
+  pensionIncome: number;
+  pensionConsumed: number;
+  pensionSaved: number;
+  pensionSavingsValue: number;
   propertyValue: number;
   propertyDebt: number;
+  propertyLoanStart: number;
   propertyEquity: number;
   totalGrossAssets: number;
   totalDebt: number;

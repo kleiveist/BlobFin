@@ -81,7 +81,13 @@ const defaultToggles: CombinedWealthToggles = {
   includeSharedDepotDevelopment: true,
   includeWithdrawals: true,
   includeRealEstateFinancing: true,
-  includeRealEstateValueTrend: true
+  includeRealEstateValueTrend: true,
+  includeStatutoryPension: false,
+  cashAccountId: "default-account",
+  depotKeys: ["standard", "retirement"],
+  statutoryPensionScenario: "base",
+  statutoryPensionMonthlyAmount: 0,
+  statutoryPensionSavingsRatePercent: 0
 };
 
 describe("combined wealth", () => {

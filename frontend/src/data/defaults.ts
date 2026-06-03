@@ -312,7 +312,13 @@ export function defaultCombinedWealthToggles(): CombinedWealthToggles {
     includeSharedDepotDevelopment: false,
     includeWithdrawals: false,
     includeRealEstateFinancing: true,
-    includeRealEstateValueTrend: false
+    includeRealEstateValueTrend: false,
+    includeStatutoryPension: true,
+    cashAccountId: "default-account",
+    depotKeys: ["standard"],
+    statutoryPensionScenario: "base",
+    statutoryPensionMonthlyAmount: 0,
+    statutoryPensionSavingsRatePercent: 0
   };
 }
 

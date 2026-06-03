@@ -31,6 +31,7 @@ import type {
   AppUiState,
   CareerMilestone,
   CareerMilestoneImpact,
+  CombinedWealthDepotKey,
   CombinedWealthToggles,
   IncomePerson,
   IncomeProjectionMode,
@@ -528,8 +529,41 @@ function normalizeCombinedWealthToggles(value: unknown): CombinedWealthToggles {
     ),
     includeWithdrawals: booleanOrDefault(value.includeWithdrawals, fallback.includeWithdrawals),
     includeRealEstateFinancing: booleanOrDefault(value.includeRealEstateFinancing, fallback.includeRealEstateFinancing),
-    includeRealEstateValueTrend: booleanOrDefault(value.includeRealEstateValueTrend, fallback.includeRealEstateValueTrend)
+    includeRealEstateValueTrend: booleanOrDefault(value.includeRealEstateValueTrend, fallback.includeRealEstateValueTrend),
+    includeStatutoryPension: booleanOrDefault(value.includeStatutoryPension, fallback.includeStatutoryPension),
+    cashAccountId: typeof value.cashAccountId === "string" && value.cashAccountId.trim() ? value.cashAccountId : fallback.cashAccountId,
+    depotKeys: normalizeCombinedWealthDepotKeys(value.depotKeys, fallback.depotKeys),
+    statutoryPensionScenario: normalizeStatutoryPensionScenarioId(
+      value.statutoryPensionScenario,
+      fallback.statutoryPensionScenario
+    ),
+    statutoryPensionMonthlyAmount: Math.max(
+      0,
+      numberOrDefault(value.statutoryPensionMonthlyAmount, fallback.statutoryPensionMonthlyAmount)
+    ),
+    statutoryPensionSavingsRatePercent: clampNumber(
+      numberOrDefault(value.statutoryPensionSavingsRatePercent, fallback.statutoryPensionSavingsRatePercent),
+      0,
+      100
+    )
   };
+}
+
+function normalizeCombinedWealthDepotKeys(
+  value: unknown,
+  fallback: CombinedWealthDepotKey[]
+): CombinedWealthDepotKey[] {
+  const keys = stringArrayOrDefault(value, fallback).filter(
+    (key): key is CombinedWealthDepotKey => key === "standard" || key === "retirement" || key === "child"
+  );
+  return Array.from(new Set(keys)).length ? Array.from(new Set(keys)) : fallback;
+}
+
+function normalizeStatutoryPensionScenarioId(
+  value: unknown,
+  fallback: StatutoryPensionScenarioId
+): StatutoryPensionScenarioId {
+  return value === "pessimistic" || value === "base" || value === "optimistic" ? value : fallback;
 }
 
 function normalizeStatutoryPensionSettings(value: unknown): StatutoryPensionSettings {

@@ -3,12 +3,17 @@ import "./styles.css";
 import {
   createId,
   defaultAppState,
+  defaultCombinedWealthToggles,
   defaultIncomeTrackerState,
   defaultInvestmentSettings,
   defaultInvestmentSettingsForNewAccount
 } from "./data/defaults";
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
-import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/combinedWealth";
+import {
+  buildCombinedWealthSeries,
+  combinedWealthHorizonYears,
+  type CombinedWealthDepotProjection
+} from "./domain/combinedWealth";
 import {
   buildIncomeAnalysisLabelDetails,
   type IncomeAnalysisLabelDetails,
@@ -109,6 +114,7 @@ import type {
   AssetProjectionPoint,
   CareerMilestone,
   CareerMilestoneImpact,
+  CombinedWealthDepotKey,
   CombinedWealthYear,
   IncomePerson,
   IncomeProjectionMode,
@@ -145,7 +151,8 @@ import {
   realEstateRepaymentSegments,
   realEstateTrendSegments,
   renderCombinedWealthChart,
-  renderCombinedWealthYearDetail,
+  renderCombinedWealthLifeSummary,
+  renderCombinedWealthPopup,
   renderRealEstateRepaymentChart,
   renderRealEstateTrendChart
 } from "./views/wealthCharts";
@@ -165,6 +172,11 @@ const CHILD_DEPOT_DEFAULT_PAYOUT_AGE = 18;
 const CHILD_DEPOT_MAX_PAYOUT_AGE = 25;
 const MAX_REAL_ESTATE_PROJECTION_YEARS = 80;
 const INVESTMENT_DEPOTS: InvestmentDepotKey[] = ["standard", "retirement", "child"];
+const COMBINED_DEPOTS: Array<{ key: CombinedWealthDepotKey; label: string }> = [
+  { key: "standard", label: "Depot" },
+  { key: "retirement", label: "Altersvorsorgedepot" },
+  { key: "child", label: "Kinderdepot" }
+];
 const APP_SECTION_IDS: AppSectionId[] = [
   "home",
   "income",
@@ -374,7 +386,10 @@ interface PositionFilterDraft {
 }
 
 type RealEstateField = keyof RealEstateFinancingSettings;
-type CombinedToggleKey = keyof AppState["combinedWealth"];
+type CombinedToggleKey = {
+  [Key in keyof AppState["combinedWealth"]]: AppState["combinedWealth"][Key] extends boolean ? Key : never;
+}[keyof AppState["combinedWealth"]];
+type CombinedNumberKey = "statutoryPensionMonthlyAmount" | "statutoryPensionSavingsRatePercent";
 type AccountDialogMode = "create" | "rename";
 type AccountDialogState = {
   mode: AccountDialogMode;
@@ -415,6 +430,7 @@ let positionFilterPopupOpen = false;
 let selectedRealEstateYear: number | null = null;
 let latestRealEstateResult: RealEstateFinancingResult | null = null;
 let selectedCombinedWealthYear: number | null = null;
+let latestCombinedWealthYears: CombinedWealthYear[] = [];
 let latestStatutoryPensionModel: StatutoryPensionModel | null = null;
 let statutoryPensionTaxPopupScenarioId: StatutoryPensionScenarioId | null = null;
 let accountDialog: AccountDialogState = null;
@@ -484,11 +500,9 @@ function sanitizeAppState(appState: AppState): AppState {
   const selectedCombinedLeadInvestmentAccountId = accountIds.includes(ui.selectedCombinedLeadInvestmentAccountId)
     ? ui.selectedCombinedLeadInvestmentAccountId
     : selectedInvestmentAccountId;
-  const normalizedCombinedLeadInvestmentAccountId = selectedCombinedAccountIds.includes(
-    selectedCombinedLeadInvestmentAccountId
-  )
+  const normalizedCombinedLeadInvestmentAccountId = accountIds.includes(selectedCombinedLeadInvestmentAccountId)
     ? selectedCombinedLeadInvestmentAccountId
-    : selectedCombinedAccountIds[0] ?? selectedCombinedLeadInvestmentAccountId;
+    : selectedInvestmentAccountId;
   const positions =
     planningAccounts.find((account) => account.id === selectedPlanningAccountId)?.yearlyRows ??
     appState.positions.map((position) => sanitizePosition(position, appState.settings.year));
@@ -519,6 +533,11 @@ function sanitizeAppState(appState: AppState): AppState {
       selectedCombinedLeadInvestmentAccountId: normalizedCombinedLeadInvestmentAccountId,
       activeSection: appSectionIdFromValue(ui.activeSection) ?? "home"
     },
+    combinedWealth: normalizeCombinedWealthState(
+      appState.combinedWealth,
+      accountIds,
+      selectedInvestmentAccountId
+    ),
     positions,
     investmentByAccountId,
     investment,
@@ -526,6 +545,33 @@ function sanitizeAppState(appState: AppState): AppState {
       ...incomeTracker,
       yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules(incomeTracker.yearlyEntries)
     }
+  };
+}
+
+function normalizeCombinedWealthState(
+  combinedWealth: AppState["combinedWealth"] | undefined,
+  accountIds: string[],
+  fallbackAccountId: string
+): AppState["combinedWealth"] {
+  const fallback = defaultCombinedWealthToggles();
+  const source = combinedWealth ?? fallback;
+  const cashAccountId =
+    source.cashAccountId && accountIds.includes(source.cashAccountId) ? source.cashAccountId : fallbackAccountId;
+  const depotKeys = Array.from(
+    new Set(
+      (source.depotKeys?.length ? source.depotKeys : fallback.depotKeys).filter((key): key is CombinedWealthDepotKey =>
+        COMBINED_DEPOTS.some((depot) => depot.key === key)
+      )
+    )
+  );
+  return {
+    ...fallback,
+    ...source,
+    cashAccountId,
+    depotKeys: depotKeys.length ? depotKeys : fallback.depotKeys,
+    statutoryPensionScenario: statutoryPensionScenarioIdFromValue(source.statutoryPensionScenario) ?? "base",
+    statutoryPensionMonthlyAmount: Math.max(0, Number(source.statutoryPensionMonthlyAmount) || 0),
+    statutoryPensionSavingsRatePercent: clamp(Number(source.statutoryPensionSavingsRatePercent) || 0, 0, 100)
   };
 }
 
@@ -595,17 +641,24 @@ function selectedRealEstateWithdrawalAccounts(): PlanningAccount[] {
   return selectedRealEstateSourceAccounts();
 }
 
-function selectedCombinedAccounts(): PlanningAccount[] {
-  return planningAccountsByIds(state.ui.selectedCombinedAccountIds);
+function selectedCombinedCashPlanningAccount(): PlanningAccount | null {
+  const account =
+    (state.combinedWealth.cashAccountId ? planningAccountById(state.combinedWealth.cashAccountId) : null) ??
+    planningAccountById(state.ui.selectedPlanningAccountId) ??
+    state.planningAccounts[0] ??
+    null;
+  if (account && state.combinedWealth.cashAccountId !== account.id) {
+    state.combinedWealth = { ...state.combinedWealth, cashAccountId: account.id };
+  }
+  return account;
 }
 
 function selectedCombinedLeadInvestmentPlanningAccount(): PlanningAccount | null {
-  const activeCombinedAccounts = selectedCombinedAccounts();
-  if (!activeCombinedAccounts.length) return null;
   const leadId = state.ui.selectedCombinedLeadInvestmentAccountId;
   const lead =
-    activeCombinedAccounts.find((account) => account.id === leadId) ??
-    activeCombinedAccounts[0] ??
+    planningAccountById(leadId) ??
+    planningAccountById(state.ui.selectedInvestmentAccountId) ??
+    state.planningAccounts[0] ??
     null;
   if (!lead) return null;
   if (state.ui.selectedCombinedLeadInvestmentAccountId !== lead.id) {
@@ -643,11 +696,9 @@ function synchronizeAccountScopedState(): void {
   const selectedCombinedLeadInvestmentAccountId = accountIds.includes(state.ui.selectedCombinedLeadInvestmentAccountId)
     ? state.ui.selectedCombinedLeadInvestmentAccountId
     : selectedInvestmentAccountId;
-  const normalizedCombinedLeadInvestmentAccountId = selectedCombinedAccountIds.includes(
-    selectedCombinedLeadInvestmentAccountId
-  )
+  const normalizedCombinedLeadInvestmentAccountId = accountIds.includes(selectedCombinedLeadInvestmentAccountId)
     ? selectedCombinedLeadInvestmentAccountId
-    : selectedCombinedAccountIds[0] ?? selectedCombinedLeadInvestmentAccountId;
+    : selectedInvestmentAccountId;
 
   const investmentByAccountId = accountIds.reduce<Record<string, InvestmentSettings>>((result, accountId) => {
     result[accountId] = state.investmentByAccountId[accountId] ?? defaultInvestmentSettingsForNewAccount();
@@ -664,6 +715,11 @@ function synchronizeAccountScopedState(): void {
     selectedCombinedAccountIds,
     selectedCombinedLeadInvestmentAccountId: normalizedCombinedLeadInvestmentAccountId
   };
+  state.combinedWealth = normalizeCombinedWealthState(
+    state.combinedWealth,
+    accountIds,
+    normalizedCombinedLeadInvestmentAccountId
+  );
   state.investment = state.investmentByAccountId[selectedInvestmentAccountId] ?? defaultInvestmentSettingsForNewAccount();
   investmentAccountContextId = selectedInvestmentAccountId;
 }
@@ -785,6 +841,12 @@ function bindEvents(): void {
 
     if (target.dataset.realEstateRange) {
       updateRealEstateField(target.dataset.realEstateRange as RealEstateField, target.value);
+      renderAll();
+      return;
+    }
+
+    if (target.dataset.combinedNumber) {
+      updateCombinedNumber(target.dataset.combinedNumber as CombinedNumberKey, target.value);
       renderAll();
       return;
     }
@@ -924,6 +986,12 @@ function bindEvents(): void {
       return;
     }
 
+    if (target.dataset.combinedNumber) {
+      updateCombinedNumber(target.dataset.combinedNumber as CombinedNumberKey, target.value);
+      renderAll();
+      return;
+    }
+
     if (target.dataset.statutoryPensionField) {
       updateStatutoryPensionField(target.dataset.statutoryPensionField, target.value);
       renderAll();
@@ -995,6 +1063,9 @@ function bindEvents(): void {
       if (!target?.closest("#statutoryPensionProjectionYearPopup")) {
         hideStatutoryPensionProjectionYearPopup();
       }
+      if (!target?.closest("#combinedWealthChartPopup")) {
+        hideCombinedWealthPopup();
+      }
       return;
     }
 
@@ -1017,6 +1088,9 @@ function bindEvents(): void {
     }
     if (action !== "close-statutory-pension-projection-popup" && !button.closest("#statutoryPensionProjectionYearPopup")) {
       hideStatutoryPensionProjectionYearPopup();
+    }
+    if (action !== "close-combined-wealth-popup" && !button.closest("#combinedWealthChartPopup")) {
+      hideCombinedWealthPopup();
     }
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
@@ -1091,8 +1165,23 @@ function bindEvents(): void {
     if (action?.startsWith("toggle-combined-account-")) {
       toggleCombinedAccount(action.replace("toggle-combined-account-", ""));
     }
+    if (action?.startsWith("select-combined-cash-account-")) {
+      selectCombinedCashAccount(action.replace("select-combined-cash-account-", ""));
+      renderAll();
+      return;
+    }
     if (action?.startsWith("select-combined-lead-account-")) {
       selectCombinedLeadInvestmentAccount(action.replace("select-combined-lead-account-", ""));
+    }
+    if (action === "toggle-combined-depot") {
+      toggleCombinedDepot(button.dataset.combinedDepot as CombinedWealthDepotKey | undefined);
+      renderAll();
+      return;
+    }
+    if (action === "select-combined-pension-scenario") {
+      selectCombinedPensionScenario(button.dataset.combinedPensionScenario as StatutoryPensionScenarioId | undefined);
+      renderAll();
+      return;
     }
     if (action === "toggle-result-max-needed") toggleResultMaxNeeded();
     if (action === "set-investment-depot-standard") setInvestmentDepot("standard");
@@ -1129,6 +1218,7 @@ function bindEvents(): void {
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
     if (action === "close-statutory-pension-year-popup") hideStatutoryPensionYearPopup();
     if (action === "close-statutory-pension-projection-popup") hideStatutoryPensionProjectionYearPopup();
+    if (action === "close-combined-wealth-popup") hideCombinedWealthPopup();
     if (action === "open-statutory-pension-tax-popup") {
       openStatutoryPensionTaxPopup(button.dataset.statutoryPensionScenario as StatutoryPensionScenarioId);
       return;
@@ -1164,7 +1254,11 @@ function bindEvents(): void {
       showRealEstateChartPopup(year, chartKind, event.clientX, event.clientY);
       return;
     }
-    if (action === "select-combined-wealth-year") setSelectedCombinedWealthYear(numberValue(button.dataset.year || ""));
+    if (action === "select-combined-wealth-year") {
+      const year = numberValue(button.dataset.year || "");
+      selectCombinedWealthYearWithPopup(year, event.clientX, event.clientY);
+      return;
+    }
     if (action === "import-positions") document.querySelector<HTMLInputElement>("#positionsCsvImport")?.click();
     if (action === "export-positions") {
       void exportCsvFile(
@@ -1228,6 +1322,7 @@ function bindEvents(): void {
     if (event.key === "Escape") {
       hideThemeSettings();
       hideInvestmentChartPopup();
+      hideCombinedWealthPopup();
       hideStatutoryPensionYearPopup();
       hideStatutoryPensionProjectionYearPopup();
       closeStatutoryPensionTaxPopup();
@@ -1384,9 +1479,11 @@ function renderCalculations(
         combinedLeadAccount.id
       )
     : combinedProjectionWithoutAccounts(retirementProjection);
+  const combinedDepotProjections = combinedDepotProjectionInputs(combinedLeadAccount);
   const combinedBirthYear = combinedLeadSettings?.birthYear ?? state.settings.year;
   const combinedRetirementBirthYear = combinedLeadSettings?.retirementBirthYear ?? state.settings.year;
   renderStatutoryPensionCalculations(combinedBirthYear);
+  renderCombinedModuleControls();
   const combinedRealEstateProjectionYears = currentCombinedRealEstateProjectionYears(
     financingStartYear,
     combinedStandardProjection,
@@ -1408,18 +1505,16 @@ function renderCalculations(
   const combinedRealEstate = calculateRealEstateFinancing(
     financingStartYear,
     state.realEstate,
-    realEstateSourceSchedule(financingStartYear, combinedRealEstateProjectionYears, state.ui.selectedCombinedAccountIds),
+    realEstateSourceSchedule(financingStartYear, combinedRealEstateProjectionYears, state.ui.selectedRealEstateAccountIds),
     {
       projectionYears: combinedRealEstateProjectionYears,
       maxProjectionYears: combinedRealEstateProjectionYears
     }
   );
   const combinedYears = calculateCombinedWealthYears(
-    combinedStandardProjection,
-    combinedRetirementProjection,
     combinedRealEstate,
-    combinedBirthYear,
-    combinedRetirementBirthYear
+    combinedDepotProjections,
+    combinedPensionInput(latestStatutoryPensionModel, combinedBirthYear)
   );
   renderCombinedWealthCalculations(combinedYears);
 }
@@ -4469,17 +4564,23 @@ function selectedRealEstateSourcePositions(
 }
 
 function calculateCombinedWealthYears(
-  standardProjection: AssetProjection,
-  retirementProjection: AssetProjection,
   realEstate: RealEstateFinancingResult,
-  standardBirthYear: number,
-  retirementBirthYear: number
+  depotProjections: CombinedWealthDepotProjection[],
+  pension: ReturnType<typeof combinedPensionInput>
 ): CombinedWealthYear[] {
-  const standardEndYear = standardBirthYear + standardProjection.endAge;
-  const retirementEndYear = retirementBirthYear + retirementProjection.endAge;
-  const horizonYears = combinedWealthHorizonYears(state.settings.year, standardEndYear, retirementEndYear);
+  const depotEndYear = depotProjections.reduce(
+    (maxYear, depot) => Math.max(maxYear, depot.birthYear + depot.projection.endAge),
+    state.settings.year
+  );
+  const pensionEndYear = pension.enabled ? pension.retirementYear + 35 : state.settings.year;
+  const realEstateEndYear = realEstate.years.at(-1)?.year ?? state.settings.year;
+  const horizonYears = combinedWealthHorizonYears(
+    state.settings.year,
+    Math.max(depotEndYear, realEstateEndYear),
+    pensionEndYear
+  );
 
-  const cashContribution = combinedCashContribution(horizonYears, selectedCombinedAccounts());
+  const cashContribution = combinedCashContribution(horizonYears, selectedCombinedCashPlanningAccount());
 
   return buildCombinedWealthSeries({
     startYear: state.settings.year,
@@ -4487,16 +4588,47 @@ function calculateCombinedWealthYears(
     cashStartValue: cashContribution.cashStartValue,
     yearlyCashDelta: cashContribution.yearlyCashDelta,
     yearlyCashDeltas: cashContribution.yearlyCashDeltas,
-    depotProjection: standardProjection,
-    sharedDepotProjection: retirementProjection,
-    depotBirthYear: standardBirthYear,
-    sharedDepotBirthYear: retirementBirthYear,
+    depotProjections,
+    pension,
     realEstateYears: realEstate.years,
     toggles: state.combinedWealth
   });
 }
 
-function combinedCashContribution(horizonYears: number, accounts: PlanningAccount[]): {
+function combinedDepotProjectionInputs(account: PlanningAccount | null): CombinedWealthDepotProjection[] {
+  if (!account) return [];
+  const summary = calculateReserveSummary(state.settings, account.yearlyRows);
+  return selectedCombinedDepotKeys().map((key) => {
+    const projection = buildDepotAssetProjection(summary, key, account.id);
+    const settings = depotInvestmentSettingsForAccount(key, account.id);
+    return {
+      id: key,
+      label: depotLabel(key),
+      projection,
+      birthYear: settings.birthYear
+    };
+  });
+}
+
+function combinedPensionInput(model: StatutoryPensionModel | null, birthYear: number): {
+  enabled: boolean;
+  retirementYear: number;
+  monthlyAmount: number;
+  savingsRatePercent: number;
+} {
+  const scenarioId = state.combinedWealth.statutoryPensionScenario;
+  const scenario = model?.scenarios.find((item) => item.id === scenarioId);
+  const scenarioSettings = state.statutoryPension.scenarios[scenarioId];
+  const retirementYear = scenario?.retirementYear ?? birthYear + scenarioSettings.retirementAge;
+  return {
+    enabled: state.combinedWealth.includeStatutoryPension,
+    retirementYear,
+    monthlyAmount: state.combinedWealth.statutoryPensionMonthlyAmount,
+    savingsRatePercent: state.combinedWealth.statutoryPensionSavingsRatePercent
+  };
+}
+
+function combinedCashContribution(horizonYears: number, account: PlanningAccount | null): {
   cashStartValue: number;
   yearlyCashDelta: number;
   yearlyCashDeltas: number[];
@@ -4505,18 +4637,17 @@ function combinedCashContribution(horizonYears: number, accounts: PlanningAccoun
   let yearlyCashDelta = 0;
   const yearlyCashDeltas = Array.from({ length: Math.max(1, horizonYears) }, () => 0);
 
-  for (const account of accounts) {
-    if (!includeAccountInCombinedCashContribution(account.type)) continue;
+  if (account && state.combinedWealth.includeCashPositions) {
     for (let yearOffset = 0; yearOffset < yearlyCashDeltas.length; yearOffset += 1) {
       const summary = calculateReserveSummary(
         { ...state.settings, year: state.settings.year + yearOffset },
         account.yearlyRows
       );
       if (yearOffset === 0) {
-        cashStartValue += summary.yearEndBalance;
-        yearlyCashDelta += summary.yearlyRemaining;
+        cashStartValue = summary.yearEndBalance;
+        yearlyCashDelta = summary.yearlyRemaining;
       }
-      yearlyCashDeltas[yearOffset] += summary.yearlyRemaining;
+      yearlyCashDeltas[yearOffset] = summary.yearlyRemaining;
     }
   }
 
@@ -4527,20 +4658,14 @@ function combinedCashContribution(horizonYears: number, accounts: PlanningAccoun
   return { cashStartValue, yearlyCashDelta, yearlyCashDeltas };
 }
 
-function includeAccountInCombinedCashContribution(accountType: PlanningAccount["type"]): boolean {
-  if (accountType === "mixed") return state.combinedWealth.includeCashPositions;
-  if (accountType === "cost_reserve") return state.combinedWealth.includeCostReserveAccounts;
-  return state.combinedWealth.includeAnnualTableAccounts;
-}
-
 function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
+  latestCombinedWealthYears = years;
   if (!selectedCombinedWealthYear && years.length) {
     selectedCombinedWealthYear = years[years.length - 1].year;
   }
   if (selectedCombinedWealthYear && !years.some((entry) => entry.year === selectedCombinedWealthYear)) {
     selectedCombinedWealthYear = years[years.length - 1]?.year ?? null;
   }
-  const selected = years.find((entry) => entry.year === selectedCombinedWealthYear) ?? years[years.length - 1] ?? null;
 
   const chartHost = document.querySelector<HTMLDivElement>("#combinedWealthChart");
   if (chartHost) {
@@ -4551,14 +4676,24 @@ function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
     });
   }
 
-  const detail = document.querySelector<HTMLDivElement>("#combinedWealthYearDetail");
+  const detail = document.querySelector<HTMLDivElement>("#combinedWealthLifeSummary");
   if (!detail) return;
-  detail.innerHTML = renderCombinedWealthYearDetail({
-    selected,
-    finalYear: years[years.length - 1] ?? null,
+  detail.innerHTML = renderCombinedWealthLifeSummary({
+    points: years,
+    taxesAndDeductions: combinedTaxesAndDeductions(years),
     formatMoney: (value) => money(value),
     formatInt: (value) => intNumber(value)
   });
+}
+
+function combinedTaxesAndDeductions(years: CombinedWealthYear[]): number {
+  if (!years.length) return 0;
+  const startYear = years[0].year;
+  const endYear = years[years.length - 1].year;
+  return state.incomeTracker.yearlyEntries.reduce((sum, entry) => {
+    if (!entry.active || entry.year < startYear || entry.year > endYear) return sum;
+    return sum + incomeYearEntryTaxTotal(entry);
+  }, 0);
 }
 
 function renderStatutoryPensionCalculations(birthYear: number): void {
@@ -4812,9 +4947,8 @@ function renderPlanningAccounts(): void {
   }
 
   if (combinedLeadAccountSelector) {
-    const activeCombinedAccounts = selectedCombinedAccounts();
-    combinedLeadAccountSelector.innerHTML = activeCombinedAccounts.length
-      ? activeCombinedAccounts
+    combinedLeadAccountSelector.innerHTML = state.planningAccounts.length
+      ? state.planningAccounts
           .map((account) => {
             const active = state.ui.selectedCombinedLeadInvestmentAccountId === account.id;
             return `
@@ -4831,12 +4965,121 @@ function renderPlanningAccounts(): void {
             `;
           })
           .join("")
-      : '<span class="chart-empty">Kein aktives Konto ausgewaehlt.</span>';
+      : '<span class="chart-empty">Noch kein Konto vorhanden.</span>';
   }
 
   summary.textContent = `Konten gesamt: ${state.planningAccounts.length} | mixed: ${totalsByType.mixed} | cost_reserve: ${totalsByType.costReserve} | annual_table: ${totalsByType.annualTable}`;
   yearAccountName.textContent = `(aktiv: ${activeAccount.name})`;
   renderPlanningAccountDialog();
+}
+
+function renderCombinedModuleControls(): void {
+  const cashSelector = document.querySelector<HTMLDivElement>("#combinedCashAccountSelector");
+  const leadSelector = document.querySelector<HTMLDivElement>("#combinedLeadInvestmentAccountSelector");
+  const depotSelector = document.querySelector<HTMLDivElement>("#combinedDepotSelector");
+  const pensionSelector = document.querySelector<HTMLDivElement>("#combinedPensionScenarioSelector");
+  const cashAccount = selectedCombinedCashPlanningAccount();
+
+  if (cashSelector) {
+    cashSelector.innerHTML = state.planningAccounts.length
+      ? state.planningAccounts
+          .map((account) => {
+            const active = cashAccount?.id === account.id;
+            return `
+              <button
+                class="planning-account-card ${active ? "active" : ""}"
+                type="button"
+                data-action="select-combined-cash-account-${account.id}"
+                aria-pressed="${active}"
+              >
+                <strong>${escapeHtml(account.name)}</strong>
+                <small>${escapeHtml(account.type)}</small>
+                <small>${intNumber(account.yearlyRows.length)} Positionen</small>
+              </button>
+            `;
+          })
+          .join("")
+      : '<span class="chart-empty">Noch kein Konto vorhanden.</span>';
+  }
+
+  if (leadSelector) {
+    const leadAccount = selectedCombinedLeadInvestmentPlanningAccount();
+    leadSelector.innerHTML = state.planningAccounts.length
+      ? state.planningAccounts
+          .map((account) => {
+            const active = leadAccount?.id === account.id;
+            return `
+              <button
+                class="planning-account-card ${active ? "active" : ""}"
+                type="button"
+                data-action="select-combined-lead-account-${account.id}"
+                aria-pressed="${active}"
+              >
+                <strong>${escapeHtml(account.name)}</strong>
+                <small>${escapeHtml(account.type)}</small>
+                <small>${intNumber(account.yearlyRows.length)} Positionen</small>
+              </button>
+            `;
+          })
+          .join("")
+      : '<span class="chart-empty">Noch kein Konto vorhanden.</span>';
+  }
+
+  if (depotSelector) {
+    const selectedKeys = new Set(selectedCombinedDepotKeys());
+    const leadAccount = selectedCombinedLeadInvestmentPlanningAccount();
+    depotSelector.innerHTML = leadAccount
+      ? COMBINED_DEPOTS.map(({ key, label }) => {
+          const active = selectedKeys.has(key);
+          const settings = depotInvestmentSettingsForAccount(key, leadAccount.id);
+          return `
+            <button
+              class="combined-depot-option ${active ? "active" : ""}"
+              type="button"
+              data-action="toggle-combined-depot"
+              data-combined-depot="${key}"
+              aria-pressed="${active}"
+            >
+              <strong>${escapeHtml(label)}</strong>
+              <span>${intNumber(settings.includedIds.length)} Positionen</span>
+            </button>
+          `;
+        }).join("")
+      : '<span class="chart-empty">Kein Leitkonto vorhanden.</span>';
+  }
+
+  if (pensionSelector) {
+    const selectedScenario = state.combinedWealth.statutoryPensionScenario;
+    const scenarioById = new Map((latestStatutoryPensionModel?.scenarios ?? []).map((scenario) => [scenario.id, scenario]));
+    pensionSelector.innerHTML = (["pessimistic", "base", "optimistic"] as const)
+      .map((scenarioId) => {
+        const scenario = scenarioById.get(scenarioId);
+        const active = selectedScenario === scenarioId;
+        return `
+          <button
+            class="combined-pension-scenario ${active ? "active" : ""}"
+            type="button"
+            data-action="select-combined-pension-scenario"
+            data-combined-pension-scenario="${scenarioId}"
+            aria-pressed="${active}"
+          >
+            <strong>${escapeHtml(scenario?.label ?? pensionScenarioLabel(scenarioId))}</strong>
+            <span>${escapeHtml(scenario ? `${money(scenario.netMonthlyPension)} netto/Monat` : "Keine Prognose")}</span>
+            <small>Rentenalter ${escapeHtml(String(scenario?.retirementAge ?? state.statutoryPension.scenarios[scenarioId].retirementAge))}</small>
+          </button>
+        `;
+      })
+      .join("");
+  }
+
+  const cashPreview = combinedCashContribution(1, cashAccount);
+  setText("combinedCashSourceMetric", cashAccount?.name ?? "-");
+  setText("combinedCashRateMetric", money(cashPreview.yearlyCashDelta));
+  setInputValue('[data-combined-number="statutoryPensionMonthlyAmount"]', state.combinedWealth.statutoryPensionMonthlyAmount);
+  setInputValue(
+    '[data-combined-number="statutoryPensionSavingsRatePercent"]',
+    state.combinedWealth.statutoryPensionSavingsRatePercent
+  );
 }
 
 function addPlanningAccount(): void {
@@ -5036,7 +5279,6 @@ function toggleCombinedAccount(accountId: string): void {
 
 function selectCombinedLeadInvestmentAccount(accountId: string): void {
   if (!accountId || !state.planningAccounts.some((account) => account.id === accountId)) return;
-  if (!state.ui.selectedCombinedAccountIds.includes(accountId)) return;
   if (state.ui.selectedCombinedLeadInvestmentAccountId === accountId) return;
   state.ui = { ...state.ui, selectedCombinedLeadInvestmentAccountId: accountId };
   renderAll();
@@ -6980,8 +7222,11 @@ function syncRealEstateLocaleLabels(locale: RealEstateFinancingSettings["locale"
 }
 
 function syncCombinedToggleInputsFromState(): void {
-  for (const [key, value] of Object.entries(state.combinedWealth) as Array<[CombinedToggleKey, boolean]>) {
+  for (const [key, value] of Object.entries(state.combinedWealth)) {
+    if (typeof value !== "boolean") continue;
     const control = document.querySelector<HTMLElement>(`[data-combined-toggle="${key}"]`);
+    const card = document.querySelector<HTMLElement>(`[data-combined-module-card="${key}"]`);
+    card?.classList.toggle("active", value);
     if (!control) continue;
     if (control instanceof HTMLInputElement) {
       control.checked = value;
@@ -7037,6 +7282,14 @@ function updateCombinedToggle(key: CombinedToggleKey, checked: boolean): void {
   } as AppState["combinedWealth"];
 }
 
+function updateCombinedNumber(key: CombinedNumberKey, value: string): void {
+  const parsed = numberValue(value);
+  state.combinedWealth = {
+    ...state.combinedWealth,
+    [key]: key === "statutoryPensionSavingsRatePercent" ? clamp(parsed, 0, 100) : Math.max(0, parsed)
+  };
+}
+
 function updateStatutoryPensionField(field: string, value: string): void {
   if (
     field !== "contributionRatePercent" &&
@@ -7086,8 +7339,51 @@ function updateStatutoryPensionScenarioField(
 }
 
 function toggleCombinedModule(key: CombinedToggleKey | undefined): void {
-  if (!key || !(key in state.combinedWealth)) return;
+  if (!key || typeof state.combinedWealth[key] !== "boolean") return;
   updateCombinedToggle(key, !state.combinedWealth[key]);
+}
+
+function selectCombinedCashAccount(accountId: string): void {
+  if (!planningAccountById(accountId)) return;
+  state.combinedWealth = {
+    ...state.combinedWealth,
+    cashAccountId: accountId
+  };
+}
+
+function selectedCombinedDepotKeys(): CombinedWealthDepotKey[] {
+  const keys = state.combinedWealth.depotKeys.filter((key): key is CombinedWealthDepotKey =>
+    COMBINED_DEPOTS.some((depot) => depot.key === key)
+  );
+  if (keys.length) return keys;
+  state.combinedWealth = { ...state.combinedWealth, depotKeys: ["standard"] };
+  return ["standard"];
+}
+
+function toggleCombinedDepot(depot: CombinedWealthDepotKey | undefined): void {
+  if (!depot || !COMBINED_DEPOTS.some((item) => item.key === depot)) return;
+  const selected = new Set(selectedCombinedDepotKeys());
+  if (selected.has(depot)) {
+    if (selected.size === 1) return;
+    selected.delete(depot);
+  } else {
+    selected.add(depot);
+  }
+  state.combinedWealth = {
+    ...state.combinedWealth,
+    depotKeys: Array.from(selected)
+  };
+}
+
+function selectCombinedPensionScenario(scenarioId: StatutoryPensionScenarioId | undefined): void {
+  const id = statutoryPensionScenarioIdFromValue(scenarioId);
+  if (!id) return;
+  const scenario = latestStatutoryPensionModel?.scenarios.find((item) => item.id === id);
+  state.combinedWealth = {
+    ...state.combinedWealth,
+    statutoryPensionScenario: id,
+    statutoryPensionMonthlyAmount: scenario?.netMonthlyPension ?? state.combinedWealth.statutoryPensionMonthlyAmount
+  };
 }
 
 function toggleRealEstateSourcePosition(kind: RealEstatePaymentSourceKind, id: string, checked: boolean): void {
@@ -7166,11 +7462,6 @@ function setSelectedRealEstateYear(year: number): void {
 
 function resetRealEstateDetailSelection(): void {
   selectedRealEstateYear = null;
-}
-
-function setSelectedCombinedWealthYear(year: number): void {
-  selectedCombinedWealthYear = Number.isFinite(year) && year > 0 ? year : null;
-  renderAll();
 }
 
 function toggleSettingsGrunddaten(): void {
@@ -8212,6 +8503,28 @@ function showRealEstateChartPopup(
   positionChartPopup(popup, card, clientX, clientY);
 }
 
+function selectCombinedWealthYearWithPopup(year: number, clientX: number, clientY: number): void {
+  selectedCombinedWealthYear = Number.isFinite(year) && year > 0 ? year : null;
+  renderCombinedWealthCalculations(latestCombinedWealthYears);
+  showCombinedWealthPopup(year, clientX, clientY);
+}
+
+function showCombinedWealthPopup(year: number, clientX: number, clientY: number): void {
+  const point = latestCombinedWealthYears.find((entry) => entry.year === year);
+  const popup = document.querySelector<HTMLDivElement>("#combinedWealthChartPopup");
+  const card = popup?.closest<HTMLElement>(".combined-chart-card");
+  if (!point || !popup || !card) return;
+
+  popup.innerHTML = renderCombinedWealthPopup({
+    selected: point,
+    finalYear: latestCombinedWealthYears.at(-1) ?? point,
+    formatMoney: (value) => money(value),
+    formatInt: (value) => intNumber(value)
+  });
+  popup.hidden = false;
+  positionChartPopup(popup, card, clientX, clientY);
+}
+
 function showStatutoryPensionYearPopup(year: number, clientX: number, clientY: number): void {
   const point = latestStatutoryPensionModel?.annualPensionYears.find((entry) => entry.year === year);
   const popup = document.querySelector<HTMLDivElement>("#statutoryPensionYearPopup");
@@ -8280,6 +8593,11 @@ function hideInvestmentChartPopup(): void {
   }
 }
 
+function hideCombinedWealthPopup(): void {
+  const popup = document.querySelector<HTMLDivElement>("#combinedWealthChartPopup");
+  if (popup) popup.hidden = true;
+}
+
 function hideStatutoryPensionYearPopup(): void {
   const popup = document.querySelector<HTMLDivElement>("#statutoryPensionYearPopup");
   if (popup) popup.hidden = true;
@@ -8312,6 +8630,12 @@ function hideStatutoryPensionTaxPopup(): void {
 function statutoryPensionScenarioIdFromValue(value: string | undefined): StatutoryPensionScenarioId | null {
   if (value === "pessimistic" || value === "base" || value === "optimistic") return value;
   return null;
+}
+
+function pensionScenarioLabel(scenarioId: StatutoryPensionScenarioId): string {
+  if (scenarioId === "pessimistic") return "Pessimistisch";
+  if (scenarioId === "optimistic") return "Optimistisch";
+  return "Basis";
 }
 
 function buildDepotAssetProjection(

@@ -689,39 +689,88 @@ export function renderAppShell(): string {
           <h2>Vermoegen</h2>
         </div>
         <div class="combined-wealth-grid">
-          <section class="combined-wealth-card">
-            <div class="combined-account-modules">
-              <div class="combined-account-module">
-                <h3>Konten aktivieren</h3>
-                <div id="combinedAccountSelector" class="planning-account-cards" aria-label="Aktive Konten fuer Kombination"></div>
-              </div>
-              <div class="combined-account-module">
-                <h3>Kombi-Leitkonto (Depot/Entnahme)</h3>
-                <div
-                  id="combinedLeadInvestmentAccountSelector"
-                  class="planning-account-cards"
-                  aria-label="Leitkonto fuer Depot und Entnahme in Kombination"
-                ></div>
-              </div>
+          <section class="combined-wealth-card combined-module-card-shell">
+            <h3>Vermoegensmodule</h3>
+            <div class="combined-module-grid">
+              <article class="combined-module-card" data-combined-module-card="includeCashPositions">
+                <div class="combined-module-card-head">
+                  <div>
+                    <strong>Cash aus Konto</strong>
+                    <small>Ein vorhandenes Konto liefert Startwert und Cash-Sparrate.</small>
+                  </div>
+                  <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeCashPositions" aria-pressed="false">
+                    <span data-combined-toggle-status>Aus</span>
+                  </button>
+                </div>
+                <div id="combinedCashAccountSelector" class="planning-account-cards combined-single-selector" aria-label="Cash-Konto fuer Kombination"></div>
+                <div class="combined-module-metrics">
+                  <span>Datenquelle <strong id="combinedCashSourceMetric">-</strong></span>
+                  <span>Cash-Sparrate <strong id="combinedCashRateMetric">-</strong></span>
+                </div>
+              </article>
+
+              <article class="combined-module-card" data-combined-module-card="includeDepotDevelopment">
+                <div class="combined-module-card-head">
+                  <div>
+                    <strong>Depots</strong>
+                    <small>Nur vorhandene Depotvarianten aus dem gewaehlten Konto werden kombiniert.</small>
+                  </div>
+                  <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeDepotDevelopment" aria-pressed="false">
+                    <span data-combined-toggle-status>Aus</span>
+                  </button>
+                </div>
+                <div class="combined-account-module">
+                  <span class="combined-module-label">Kombi-Leitkonto</span>
+                  <div id="combinedLeadInvestmentAccountSelector" class="planning-account-cards combined-single-selector" aria-label="Leitkonto fuer Depot in Kombination"></div>
+                </div>
+                <div id="combinedDepotSelector" class="combined-depot-selector" aria-label="Depotauswahl fuer Kombination"></div>
+              </article>
+
+              <article class="combined-module-card" data-combined-module-card="includeStatutoryPension">
+                <div class="combined-module-card-head">
+                  <div>
+                    <strong>Rente</strong>
+                    <small>Ein Szenario startet ab Rentenalter; nur der Sparanteil erhoeht das Vermoegen.</small>
+                  </div>
+                  <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeStatutoryPension" aria-pressed="false">
+                    <span data-combined-toggle-status>Aus</span>
+                  </button>
+                </div>
+                <div id="combinedPensionScenarioSelector" class="combined-pension-scenarios" aria-label="Rentenszenario fuer Kombination"></div>
+                <div class="combined-pension-inputs">
+                  <label>
+                    <span>Monatliche Rente</span>
+                    <input type="number" min="0" step="1" data-combined-number="statutoryPensionMonthlyAmount" />
+                  </label>
+                  <label>
+                    <span>Sparanteil aus Rente %</span>
+                    <input type="number" min="0" max="100" step="1" data-combined-number="statutoryPensionSavingsRatePercent" />
+                  </label>
+                </div>
+              </article>
+
+              <article class="combined-module-card" data-combined-module-card="includeRealEstateFinancing">
+                <div class="combined-module-card-head">
+                  <div>
+                    <strong>Immobilien</strong>
+                    <small>Wert, Schuld und Eigenkapital bleiben aus der bestehenden Immobilienlogik.</small>
+                  </div>
+                  <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeRealEstateFinancing" aria-pressed="false">
+                    <span data-combined-toggle-status>Aus</span>
+                  </button>
+                </div>
+                <div class="combined-module-metrics">
+                  <span>Datenquelle <strong>Immobilienfinanzierung</strong></span>
+                  <span>Berechnung <strong>Wert, Schuld, Eigenkapital</strong></span>
+                </div>
+              </article>
             </div>
           </section>
-          <section class="combined-wealth-card">
-            <h3>Module aktivieren</h3>
-            <div class="combined-toggle-grid">
-              ${combinedToggle("includeCashPositions", "Cash-/Kontopositionen", "Beruecksichtigt liquide Konten und laufende Ruecklagen.")}
-              ${combinedToggle("includeCostReserveAccounts", "Kosten-/Ruecklagenkonten", "Fuehrt geplante Kosten- und Reservekonten in der Kombination mit.")}
-              ${combinedToggle("includeAnnualTableAccounts", "Jahrestabellenkonten", "Nimmt jahresbasierte Konten aus den Tabellen in den Pfad auf.")}
-              ${combinedToggle("includeDepotDevelopment", "Depot-/Investmententwicklung", "Zeigt das Standarddepot mit Sparrate, Wachstum und Entnahmen.")}
-              ${combinedToggle("includeSharedDepotDevelopment", "Gemeinsame Anlageentwicklung", "Addiert die gemeinsame Anlageentwicklung zum Standarddepot.")}
-              ${combinedToggle("includeWithdrawals", "Auszahlungs-/Entnahmeplanung", "Spiegelt geplante Entnahmen als Liquiditaetseffekt im Gesamtpfad.")}
-              ${combinedToggle("includeRealEstateFinancing", "Immobilienfinanzierung", "Beruecksichtigt Darlehen und Tilgungsquellen der Immobilie.")}
-              ${combinedToggle("includeRealEstateValueTrend", "Immobilienwertentwicklung", "Fuehrt den Immobilienwert bis zum Endjahr oder Verkaufsjahr fort.")}
-            </div>
-          </section>
-          <section class="combined-wealth-card">
+          <section class="combined-wealth-card combined-chart-card">
             <h3>Kombinierter Vermoegenspfad</h3>
             <div id="combinedWealthChart" class="wealth-chart-host"></div>
-            <div id="combinedWealthYearDetail" class="wealth-detail-box"></div>
+            <div id="combinedWealthChartPopup" class="investment-chart-popup combined-wealth-popup" role="dialog" aria-label="Kombinationsdetails" hidden></div>
+            <div id="combinedWealthLifeSummary" class="wealth-detail-box"></div>
           </section>
         </div>
       </section>
@@ -1007,24 +1056,6 @@ function realEstateEnglishLabel(key: string, fallback: string): string {
     inflationRatePercent: "Inflation in %"
   };
   return labels[key] ?? fallback;
-}
-
-function combinedToggle(key: string, label: string, description: string): string {
-  return `
-    <button
-      class="combined-toggle-item"
-      type="button"
-      data-action="toggle-combined-module"
-      data-combined-toggle="${key}"
-      aria-pressed="false"
-    >
-      <span class="combined-toggle-copy">
-        <strong>${label}</strong>
-        <small>${description}</small>
-      </span>
-      <span class="combined-toggle-status" data-combined-toggle-status>Aus</span>
-    </button>
-  `;
 }
 
 function numberField(

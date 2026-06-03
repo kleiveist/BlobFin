@@ -47,11 +47,17 @@ const combinedYear: CombinedWealthYear = {
   year: 2026,
   cashValue: 10000,
   depotValue: 20000,
+  depotBreakdown: [{ id: "standard", label: "Depot", value: 20000 }],
   withdrawalImpact: 0,
   redirectedCashRepayment: 0,
   redirectedDepotRepayment: 0,
+  pensionIncome: 0,
+  pensionConsumed: 0,
+  pensionSaved: 0,
+  pensionSavingsValue: 0,
   propertyValue: 300000,
   propertyDebt: 212000,
+  propertyLoanStart: 220000,
   propertyEquity: 88000,
   totalGrossAssets: 330000,
   totalDebt: 212000,
@@ -127,8 +133,8 @@ describe("follow-up ui rendering", () => {
     const statutoryPageIndex = html.indexOf('data-module-section="statutory_pension"');
     const pensionIndex = html.indexOf('id="statutoryPensionSection"');
     const combinedIndex = html.indexOf('data-module-section="combined_wealth"');
-    const accountsIndex = html.indexOf("Konten aktivieren");
-    const modulesIndex = html.indexOf("Module aktivieren");
+    const accountsIndex = html.indexOf("Cash aus Konto");
+    const modulesIndex = html.indexOf("Vermoegensmodule");
     const chartIndex = html.indexOf('id="combinedWealthChart"');
 
     expect(statutoryPageIndex).toBeGreaterThan(-1);
@@ -182,9 +188,12 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("Konten fuer Sparquellen und Entnahme-Zugewinn");
     expect(html).toContain('class="real-estate-locale-default"');
     expect(html).not.toContain('data-action="set-real-estate-locale-en"');
-    expect(html).toContain('id="combinedAccountSelector"');
+    expect(html).toContain('id="combinedCashAccountSelector"');
     expect(html).toContain('id="combinedLeadInvestmentAccountSelector"');
-    expect(html).toContain("Kombi-Leitkonto (Depot/Entnahme)");
+    expect(html).toContain('id="combinedDepotSelector"');
+    expect(html).toContain('id="combinedPensionScenarioSelector"');
+    expect(html).toContain('id="combinedWealthLifeSummary"');
+    expect(html).toContain("Kombi-Leitkonto");
     expect(html).toContain('id="accountYearTableOverview"');
     expect(html).not.toContain('id="resultHead"');
   });

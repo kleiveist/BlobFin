@@ -3623,6 +3623,185 @@ tfoot th {
   gap: 10px;
 }
 
+.combined-module-card-shell {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.combined-module-card-shell > h3 {
+  margin: 0 0 10px;
+}
+
+.combined-module-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.combined-module-card {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.combined-module-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.combined-module-card-head {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.combined-module-card-head div,
+.combined-module-metrics,
+.combined-pension-inputs,
+.combined-account-module {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.combined-module-card-head strong {
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+.combined-module-card-head small,
+.combined-module-label,
+.combined-module-metrics span,
+.combined-pension-inputs span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.combined-module-switch {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 58px;
+  padding: 6px 10px;
+}
+
+.combined-module-switch.active,
+.combined-module-card.active .combined-module-switch {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.combined-single-selector.planning-account-cards {
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+}
+
+.combined-module-metrics {
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.combined-module-metrics span,
+.combined-pension-inputs label {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.combined-module-metrics strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combined-depot-selector,
+.combined-pension-scenarios {
+  display: grid;
+  gap: 8px;
+}
+
+.combined-depot-option,
+.combined-pension-scenario {
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  text-align: left;
+}
+
+.combined-depot-option:hover,
+.combined-depot-option:focus-visible,
+.combined-pension-scenario:hover,
+.combined-pension-scenario:focus-visible,
+.combined-module-switch:hover,
+.combined-module-switch:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.combined-depot-option.active,
+.combined-pension-scenario.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.combined-depot-option strong,
+.combined-pension-scenario strong,
+.combined-pension-scenario span,
+.combined-pension-scenario small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combined-depot-option span,
+.combined-pension-scenario span,
+.combined-pension-scenario small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.combined-pension-inputs label {
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.combined-pension-inputs input {
+  min-width: 86px;
+  width: 110px;
+}
+
 .combined-account-modules {
   display: grid;
   gap: 10px;
@@ -3878,6 +4057,10 @@ tfoot th {
   background: #9b94ff;
 }
 
+.wealth-column-segment.pension {
+  background: #0f9f8f;
+}
+
 .wealth-column-segment.property {
   background: #5f88e8;
 }
@@ -3936,6 +4119,10 @@ tfoot th {
   background: #9b94ff;
 }
 
+.legend-dot.pension {
+  background: #0f9f8f;
+}
+
 .legend-dot.property {
   background: #5f88e8;
 }
@@ -3975,6 +4162,16 @@ tfoot th {
 .combined-wealth-card .wealth-chart-host {
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.combined-chart-card {
+  position: relative;
+}
+
+.combined-wealth-popup {
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  width: min(430px, calc(100% - 24px));
 }
 
 .combined-wealth-vertical-chart {
@@ -4075,6 +4272,31 @@ tfoot th {
   margin-top: 8px;
   min-height: 60px;
   padding: 10px;
+}
+
+.combined-life-summary {
+  display: grid;
+  gap: 6px;
+}
+
+.combined-life-summary-head {
+  align-items: baseline;
+  border-bottom: 1px solid var(--row-border);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  padding-bottom: 8px;
+}
+
+.combined-life-summary-head span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.combined-life-summary-head strong {
+  font-variant-numeric: tabular-nums;
 }
 
 .chart-empty {
@@ -5742,6 +5964,10 @@ tfoot th {
     grid-template-columns: 1fr;
   }
 
+  .combined-module-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .income-analysis-layout,
   .income-analysis-distribution-layout,
   .income-analysis-metrics {
@@ -5772,6 +5998,10 @@ tfoot th {
 
   .module-overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .combined-module-grid {
+    grid-template-columns: 1fr;
   }
 
   .account-year-table-metrics {
