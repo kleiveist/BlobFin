@@ -694,9 +694,12 @@ export function renderAppShell(): string {
             <div class="combined-module-grid">
               <article class="combined-module-card" data-combined-module-card="includeCashPositions">
                 <div class="combined-module-card-head">
-                  <div>
-                    <strong>Cash aus Konto</strong>
-                    <small>Ein vorhandenes Konto liefert Startwert und Cash-Sparrate.</small>
+                  <div class="combined-module-copy">
+                    ${combinedModuleIcon("cash")}
+                    <span>
+                      <strong>Cash aus Konto</strong>
+                      <small>Ein vorhandenes Konto liefert Startwert und Cash-Sparrate.</small>
+                    </span>
                   </div>
                   <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeCashPositions" aria-pressed="false">
                     <span data-combined-toggle-status>Aus</span>
@@ -711,9 +714,12 @@ export function renderAppShell(): string {
 
               <article class="combined-module-card" data-combined-module-card="includeDepotDevelopment">
                 <div class="combined-module-card-head">
-                  <div>
-                    <strong>Depots</strong>
-                    <small>Nur vorhandene Depotvarianten aus dem gewaehlten Konto werden kombiniert.</small>
+                  <div class="combined-module-copy">
+                    ${combinedModuleIcon("depot")}
+                    <span>
+                      <strong>Depots</strong>
+                      <small>Nur vorhandene Depotvarianten aus dem gewaehlten Konto werden kombiniert.</small>
+                    </span>
                   </div>
                   <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeDepotDevelopment" aria-pressed="false">
                     <span data-combined-toggle-status>Aus</span>
@@ -728,9 +734,12 @@ export function renderAppShell(): string {
 
               <article class="combined-module-card" data-combined-module-card="includeStatutoryPension">
                 <div class="combined-module-card-head">
-                  <div>
-                    <strong>Rente</strong>
-                    <small>Ein Szenario startet ab Rentenalter; nur der Sparanteil erhoeht das Vermoegen.</small>
+                  <div class="combined-module-copy">
+                    ${combinedModuleIcon("pension")}
+                    <span>
+                      <strong>Rente</strong>
+                      <small>Ein Szenario startet ab Rentenalter; nur der Sparanteil erhoeht das Vermoegen.</small>
+                    </span>
                   </div>
                   <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeStatutoryPension" aria-pressed="false">
                     <span data-combined-toggle-status>Aus</span>
@@ -751,9 +760,12 @@ export function renderAppShell(): string {
 
               <article class="combined-module-card" data-combined-module-card="includeRealEstateFinancing">
                 <div class="combined-module-card-head">
-                  <div>
-                    <strong>Immobilien</strong>
-                    <small>Wert, Schuld und Eigenkapital bleiben aus der bestehenden Immobilienlogik.</small>
+                  <div class="combined-module-copy">
+                    ${combinedModuleIcon("property")}
+                    <span>
+                      <strong>Immobilien</strong>
+                      <small>Wert, Schuld und Eigenkapital bleiben aus der bestehenden Immobilienlogik.</small>
+                    </span>
                   </div>
                   <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeRealEstateFinancing" aria-pressed="false">
                     <span data-combined-toggle-status>Aus</span>
@@ -1056,6 +1068,20 @@ function realEstateEnglishLabel(key: string, fallback: string): string {
     inflationRatePercent: "Inflation in %"
   };
   return labels[key] ?? fallback;
+}
+
+function combinedModuleIcon(kind: "cash" | "depot" | "pension" | "property"): string {
+  const paths: Record<"cash" | "depot" | "pension" | "property", string> = {
+    cash: '<path d="M4 8h16v10H4z" /><path d="M7 11h3" /><path d="M14 13a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z" />',
+    depot: '<path d="M4 18h16" /><path d="M6 15l4-4 3 2 5-7" /><path d="M15 6h3v3" />',
+    pension: '<path d="M6 19V8" /><path d="M18 19V8" /><path d="M4 19h16" /><path d="M4 8h16" /><path d="M8 13h8" />',
+    property: '<path d="M4 11 12 5l8 6" /><path d="M6 10v9h12v-9" /><path d="M10 19v-5h4v5" />'
+  };
+  return `
+    <span class="combined-module-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">${paths[kind]}</svg>
+    </span>
+  `;
 }
 
 function numberField(

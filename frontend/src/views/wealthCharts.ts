@@ -7,6 +7,13 @@ interface ChartRenderInput<T> {
   formatMoney: (value: number) => string;
 }
 
+export type CombinedWealthLineId = "pensionConsumedCumulative" | "taxCumulative";
+export type CombinedWealthLineVisibility = Record<CombinedWealthLineId, boolean>;
+
+interface CombinedWealthChartInput extends ChartRenderInput<CombinedWealthYear> {
+  lineVisibility?: CombinedWealthLineVisibility;
+}
+
 interface RealEstateChartOptions {
   financingEndYear?: number;
 }
@@ -34,6 +41,12 @@ interface VerticalChartPoint {
   valueLabel: string;
   barTotal: number;
   segments: VerticalBarSegment[];
+}
+
+interface VerticalChartLine {
+  className: string;
+  label: string;
+  points: Array<{ year: number; value: number; valueLabel: string }>;
 }
 
 export interface RealEstateRepaymentSegmentInput {
@@ -112,7 +125,7 @@ export function renderRealEstateTrendChart(input: RealEstateTrendChartInput): st
   });
 }
 
-export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealthYear>): string {
+export function renderCombinedWealthChart(input: CombinedWealthChartInput): string {
   if (!input.points.length) {
     return '<div class="chart-empty">Bitte zuerst Module aktivieren und berechnen.</div>';
   }
@@ -125,6 +138,10 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
       .filter((point) => (point.year - startYear) % 15 === 0)
       .map((point) => point.year)
   );
+  const lineVisibility = input.lineVisibility ?? {
+    pensionConsumedCumulative: true,
+    taxCumulative: true
+  };
   const maxValue = Math.max(
     1,
     ...input.points.map(
@@ -134,8 +151,10 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
             Math.max(0, point.depotValue) +
             Math.max(0, point.pensionConsumed) +
             Math.max(0, point.pensionSavingsValue) +
+            Math.max(0, point.taxValue) +
             Math.max(0, point.propertyValue),
-          Math.max(0, point.pensionConsumed)
+          Math.max(0, point.pensionConsumedValue),
+          Math.max(0, point.cumulativeTaxValue)
         )
     )
   );
@@ -144,12 +163,33 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
     label: "Kombiniertes Vermoegen je Jahr",
     chartClassName: "combined-wealth-vertical-chart",
     header: `
-      <div class="combined-wealth-summary" aria-hidden="true">
-        ${renderCombinedSummaryValue("Cash", selectedPoint.cashValue, input.formatMoney)}
-        ${renderCombinedSummaryValue("Depot", selectedPoint.depotValue, input.formatMoney)}
-        ${renderCombinedSummaryValue("Rente p.a.", selectedPoint.pensionIncome, input.formatMoney)}
-        ${renderCombinedSummaryValue("Rentensparen", selectedPoint.pensionSavingsValue, input.formatMoney)}
-        ${renderCombinedSummaryValue("Immobilienwert", selectedPoint.propertyValue, input.formatMoney)}
+      <div class="combined-wealth-summary">
+        <div class="combined-wealth-summary-values">
+          ${renderCombinedSummaryValue("Cash", selectedPoint.cashValue, input.formatMoney)}
+          ${renderCombinedSummaryValue("Depot", selectedPoint.depotValue, input.formatMoney)}
+          ${renderCombinedSummaryValue("Rente p.a.", selectedPoint.pensionIncome, input.formatMoney)}
+          ${renderCombinedSummaryValue("Rentensparen", selectedPoint.pensionSavingsValue, input.formatMoney)}
+          ${renderCombinedSummaryValue("Steuern", selectedPoint.taxValue, input.formatMoney)}
+          ${renderCombinedSummaryValue("Immobilienwert", selectedPoint.propertyValue, input.formatMoney)}
+        </div>
+        <div class="combined-wealth-line-controls" aria-label="Kumulierte Linien">
+          ${renderCombinedLineToggle({
+            id: "pensionConsumedCumulative",
+            className: "pension-consumed-cumulative",
+            label: "Verbrauchte Rente kumuliert",
+            value: selectedPoint.pensionConsumedValue,
+            active: lineVisibility.pensionConsumedCumulative,
+            formatMoney: input.formatMoney
+          })}
+          ${renderCombinedLineToggle({
+            id: "taxCumulative",
+            className: "tax-cumulative",
+            label: "Steuern kumuliert",
+            value: selectedPoint.cumulativeTaxValue,
+            active: lineVisibility.taxCumulative,
+            formatMoney: input.formatMoney
+          })}
+        </div>
       </div>
     `,
     footer: `
@@ -172,8 +212,29 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
       { className: "depot", label: "Depot" },
       { className: "pension-consumed", label: "Verbrauchte Rente" },
       { className: "pension", label: "Gesparte Rente" },
+      { className: "tax", label: "Steuern" },
       { className: "property", label: "Immobilienwert" }
     ],
+    lines: [
+      lineVisibility.pensionConsumedCumulative ? {
+        className: "pension-consumed-cumulative",
+        label: "Verbrauchte Rente kumuliert",
+        points: input.points.map((point) => ({
+          year: point.year,
+          value: Math.max(0, point.pensionConsumedValue),
+          valueLabel: input.formatMoney(point.pensionConsumedValue)
+        }))
+      } : null,
+      lineVisibility.taxCumulative ? {
+        className: "tax-cumulative",
+        label: "Steuern kumuliert",
+        points: input.points.map((point) => ({
+          year: point.year,
+          value: Math.max(0, point.cumulativeTaxValue),
+          valueLabel: input.formatMoney(point.cumulativeTaxValue)
+        }))
+      } : null
+    ].filter((line): line is VerticalChartLine => Boolean(line)),
     points: input.points.map((point) => ({
       year: point.year,
       selected: input.selectedYear === point.year,
@@ -185,13 +246,15 @@ export function renderCombinedWealthChart(input: ChartRenderInput<CombinedWealth
         Math.max(0, point.depotValue) +
         Math.max(0, point.pensionConsumed) +
         Math.max(0, point.pensionSavingsValue) +
+        Math.max(0, point.taxValue) +
         Math.max(0, point.propertyValue),
       segments: [
+        { className: "property", label: "Immobilienwert", value: Math.max(0, point.propertyValue) },
         { className: "cash", label: "Cash", value: Math.max(0, point.cashValue) },
         { className: "depot", label: "Depot", value: Math.max(0, point.depotValue) },
         { className: "pension-consumed", label: "Verbrauchte Rente", value: Math.max(0, point.pensionConsumed) },
         { className: "pension", label: "Gesparte Rente", value: Math.max(0, point.pensionSavingsValue) },
-        { className: "property", label: "Immobilienwert", value: Math.max(0, point.propertyValue) }
+        { className: "tax", label: "Steuern", value: Math.max(0, point.taxValue) }
       ]
     }))
   });
@@ -215,6 +278,7 @@ export function renderCombinedWealthLifeSummary(input: {
   const repaidPropertyDebt = Math.max(0, firstDebt - finalYear.propertyDebt);
   const depotDevelopment = finalYear.depotValue - firstYear.depotValue;
   const cashDevelopment = finalYear.cashValue - firstYear.cashValue;
+  const totalTaxesAndDeductions = input.taxesAndDeductions + finalYear.cumulativeTaxValue;
 
   return `
     <div class="combined-life-summary">
@@ -225,7 +289,7 @@ export function renderCombinedWealthLifeSummary(input: {
       ${wealthDetailLine("Gesamtes aufgebautes Vermoegen", input.formatMoney(finalYear.totalGrossAssets))}
       ${wealthDetailLine("Verbrauchte Rentenzahlungen", input.formatMoney(pensionConsumed))}
       ${wealthDetailLine("Gesparte Rentenanteile", input.formatMoney(pensionSaved))}
-      ${wealthDetailLine("Gezahlte Steuern und Abgaben", input.formatMoney(input.taxesAndDeductions))}
+      ${wealthDetailLine("Gezahlte Steuern und Abgaben", input.formatMoney(totalTaxesAndDeductions))}
       ${wealthDetailLine("Getilgte Immobilienschulden", input.formatMoney(repaidPropertyDebt))}
       ${wealthDetailLine("Verbleibende Immobilienschuld", input.formatMoney(finalYear.propertyDebt))}
       ${wealthDetailLine("Immobilien-Eigenkapital", input.formatMoney(finalYear.propertyEquity))}
@@ -247,11 +311,6 @@ export function renderCombinedWealthPopup(input: {
     return "<div class='chart-empty'>Bitte zuerst Module aktivieren und berechnen.</div>";
   }
 
-  const finalYear = input.finalYear ?? input.selected;
-  const depotLines = input.selected.depotBreakdown.length
-    ? input.selected.depotBreakdown.map((depot) => wealthDetailLine(depot.label, input.formatMoney(depot.value))).join("")
-    : wealthDetailLine("Aktive Depots", input.formatMoney(0));
-
   return `
     <div class="chart-popup-head">
       <div>
@@ -261,28 +320,12 @@ export function renderCombinedWealthPopup(input: {
       <button class="chart-popup-close" type="button" data-action="close-combined-wealth-popup" aria-label="Popup schliessen">x</button>
     </div>
     <div class="chart-popup-list">
-      ${chartPopupSection("Aktive Module", [
-        wealthDetailLine("Cash aus gewaehltem Konto", input.formatMoney(input.selected.cashValue)),
-        wealthDetailLine("Ausgewaehlte Depots", input.formatMoney(input.selected.depotValue)),
-        wealthDetailLine("Gesparte Rentenanteile kumuliert", input.formatMoney(input.selected.pensionSavingsValue)),
-        wealthDetailLine("Immobilienwert", input.formatMoney(input.selected.propertyValue))
-      ])}
-      ${chartPopupSection("Depot-Aufschluesselung", [depotLines])}
-      ${chartPopupSection("Rente im Lebensverlauf", [
-        wealthDetailLine("Jaehrliche Rentenzahlung", input.formatMoney(input.selected.pensionIncome)),
-        wealthDetailLine("Davon verbraucht", input.formatMoney(input.selected.pensionConsumed)),
-        wealthDetailLine("Davon gespart", input.formatMoney(input.selected.pensionSaved))
-      ])}
-      ${chartPopupSection("Immobilien", [
-        wealthDetailLine("Immobilienschuld", input.formatMoney(input.selected.propertyDebt)),
-        wealthDetailLine("Immobilien-Eigenkapital", input.formatMoney(input.selected.propertyEquity))
-      ])}
-      ${chartPopupSection("Gesamt", [
-        wealthDetailLine("Bruttovermoegen", input.formatMoney(input.selected.totalGrossAssets)),
-        wealthDetailLine("Gesamtschulden", input.formatMoney(input.selected.totalDebt)),
-        wealthDetailLine("Nettovermoegen", input.formatMoney(input.selected.totalNetWealth)),
-        wealthDetailLine("Erbe am Ende", input.formatMoney(finalYear.totalNetWealth))
-      ])}
+      ${chartPopupLine("cash", "Cash", input.formatMoney(input.selected.cashValue))}
+      ${chartPopupLine("depot", "Depot", input.formatMoney(input.selected.depotValue))}
+      ${chartPopupLine("pension-consumed", "Verbrauchte Rente", input.formatMoney(input.selected.pensionConsumed))}
+      ${chartPopupLine("pension", "Gesparte Rente", input.formatMoney(input.selected.pensionSavingsValue))}
+      ${chartPopupLine("tax", "Steuern", input.formatMoney(input.selected.taxValue))}
+      ${chartPopupLine("property", "Immobilienwert", input.formatMoney(input.selected.propertyValue))}
     </div>
   `;
 }
@@ -337,6 +380,7 @@ function renderVerticalChart(input: {
   showColumnYear?: boolean;
   showXAxisLabel?: boolean;
   legend: Array<{ className: string; label: string }>;
+  lines?: VerticalChartLine[];
   points: VerticalChartPoint[];
 }): string {
   const columnCount = Math.max(1, input.points.length);
@@ -356,6 +400,7 @@ function renderVerticalChart(input: {
       </div>
       <div class="wealth-plot" role="list" style="--wealth-chart-count:${columnCount};">
         ${input.points.map((point) => renderVerticalBar(point, input.maxValue, showColumnValue, showColumnYear)).join("")}
+        ${(input.lines ?? []).map((line) => renderLineOverlay(line, input.maxValue)).join("")}
       </div>
       ${showXAxisLabel ? '<div class="wealth-x-axis" aria-hidden="true">Jahr</div>' : ""}
       ${input.footer ?? ""}
@@ -410,7 +455,7 @@ function renderVerticalBar(
 }
 
 function renderCombinedSummaryValue(
-  label: "Cash" | "Depot" | "Rente p.a." | "Rentensparen" | "Immobilienwert",
+  label: "Cash" | "Depot" | "Rente p.a." | "Rentensparen" | "Steuern" | "Immobilienwert",
   value: number,
   formatMoney: (value: number) => string
 ): string {
@@ -422,15 +467,39 @@ function renderCombinedSummaryValue(
   `;
 }
 
+function renderCombinedLineToggle(input: {
+  id: CombinedWealthLineId;
+  className: string;
+  label: string;
+  value: number;
+  active: boolean;
+  formatMoney: (value: number) => string;
+}): string {
+  return `
+    <button
+      class="combined-wealth-line-toggle ${input.active ? "active" : ""}"
+      type="button"
+      data-action="toggle-combined-wealth-line"
+      data-combined-wealth-line="${input.id}"
+      aria-pressed="${input.active}"
+    >
+      <span class="combined-wealth-line-label">
+        <i class="combined-wealth-line-dot ${escapeHtml(input.className)}"></i>${escapeHtml(input.label)}
+      </span>
+      <strong>${input.formatMoney(input.value)}</strong>
+    </button>
+  `;
+}
+
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + (Number.isFinite(value) ? value : 0), 0);
 }
 
-function chartPopupSection(title: string, lines: string[]): string {
+function chartPopupLine(color: string, label: string, value: string): string {
   return `
-    <div class="chart-popup-section">
-      <div class="chart-popup-section-title">${escapeHtml(title)}</div>
-      ${lines.join("")}
+    <div class="chart-popup-line">
+      <span><i class="chart-popup-dot ${escapeHtml(color)}"></i>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </div>
   `;
 }
@@ -457,9 +526,29 @@ function renderSegment(segment: VerticalBarSegment, maxValue: number): string {
   `;
 }
 
+function renderLineOverlay(line: VerticalChartLine, maxValue: number): string {
+  const points = line.points.map((point, index) => {
+    const x = ((index + 0.5) / line.points.length) * 100;
+    const y = 100 - heightPercent(point.value, maxValue);
+    return `${roundChartCoordinate(x)},${roundChartCoordinate(y)}`;
+  });
+  if (!points.length) return "";
+
+  return `
+    <svg class="wealth-line-overlay ${escapeHtml(line.className)}" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <title>${escapeHtml(line.label)}</title>
+      <polyline points="${points.join(" ")}"></polyline>
+    </svg>
+  `;
+}
+
 function heightPercent(value: number, maxValue: number): number {
   if (!Number.isFinite(value) || value <= 0 || maxValue <= 0) return 0;
   return Math.max(0, Math.min(100, (value / maxValue) * 100));
+}
+
+function roundChartCoordinate(value: number): string {
+  return String(Math.round(value * 100) / 100);
 }
 
 function propertyComposition(input: RealEstateRepaymentSegmentInput): {

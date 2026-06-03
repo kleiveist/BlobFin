@@ -2233,6 +2233,31 @@ tfoot th {
   background: #b87514;
 }
 
+.chart-popup-dot.cash {
+  background: #777b82;
+}
+
+.chart-popup-dot.depot {
+  background: #9b94ff;
+}
+
+.chart-popup-dot.pension,
+.chart-popup-dot.pension-consumed {
+  background: #0f9f8f;
+}
+
+.chart-popup-dot.pension-consumed-cumulative {
+  background: #086a61;
+}
+
+.chart-popup-dot.tax {
+  background: #c35a3a;
+}
+
+.chart-popup-dot.tax-cumulative {
+  background: #8f3f2c;
+}
+
 .investment-legend {
   display: flex;
   align-items: center;
@@ -3661,6 +3686,41 @@ tfoot th {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.combined-module-copy {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.combined-module-copy > span:not(.combined-module-icon) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.combined-module-icon {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.combined-module-icon svg {
+  fill: none;
+  height: 20px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 20px;
+}
+
 .combined-module-card-head div,
 .combined-module-metrics,
 .combined-pension-inputs,
@@ -3710,7 +3770,12 @@ tfoot th {
 }
 
 .combined-single-selector.planning-account-cards {
-  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.combined-single-selector .planning-account-card {
+  min-height: 0;
+  padding: 8px;
 }
 
 .combined-module-metrics {
@@ -3963,6 +4028,7 @@ tfoot th {
   min-height: 208px;
   overflow: hidden;
   padding: 18px 8px 0;
+  position: relative;
 }
 
 .real-estate-chart-card .wealth-column-button {
@@ -3986,6 +4052,8 @@ tfoot th {
   grid-template-rows: 20px minmax(130px, 1fr) 20px;
   min-width: 0;
   padding: 4px 2px;
+  position: relative;
+  z-index: 1;
 }
 
 .wealth-column-button.active {
@@ -4072,6 +4140,10 @@ tfoot th {
   );
 }
 
+.wealth-column-segment.tax {
+  background: #c35a3a;
+}
+
 .wealth-column-segment.property {
   background: #5f88e8;
 }
@@ -4110,6 +4182,35 @@ tfoot th {
   width: 64%;
 }
 
+.wealth-line-overlay {
+  height: calc(100% - 18px);
+  inset: 18px 8px 0;
+  overflow: visible;
+  pointer-events: none;
+  position: absolute;
+  width: calc(100% - 16px);
+  z-index: 4;
+}
+
+.wealth-line-overlay polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.wealth-line-overlay.tax-cumulative {
+  color: #8f3f2c;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.7));
+}
+
+.wealth-line-overlay.pension-consumed-cumulative {
+  color: #086a61;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.7));
+}
+
 .wealth-legend {
   color: var(--muted);
   display: flex;
@@ -4137,6 +4238,24 @@ tfoot th {
 .legend-dot.pension-consumed {
   background: #0f9f8f;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.46);
+}
+
+.legend-dot.pension-consumed-cumulative {
+  background: #086a61;
+  border-radius: 2px;
+  height: 3px;
+  margin-top: 6px;
+}
+
+.legend-dot.tax {
+  background: #c35a3a;
+}
+
+.legend-dot.tax-cumulative {
+  background: #8f3f2c;
+  border-radius: 2px;
+  height: 3px;
+  margin-top: 6px;
 }
 
 .legend-dot.property {
@@ -4195,13 +4314,20 @@ tfoot th {
 }
 
 .combined-wealth-summary {
+  align-items: start;
   border-bottom: 1px solid var(--row-border);
   display: grid;
-  gap: 6px;
+  gap: 10px;
   grid-column: 2;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, max-content);
   min-height: 0;
   padding: 0 6px 8px;
+}
+
+.combined-wealth-summary-values {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
 
 .combined-wealth-summary-item {
@@ -4229,6 +4355,75 @@ tfoot th {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.combined-wealth-line-controls {
+  align-items: stretch;
+  display: grid;
+  gap: 6px;
+  justify-self: end;
+  min-width: 0;
+  width: min(230px, 100%);
+}
+
+.combined-wealth-line-toggle {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  min-width: 0;
+  padding: 6px 8px;
+  text-align: right;
+}
+
+.combined-wealth-line-toggle.active {
+  background: var(--highlight);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.combined-wealth-line-label {
+  align-items: center;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 850;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.combined-wealth-line-toggle strong {
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combined-wealth-line-dot {
+  border-radius: 2px;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 3px;
+  width: 16px;
+}
+
+.combined-wealth-line-dot.pension-consumed-cumulative {
+  background: #086a61;
+}
+
+.combined-wealth-line-dot.tax-cumulative {
+  background: #8f3f2c;
 }
 
 .combined-wealth-card .wealth-plot {
@@ -6056,8 +6251,14 @@ tfoot th {
 
   .combined-wealth-summary {
     gap: 5px;
+    grid-template-columns: 1fr;
     padding-left: 2px;
     padding-right: 2px;
+  }
+
+  .combined-wealth-line-controls {
+    justify-self: stretch;
+    width: 100%;
   }
 
   .combined-wealth-summary-label {
@@ -6115,6 +6316,10 @@ tfoot th {
   }
 
   .module-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .combined-single-selector.planning-account-cards {
     grid-template-columns: 1fr;
   }
 

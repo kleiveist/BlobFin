@@ -150,6 +150,8 @@ import {
   realEstatePopupHeading,
   realEstateRepaymentSegments,
   realEstateTrendSegments,
+  type CombinedWealthLineId,
+  type CombinedWealthLineVisibility,
   renderCombinedWealthChart,
   renderCombinedWealthLifeSummary,
   renderCombinedWealthPopup,
@@ -431,6 +433,10 @@ let selectedRealEstateYear: number | null = null;
 let latestRealEstateResult: RealEstateFinancingResult | null = null;
 let selectedCombinedWealthYear: number | null = null;
 let latestCombinedWealthYears: CombinedWealthYear[] = [];
+let combinedWealthLineVisibility: CombinedWealthLineVisibility = {
+  pensionConsumedCumulative: true,
+  taxCumulative: true
+};
 let latestStatutoryPensionModel: StatutoryPensionModel | null = null;
 let statutoryPensionTaxPopupScenarioId: StatutoryPensionScenarioId | null = null;
 let accountDialog: AccountDialogState = null;
@@ -1253,6 +1259,10 @@ function bindEvents(): void {
       const chartKind = button.dataset.chartKind === "trend" ? "trend" : "repayment";
       setSelectedRealEstateYear(year);
       showRealEstateChartPopup(year, chartKind, event.clientX, event.clientY);
+      return;
+    }
+    if (action === "toggle-combined-wealth-line") {
+      toggleCombinedWealthLine(button.dataset.combinedWealthLine as CombinedWealthLineId | undefined);
       return;
     }
     if (action === "select-combined-wealth-year") {
@@ -4615,16 +4625,21 @@ function combinedPensionInput(model: StatutoryPensionModel | null, birthYear: nu
   enabled: boolean;
   retirementYear: number;
   monthlyAmount: number;
+  annualTax: number;
   savingsRatePercent: number;
 } {
   const scenarioId = state.combinedWealth.statutoryPensionScenario;
   const scenario = model?.scenarios.find((item) => item.id === scenarioId);
   const scenarioSettings = state.statutoryPension.scenarios[scenarioId];
   const retirementYear = scenario?.retirementYear ?? birthYear + scenarioSettings.retirementAge;
+  const scenarioNetPension = Math.max(0, scenario?.netMonthlyPension ?? 0);
+  const pensionTaxScale =
+    scenarioNetPension > 0 ? state.combinedWealth.statutoryPensionMonthlyAmount / scenarioNetPension : 0;
   return {
     enabled: state.combinedWealth.includeStatutoryPension,
     retirementYear,
     monthlyAmount: state.combinedWealth.statutoryPensionMonthlyAmount,
+    annualTax: Math.max(0, scenario?.incomeTaxMonthly ?? 0) * Math.max(0, pensionTaxScale) * 12,
     savingsRatePercent: state.combinedWealth.statutoryPensionSavingsRatePercent
   };
 }
@@ -4673,6 +4688,7 @@ function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
     chartHost.innerHTML = renderCombinedWealthChart({
       points: years,
       selectedYear: selectedCombinedWealthYear,
+      lineVisibility: combinedWealthLineVisibility,
       formatMoney: (value) => money(value)
     });
   }
@@ -4695,6 +4711,15 @@ function combinedTaxesAndDeductions(years: CombinedWealthYear[]): number {
     if (!entry.active || entry.year < startYear || entry.year > endYear) return sum;
     return sum + incomeYearEntryTaxTotal(entry);
   }, 0);
+}
+
+function toggleCombinedWealthLine(lineId: CombinedWealthLineId | undefined): void {
+  if (!lineId || !(lineId in combinedWealthLineVisibility)) return;
+  combinedWealthLineVisibility = {
+    ...combinedWealthLineVisibility,
+    [lineId]: !combinedWealthLineVisibility[lineId]
+  };
+  renderCombinedWealthCalculations(latestCombinedWealthYears);
 }
 
 function renderStatutoryPensionCalculations(birthYear: number): void {

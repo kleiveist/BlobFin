@@ -53,8 +53,13 @@ const combinedYear: CombinedWealthYear = {
   redirectedDepotRepayment: 0,
   pensionIncome: 0,
   pensionConsumed: 0,
+  pensionConsumedValue: 0,
   pensionSaved: 0,
   pensionSavingsValue: 0,
+  depotTaxValue: 0,
+  pensionTaxValue: 0,
+  taxValue: 0,
+  cumulativeTaxValue: 0,
   propertyValue: 300000,
   propertyDebt: 212000,
   propertyLoanStart: 220000,
@@ -261,7 +266,14 @@ describe("follow-up ui rendering", () => {
       formatMoney: String
     });
     const combined = renderCombinedWealthChart({
-      points: [{ ...combinedYear, pensionIncome: 12000, pensionConsumed: 12000 }],
+      points: [{
+        ...combinedYear,
+        pensionIncome: 12000,
+        pensionConsumed: 12000,
+        pensionConsumedValue: 24000,
+        taxValue: 900,
+        cumulativeTaxValue: 1800
+      }],
       selectedYear: 2026,
       formatMoney: String
     });
@@ -279,7 +291,37 @@ describe("follow-up ui rendering", () => {
     expect(combined).toContain("wealth-vertical-chart");
     expect(combined).toContain("Verbrauchte Rente");
     expect(combined).toContain("wealth-column-segment pension-consumed");
+    expect(combined).toContain("Verbrauchte Rente kumuliert");
+    expect(combined).toContain('data-action="toggle-combined-wealth-line"');
+    expect(combined).toContain('data-combined-wealth-line="pensionConsumedCumulative"');
+    expect(combined).toContain("wealth-line-overlay pension-consumed-cumulative");
+    expect(combined).toContain("Steuern");
+    expect(combined).toContain("wealth-column-segment tax");
+    expect(combined).toContain("Steuern kumuliert");
+    expect(combined).toContain('data-combined-wealth-line="taxCumulative"');
+    expect(combined).toContain("wealth-line-overlay tax-cumulative");
+    expect(combined).not.toContain("legend-dot pension-consumed-cumulative");
+    expect(combined).not.toContain("legend-dot tax-cumulative");
+    expect(combined.indexOf("wealth-column-segment property")).toBeLessThan(
+      combined.indexOf("wealth-column-segment cash")
+    );
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");
+  });
+
+  it("can render the combined wealth chart with cumulative lines switched off", () => {
+    const chart = renderCombinedWealthChart({
+      points: [{ ...combinedYear, pensionConsumedValue: 24000, cumulativeTaxValue: 1800 }],
+      selectedYear: 2026,
+      lineVisibility: {
+        pensionConsumedCumulative: false,
+        taxCumulative: false
+      },
+      formatMoney: String
+    });
+
+    expect(chart).toContain('aria-pressed="false"');
+    expect(chart).not.toContain("wealth-line-overlay pension-consumed-cumulative");
+    expect(chart).not.toContain("wealth-line-overlay tax-cumulative");
   });
 
   it("sets the vertical chart column count for responsive fitting", () => {

@@ -154,6 +154,60 @@ describe("combined wealth", () => {
     expect(result[0].totalNetWealth).toBeGreaterThan(0);
   });
 
+  it("adds annual depot and pension taxes and keeps a cumulative tax value", () => {
+    const depot = projection(
+      [
+        { ...point(30, "saving", 10000), tax: 100, periodTax: 100 },
+        { ...point(31, "saving", 12000), tax: 250, periodTax: 150 },
+        { ...point(32, "saving", 14000), tax: 400, periodTax: 150 }
+      ],
+      0,
+      65
+    );
+
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 3,
+      cashStartValue: 0,
+      yearlyCashDelta: 0,
+      depotProjection: depot,
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      pension: {
+        enabled: true,
+        retirementYear: 2027,
+        monthlyAmount: 1000,
+        annualTax: 1200,
+        savingsRatePercent: 25
+      },
+      realEstateYears: [],
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeRealEstateFinancing: false,
+        includeRealEstateValueTrend: false,
+        includeStatutoryPension: true
+      }
+    });
+
+    expect(result[0].depotTaxValue).toBe(100);
+    expect(result[0].pensionConsumedValue).toBe(0);
+    expect(result[0].pensionTaxValue).toBe(0);
+    expect(result[0].taxValue).toBe(100);
+    expect(result[0].cumulativeTaxValue).toBe(100);
+    expect(result[1].depotTaxValue).toBe(150);
+    expect(result[1].pensionConsumedValue).toBe(9000);
+    expect(result[1].pensionTaxValue).toBe(1200);
+    expect(result[1].taxValue).toBe(1350);
+    expect(result[1].cumulativeTaxValue).toBe(1450);
+    expect(result[2].depotTaxValue).toBe(150);
+    expect(result[2].pensionConsumedValue).toBe(18000);
+    expect(result[2].pensionTaxValue).toBe(1200);
+    expect(result[2].taxValue).toBe(1350);
+    expect(result[2].cumulativeTaxValue).toBe(2800);
+  });
+
   it("can exclude real estate from combined results", () => {
     const depot = projection([point(30, "saving", 10000)], 0, 65);
     const shared = projection([point(30, "saving", 5000)], 0, 65);

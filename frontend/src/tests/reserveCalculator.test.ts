@@ -4,6 +4,7 @@ import { defaultAppState } from "../data/defaults";
 import { calculateReserveSummary, calculateYearTableFooterValue } from "../domain/reserveCalculator";
 import { exportPositionsCsv, exportYearTableCsv, parseCsv, positionsFromCsvRows } from "../lib/csv";
 import { positionTableMode } from "../lib/positionKinds";
+import type { ReservePosition } from "../types";
 
 describe("reserve calculator", () => {
   it("keeps the imported default yearly values deterministic", () => {
@@ -471,5 +472,117 @@ describe("reserve calculator", () => {
     expect(positionTableMode(uniFee!)).toBe("expense");
     expect(kfzReserve?.icon).toBe("car");
     expect(imported[imported.length - 1]?.type).toBe("savings");
+  });
+
+  it("round-trips amount detail popup rows through positions csv", () => {
+    const state = defaultAppState();
+    const expenseTemplate = state.positions.find((position) => position.id === "uni-gebuehr")!;
+    const incomeTemplate = state.positions.find((position) => position.id === "nettoeinkommen")!;
+    const positions: ReservePosition[] = [
+      {
+        ...expenseTemplate,
+        id: "expense-monthly-details",
+        name: "Monatliche Ausgabe mit Details",
+        amount: 1,
+        payoutType: "monthly",
+        costBreakdown: [
+          { id: "streaming", name: "Streaming", amount: 20.5 },
+          { id: "software", name: "Software", amount: 10 }
+        ]
+      },
+      {
+        ...expenseTemplate,
+        id: "expense-yearly-details",
+        name: "Jaehrliche Ausgabe mit Details",
+        amount: 1,
+        payoutType: "yearly",
+        payoutMonth: 5,
+        costBreakdown: [
+          { id: "insurance", name: "Versicherung", amount: 120 },
+          { id: "tax", name: "Steuer", amount: 30 }
+        ]
+      },
+      {
+        ...expenseTemplate,
+        id: "expense-once-details",
+        name: "Einmalige Ausgabe mit Details",
+        amount: 1,
+        payoutType: "once",
+        payoutMonth: 8,
+        costBreakdown: [
+          { id: "move", name: "Umzug", amount: 1000 },
+          { id: "deposit", name: "Kaution", amount: null }
+        ]
+      },
+      {
+        ...incomeTemplate,
+        id: "income-once-details",
+        flow: "income",
+        type: "incomeTemporary",
+        name: "Einmalige Einnahme mit Details",
+        amount: 1,
+        payoutType: "once",
+        payoutMonth: 9,
+        interestBearing: false,
+        cashback: false,
+        costBreakdown: [
+          { id: "bonus", name: "Bonus", amount: 900 },
+          { id: "refund", name: "Rueckerstattung", amount: 100 }
+        ]
+      }
+    ];
+
+    const csv = exportPositionsCsv(positions);
+    const imported = positionsFromCsvRows(parseCsv(csv));
+    const detailsFor = (name: string) =>
+      imported.find((position) => position.name === name)?.costBreakdown?.map((item) => ({
+        name: item.name,
+        amount: item.amount
+      }));
+
+    expect(csv).toContain('"Detailname"');
+    expect(csv).toContain('"Rueckerstattung"');
+    expect(imported).toHaveLength(positions.length);
+    expect(imported.find((position) => position.name === "Monatliche Ausgabe mit Details")?.amount).toBe(30.5);
+    expect(imported.find((position) => position.name === "Jaehrliche Ausgabe mit Details")?.amount).toBe(150);
+    expect(imported.find((position) => position.name === "Einmalige Ausgabe mit Details")?.amount).toBe(1000);
+    expect(imported.find((position) => position.name === "Einmalige Einnahme mit Details")?.amount).toBe(1000);
+    expect(detailsFor("Monatliche Ausgabe mit Details")).toEqual([
+      { name: "Streaming", amount: 20.5 },
+      { name: "Software", amount: 10 }
+    ]);
+    expect(detailsFor("Jaehrliche Ausgabe mit Details")).toEqual([
+      { name: "Versicherung", amount: 120 },
+      { name: "Steuer", amount: 30 }
+    ]);
+    expect(detailsFor("Einmalige Ausgabe mit Details")).toEqual([
+      { name: "Umzug", amount: 1000 },
+      { name: "Kaution", amount: null }
+    ]);
+    expect(detailsFor("Einmalige Einnahme mit Details")).toEqual([
+      { name: "Bonus", amount: 900 },
+      { name: "Rueckerstattung", amount: 100 }
+    ]);
+  });
+
+  it("imports legacy positions csv without detail columns", () => {
+    const csv = [
+      "Aktiv;View;Richtung;Label;Name;Art;Betrag;Startmonat;Endmonat;Abgang;Abgangsjahr;Abgangsmonat;Abgangstag;Zinsen;Cashback",
+      "Ja;Ja;Ausgabe;Auto;Legacy-Ausgabe;Temporaere Ausgabe;123,45;Januar;Dezember;monatlich;2026;Juni;15;Nein;Ja"
+    ].join("\n");
+
+    const imported = positionsFromCsvRows(parseCsv(csv));
+
+    expect(imported).toHaveLength(1);
+    expect(imported[0]).toMatchObject({
+      name: "Legacy-Ausgabe",
+      flow: "expense",
+      type: "temporary",
+      amount: 123.45,
+      payoutType: "monthly",
+      payoutMonth: 6,
+      cashback: true
+    });
+    expect(imported[0]?.costBreakdown).toBeUndefined();
   });
 });

@@ -17,6 +17,7 @@ export interface CombinedWealthPensionInput {
   enabled: boolean;
   retirementYear: number;
   monthlyAmount: number;
+  annualTax: number;
   savingsRatePercent: number;
 }
 
@@ -44,7 +45,8 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
   const depotInputs = combinedDepotInputs(input);
   const depotMaps = depotInputs.map((depot) => ({
     ...depot,
-    valuesByYear: projectionNetByYear(depot.projection, depot.birthYear)
+    valuesByYear: projectionValueByYear(depot.projection, depot.birthYear, "netBalance"),
+    taxByYear: projectionValueByYear(depot.projection, depot.birthYear, "periodTax")
   }));
 
   let withdrawalImpact = 0;
@@ -52,7 +54,9 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
   let redirectedDepotRepayment = 0;
   let depotCashDrawdown = 0;
   let cumulativeCashValue = input.cashStartValue;
+  let cumulativePensionConsumed = 0;
   let cumulativePensionSavings = 0;
+  let cumulativeTaxValue = 0;
 
   for (let yearOffset = 0; yearOffset < input.horizonYears; yearOffset += 1) {
     const year = input.startYear + yearOffset;
@@ -114,7 +118,15 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
     const pensionIncome = annualPensionIncomeForYear(input.pension, year);
     const pensionSaved = roundMoney((pensionIncome * pensionSavingsRate(input.pension)) / 100);
     const pensionConsumed = roundMoney(Math.max(0, pensionIncome - pensionSaved));
+    cumulativePensionConsumed = roundMoney(cumulativePensionConsumed + pensionConsumed);
     cumulativePensionSavings = roundMoney(cumulativePensionSavings + pensionSaved);
+
+    const depotTaxValue = input.toggles.includeDepotDevelopment
+      ? roundMoney(depotMaps.reduce((sum, depot) => sum + (depot.taxByYear.get(year) ?? 0), 0))
+      : 0;
+    const pensionTaxValue = annualPensionTaxForYear(input.pension, year);
+    const taxValue = roundMoney(depotTaxValue + pensionTaxValue);
+    cumulativeTaxValue = roundMoney(cumulativeTaxValue + taxValue);
 
     const propertyValue =
       input.toggles.includeRealEstateValueTrend || input.toggles.includeRealEstateFinancing
@@ -142,8 +154,13 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
       redirectedDepotRepayment,
       pensionIncome,
       pensionConsumed,
+      pensionConsumedValue: cumulativePensionConsumed,
       pensionSaved,
       pensionSavingsValue: cumulativePensionSavings,
+      depotTaxValue,
+      pensionTaxValue,
+      taxValue,
+      cumulativeTaxValue,
       propertyValue,
       propertyDebt,
       propertyLoanStart,
@@ -194,11 +211,15 @@ function depotRepaymentTargetIndex(depots: Array<{ id: CombinedWealthDepotKey }>
   return standardIndex >= 0 ? standardIndex : 0;
 }
 
-function projectionNetByYear(projection: AssetProjection, birthYear: number): Map<number, number> {
+function projectionValueByYear(
+  projection: AssetProjection,
+  birthYear: number,
+  field: "netBalance" | "periodTax"
+): Map<number, number> {
   const map = new Map<number, number>();
   for (const point of projection.points) {
     const year = birthYear + point.age;
-    map.set(year, point.netBalance);
+    map.set(year, point[field]);
   }
   return map;
 }
@@ -214,6 +235,12 @@ function annualPensionIncomeForYear(pension: CombinedWealthPensionInput | undefi
   if (!pension?.enabled) return 0;
   if (!Number.isFinite(pension.retirementYear) || year < Math.round(pension.retirementYear)) return 0;
   return roundMoney(Math.max(0, pension.monthlyAmount) * 12);
+}
+
+function annualPensionTaxForYear(pension: CombinedWealthPensionInput | undefined, year: number): number {
+  if (!pension?.enabled) return 0;
+  if (!Number.isFinite(pension.retirementYear) || year < Math.round(pension.retirementYear)) return 0;
+  return roundMoney(Math.max(0, pension.annualTax));
 }
 
 function pensionSavingsRate(pension: CombinedWealthPensionInput | undefined): number {

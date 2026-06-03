@@ -365,8 +365,13 @@ export interface CombinedWealthYear {
   redirectedDepotRepayment: number;
   pensionIncome: number;
   pensionConsumed: number;
+  pensionConsumedValue: number;
   pensionSaved: number;
   pensionSavingsValue: number;
+  depotTaxValue: number;
+  pensionTaxValue: number;
+  taxValue: number;
+  cumulativeTaxValue: number;
   propertyValue: number;
   propertyDebt: number;
   propertyLoanStart: number;
