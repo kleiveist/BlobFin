@@ -4669,15 +4669,14 @@ tfoot th {
 .income-analysis-distribution-main {
   display: grid;
   gap: 10px;
-  grid-template-rows: minmax(220px, 0.95fr) auto minmax(0, 1.05fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
 
 .income-analysis-distribution-chart {
-  height: auto;
-  min-height: 220px;
+  height: 100%;
 }
 
 .income-analysis-distribution-detail {
@@ -4907,8 +4906,7 @@ tfoot th {
   font-weight: 900;
 }
 
-.income-analysis-label-filter-card,
-.income-analysis-label-table-card {
+.income-analysis-label-filter-card {
   min-width: 0;
   border: 1px solid var(--row-border);
   border-radius: 8px;
@@ -4922,12 +4920,6 @@ tfoot th {
   align-items: center;
 }
 
-.income-analysis-label-table-card {
-  display: grid;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .income-analysis-label-income-list {
   align-content: start;
   gap: 8px;
@@ -4935,7 +4927,9 @@ tfoot th {
 
 .income-analysis-label-income-card {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
   border-bottom: 1px solid var(--row-border);
   padding: 9px 0;
@@ -4971,79 +4965,6 @@ tfoot th {
 
 .income-analysis-label-filter-button {
   flex: 0 0 34px;
-}
-
-.income-analysis-label-table-wrap {
-  min-height: 0;
-  overflow: auto;
-}
-
-.income-analysis-label-table {
-  width: 100%;
-  min-width: 640px;
-  border-collapse: collapse;
-}
-
-.income-analysis-label-table th,
-.income-analysis-label-table td {
-  border-bottom: 1px solid var(--row-border);
-  padding: 9px 10px;
-  text-align: right;
-  vertical-align: top;
-  white-space: nowrap;
-}
-
-.income-analysis-label-table th:first-child,
-.income-analysis-label-table td:first-child {
-  min-width: 240px;
-  text-align: left;
-  white-space: normal;
-}
-
-.income-analysis-label-table th {
-  position: sticky;
-  z-index: 1;
-  top: 0;
-  background: var(--surface-soft);
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 900;
-}
-
-.income-analysis-label-summary-row td {
-  background: var(--surface-muted);
-  font-weight: 950;
-}
-
-.income-analysis-label-entry-row td {
-  background: var(--surface);
-  font-size: 0.8rem;
-}
-
-.income-analysis-label-table-title,
-.income-analysis-label-entry-cell {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.income-analysis-label-table-title {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-}
-
-.income-analysis-label-table-title .position-icon-svg {
-  width: 18px;
-  height: 18px;
-  color: var(--accent-strong);
-}
-
-.income-analysis-label-table-title small,
-.income-analysis-label-entry-cell small {
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 800;
 }
 
 .income-analysis-empty {

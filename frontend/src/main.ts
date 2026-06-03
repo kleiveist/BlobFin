@@ -12,7 +12,6 @@ import { buildCombinedWealthSeries, combinedWealthHorizonYears } from "./domain/
 import {
   buildIncomeAnalysisLabelDetails,
   type IncomeAnalysisLabelDetails,
-  type IncomeAnalysisLabelEntry,
   type IncomeAnalysisLabelGroup
 } from "./domain/incomeAnalysis";
 import {
@@ -2186,7 +2185,6 @@ function renderIncomeAnalysisDistributionContent(analysis: IncomeAnalysisModel, 
           ${renderIncomeAnalysisChart(analysis, slices)}
         </section>
         ${renderIncomeAnalysisLabelFilter(analysis.labelDetails)}
-        ${renderIncomeAnalysisLabelTable(analysis.labelDetails)}
       </div>
       ${renderIncomeAnalysisDistributionDetail(analysis.labelDetails)}
     </div>
@@ -2250,78 +2248,6 @@ function renderIncomeAnalysisLabelFilter(details: IncomeAnalysisLabelDetails): s
           .join("")}
       </div>
     </section>
-  `;
-}
-
-function renderIncomeAnalysisLabelTable(details: IncomeAnalysisLabelDetails): string {
-  if (!details.groups.length) {
-    return `
-      <section class="income-analysis-label-table-card">
-        ${incomeAnalysisEmpty("Keine Positionen fuer die gewaehlten Labels.")}
-      </section>
-    `;
-  }
-
-  return `
-    <section class="income-analysis-label-table-card" aria-label="Einkommensverteilung Tabelle">
-      <div class="table-wrap income-analysis-label-table-wrap">
-        <table class="income-analysis-label-table">
-          <thead>
-            <tr>
-              <th>Label / Position</th>
-              <th>Brutto</th>
-              <th>Steuern</th>
-              <th>Sozialabgaben</th>
-              <th>Netto</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${details.groups.map(renderIncomeAnalysisLabelTableGroup).join("")}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `;
-}
-
-function renderIncomeAnalysisLabelTableGroup(group: IncomeAnalysisLabelGroup): string {
-  return `
-    <tr class="income-analysis-label-summary-row">
-      <td>
-        <span class="income-analysis-label-table-title">
-          ${positionIconSvg(group.icon)}
-          <strong>${escapeHtml(group.labelText)}</strong>
-          <small>${group.entries.length} ${group.entries.length === 1 ? "Position" : "Positionen"}</small>
-        </span>
-      </td>
-      <td>${escapeHtml(money(group.gross))}</td>
-      <td>${escapeHtml(money(group.taxes))}</td>
-      <td>${escapeHtml(money(group.social))}</td>
-      <td>${escapeHtml(money(group.net))}</td>
-    </tr>
-    ${group.entries.map(renderIncomeAnalysisLabelTableEntry).join("")}
-  `;
-}
-
-function renderIncomeAnalysisLabelTableEntry(entry: IncomeAnalysisLabelEntry): string {
-  const sourceParts = [
-    entry.employer.trim() || null,
-    incomePersonLabel(entry.person),
-    INCOME_SOURCE_LABELS[entry.source]
-  ].filter(Boolean);
-  return `
-    <tr class="income-analysis-label-entry-row">
-      <td>
-        <span class="income-analysis-label-entry-cell">
-          <strong>${escapeHtml(String(entry.year))}</strong>
-          <small>${escapeHtml(sourceParts.join(" · "))}</small>
-        </span>
-      </td>
-      <td>${escapeHtml(money(entry.gross))}</td>
-      <td>${escapeHtml(money(entry.taxes))}</td>
-      <td>${escapeHtml(money(entry.social))}</td>
-      <td>${escapeHtml(money(entry.net))}</td>
-    </tr>
   `;
 }
 
@@ -4136,12 +4062,6 @@ function incomeInteger(value: string, fallback: number): number {
 function incomePerson(value: string): IncomePerson {
   if (value === "person1" || value === "person2" || value === "household") return value;
   return "household";
-}
-
-function incomePersonLabel(value: IncomePerson): string {
-  if (value === "person1") return "Person 1";
-  if (value === "person2") return "Person 2";
-  return "Haushalt";
 }
 
 function incomeYearSource(value: string): IncomeYearEntrySource {
