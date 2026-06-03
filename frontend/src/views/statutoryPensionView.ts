@@ -1,4 +1,4 @@
-import type { StatutoryPensionModel } from "../domain/statutoryPension";
+import { STATUTORY_PENSION_DEDUCTION_PERCENT_MAX, type StatutoryPensionModel } from "../domain/statutoryPension";
 import { escapeHtml, intNumber, money, percent } from "../lib/format";
 import type { StatutoryPensionScenarioId, StatutoryPensionSettings } from "../types";
 
@@ -182,16 +182,6 @@ function statutoryPensionScenarioCard(scenario: StatutoryPensionModel["scenarios
         )}
         ${statutoryPensionScenarioTaxButton(scenario)}
       </div>
-      <div class="statutory-pension-scenario-results">
-        <span>Monatsrente brutto <strong>${escapeHtml(money(scenario.grossMonthlyPension))}</strong></span>
-        <span>Monatsrente netto <strong>${escapeHtml(money(scenario.netMonthlyPension))}</strong></span>
-        <span>Abzuege gesamt <strong>${escapeHtml(money(scenario.totalDeductionsMonthly))}</strong></span>
-        <span>Besteuerungsanteil <strong>${escapeHtml(percent(scenario.taxableSharePercent))}</strong></span>
-        <span>Rentenjahr <strong>${escapeHtml(String(scenario.retirementYear))}</strong></span>
-        <span>Zusatzpunkte <strong>${escapeHtml(statutoryPensionDecimal(scenario.projectedAdditionalPoints, 2))}</strong></span>
-        <span>Punkte gesamt <strong>${escapeHtml(statutoryPensionDecimal(scenario.projectedTotalPoints, 2))}</strong></span>
-        <span>Rentenwert dann <strong>${escapeHtml(money(scenario.projectedPensionValue))}</strong></span>
-      </div>
       ${scenario.fallbackToConstantIncome ? `<small>Zukunftsprojektion ist nicht berechenbar; gleichbleibender Lohn wird genutzt.</small>` : ""}
     </article>
   `;
@@ -222,11 +212,11 @@ export function renderStatutoryPensionTaxPopupHtml(
           ${statutoryPensionScenarioRangeField(
             scenario.id,
             "taxRatePercent",
-            "Steuerquote %",
+            "Einkommensteuer %",
             scenario.taxRatePercent,
             0.1,
             0,
-            50,
+            STATUTORY_PENSION_DEDUCTION_PERCENT_MAX,
             percent(scenario.taxRatePercent)
           )}
           ${statutoryPensionScenarioRangeField(
@@ -236,17 +226,17 @@ export function renderStatutoryPensionTaxPopupHtml(
             scenario.healthInsurancePercent,
             0.05,
             0,
-            20,
+            STATUTORY_PENSION_DEDUCTION_PERCENT_MAX,
             percent(scenario.healthInsurancePercent)
           )}
           ${statutoryPensionScenarioRangeField(
             scenario.id,
             "careInsurancePercent",
-            "Pflegeversicherung %",
+            "Pflegeversicherung kinderlos %",
             scenario.careInsurancePercent,
             0.05,
             0,
-            10,
+            STATUTORY_PENSION_DEDUCTION_PERCENT_MAX,
             percent(scenario.careInsurancePercent)
           )}
         </div>

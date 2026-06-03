@@ -70,6 +70,7 @@ const SCENARIO_LABELS: Record<StatutoryPensionScenarioId, string> = {
   base: "Basis",
   optimistic: "Optimistisch"
 };
+export const STATUTORY_PENSION_DEDUCTION_PERCENT_MAX = 15;
 
 export function buildStatutoryPensionModel(input: {
   tracker: IncomeTrackerState;
@@ -208,9 +209,13 @@ function statutoryPensionScenarioResults(input: {
     );
     const grossMonthlyPension = roundCents(projectedTotalPoints * projectedPensionValue);
     const taxableSharePercent = statutoryPensionTaxableSharePercent(retirementYear);
-    const taxRatePercent = clamp(scenario.taxRatePercent, 0, 50);
-    const healthInsurancePercent = clamp(scenario.healthInsurancePercent, 0, 20);
-    const careInsurancePercent = clamp(scenario.careInsurancePercent, 0, 10);
+    const taxRatePercent = clamp(scenario.taxRatePercent, 0, STATUTORY_PENSION_DEDUCTION_PERCENT_MAX);
+    const healthInsurancePercent = clamp(
+      scenario.healthInsurancePercent,
+      0,
+      STATUTORY_PENSION_DEDUCTION_PERCENT_MAX
+    );
+    const careInsurancePercent = clamp(scenario.careInsurancePercent, 0, STATUTORY_PENSION_DEDUCTION_PERCENT_MAX);
     const incomeTaxMonthly = roundCents((grossMonthlyPension * taxableSharePercent * taxRatePercent) / 10000);
     const healthInsuranceMonthly = roundCents((grossMonthlyPension * healthInsurancePercent) / 100);
     const careInsuranceMonthly = roundCents((grossMonthlyPension * careInsurancePercent) / 100);

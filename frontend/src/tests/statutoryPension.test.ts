@@ -177,15 +177,15 @@ describe("statutory pension model", () => {
   it("uses the planned deduction defaults for all scenarios", () => {
     const settings = defaultStatutoryPensionSettings();
 
-    expect(settings.scenarios.optimistic.taxRatePercent).toBe(10);
+    expect(settings.scenarios.optimistic.taxRatePercent).toBe(7.52);
     expect(settings.scenarios.optimistic.healthInsurancePercent).toBe(8.75);
-    expect(settings.scenarios.optimistic.careInsurancePercent).toBe(3.6);
-    expect(settings.scenarios.base.taxRatePercent).toBe(12);
+    expect(settings.scenarios.optimistic.careInsurancePercent).toBe(4.2);
+    expect(settings.scenarios.base.taxRatePercent).toBe(9.52);
     expect(settings.scenarios.base.healthInsurancePercent).toBe(10.75);
-    expect(settings.scenarios.base.careInsurancePercent).toBe(5.6);
-    expect(settings.scenarios.pessimistic.taxRatePercent).toBe(15);
+    expect(settings.scenarios.base.careInsurancePercent).toBe(6.2);
+    expect(settings.scenarios.pessimistic.taxRatePercent).toBe(12.52);
     expect(settings.scenarios.pessimistic.healthInsurancePercent).toBe(13.75);
-    expect(settings.scenarios.pessimistic.careInsurancePercent).toBe(8.6);
+    expect(settings.scenarios.pessimistic.careInsurancePercent).toBe(9.2);
   });
 
   it("calculates the taxable pension share by retirement year", () => {
@@ -220,8 +220,9 @@ describe("statutory pension model", () => {
     const scenario = model.scenarios.find((item) => item.id === "pessimistic")!;
 
     expect(scenario.taxableSharePercent).toBe(100);
+    expect(scenario.taxRatePercent).toBe(15);
     expect(scenario.grossMonthlyPension).toBeCloseTo(scenario.projectedMonthlyPension, 2);
-    expect(scenario.incomeTaxMonthly).toBeCloseTo(scenario.grossMonthlyPension * 0.2, 2);
+    expect(scenario.incomeTaxMonthly).toBeCloseTo(scenario.grossMonthlyPension * 0.15, 2);
     expect(scenario.healthInsuranceMonthly).toBeCloseTo(scenario.grossMonthlyPension * 0.1, 2);
     expect(scenario.careInsuranceMonthly).toBeCloseTo(scenario.grossMonthlyPension * 0.05, 2);
     expect(scenario.netMonthlyPension).toBeCloseTo(
@@ -302,16 +303,16 @@ describe("statutory pension model", () => {
       pensionPoints: 1,
       grossMonthlyPension: 50,
       taxableSharePercent: 100,
-      incomeTaxMonthly: 10,
+      incomeTaxMonthly: 7.5,
       healthInsuranceMonthly: 5,
       careInsuranceMonthly: 2.5,
-      netMonthlyPension: 32.5
+      netMonthlyPension: 35
     });
     expect(model.annualPensionYears[1]).toMatchObject({
       relevantGrossIncome: 25000,
       pensionPoints: 0.5,
       grossMonthlyPension: 25,
-      netMonthlyPension: 16.25
+      netMonthlyPension: 17.5
     });
   });
 
@@ -338,6 +339,7 @@ describe("statutory pension model", () => {
     expect(html).toContain('data-statutory-pension-scenario="base"');
     expect(count(html, 'data-action="open-statutory-pension-tax-popup"')).toBe(3);
     expect(html).toContain("Steuerlast");
+    expect(html).not.toContain("statutory-pension-scenario-results");
     expect(html).not.toContain('data-statutory-pension-scenario-field="taxRatePercent"');
     expect(html).not.toContain('data-statutory-pension-scenario-field="healthInsurancePercent"');
     expect(html).not.toContain('data-statutory-pension-scenario-field="careInsurancePercent"');
@@ -381,7 +383,10 @@ describe("statutory pension model", () => {
     expect(popup).toContain("Brutto-Monatsrente");
     expect(popup).toContain("Abzuege gesamt");
     expect(popup).toContain("Netto-Monatsrente");
+    expect(popup).toContain("Einkommensteuer %");
+    expect(popup).toContain("Pflegeversicherung kinderlos %");
     expect(popup).toContain('data-action="close-statutory-pension-tax-popup"');
+    expect(count(popup, 'max="15"')).toBe(3);
     expect(popup).toContain('data-statutory-pension-scenario-field="taxRatePercent"');
     expect(popup).toContain('data-statutory-pension-scenario-field="healthInsurancePercent"');
     expect(popup).toContain('data-statutory-pension-scenario-field="careInsurancePercent"');

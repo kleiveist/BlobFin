@@ -41,6 +41,7 @@ import {
 } from "./domain/incomeTaxRules";
 import {
   buildStatutoryPensionModel,
+  STATUTORY_PENSION_DEDUCTION_PERCENT_MAX,
   type StatutoryPensionModel
 } from "./domain/statutoryPension";
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
@@ -7037,11 +7038,11 @@ function updateStatutoryPensionScenarioField(
   } else if (field === "annualPensionIncreasePercent") {
     nextScenario.annualPensionIncreasePercent = clamp(numberValue(value), 0.1, 2);
   } else if (field === "taxRatePercent") {
-    nextScenario.taxRatePercent = clamp(numberValue(value), 0, 50);
+    nextScenario.taxRatePercent = clamp(numberValue(value), 0, STATUTORY_PENSION_DEDUCTION_PERCENT_MAX);
   } else if (field === "healthInsurancePercent") {
-    nextScenario.healthInsurancePercent = clamp(numberValue(value), 0, 20);
+    nextScenario.healthInsurancePercent = clamp(numberValue(value), 0, STATUTORY_PENSION_DEDUCTION_PERCENT_MAX);
   } else if (field === "careInsurancePercent") {
-    nextScenario.careInsurancePercent = clamp(numberValue(value), 0, 10);
+    nextScenario.careInsurancePercent = clamp(numberValue(value), 0, STATUTORY_PENSION_DEDUCTION_PERCENT_MAX);
   } else if (field === "incomeMode") {
     nextScenario.incomeMode = value === "constant" ? "constant" : "income_projection";
   } else {

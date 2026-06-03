@@ -322,17 +322,17 @@ describe("storage", () => {
     expect(loaded.statutoryPension.contributionRatePercent).toBe(18.6);
     expect(loaded.statutoryPension.averageAnnualIncome).toBe(51944);
     expect(loaded.statutoryPension.scenarios.pessimistic.incomeMode).toBe("constant");
-    expect(loaded.statutoryPension.scenarios.pessimistic.taxRatePercent).toBe(15);
+    expect(loaded.statutoryPension.scenarios.pessimistic.taxRatePercent).toBe(12.52);
     expect(loaded.statutoryPension.scenarios.pessimistic.healthInsurancePercent).toBe(13.75);
-    expect(loaded.statutoryPension.scenarios.pessimistic.careInsurancePercent).toBe(8.6);
+    expect(loaded.statutoryPension.scenarios.pessimistic.careInsurancePercent).toBe(9.2);
     expect(loaded.statutoryPension.scenarios.base.incomeMode).toBe("income_projection");
-    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(12);
+    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(9.52);
     expect(loaded.statutoryPension.scenarios.base.healthInsurancePercent).toBe(10.75);
-    expect(loaded.statutoryPension.scenarios.base.careInsurancePercent).toBe(5.6);
+    expect(loaded.statutoryPension.scenarios.base.careInsurancePercent).toBe(6.2);
     expect(loaded.statutoryPension.scenarios.optimistic.retirementAge).toBe(72);
-    expect(loaded.statutoryPension.scenarios.optimistic.taxRatePercent).toBe(10);
+    expect(loaded.statutoryPension.scenarios.optimistic.taxRatePercent).toBe(7.52);
     expect(loaded.statutoryPension.scenarios.optimistic.healthInsurancePercent).toBe(8.75);
-    expect(loaded.statutoryPension.scenarios.optimistic.careInsurancePercent).toBe(3.6);
+    expect(loaded.statutoryPension.scenarios.optimistic.careInsurancePercent).toBe(4.2);
   });
 
   it("adds new statutory pension deduction fallbacks to saved scenarios", () => {
@@ -360,13 +360,31 @@ describe("storage", () => {
 
     const loaded = loadState(storage);
 
-    expect(loaded.statutoryPension.scenarios.pessimistic.taxRatePercent).toBe(15);
+    expect(loaded.statutoryPension.scenarios.pessimistic.taxRatePercent).toBe(12.52);
     expect(loaded.statutoryPension.scenarios.pessimistic.healthInsurancePercent).toBe(13.75);
-    expect(loaded.statutoryPension.scenarios.pessimistic.careInsurancePercent).toBe(8.6);
-    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(12);
+    expect(loaded.statutoryPension.scenarios.pessimistic.careInsurancePercent).toBe(9.2);
+    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(9.52);
     expect(loaded.statutoryPension.scenarios.base.healthInsurancePercent).toBe(10.75);
-    expect(loaded.statutoryPension.scenarios.base.careInsurancePercent).toBe(5.6);
-    expect(loaded.statutoryPension.scenarios.optimistic.taxRatePercent).toBe(10);
+    expect(loaded.statutoryPension.scenarios.base.careInsurancePercent).toBe(6.2);
+    expect(loaded.statutoryPension.scenarios.optimistic.taxRatePercent).toBe(7.52);
+  });
+
+  it("prefills statutory pension deductions from defaults when saved social deductions are empty", () => {
+    const storage = new MemoryStorage();
+    const legacyState = defaultAppState();
+    legacyState.statutoryPension.scenarios.optimistic = {
+      ...legacyState.statutoryPension.scenarios.optimistic,
+      taxRatePercent: 6,
+      healthInsurancePercent: 0,
+      careInsurancePercent: 0
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.statutoryPension.scenarios.optimistic.taxRatePercent).toBe(7.52);
+    expect(loaded.statutoryPension.scenarios.optimistic.healthInsurancePercent).toBe(8.75);
+    expect(loaded.statutoryPension.scenarios.optimistic.careInsurancePercent).toBe(4.2);
   });
 
   it("persists statutory pension scenario settings", () => {
@@ -389,7 +407,7 @@ describe("storage", () => {
     expect(loaded.statutoryPension.scenarios.base.retirementAge).toBe(70);
     expect(loaded.statutoryPension.scenarios.base.incomeMode).toBe("constant");
     expect(loaded.statutoryPension.scenarios.base.annualPensionIncreasePercent).toBe(1.5);
-    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(18);
+    expect(loaded.statutoryPension.scenarios.base.taxRatePercent).toBe(15);
     expect(loaded.statutoryPension.scenarios.base.healthInsurancePercent).toBe(9);
     expect(loaded.statutoryPension.scenarios.base.careInsurancePercent).toBe(4);
   });

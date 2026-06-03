@@ -15,6 +15,7 @@ import {
 } from "../data/defaults";
 import { DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT } from "../domain/incomeTracker";
 import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
+import { STATUTORY_PENSION_DEDUCTION_PERCENT_MAX } from "../domain/statutoryPension";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
 import { flowForType, isIncomeType, isPositionType, typeForFlow } from "./positionKinds";
 import {
@@ -563,6 +564,7 @@ function normalizeStatutoryPensionScenario(
   fallback: StatutoryPensionScenarioSettings
 ): StatutoryPensionScenarioSettings {
   const value = isRecord(scenarios) && isRecord(scenarios[id]) ? scenarios[id] : {};
+  const useDeductionFallbacks = statutoryPensionUsesDeductionFallbacks(value);
   return {
     retirementAge: clampNumber(statutoryPensionNumberOrFallback(value.retirementAge, fallback.retirementAge), 67, 72),
     incomeMode: normalizeStatutoryPensionIncomeMode(value.incomeMode, fallback.incomeMode),
@@ -574,16 +576,26 @@ function normalizeStatutoryPensionScenario(
       0.1,
       2
     ),
-    taxRatePercent: clampNumber(statutoryPensionNumberOrFallback(value.taxRatePercent, fallback.taxRatePercent), 0, 50),
-    healthInsurancePercent: clampNumber(
-      statutoryPensionNumberOrFallback(value.healthInsurancePercent, fallback.healthInsurancePercent),
+    taxRatePercent: clampNumber(
+      useDeductionFallbacks
+        ? fallback.taxRatePercent
+        : statutoryPensionNumberOrFallback(value.taxRatePercent, fallback.taxRatePercent),
       0,
-      20
+      STATUTORY_PENSION_DEDUCTION_PERCENT_MAX
+    ),
+    healthInsurancePercent: clampNumber(
+      useDeductionFallbacks
+        ? fallback.healthInsurancePercent
+        : statutoryPensionNumberOrFallback(value.healthInsurancePercent, fallback.healthInsurancePercent),
+      0,
+      STATUTORY_PENSION_DEDUCTION_PERCENT_MAX
     ),
     careInsurancePercent: clampNumber(
-      statutoryPensionNumberOrFallback(value.careInsurancePercent, fallback.careInsurancePercent),
+      useDeductionFallbacks
+        ? fallback.careInsurancePercent
+        : statutoryPensionNumberOrFallback(value.careInsurancePercent, fallback.careInsurancePercent),
       0,
-      10
+      STATUTORY_PENSION_DEDUCTION_PERCENT_MAX
     )
   };
 }
@@ -591,6 +603,19 @@ function normalizeStatutoryPensionScenario(
 function statutoryPensionNumberOrFallback(value: unknown, fallback: number): number {
   if (value === null || value === undefined || value === "") return fallback;
   return numberOrDefault(value, fallback);
+}
+
+function statutoryPensionUsesDeductionFallbacks(value: Record<string, unknown>): boolean {
+  return (
+    statutoryPensionSavedNumber(value.healthInsurancePercent) === 0 &&
+    statutoryPensionSavedNumber(value.careInsurancePercent) === 0
+  );
+}
+
+function statutoryPensionSavedNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function normalizeStatutoryPensionIncomeMode(
