@@ -777,6 +777,7 @@ export function renderAppShell(): string {
                 <div class="combined-module-metrics">
                   <span>Datenquelle <strong>Immobilienfinanzierung</strong></span>
                   <span>Status <strong id="combinedRealEstateActivationMetric">-</strong></span>
+                  <span>Finanzierungszeitraum <strong id="combinedRealEstateFinancingYearsMetric">-</strong></span>
                 </div>
               </article>
             </div>

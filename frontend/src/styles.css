@@ -4321,6 +4321,12 @@ tfoot th {
   background: #43b20a;
 }
 
+.combined-wealth-card .wealth-column-segment.equity,
+.combined-wealth-card .legend-dot.equity,
+.combined-wealth-card .chart-popup-dot.equity {
+  background: #1d4ed8;
+}
+
 .legend-dot.debt {
   background: #ff5b63;
 }
@@ -4374,51 +4380,19 @@ tfoot th {
   display: grid;
   gap: 10px;
   grid-column: 2;
-  grid-template-columns: minmax(0, 1fr) minmax(190px, max-content);
+  justify-items: end;
   min-height: 0;
   padding: 0 6px 8px;
-}
-
-.combined-wealth-summary-values {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.combined-wealth-summary-item {
-  align-items: start;
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.combined-wealth-summary-label {
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.combined-wealth-summary-value {
-  color: var(--text);
-  font-size: 0.78rem;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .combined-wealth-line-controls {
   align-items: stretch;
   display: grid;
   gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   justify-self: end;
   min-width: 0;
-  width: min(230px, 100%);
+  width: min(720px, 100%);
 }
 
 .combined-wealth-line-toggle {
@@ -4479,6 +4453,14 @@ tfoot th {
 
 .combined-wealth-line-dot.tax-cumulative {
   background: #8f3f2c;
+}
+
+.combined-wealth-line-dot.property {
+  background: #5f88e8;
+}
+
+.combined-wealth-line-dot.debt {
+  background: #ff5b63;
 }
 
 .combined-wealth-card .wealth-plot {
@@ -6310,7 +6292,6 @@ tfoot th {
 
   .combined-wealth-summary {
     gap: 5px;
-    grid-template-columns: 1fr;
     padding-left: 2px;
     padding-right: 2px;
   }
@@ -6318,14 +6299,6 @@ tfoot th {
   .combined-wealth-line-controls {
     justify-self: stretch;
     width: 100%;
-  }
-
-  .combined-wealth-summary-label {
-    font-size: 0.66rem;
-  }
-
-  .combined-wealth-summary-value {
-    font-size: 0.72rem;
   }
 
   .combined-wealth-card .wealth-plot {

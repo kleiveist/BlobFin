@@ -90,6 +90,31 @@ const defaultToggles: CombinedWealthToggles = {
   statutoryPensionSavingsRatePercent: 0
 };
 
+function realEstateYear(values: Partial<RealEstateFinancingYear> & Pick<RealEstateFinancingYear, "year">): RealEstateFinancingYear {
+  const propertyValue = values.propertyValue ?? 0;
+  const loanEnd = values.loanEnd ?? 0;
+  const defaults: RealEstateFinancingYear = {
+    year: values.year,
+    propertyValue,
+    loanStart: values.loanStart ?? loanEnd,
+    interestPaid: 0,
+    interestDue: 0,
+    interestShortfall: 0,
+    monthlyPaymentFromSavings: 0,
+    monthlyPaymentFromWithdrawalGain: 0,
+    monthlyPaymentAvailable: 0,
+    principalFromMonthlyPayment: values.principalFromMonthlyPayment ?? values.principalPaid ?? 0,
+    principalPaid: values.principalPaid ?? 0,
+    specialRepayment: 0,
+    additionalRepayment: 0,
+    additionalRepaymentBreakdown: zeroAdditionalRepayment,
+    propertyEquity: values.propertyEquity ?? propertyValue - loanEnd,
+    netPropertyWealth: values.netPropertyWealth ?? propertyValue - loanEnd,
+    loanEnd
+  };
+  return { ...defaults, ...values } as RealEstateFinancingYear;
+}
+
 describe("combined wealth", () => {
   it("aggregates cash, depot and property equity for net wealth", () => {
     const depot = projection([point(30, "saving", 10000), point(31, "saving", 12000)], 0, 65);
@@ -153,8 +178,125 @@ describe("combined wealth", () => {
     expect(result[0].propertyDebt).toBe(205000);
     expect(result[0].propertyValue).toBe(300000);
     expect(result[0].propertyEquity).toBe(95000);
+    expect(result[0].propertyAssetValue).toBe(95000);
     expect(result[0].totalGrossAssets).toBe(333000);
     expect(result[0].totalNetWealth).toBe(128000);
+  });
+
+  it("keeps property booked at zero before the financing start year", () => {
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 3,
+      cashStartValue: 0,
+      yearlyCashDelta: 0,
+      depotProjection: projection([], 0, 65),
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateEquityCapital: 50000,
+      realEstateStartValue: 300000,
+      realEstateYears: [
+        realEstateYear({
+          year: 2028,
+          propertyValue: 306000,
+          loanStart: 300000,
+          loanEnd: 298000,
+          principalPaid: 2000
+        })
+      ],
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeRealEstateFinancing: true,
+        includeRealEstateValueTrend: true
+      }
+    });
+
+    expect(result[0].propertyAssetValue).toBe(0);
+    expect(result[1].propertyAssetValue).toBe(0);
+    expect(result[2].propertyAssetValue).toBe(58000);
+  });
+
+  it("books property as equity capital plus principal repayment and value growth", () => {
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 1,
+      cashStartValue: 1000,
+      yearlyCashDelta: 0,
+      depotProjection: projection([point(30, "saving", 10000)], 0, 65),
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateEquityCapital: 50000,
+      realEstateStartValue: 300000,
+      realEstateYears: [
+        realEstateYear({
+          year: 2026,
+          propertyValue: 306000,
+          loanStart: 300000,
+          loanEnd: 290000,
+          principalPaid: 10000
+        })
+      ],
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeRealEstateFinancing: true,
+        includeRealEstateValueTrend: true
+      }
+    });
+
+    expect(result[0].propertyEquity).toBe(16000);
+    expect(result[0].propertyAssetValue).toBe(66000);
+    expect(result[0].totalNetWealth).toBe(77000);
+  });
+
+  it("keeps the paid-off property base capped and then adds only value growth", () => {
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 3,
+      cashStartValue: 0,
+      yearlyCashDelta: 0,
+      depotProjection: projection([], 0, 65),
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateEquityCapital: 50000,
+      realEstateStartValue: 300000,
+      realEstateYears: [
+        realEstateYear({
+          year: 2026,
+          propertyValue: 306000,
+          loanStart: 300000,
+          loanEnd: 150000,
+          principalPaid: 150000
+        }),
+        realEstateYear({
+          year: 2027,
+          propertyValue: 312120,
+          loanStart: 150000,
+          loanEnd: 0,
+          principalPaid: 150000
+        }),
+        realEstateYear({
+          year: 2028,
+          propertyValue: 318362.4,
+          loanStart: 0,
+          loanEnd: 0,
+          principalPaid: 0
+        })
+      ],
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeRealEstateFinancing: true,
+        includeRealEstateValueTrend: true
+      }
+    });
+
+    expect(result[0].propertyAssetValue).toBe(206000);
+    expect(result[1].propertyAssetValue).toBe(312120);
+    expect(result[2].propertyAssetValue).toBe(318362.4);
   });
 
   it("adds annual depot and pension taxes and keeps a cumulative tax value", () => {
@@ -254,6 +396,7 @@ describe("combined wealth", () => {
 
     expect(result[0].propertyValue).toBe(0);
     expect(result[0].propertyDebt).toBe(0);
+    expect(result[0].propertyAssetValue).toBe(0);
   });
 
   it("does not include property value from value trend without financing activation", () => {
@@ -298,6 +441,7 @@ describe("combined wealth", () => {
     expect(result[0].propertyValue).toBe(0);
     expect(result[0].propertyDebt).toBe(0);
     expect(result[0].propertyEquity).toBe(0);
+    expect(result[0].propertyAssetValue).toBe(0);
     expect(result[0].totalNetWealth).toBe(10000);
   });
 
@@ -383,6 +527,7 @@ describe("combined wealth", () => {
 
     expect(result[2].propertyValue).toBe(312120);
     expect(result[2].propertyDebt).toBe(194000);
+    expect(result[2].propertyAssetValue).toBe(118120);
   });
 
   it("drops the property from combined years after the supplied sale horizon", () => {
@@ -425,8 +570,11 @@ describe("combined wealth", () => {
     });
 
     expect(result[0].propertyValue).toBe(300000);
+    expect(result[0].propertyAssetValue).toBe(102000);
     expect(result[1].propertyValue).toBe(0);
+    expect(result[1].propertyAssetValue).toBe(0);
     expect(result[2].propertyValue).toBe(0);
+    expect(result[2].propertyAssetValue).toBe(0);
   });
 
   it("does not extend the combined horizon with later real estate years", () => {
@@ -564,6 +712,7 @@ describe("combined wealth", () => {
       depotBirthYear: 1996,
       sharedDepotBirthYear: 1996,
       realEstateSaleYear: 2027,
+      realEstateEstimatedSaleValue: 330000,
       realEstateYears: realEstate,
       toggles: {
         ...defaultToggles,
@@ -576,12 +725,15 @@ describe("combined wealth", () => {
     expect(result[0].cashValue).toBe(1000);
     expect(result[0].propertyValue).toBe(300000);
     expect(result[0].propertyDebt).toBe(200000);
-    expect(result[1].cashValue).toBe(141000);
+    expect(result[0].propertyAssetValue).toBe(100000);
+    expect(result[1].cashValue).toBe(151000);
     expect(result[1].propertyValue).toBe(0);
     expect(result[1].propertyDebt).toBe(0);
-    expect(result[2].cashValue).toBe(141000);
+    expect(result[1].propertyAssetValue).toBe(0);
+    expect(result[2].cashValue).toBe(151000);
     expect(result[2].propertyValue).toBe(0);
     expect(result[2].propertyDebt).toBe(0);
+    expect(result[2].propertyAssetValue).toBe(0);
   });
 
   it("caps the combined horizon at the global planning end year", () => {
@@ -748,6 +900,7 @@ describe("combined wealth", () => {
     expect(result[0].propertyValue).toBe(0);
     expect(result[0].propertyDebt).toBe(0);
     expect(result[0].propertyEquity).toBe(0);
+    expect(result[0].propertyAssetValue).toBe(0);
   });
 
   it("covers negative cash years from the standard depot and floors cash at zero", () => {

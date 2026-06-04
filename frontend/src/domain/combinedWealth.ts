@@ -29,6 +29,8 @@ interface BuildCombinedWealthSeriesInput {
   yearlyCashDeltas?: number[];
   realEstateSaleYear?: number | null;
   realEstateEstimatedSaleValue?: number | null;
+  realEstateEquityCapital?: number;
+  realEstateStartValue?: number;
   depotProjection?: AssetProjection;
   sharedDepotProjection?: AssetProjection;
   depotBirthYear?: number;
@@ -59,6 +61,9 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
   let cumulativePensionConsumed = 0;
   let cumulativePensionSavings = 0;
   let cumulativeTaxValue = 0;
+  let cumulativePropertyPrincipalPaid = 0;
+  const realEstateStartValue = realEstateStartValueForInput(input);
+  const realEstateEquityCapital = realEstateEquityCapitalForInput(input, realEstateStartValue);
 
   for (let yearOffset = 0; yearOffset < input.horizonYears; yearOffset += 1) {
     const year = input.startYear + yearOffset;
@@ -77,6 +82,11 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
       redirectedCashRepayment + (allocation?.withdrawalGain ?? 0) + (allocation?.legacySavingsRate ?? 0) + (allocation?.netGain ?? 0)
     );
     redirectedDepotRepayment = roundMoney(redirectedDepotRepayment + (allocation?.depotSavingsRate ?? 0));
+    if (realEstateActiveForYear && realEstate) {
+      cumulativePropertyPrincipalPaid = roundMoney(
+        cumulativePropertyPrincipalPaid + realEstatePrincipalPaidForYear(realEstate)
+      );
+    }
 
     const rawCashValue = input.toggles.includeCashPositions
       ? roundMoney(cumulativeCashValue - redirectedCashRepayment)
@@ -143,13 +153,22 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
     const propertyDebt = realEstateActiveForYear ? roundMoney(realEstate?.loanEnd ?? 0) : 0;
     const propertyLoanStart = realEstateActiveForYear ? roundMoney(realEstate?.loanStart ?? 0) : 0;
     const propertyEquity = roundMoney(propertyValue - propertyDebt);
+    const propertyAssetValue =
+      realEstateActiveForYear && realEstate
+        ? bookedPropertyAssetValue({
+            propertyValue,
+            startValue: realEstateStartValue,
+            equityCapital: realEstateEquityCapital,
+            cumulativePrincipalPaid: cumulativePropertyPrincipalPaid
+          })
+        : 0;
 
     const totalGrossAssets = roundMoney(
       Math.max(0, cashValue) + Math.max(0, depotValue) + Math.max(0, propertyValue) + Math.max(0, cumulativePensionSavings)
     );
     const totalDebt = roundMoney(Math.max(0, propertyDebt));
     const totalNetWealth = roundMoney(
-      cashValue + depotValue + propertyEquity + withdrawalImpact + cumulativePensionSavings
+      cashValue + depotValue + propertyAssetValue + withdrawalImpact + cumulativePensionSavings
     );
 
     years.push({
@@ -173,6 +192,7 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
       propertyDebt,
       propertyLoanStart,
       propertyEquity,
+      propertyAssetValue,
       totalGrossAssets,
       totalDebt,
       totalNetWealth
@@ -198,6 +218,47 @@ export function combinedWealthHorizonYears(
 function cashDeltaForYearOffset(input: BuildCombinedWealthSeriesInput, yearOffset: number): number {
   const value = input.yearlyCashDeltas?.[yearOffset] ?? input.yearlyCashDelta;
   return Number.isFinite(value) ? roundMoney(value) : 0;
+}
+
+function realEstateStartValueForInput(input: BuildCombinedWealthSeriesInput): number {
+  if (Number.isFinite(input.realEstateStartValue) && (input.realEstateStartValue ?? 0) > 0) {
+    return roundMoney(Math.max(0, input.realEstateStartValue ?? 0));
+  }
+  return roundMoney(firstRealEstateYear(input)?.propertyValue ?? 0);
+}
+
+function realEstateEquityCapitalForInput(input: BuildCombinedWealthSeriesInput, startValue: number): number {
+  if (Number.isFinite(input.realEstateEquityCapital) && (input.realEstateEquityCapital ?? 0) > 0) {
+    return roundMoney(Math.max(0, input.realEstateEquityCapital ?? 0));
+  }
+  const firstYear = firstRealEstateYear(input);
+  if (!firstYear) return 0;
+  return roundMoney(Math.min(Math.max(0, startValue), Math.max(0, firstYear.propertyValue - firstYear.loanStart)));
+}
+
+function firstRealEstateYear(input: BuildCombinedWealthSeriesInput): RealEstateFinancingYear | undefined {
+  return input.realEstateYears.find((entry) => entry.propertyValue > 0 || entry.loanStart > 0 || entry.loanEnd > 0);
+}
+
+function realEstatePrincipalPaidForYear(year: RealEstateFinancingYear): number {
+  const reportedPrincipal = Math.max(0, year.principalPaid);
+  if (reportedPrincipal > 0) return roundMoney(reportedPrincipal);
+  return roundMoney(Math.max(0, year.loanStart - year.loanEnd));
+}
+
+function bookedPropertyAssetValue(input: {
+  propertyValue: number;
+  startValue: number;
+  equityCapital: number;
+  cumulativePrincipalPaid: number;
+}): number {
+  const startValue = Math.max(0, input.startValue);
+  const bookedBaseValue = Math.min(
+    startValue,
+    Math.max(0, input.equityCapital) + Math.max(0, input.cumulativePrincipalPaid)
+  );
+  const propertyValueGrowth = Math.max(0, input.propertyValue - startValue);
+  return roundMoney(bookedBaseValue + propertyValueGrowth);
 }
 
 function combinedDepotInputs(input: BuildCombinedWealthSeriesInput): CombinedWealthDepotProjection[] {

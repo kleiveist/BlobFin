@@ -7,6 +7,7 @@ import {
   realEstateRepaymentSegments,
   realEstateTrendSegments,
   renderCombinedWealthChart,
+  renderCombinedWealthPopup,
   renderCombinedWealthYearDetail,
   renderRealEstateRepaymentChart,
   renderRealEstateTrendChart
@@ -64,6 +65,7 @@ const combinedYear: CombinedWealthYear = {
   propertyDebt: 212000,
   propertyLoanStart: 220000,
   propertyEquity: 88000,
+  propertyAssetValue: 88000,
   totalGrossAssets: 330000,
   totalDebt: 212000,
   totalNetWealth: 118000
@@ -235,6 +237,7 @@ describe("follow-up ui rendering", () => {
     expect(count(html, 'data-real-estate-field="purchaseActivated"')).toBe(1);
     expect(html).toContain("Immobilie gekauft / Kauf geplant");
     expect(html).toContain('id="combinedRealEstateActivationMetric"');
+    expect(html).toContain('id="combinedRealEstateFinancingYearsMetric"');
     expect(html).not.toContain('data-real-estate-field="equityCapital"');
     expect(html).not.toContain('data-real-estate-field="loanAmount"');
     expect(html).not.toContain('data-real-estate-field="targetTermYears"');
@@ -319,9 +322,12 @@ describe("follow-up ui rendering", () => {
     expect(combined).toContain("Steuern kumuliert");
     expect(combined).toContain('data-combined-wealth-line="taxCumulative"');
     expect(combined).toContain("wealth-line-overlay tax-cumulative");
+    expect(combined).toContain('data-combined-wealth-line="propertyValue"');
+    expect(combined).toContain('data-combined-wealth-line="propertyDebt"');
     expect(combined).not.toContain("legend-dot pension-consumed-cumulative");
     expect(combined).not.toContain("legend-dot tax-cumulative");
-    expect(combined).toContain("Immobilien-Eigenkapital");
+    expect(combined).toContain("Immobilienwert");
+    expect(combined).not.toContain("Immobilien-Eigenkapital");
     expect(combined).toContain("Immobilienschuld");
     expect(combined).toContain("Nettovermoegen");
     expect(combined).toContain("wealth-column-segment equity");
@@ -335,20 +341,26 @@ describe("follow-up ui rendering", () => {
     expect(`${repayment}${trend}${combined}`).not.toContain("wealth-bar-row");
   });
 
-  it("can render the combined wealth chart with cumulative lines switched off", () => {
+  it("can render the combined wealth chart with reference lines switched off", () => {
     const chart = renderCombinedWealthChart({
       points: [{ ...combinedYear, pensionConsumedValue: 24000, cumulativeTaxValue: 1800 }],
       selectedYear: 2026,
       lineVisibility: {
         pensionConsumedCumulative: false,
-        taxCumulative: false
+        taxCumulative: false,
+        propertyValue: false,
+        propertyDebt: false
       },
       formatMoney: String
     });
 
     expect(chart).toContain('aria-pressed="false"');
+    expect(chart).toContain('data-combined-wealth-line="propertyValue"');
+    expect(chart).toContain('data-combined-wealth-line="propertyDebt"');
     expect(chart).not.toContain("wealth-line-overlay pension-consumed-cumulative");
     expect(chart).not.toContain("wealth-line-overlay tax-cumulative");
+    expect(chart).not.toContain("wealth-line-overlay property");
+    expect(chart).not.toContain("wealth-line-overlay debt");
   });
 
   it("sets the vertical chart column count for responsive fitting", () => {
@@ -361,7 +373,7 @@ describe("follow-up ui rendering", () => {
     expect(chart).toContain('style="--wealth-chart-count:2;"');
   });
 
-  it("renders the combined wealth chart with section header values and 15-year ticks", () => {
+  it("renders the combined wealth chart with line controls and 15-year ticks", () => {
     const points: CombinedWealthYear[] = Array.from({ length: 33 }, (_, index) => ({
       ...combinedYear,
       year: 2026 + index,
@@ -378,14 +390,23 @@ describe("follow-up ui rendering", () => {
     const compact = chart.replace(/\s+/g, " ");
 
     expect(chart).toContain("combined-wealth-summary");
-    expect(chart).toContain("combined-wealth-summary-label");
-    expect(compact).toContain('class="combined-wealth-summary-label">Cash</span>');
-    expect(compact).toContain('class="combined-wealth-summary-value">10300 EUR</strong>');
-    expect(compact).toContain('class="combined-wealth-summary-value">20600 EUR</strong>');
-    expect(compact).toContain('class="combined-wealth-summary-label">Nettovermoegen</span>');
+    expect(compact).toContain('class="legend-item"><span class="legend-dot cash"></span>Cash</span>');
+    expect(compact).toContain('class="legend-item"><span class="legend-dot depot"></span>Depot</span>');
+    expect(compact).toContain('class="legend-item"><span class="legend-dot pension-consumed"></span>Verbrauchte Rente</span>');
+    expect(compact).toContain('class="legend-item"><span class="legend-dot pension"></span>Gesparte Rente</span>');
+    expect(compact).toContain('class="legend-item"><span class="legend-dot tax"></span>Steuern</span>');
+    expect(compact).toContain('class="legend-item"><span class="legend-dot equity"></span>Immobilienwert</span>');
+    expect(chart).not.toContain("combined-wealth-summary-values");
+    expect(chart).not.toContain("combined-wealth-summary-label");
+    expect(chart).not.toContain("combined-wealth-summary-value");
+    expect(compact).not.toContain('class="combined-wealth-summary-label">Cash</span>');
+    expect(compact).not.toContain('class="combined-wealth-summary-label">Nettovermoegen</span>');
     expect(compact).not.toContain('class="combined-wealth-summary-label">Immobilienwert</span>');
     expect(chart).toContain("wealth-line-overlay property");
+    expect(chart).toContain('data-combined-wealth-line="propertyValue"');
+    expect(chart).toContain('data-combined-wealth-line="propertyDebt"');
     expect(chart).toContain("Immobilienwert brutto");
+    expect(chart).not.toContain("Immobilien-Eigenkapital");
     expect(chart).not.toContain("wealth-column-value");
     expect(chart).not.toContain("wealth-column-year");
     expect(chart).not.toContain('class="wealth-x-axis"');
@@ -396,6 +417,19 @@ describe("follow-up ui rendering", () => {
     expect(compact).toContain('class="combined-wealth-tick visible"> 2056 </span>');
     expect(compact).not.toContain('class="combined-wealth-tick visible"> 2058 </span>');
     expect(count(chart, 'data-action="select-combined-wealth-year"')).toBe(33);
+  });
+
+  it("moves the yearly pension value into the combined wealth popup", () => {
+    const popup = renderCombinedWealthPopup({
+      selected: { ...combinedYear, pensionIncome: 12000, pensionConsumed: 9000 },
+      finalYear: combinedYear,
+      formatMoney: (value) => `${value} EUR`,
+      formatInt: String
+    });
+
+    expect(popup).toContain("Rente p.a.");
+    expect(popup).toContain("12000 EUR");
+    expect(popup.indexOf("Rente p.a.")).toBeLessThan(popup.indexOf("Verbrauchte Rente"));
   });
 
   it("exposes real estate popup segment labels", () => {

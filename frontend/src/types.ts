@@ -378,6 +378,7 @@ export interface CombinedWealthYear {
   propertyDebt: number;
   propertyLoanStart: number;
   propertyEquity: number;
+  propertyAssetValue: number;
   totalGrossAssets: number;
   totalDebt: number;
   totalNetWealth: number;

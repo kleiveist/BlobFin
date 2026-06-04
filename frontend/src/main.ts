@@ -436,7 +436,9 @@ let selectedCombinedWealthYear: number | null = null;
 let latestCombinedWealthYears: CombinedWealthYear[] = [];
 let combinedWealthLineVisibility: CombinedWealthLineVisibility = {
   pensionConsumedCumulative: true,
-  taxCumulative: true
+  taxCumulative: true,
+  propertyValue: true,
+  propertyDebt: true
 };
 let latestStatutoryPensionModel: StatutoryPensionModel | null = null;
 let statutoryPensionTaxPopupScenarioId: StatutoryPensionScenarioId | null = null;
@@ -1516,7 +1518,6 @@ function renderCalculations(
     state.realEstate.financingStartAge
   );
   renderStatutoryPensionCalculations(combinedBirthYear);
-  renderCombinedModuleControls();
   const combinedRealEstateProjectionYears = currentCombinedRealEstateProjectionYears(
     combinedRealEstateStartYear,
     combinedStandardProjection,
@@ -1535,6 +1536,7 @@ function renderCalculations(
     }
   );
   renderRealEstateCalculations(realEstate, realEstateProjectionYears);
+  renderCombinedModuleControls();
   const combinedRealEstateActive = state.realEstate.purchaseActivated && state.combinedWealth.includeRealEstateFinancing;
   const combinedRealEstate = combinedRealEstateActive
     ? calculateRealEstateFinancing(
@@ -4390,14 +4392,12 @@ function renderRealEstateCalculations(result: RealEstateFinancingResult, chartPr
     realEstateActualPaymentStartYear(result) ?? result.years[0]?.year ?? currentRealEstateFinancingStartYear();
   const actualFinancingStartAge = Math.max(0, actualFinancingStartYear - state.investment.birthYear);
   const actualFinancingEndAge = Math.max(actualFinancingStartAge, result.financingEndYear - state.investment.birthYear);
+  const financingYearsText = realEstateFinancingYearsText(result);
   setText(
     "realEstateCalculatedEndAgeMetric",
     finalLoanYear && finalLoanYear.loanEnd <= 0 ? `${intNumber(actualFinancingEndAge)} Jahre` : "nicht getilgt"
   );
-  setText(
-    "realEstateFinancingYearsMetric",
-    `${intNumber(actualFinancingStartAge)} -> ${intNumber(actualFinancingEndAge)} | ${intNumber(result.financingYears)} Jahre`
-  );
+  setText("realEstateFinancingYearsMetric", financingYearsText);
 
   const chartYears = result.years.slice(0, Math.max(1, chartProjectionYears));
   selectedRealEstateYear = defaultRealEstateDetailYear(chartYears, selectedRealEstateYear);
@@ -4439,6 +4439,15 @@ function realEstateActualPaymentStartYear(result: RealEstateFinancingResult): nu
     return month.interestPaid + month.principalPaid + month.specialRepayment > 0;
   });
   return firstPaymentMonth?.year ?? null;
+}
+
+function realEstateFinancingYearsText(result: RealEstateFinancingResult | null): string {
+  if (!result) return "-";
+  const actualFinancingStartYear =
+    realEstateActualPaymentStartYear(result) ?? result.years[0]?.year ?? currentRealEstateFinancingStartYear();
+  const actualFinancingStartAge = Math.max(0, actualFinancingStartYear - state.investment.birthYear);
+  const actualFinancingEndAge = Math.max(actualFinancingStartAge, result.financingEndYear - state.investment.birthYear);
+  return `${intNumber(actualFinancingStartAge)} -> ${intNumber(actualFinancingEndAge)} | ${intNumber(result.financingYears)} Jahre`;
 }
 
 function currentRealEstateProjectionYears(startYear: number, investmentEndAge: number): number {
@@ -4640,6 +4649,8 @@ function calculateCombinedWealthYears(
       ? state.realEstate.plannedSaleYear
       : null,
     realEstateEstimatedSaleValue: state.realEstate.estimatedSaleValue,
+    realEstateEquityCapital: realEstate.equityCapital,
+    realEstateStartValue: realEstate.effectivePropertyStartValue,
     depotProjections,
     pension,
     realEstateYears: realEstate.years,
@@ -5195,6 +5206,10 @@ function renderCombinedModuleControls(): void {
         ? `aktiv bis Verkauf ${intNumber(state.realEstate.plannedSaleYear)}`
         : "aktiv"
       : "Kauf nicht aktiviert"
+  );
+  setText(
+    "combinedRealEstateFinancingYearsMetric",
+    state.realEstate.purchaseActivated ? realEstateFinancingYearsText(latestRealEstateResult) : "-"
   );
   setInputValue('[data-combined-number="statutoryPensionMonthlyAmount"]', state.combinedWealth.statutoryPensionMonthlyAmount);
   setInputValue(
