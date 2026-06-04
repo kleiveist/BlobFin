@@ -435,6 +435,7 @@ let selectedRealEstateYear: number | null = null;
 let latestRealEstateResult: RealEstateFinancingResult | null = null;
 let selectedCombinedWealthYear: number | null = null;
 let latestCombinedWealthYears: CombinedWealthYear[] = [];
+let combinedCashPopupAccountId: string | null = null;
 let combinedWealthLineVisibility: CombinedWealthLineVisibility = {
   pensionConsumedCumulative: true,
   taxCumulative: true,
@@ -1086,6 +1087,9 @@ function bindEvents(): void {
       if (!target?.closest("#combinedWealthChartPopup")) {
         hideCombinedWealthPopup();
       }
+      if (target?.id === "combinedCashPositionPopup" || !target?.closest("#combinedCashPositionPopup")) {
+        hideCombinedCashPositionPopup();
+      }
       if (!target?.closest("#baseDataPopup")) {
         hideBaseDataPopup();
       }
@@ -1114,6 +1118,13 @@ function bindEvents(): void {
     }
     if (action !== "close-combined-wealth-popup" && !button.closest("#combinedWealthChartPopup")) {
       hideCombinedWealthPopup();
+    }
+    if (
+      action !== "close-combined-cash-position-popup" &&
+      !action?.startsWith("select-combined-cash-account-") &&
+      !button.closest("#combinedCashPositionPopup")
+    ) {
+      hideCombinedCashPositionPopup();
     }
     if (
       action !== "open-base-data-popup" &&
@@ -1249,6 +1260,7 @@ function bindEvents(): void {
     if (action === "close-statutory-pension-year-popup") hideStatutoryPensionYearPopup();
     if (action === "close-statutory-pension-projection-popup") hideStatutoryPensionProjectionYearPopup();
     if (action === "close-combined-wealth-popup") hideCombinedWealthPopup();
+    if (action === "close-combined-cash-position-popup") hideCombinedCashPositionPopup();
     if (action === "open-statutory-pension-tax-popup") {
       openStatutoryPensionTaxPopup(button.dataset.statutoryPensionScenario as StatutoryPensionScenarioId);
       return;
@@ -1359,6 +1371,7 @@ function bindEvents(): void {
       hideThemeSettings();
       hideInvestmentChartPopup();
       hideCombinedWealthPopup();
+      hideCombinedCashPositionPopup();
       hideBaseDataPopup();
       hideStatutoryPensionYearPopup();
       hideStatutoryPensionProjectionYearPopup();
@@ -5110,7 +5123,6 @@ function renderPlanningAccounts(): void {
 
 function renderCombinedModuleControls(): void {
   const cashSelector = document.querySelector<HTMLDivElement>("#combinedCashAccountSelector");
-  const cashPositionSelector = document.querySelector<HTMLDivElement>("#combinedCashPositionSelector");
   const leadSelector = document.querySelector<HTMLDivElement>("#combinedLeadInvestmentAccountSelector");
   const depotSelector = document.querySelector<HTMLDivElement>("#combinedDepotSelector");
   const pensionSelector = document.querySelector<HTMLDivElement>("#combinedPensionScenarioSelector");
@@ -5127,6 +5139,7 @@ function renderCombinedModuleControls(): void {
                 type="button"
                 data-action="select-combined-cash-account-${account.id}"
                 aria-pressed="${active}"
+                aria-haspopup="dialog"
               >
                 <strong>${escapeHtml(account.name)}</strong>
                 <small>${escapeHtml(account.type)}</small>
@@ -5136,34 +5149,6 @@ function renderCombinedModuleControls(): void {
           })
           .join("")
       : '<span class="chart-empty">Noch kein Konto vorhanden.</span>';
-  }
-
-  if (cashPositionSelector) {
-    const positions = combinedCashSelectablePositions(cashAccount);
-    const selectedIds = new Set(state.combinedWealth.cashPositionIds);
-    if (!cashAccount) {
-      cashPositionSelector.innerHTML = '<div class="include-empty">Noch kein Konto vorhanden.</div>';
-    } else if (!positions.length) {
-      cashPositionSelector.innerHTML = `
-        <div class="include-empty">Keine freien investierbaren Positionen in diesem Konto.</div>
-      `;
-    } else {
-      cashPositionSelector.innerHTML = positions
-        .map((position) => {
-          const checked = selectedIds.has(position.id) ? "checked" : "";
-          return `
-            <label class="include-item combined-cash-position-item">
-              <input type="checkbox" data-combined-cash-position="${position.id}" ${checked} />
-              <span class="include-icon">${positionIconSvg(normalizePositionIcon(position.icon))}</span>
-              <span>
-                <span class="include-name">${escapeHtml(position.name)}</span>
-                <span class="include-amount">${escapeHtml(investmentPositionSubtitle(position))}</span>
-              </span>
-            </label>
-          `;
-        })
-        .join("");
-    }
   }
 
   if (leadSelector) {
@@ -5256,11 +5241,62 @@ function renderCombinedModuleControls(): void {
     '[data-combined-number="statutoryPensionSavingsRatePercent"]',
     state.combinedWealth.statutoryPensionSavingsRatePercent
   );
+  renderCombinedCashPositionPopup();
 }
 
 function orderedCombinedCashAccounts(activeAccount: PlanningAccount | null): PlanningAccount[] {
   if (!activeAccount) return state.planningAccounts;
   return [activeAccount, ...state.planningAccounts.filter((account) => account.id !== activeAccount.id)];
+}
+
+function renderCombinedCashPositionPopup(): void {
+  const popup = document.querySelector<HTMLDivElement>("#combinedCashPositionPopup");
+  if (!popup) return;
+  const account = combinedCashPopupAccountId ? planningAccountById(combinedCashPopupAccountId) : null;
+  if (!account) {
+    popup.hidden = true;
+    popup.innerHTML = "";
+    return;
+  }
+
+  const positions = combinedCashSelectablePositions(account);
+  const selectedIds = new Set(state.combinedWealth.cashPositionIds);
+  const selectedCount = positions.filter((position) => selectedIds.has(position.id)).length;
+  const positionList = positions.length
+    ? positions
+        .map((position) => {
+          const checked = selectedIds.has(position.id) ? "checked" : "";
+          return `
+            <label class="include-item combined-cash-position-item">
+              <input type="checkbox" data-combined-cash-position="${position.id}" ${checked} />
+              <span class="include-icon">${positionIconSvg(normalizePositionIcon(position.icon))}</span>
+              <span>
+                <span class="include-name">${escapeHtml(position.name)}</span>
+                <span class="include-amount">${escapeHtml(investmentPositionSubtitle(position))}</span>
+              </span>
+            </label>
+          `;
+        })
+        .join("")
+    : '<div class="include-empty">Keine freien investierbaren Positionen in diesem Konto.</div>';
+
+  popup.innerHTML = `
+    <div class="combined-cash-position-dialog">
+      <div class="chart-popup-head">
+        <div>
+          <span>Cash aus Konto</span>
+          <strong>${escapeHtml(account.name)}</strong>
+        </div>
+        <button class="chart-popup-close" type="button" data-action="close-combined-cash-position-popup" aria-label="Popup schliessen">x</button>
+      </div>
+      <div class="include-list combined-cash-position-list">${positionList}</div>
+      <div class="combined-cash-position-actions">
+        <span>${intNumber(selectedCount)} aktiv</span>
+        <button class="button" type="button" data-action="close-combined-cash-position-popup">Fertig</button>
+      </div>
+    </div>
+  `;
+  popup.hidden = false;
 }
 
 function addPlanningAccount(): void {
@@ -7606,6 +7642,7 @@ function selectCombinedCashAccount(accountId: string): void {
   const account = planningAccountById(accountId);
   if (!account) return;
   const selectableIds = new Set(combinedCashSelectablePositions(account).map((position) => position.id));
+  combinedCashPopupAccountId = accountId;
   state.combinedWealth = {
     ...state.combinedWealth,
     cashAccountId: accountId,
@@ -8966,6 +9003,12 @@ function hideInvestmentChartPopup(): void {
 
 function hideCombinedWealthPopup(): void {
   const popup = document.querySelector<HTMLDivElement>("#combinedWealthChartPopup");
+  if (popup) popup.hidden = true;
+}
+
+function hideCombinedCashPositionPopup(): void {
+  combinedCashPopupAccountId = null;
+  const popup = document.querySelector<HTMLDivElement>("#combinedCashPositionPopup");
   if (popup) popup.hidden = true;
 }
 

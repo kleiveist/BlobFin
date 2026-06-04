@@ -709,7 +709,7 @@ export function renderAppShell(): string {
                   </button>
                 </div>
                 <div id="combinedCashAccountSelector" class="planning-account-cards combined-single-selector combined-cash-account-selector" aria-label="Cash-Konto fuer Kombination"></div>
-                <div id="combinedCashPositionSelector" class="include-list combined-cash-position-list" aria-label="Investierbare Cash-Positionen"></div>
+                <div id="combinedCashPositionPopup" class="combined-cash-position-popup" role="dialog" aria-modal="true" aria-label="Investierbare Cash-Positionen" hidden></div>
                 <div class="combined-module-metrics">
                   <span>Datenquelle <strong id="combinedCashSourceMetric">-</strong></span>
                   <span>Cash-Zuwachs <strong id="combinedCashRateMetric">-</strong></span>

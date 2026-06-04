@@ -841,8 +841,52 @@ describe("combined wealth", () => {
 
     expect(result[0].redirectedCashRepayment).toBe(3600);
     expect(result[0].redirectedDepotRepayment).toBe(2400);
-    expect(result[0].cashValue).toBe(6400);
+    expect(result[0].cashValue).toBe(10000);
     expect(result[0].depotValue).toBe(9600);
+  });
+
+  it("does not create cash or depot drawdown from redirected repayment without cash positions", () => {
+    const depot = projection([point(30, "saving", 12000)], 0, 65);
+    const realEstate: RealEstateFinancingYear[] = [
+      realEstateYear({
+        year: 2026,
+        propertyValue: 300000,
+        loanStart: 200000,
+        loanEnd: 194000,
+        principalPaid: 6000,
+        additionalRepayment: 6000,
+        additionalRepaymentBreakdown: {
+          withdrawalGain: 6000,
+          depotSavingsRate: 0,
+          legacySavingsRate: 0,
+          netGain: 0,
+          totalAdditionalRepayment: 6000
+        }
+      })
+    ];
+
+    const result = buildCombinedWealthSeries({
+      startYear: 2026,
+      horizonYears: 1,
+      cashStartValue: 0,
+      yearlyCashDelta: 0,
+      yearlyCashDeltas: [0],
+      depotProjection: depot,
+      sharedDepotProjection: projection([], 0, 65),
+      depotBirthYear: 1996,
+      sharedDepotBirthYear: 1996,
+      realEstateYears: realEstate,
+      toggles: {
+        ...defaultToggles,
+        includeSharedDepotDevelopment: false,
+        includeWithdrawals: false,
+        includeRealEstateFinancing: true
+      }
+    });
+
+    expect(result[0].redirectedCashRepayment).toBe(6000);
+    expect(result[0].cashValue).toBe(0);
+    expect(result[0].depotValue).toBe(12000);
   });
 
   it("keeps repayment sources liquid when real estate financing is inactive", () => {

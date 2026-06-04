@@ -3836,6 +3836,44 @@ tfoot th {
   min-width: 0;
 }
 
+.combined-cash-position-popup {
+  background: rgba(31, 37, 40, 0.35);
+  display: grid;
+  inset: 0;
+  padding: 16px;
+  place-items: center;
+  position: fixed;
+  z-index: 42;
+}
+
+.combined-cash-position-popup[hidden] {
+  display: none;
+}
+
+.combined-cash-position-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(31, 37, 40, 0.22);
+  color: var(--text);
+  display: grid;
+  gap: 12px;
+  max-height: min(680px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 12px;
+  width: min(520px, 100%);
+}
+
+.combined-cash-position-dialog .chart-popup-close {
+  background: var(--surface-soft);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .combined-cash-position-popup {
+  background: rgba(0, 0, 0, 0.52);
+}
+
 .combined-cash-position-list {
   max-height: 220px;
   overflow: auto;
@@ -3843,6 +3881,19 @@ tfoot th {
 
 .combined-cash-position-item {
   background: var(--surface);
+}
+
+.combined-cash-position-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.combined-cash-position-actions span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .combined-module-metrics {

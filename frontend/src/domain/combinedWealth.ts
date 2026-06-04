@@ -88,9 +88,7 @@ export function buildCombinedWealthSeries(input: BuildCombinedWealthSeriesInput)
       );
     }
 
-    const rawCashValue = input.toggles.includeCashPositions
-      ? roundMoney(cumulativeCashValue - redirectedCashRepayment)
-      : 0;
+    const rawCashValue = input.toggles.includeCashPositions ? roundMoney(cumulativeCashValue) : 0;
     const standardDepotBeforeCashDrawdown = roundMoney(
       (depotMaps[depotRepaymentTargetIndex(depotMaps)]?.valuesByYear.get(year) ?? 0) -
         redirectedDepotRepayment -
