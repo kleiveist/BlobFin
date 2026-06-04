@@ -3823,6 +3823,28 @@ tfoot th {
   padding: 8px;
 }
 
+.combined-cash-account-selector.planning-account-cards {
+  display: flex;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.combined-cash-account-selector .planning-account-card {
+  flex: 0 0 100%;
+  max-width: 100%;
+  min-height: 98px;
+  min-width: 0;
+}
+
+.combined-cash-position-list {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.combined-cash-position-item {
+  background: var(--surface);
+}
+
 .combined-module-metrics {
   background: var(--surface);
   border: 1px solid var(--row-border);
@@ -6370,6 +6392,10 @@ tfoot th {
 
   .combined-single-selector.planning-account-cards {
     grid-template-columns: 1fr;
+  }
+
+  .combined-cash-account-selector.planning-account-cards {
+    display: flex;
   }
 
   .overview-card {

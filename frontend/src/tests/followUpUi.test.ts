@@ -211,6 +211,11 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('class="real-estate-locale-default"');
     expect(html).not.toContain('data-action="set-real-estate-locale-en"');
     expect(html).toContain('id="combinedCashAccountSelector"');
+    expect(html).toContain("combined-cash-account-selector");
+    expect(html).toContain('id="combinedCashPositionSelector"');
+    expect(html).toContain("Investierbare Cash-Positionen");
+    expect(html).toContain("Cash-Zuwachs");
+    expect(html).not.toContain("Cash-Sparrate");
     expect(html).toContain('id="combinedLeadInvestmentAccountSelector"');
     expect(html).toContain('id="combinedDepotSelector"');
     expect(html).toContain('id="combinedPensionScenarioSelector"');

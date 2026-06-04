@@ -78,6 +78,34 @@ export function selectedInvestmentContributionForProjectionYear(
   return total;
 }
 
+export function selectedSavingsContributionForProjectionYear(
+  positions: ReservePosition[],
+  selectedIds: string[],
+  baseYear: number,
+  projectionYearIndex: number
+): number {
+  const selected = new Set(selectedIds);
+  const calendarYear = baseYear + projectionYearIndex;
+  let total = 0;
+  for (let month = 1; month <= 12; month += 1) {
+    total += positions.reduce((sum, position) => {
+      if (
+        !position.active ||
+        position.type !== "savings" ||
+        positionFlow(position) !== "expense" ||
+        !selected.has(position.id)
+      ) {
+        return sum;
+      }
+      if (position.payoutType === "once") {
+        return sum + oneTimeInvestmentContributionForMonth(position, calendarYear, month);
+      }
+      return sum + investmentContributionForMonth(position, calendarYear, month);
+    }, 0);
+  }
+  return total;
+}
+
 export function selectedRecurringInvestmentContributionForProjectionYear(
   positions: ReservePosition[],
   settings: InvestmentSettings,

@@ -84,6 +84,7 @@ const defaultToggles: CombinedWealthToggles = {
   includeRealEstateValueTrend: true,
   includeStatutoryPension: false,
   cashAccountId: "default-account",
+  cashPositionIds: [],
   depotKeys: ["standard", "retirement"],
   statutoryPensionScenario: "base",
   statutoryPensionMonthlyAmount: 0,

@@ -317,6 +317,7 @@ export function defaultCombinedWealthToggles(): CombinedWealthToggles {
     includeRealEstateValueTrend: false,
     includeStatutoryPension: true,
     cashAccountId: "default-account",
+    cashPositionIds: [],
     depotKeys: ["standard"],
     statutoryPensionScenario: "base",
     statutoryPensionMonthlyAmount: 0,

@@ -52,7 +52,8 @@ import {
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
 import {
   investmentContributionForMonth,
-  oneTimeInvestmentContributionForMonth
+  oneTimeInvestmentContributionForMonth,
+  selectedSavingsContributionForProjectionYear
 } from "./domain/investmentContributions";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
 import {
@@ -577,6 +578,7 @@ function normalizeCombinedWealthState(
     ...fallback,
     ...source,
     cashAccountId,
+    cashPositionIds: Array.from(new Set(source.cashPositionIds ?? fallback.cashPositionIds)),
     depotKeys: depotKeys.length ? depotKeys : fallback.depotKeys,
     statutoryPensionScenario: statutoryPensionScenarioIdFromValue(source.statutoryPensionScenario) ?? "base",
     statutoryPensionMonthlyAmount: Math.max(0, Number(source.statutoryPensionMonthlyAmount) || 0),
@@ -974,6 +976,12 @@ function bindEvents(): void {
 
     if (target.dataset.includePosition && target instanceof HTMLInputElement) {
       toggleInvestmentPosition(target.dataset.includePosition, target.checked);
+      renderAll();
+      return;
+    }
+
+    if (target.dataset.combinedCashPosition && target instanceof HTMLInputElement) {
+      toggleCombinedCashPosition(target.dataset.combinedCashPosition, target.checked);
       renderAll();
       return;
     }
@@ -1380,6 +1388,7 @@ function renderAll(): void {
   normalizeInvestmentDepotSelections();
   normalizeInvestmentSelectionIds();
   normalizeRealEstateSourceIds();
+  normalizeCombinedCashPositionIds();
   state.investmentByAccountId = {
     ...state.investmentByAccountId,
     [state.ui.selectedInvestmentAccountId]: state.investment
@@ -4619,6 +4628,32 @@ function selectedRealEstateSourcePositions(
   );
 }
 
+function selectedCombinedCashPositions(account = selectedCombinedCashPlanningAccount()): ReservePosition[] {
+  if (!account) return [];
+  const selectedIds = new Set(state.combinedWealth.cashPositionIds);
+  return combinedCashSelectablePositions(account).filter((position) => selectedIds.has(position.id));
+}
+
+function combinedCashSelectablePositions(account = selectedCombinedCashPlanningAccount()): ReservePosition[] {
+  if (!account) return [];
+  const blockedIds = combinedCashBlockedPositionIds();
+  return account.yearlyRows.filter(
+    (position) =>
+      position.active &&
+      position.type === "savings" &&
+      positionFlow(position) === "expense" &&
+      !blockedIds.has(position.id)
+  );
+}
+
+function combinedCashBlockedPositionIds(): Set<string> {
+  return new Set([...investmentSelectedPositionIds(), ...realEstateSelectedSourceIds()]);
+}
+
+function combinedCashSelectedPositionIds(): Set<string> {
+  return new Set(state.combinedWealth.cashPositionIds);
+}
+
 function calculateCombinedWealthYears(
   realEstate: RealEstateFinancingResult,
   depotProjections: CombinedWealthDepotProjection[],
@@ -4724,52 +4759,28 @@ function combinedCashContribution(horizonYears: number, account: PlanningAccount
   yearlyCashDelta: number;
   yearlyCashDeltas: number[];
 } {
-  let cashStartValue = 0;
-  let yearlyCashDelta = 0;
+  const cashStartValue = 0;
   const yearlyCashDeltas = Array.from({ length: Math.max(1, horizonYears) }, () => 0);
 
   if (account && state.combinedWealth.includeCashPositions) {
+    const selectedPositions = selectedCombinedCashPositions(account);
+    const selectedIds = state.combinedWealth.cashPositionIds;
     for (let yearOffset = 0; yearOffset < yearlyCashDeltas.length; yearOffset += 1) {
-      const summary = calculateReserveSummary(
-        { ...state.settings, year: state.settings.year + yearOffset },
-        account.yearlyRows
+      yearlyCashDeltas[yearOffset] = selectedSavingsContributionForProjectionYear(
+        selectedPositions,
+        selectedIds,
+        state.settings.year,
+        yearOffset
       );
-      const inactiveRealEstateCash = realEstateInactiveCashFallbackForYear(account, state.settings.year + yearOffset);
-      if (yearOffset === 0) {
-        cashStartValue = summary.yearEndBalance + inactiveRealEstateCash;
-        yearlyCashDelta = summary.yearlyRemaining + inactiveRealEstateCash;
-      }
-      yearlyCashDeltas[yearOffset] = summary.yearlyRemaining + inactiveRealEstateCash;
     }
   }
 
+  const yearlyCashDelta = yearlyCashDeltas[0] ?? 0;
   if (!Number.isFinite(cashStartValue) || !Number.isFinite(yearlyCashDelta)) {
     return { cashStartValue: 0, yearlyCashDelta: 0, yearlyCashDeltas };
   }
 
   return { cashStartValue, yearlyCashDelta, yearlyCashDeltas };
-}
-
-function realEstateInactiveCashFallbackForYear(account: PlanningAccount, year: number): number {
-  if (state.realEstate.purchaseActivated || !state.combinedWealth.includeRealEstateFinancing) return 0;
-  const selected = new Map<string, ReservePosition>();
-  for (const kind of ["equityCapital", "monthlyPayment", "specialRepayment"] as const) {
-    for (const position of selectedRealEstateSourcePositions(kind, [account])) {
-      selected.set(position.id, position);
-    }
-  }
-  let total = 0;
-  for (const position of selected.values()) {
-    for (let month = 1; month <= 12; month += 1) {
-      total += realEstateFallbackContributionForMonth(position, year, month);
-    }
-  }
-  return Math.max(0, total);
-}
-
-function realEstateFallbackContributionForMonth(position: ReservePosition, year: number, month: number): number {
-  if (position.payoutType === "once") return oneTimeInvestmentContributionForMonth(position, year, month);
-  return investmentContributionForMonth(position, year, month);
 }
 
 function renderCombinedWealthCalculations(years: CombinedWealthYear[]): void {
@@ -5099,6 +5110,7 @@ function renderPlanningAccounts(): void {
 
 function renderCombinedModuleControls(): void {
   const cashSelector = document.querySelector<HTMLDivElement>("#combinedCashAccountSelector");
+  const cashPositionSelector = document.querySelector<HTMLDivElement>("#combinedCashPositionSelector");
   const leadSelector = document.querySelector<HTMLDivElement>("#combinedLeadInvestmentAccountSelector");
   const depotSelector = document.querySelector<HTMLDivElement>("#combinedDepotSelector");
   const pensionSelector = document.querySelector<HTMLDivElement>("#combinedPensionScenarioSelector");
@@ -5106,7 +5118,7 @@ function renderCombinedModuleControls(): void {
 
   if (cashSelector) {
     cashSelector.innerHTML = state.planningAccounts.length
-      ? state.planningAccounts
+      ? orderedCombinedCashAccounts(cashAccount)
           .map((account) => {
             const active = cashAccount?.id === account.id;
             return `
@@ -5124,6 +5136,34 @@ function renderCombinedModuleControls(): void {
           })
           .join("")
       : '<span class="chart-empty">Noch kein Konto vorhanden.</span>';
+  }
+
+  if (cashPositionSelector) {
+    const positions = combinedCashSelectablePositions(cashAccount);
+    const selectedIds = new Set(state.combinedWealth.cashPositionIds);
+    if (!cashAccount) {
+      cashPositionSelector.innerHTML = '<div class="include-empty">Noch kein Konto vorhanden.</div>';
+    } else if (!positions.length) {
+      cashPositionSelector.innerHTML = `
+        <div class="include-empty">Keine freien investierbaren Positionen in diesem Konto.</div>
+      `;
+    } else {
+      cashPositionSelector.innerHTML = positions
+        .map((position) => {
+          const checked = selectedIds.has(position.id) ? "checked" : "";
+          return `
+            <label class="include-item combined-cash-position-item">
+              <input type="checkbox" data-combined-cash-position="${position.id}" ${checked} />
+              <span class="include-icon">${positionIconSvg(normalizePositionIcon(position.icon))}</span>
+              <span>
+                <span class="include-name">${escapeHtml(position.name)}</span>
+                <span class="include-amount">${escapeHtml(investmentPositionSubtitle(position))}</span>
+              </span>
+            </label>
+          `;
+        })
+        .join("");
+    }
   }
 
   if (leadSelector) {
@@ -5216,6 +5256,11 @@ function renderCombinedModuleControls(): void {
     '[data-combined-number="statutoryPensionSavingsRatePercent"]',
     state.combinedWealth.statutoryPensionSavingsRatePercent
   );
+}
+
+function orderedCombinedCashAccounts(activeAccount: PlanningAccount | null): PlanningAccount[] {
+  if (!activeAccount) return state.planningAccounts;
+  return [activeAccount, ...state.planningAccounts.filter((account) => account.id !== activeAccount.id)];
 }
 
 function addPlanningAccount(): void {
@@ -6947,6 +6992,7 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
 
   const blockedPositionIds = new Set(otherDepots.flatMap((item) => depotInvestmentSettings(item).includedIds));
   const blockedRealEstateIds = realEstateSelectedSourceIds();
+  const blockedCashIds = combinedCashSelectedPositionIds();
   const visibleSavingsPositions = savingsPositions.filter(
     (position) => !blockedPositionIds.has(position.id) || settings.includedIds.includes(position.id)
   );
@@ -6959,9 +7005,14 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
     .map((position) => {
       const checked = settings.includedIds.includes(position.id) ? "checked" : "";
       const blockedByRealEstate = blockedRealEstateIds.has(position.id);
-      const disabled = blockedByRealEstate ? "disabled" : "";
-      const blockedClass = blockedByRealEstate ? "blocked" : "";
-      const subtitle = blockedByRealEstate ? "belegt in Immobilienfinanzierung" : investmentPositionSubtitle(position);
+      const blockedByCash = blockedCashIds.has(position.id);
+      const disabled = blockedByRealEstate || blockedByCash ? "disabled" : "";
+      const blockedClass = blockedByRealEstate || blockedByCash ? "blocked" : "";
+      const subtitle = blockedByRealEstate
+        ? "belegt in Immobilienfinanzierung"
+        : blockedByCash
+          ? "belegt im Cash-Modul"
+          : investmentPositionSubtitle(position);
       return `
         <label class="include-item ${blockedClass}">
           <input type="checkbox" data-include-position="${position.id}" ${checked} ${disabled} />
@@ -7073,6 +7124,7 @@ function renderRealEstateSourceList(kind: RealEstatePaymentSourceKind, selector:
 
   const selectedIds = new Set(realEstateSourceIds(kind));
   const financingStartYear = currentRealEstateFinancingStartYear();
+  const blockedCashIds = combinedCashSelectedPositionIds();
   const blockedByOtherRealEstate = otherRealEstateSourceKinds(kind).reduce((blockedIds, otherKind) => {
     for (const id of realEstateSourceIds(otherKind)) blockedIds.add(id);
     return blockedIds;
@@ -7082,17 +7134,20 @@ function renderRealEstateSourceList(kind: RealEstatePaymentSourceKind, selector:
     .map(({ accountName, position }) => {
       const blockedDepot = blockedInvestmentDepotForPosition(position.id);
       const blockedByRealEstate = blockedByOtherRealEstate.has(position.id);
+      const blockedByCash = blockedCashIds.has(position.id);
       const blockedByTiming = kind === "equityCapital" && position.payoutYear > financingStartYear;
-      const blocked = Boolean(blockedDepot) || blockedByRealEstate || blockedByTiming;
+      const blocked = Boolean(blockedDepot) || blockedByRealEstate || blockedByCash || blockedByTiming;
       const checked = selectedIds.has(position.id) ? "checked" : "";
       const disabled = blocked ? "disabled" : "";
       const blockedText = blockedDepot
         ? `belegt im ${depotLabel(blockedDepot)}`
         : blockedByRealEstate
           ? "bereits in anderer Immobilienquelle"
-          : blockedByTiming
-            ? `erst nach Finanzierungsstart ${financingStartYear} verfuegbar`
-            : `${realEstatePositionSubtitle(position)} | Konto ${accountName}`;
+          : blockedByCash
+            ? "belegt im Cash-Modul"
+            : blockedByTiming
+              ? `erst nach Finanzierungsstart ${financingStartYear} verfuegbar`
+              : `${realEstatePositionSubtitle(position)} | Konto ${accountName}`;
       return `
         <label class="include-item ${blocked ? "blocked" : ""}">
           <input
@@ -7144,7 +7199,28 @@ function realEstateSourceField(kind: RealEstatePaymentSourceKind): keyof RealEst
 }
 
 function blockedInvestmentDepotForPosition(positionId: string): InvestmentDepotKey | null {
-  return INVESTMENT_DEPOTS.find((depot) => depotInvestmentSettings(depot).includedIds.includes(positionId)) ?? null;
+  for (const settings of investmentSettingsForBlocking()) {
+    const depot = INVESTMENT_DEPOTS.find((item) =>
+      depotInvestmentSettingsForBase(item, settings).includedIds.includes(positionId)
+    );
+    if (depot) return depot;
+  }
+  return null;
+}
+
+function investmentSelectedPositionIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const settings of investmentSettingsForBlocking()) {
+    for (const depot of INVESTMENT_DEPOTS) {
+      for (const id of depotInvestmentSettingsForBase(depot, settings).includedIds) ids.add(id);
+    }
+  }
+  return ids;
+}
+
+function investmentSettingsForBlocking(): InvestmentSettings[] {
+  const settings = [state.investment, ...Object.values(state.investmentByAccountId)];
+  return Array.from(new Set(settings));
 }
 
 function expenseDateCells(position: ReservePosition): string {
@@ -7527,10 +7603,27 @@ function toggleCombinedModule(key: CombinedToggleKey | undefined): void {
 }
 
 function selectCombinedCashAccount(accountId: string): void {
-  if (!planningAccountById(accountId)) return;
+  const account = planningAccountById(accountId);
+  if (!account) return;
+  const selectableIds = new Set(combinedCashSelectablePositions(account).map((position) => position.id));
   state.combinedWealth = {
     ...state.combinedWealth,
-    cashAccountId: accountId
+    cashAccountId: accountId,
+    cashPositionIds: state.combinedWealth.cashPositionIds.filter((id) => selectableIds.has(id))
+  };
+}
+
+function toggleCombinedCashPosition(id: string, checked: boolean): void {
+  const account = selectedCombinedCashPlanningAccount();
+  if (!account) return;
+  const selectableIds = new Set(combinedCashSelectablePositions(account).map((position) => position.id));
+  if (checked && !selectableIds.has(id)) return;
+  const selectedIds = new Set(state.combinedWealth.cashPositionIds.filter((item) => selectableIds.has(item)));
+  if (checked) selectedIds.add(id);
+  else selectedIds.delete(id);
+  state.combinedWealth = {
+    ...state.combinedWealth,
+    cashPositionIds: Array.from(selectedIds)
   };
 }
 
@@ -7571,6 +7664,7 @@ function selectCombinedPensionScenario(scenarioId: StatutoryPensionScenarioId | 
 
 function toggleRealEstateSourcePosition(kind: RealEstatePaymentSourceKind, id: string, checked: boolean): void {
   if (checked && blockedInvestmentDepotForPosition(id)) return;
+  if (checked && combinedCashSelectedPositionIds().has(id)) return;
   if (checked && otherRealEstateSourceKinds(kind).some((otherKind) => realEstateSourceIds(otherKind).includes(id))) return;
 
   const currentIds = new Set(realEstateSourceIds(kind));
@@ -8227,11 +8321,18 @@ function removePosition(id: string): void {
     monthlyPaymentSourceIds: state.realEstate.monthlyPaymentSourceIds.filter((item) => item !== id),
     specialRepaymentSourceIds: state.realEstate.specialRepaymentSourceIds.filter((item) => item !== id)
   };
+  state.combinedWealth = {
+    ...state.combinedWealth,
+    cashPositionIds: state.combinedWealth.cashPositionIds.filter((item) => item !== id)
+  };
 }
 
 function toggleInvestmentPosition(id: string, checked: boolean): void {
   const depot = activeInvestmentDepot();
   if (checked && realEstateSelectedSourceIds().has(id)) {
+    return;
+  }
+  if (checked && combinedCashSelectedPositionIds().has(id)) {
     return;
   }
   if (checked && otherInvestmentDepots(depot).some((item) => depotInvestmentSettings(item).includedIds.includes(id))) {
@@ -9304,6 +9405,23 @@ function normalizeRealEstateSourceIds(): void {
     equityCapitalSourceIds,
     monthlyPaymentSourceIds,
     specialRepaymentSourceIds
+  };
+}
+
+function normalizeCombinedCashPositionIds(): void {
+  const account = selectedCombinedCashPlanningAccount();
+  if (!account) {
+    state.combinedWealth = { ...state.combinedWealth, cashPositionIds: [] };
+    return;
+  }
+
+  const selectableIds = new Set(combinedCashSelectablePositions(account).map((position) => position.id));
+  const cashPositionIds = Array.from(new Set(state.combinedWealth.cashPositionIds)).filter((id) =>
+    selectableIds.has(id)
+  );
+  state.combinedWealth = {
+    ...state.combinedWealth,
+    cashPositionIds
   };
 }
 

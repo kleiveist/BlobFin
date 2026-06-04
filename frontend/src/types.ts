@@ -258,6 +258,7 @@ export interface CombinedWealthToggles {
   includeRealEstateValueTrend: boolean;
   includeStatutoryPension: boolean;
   cashAccountId: string | null;
+  cashPositionIds: string[];
   depotKeys: CombinedWealthDepotKey[];
   statutoryPensionScenario: StatutoryPensionScenarioId;
   statutoryPensionMonthlyAmount: number;

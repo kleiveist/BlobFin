@@ -398,6 +398,73 @@ describe("storage", () => {
     expect(loaded.combinedWealth.includeWithdrawals).toBe(false);
     expect(loaded.combinedWealth.includeRealEstateFinancing).toBe(false);
     expect(loaded.combinedWealth.includeRealEstateValueTrend).toBe(false);
+    expect(loaded.combinedWealth.cashPositionIds).toEqual([]);
+  });
+
+  it("keeps only free selected cash positions from the selected cash account", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const freePosition = {
+      ...state.planningAccounts[0].yearlyRows.find((position) => position.id === "investitionsrate")!,
+      id: "cash-free",
+      name: "Cash frei"
+    };
+    const blockedInvestmentPosition = {
+      ...freePosition,
+      id: "cash-investment-blocked",
+      name: "Cash Investment belegt"
+    };
+    const blockedRealEstatePosition = {
+      ...freePosition,
+      id: "cash-real-estate-blocked",
+      name: "Cash Immobilie belegt"
+    };
+    const deletedPositionId = "cash-deleted";
+    const positions = [
+      ...state.planningAccounts[0].yearlyRows,
+      freePosition,
+      blockedInvestmentPosition,
+      blockedRealEstatePosition
+    ];
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        planningAccounts: [
+          {
+            ...state.planningAccounts[0],
+            yearlyRows: positions
+          }
+        ],
+        investment: {
+          ...state.investment,
+          includedIds: [blockedInvestmentPosition.id]
+        },
+        investmentByAccountId: {
+          [state.planningAccounts[0].id]: {
+            ...state.investment,
+            includedIds: [blockedInvestmentPosition.id]
+          }
+        },
+        realEstate: {
+          ...state.realEstate,
+          monthlyPaymentSourceIds: [blockedRealEstatePosition.id]
+        },
+        combinedWealth: {
+          ...state.combinedWealth,
+          cashPositionIds: [
+            freePosition.id,
+            blockedInvestmentPosition.id,
+            blockedRealEstatePosition.id,
+            deletedPositionId
+          ]
+        }
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.combinedWealth.cashPositionIds).toEqual([freePosition.id]);
   });
 
   it("uses default statutory pension settings when saved values are missing", () => {

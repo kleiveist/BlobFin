@@ -701,17 +701,18 @@ export function renderAppShell(): string {
                     ${combinedModuleIcon("cash")}
                     <span>
                       <strong>Cash aus Konto</strong>
-                      <small>Ein vorhandenes Konto liefert Startwert und Cash-Sparrate.</small>
+                      <small>Das Konto grenzt freie investierbare Positionen fuer Cash-Zuwachs ein.</small>
                     </span>
                   </div>
                   <button class="combined-module-switch" type="button" data-action="toggle-combined-module" data-combined-toggle="includeCashPositions" aria-pressed="false">
                     <span data-combined-toggle-status>Aus</span>
                   </button>
                 </div>
-                <div id="combinedCashAccountSelector" class="planning-account-cards combined-single-selector" aria-label="Cash-Konto fuer Kombination"></div>
+                <div id="combinedCashAccountSelector" class="planning-account-cards combined-single-selector combined-cash-account-selector" aria-label="Cash-Konto fuer Kombination"></div>
+                <div id="combinedCashPositionSelector" class="include-list combined-cash-position-list" aria-label="Investierbare Cash-Positionen"></div>
                 <div class="combined-module-metrics">
                   <span>Datenquelle <strong id="combinedCashSourceMetric">-</strong></span>
-                  <span>Cash-Sparrate <strong id="combinedCashRateMetric">-</strong></span>
+                  <span>Cash-Zuwachs <strong id="combinedCashRateMetric">-</strong></span>
                 </div>
               </article>
 

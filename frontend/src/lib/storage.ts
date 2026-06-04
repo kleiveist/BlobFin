@@ -117,7 +117,7 @@ function normalizeState(value: unknown): AppState {
   const planningAccounts = normalizePlanningAccounts(value.planningAccounts, legacyPositions, settings.year);
   const ui = normalizeAppUiState(value.ui, planningAccounts);
   const positions = positionsForPlanningAccount(planningAccounts, ui.selectedPlanningAccountId, legacyPositions);
-  const combinedWealth = normalizeCombinedWealthToggles(value.combinedWealth);
+  let combinedWealth = normalizeCombinedWealthToggles(value.combinedWealth);
   const realEstate = normalizeRealEstatePurchaseActivation(
     normalizeRealEstateFinancingSettings(value.realEstate),
     combinedWealth
@@ -136,6 +136,12 @@ function normalizeState(value: unknown): AppState {
     ui.selectedInvestmentAccountId
   );
   const investment = investmentForAccount(investmentByAccountId, ui.selectedInvestmentAccountId);
+  combinedWealth = normalizeCombinedCashPositionIds(
+    combinedWealth,
+    planningAccounts,
+    realEstate,
+    investmentByAccountId
+  );
 
   return {
     theme: normalizeThemeMode(value.theme, fallback.theme),
@@ -645,6 +651,7 @@ function normalizeCombinedWealthToggles(value: unknown): CombinedWealthToggles {
     includeRealEstateValueTrend: booleanOrDefault(value.includeRealEstateValueTrend, fallback.includeRealEstateValueTrend),
     includeStatutoryPension: booleanOrDefault(value.includeStatutoryPension, fallback.includeStatutoryPension),
     cashAccountId: typeof value.cashAccountId === "string" && value.cashAccountId.trim() ? value.cashAccountId : fallback.cashAccountId,
+    cashPositionIds: Array.from(new Set(stringArrayOrDefault(value.cashPositionIds, fallback.cashPositionIds))),
     depotKeys: normalizeCombinedWealthDepotKeys(value.depotKeys, fallback.depotKeys),
     statutoryPensionScenario: normalizeStatutoryPensionScenarioId(
       value.statutoryPensionScenario,
@@ -670,6 +677,42 @@ function normalizeCombinedWealthDepotKeys(
     (key): key is CombinedWealthDepotKey => key === "standard" || key === "retirement" || key === "child"
   );
   return Array.from(new Set(keys)).length ? Array.from(new Set(keys)) : fallback;
+}
+
+function normalizeCombinedCashPositionIds(
+  combinedWealth: CombinedWealthToggles,
+  planningAccounts: PlanningAccount[],
+  realEstate: RealEstateFinancingSettings,
+  investmentByAccountId: Record<string, InvestmentSettings>
+): CombinedWealthToggles {
+  const account =
+    planningAccounts.find((item) => item.id === combinedWealth.cashAccountId) ?? planningAccounts[0] ?? null;
+  if (!account) return { ...combinedWealth, cashPositionIds: [] };
+
+  const blockedIds = new Set<string>([
+    ...realEstate.equityCapitalSourceIds,
+    ...realEstate.monthlyPaymentSourceIds,
+    ...realEstate.specialRepaymentSourceIds
+  ]);
+  for (const settings of Object.values(investmentByAccountId)) {
+    for (const id of settings.includedIds) blockedIds.add(id);
+    for (const id of settings.retirementIncludedIds) blockedIds.add(id);
+    for (const id of settings.childIncludedIds) blockedIds.add(id);
+  }
+
+  const selectableIds = new Set(
+    account.yearlyRows
+      .filter(
+        (position) =>
+          position.active &&
+          position.type === "savings" &&
+          position.flow === "expense" &&
+          !blockedIds.has(position.id)
+      )
+      .map((position) => position.id)
+  );
+  const cashPositionIds = Array.from(new Set(combinedWealth.cashPositionIds)).filter((id) => selectableIds.has(id));
+  return { ...combinedWealth, cashPositionIds };
 }
 
 function normalizeStatutoryPensionScenarioId(
