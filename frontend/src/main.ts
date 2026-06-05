@@ -51,8 +51,10 @@ import {
 } from "./domain/statutoryPension";
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
 import {
+  investmentSavingsSelectionSummary,
   investmentContributionForMonth,
   oneTimeInvestmentContributionForMonth,
+  selectableInvestmentSavingsPositions,
   selectedSavingsContributionForProjectionYear
 } from "./domain/investmentContributions";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
@@ -445,6 +447,7 @@ let latestRealEstateResult: RealEstateFinancingResult | null = null;
 let selectedCombinedWealthYear: number | null = null;
 let latestCombinedWealthYears: CombinedWealthYear[] = [];
 let combinedCashPopupAccountId: string | null = null;
+let investmentIncludePopupOpen = false;
 let renderAllTimer: number | null = null;
 let renderAllRunning = false;
 let combinedWealthLineVisibility: CombinedWealthLineVisibility = {
@@ -1141,6 +1144,13 @@ function bindEvents(): void {
       if (target?.id === "combinedCashPositionPopup" || !target?.closest("#combinedCashPositionPopup")) {
         hideCombinedCashPositionPopup();
       }
+      if (
+        investmentIncludePopupOpen &&
+        !target?.closest("#investmentIncludePopup") &&
+        !target?.closest("[data-action='toggle-investment-include-popup']")
+      ) {
+        hideInvestmentIncludePopup();
+      }
       if (!target?.closest("#baseDataPopup")) {
         hideBaseDataPopup();
       }
@@ -1176,6 +1186,14 @@ function bindEvents(): void {
       !button.closest("#combinedCashPositionPopup")
     ) {
       hideCombinedCashPositionPopup();
+    }
+    if (
+      investmentIncludePopupOpen &&
+      action !== "toggle-investment-include-popup" &&
+      action !== "close-investment-include-popup" &&
+      !button.closest("#investmentIncludePopup")
+    ) {
+      hideInvestmentIncludePopup();
     }
     if (
       action !== "open-base-data-popup" &&
@@ -1285,6 +1303,8 @@ function bindEvents(): void {
     if (action === "set-investment-depot-child") setInvestmentDepot("child");
     if (action === "toggle-interest-investment") toggleInterestInvestment();
     if (action === "toggle-cashback-investment") toggleCashbackInvestment();
+    if (action === "toggle-investment-include-popup") toggleInvestmentIncludePopup();
+    if (action === "close-investment-include-popup") hideInvestmentIncludePopup();
     if (action === "toggle-real-estate-withdrawal-gain-source") toggleRealEstateWithdrawalGainSource();
     if (action === "toggle-real-estate-depot-savings-rate-source") toggleRealEstateDepotSavingsRateSource();
     if (action === "toggle-combined-module") {
@@ -1432,6 +1452,7 @@ function bindEvents(): void {
       hideStatutoryPensionProjectionYearPopup();
       closeStatutoryPensionTaxPopup();
       hideReserveChartPopup();
+      hideInvestmentIncludePopup();
       hidePositionFilterPopup();
       closePlanningAccountDialog();
       closeIncomeTaxDialog();
@@ -1485,15 +1506,12 @@ function renderAll(): void {
     renderPlanningYearNavigation();
     const investmentAccount = selectedInvestmentPlanningAccount();
     const planningSettings = activePlanningSettings();
-    const reserve = calculateReserveSummary(
-      planningSettings,
-      positionsForPlanningYear(investmentAccount.yearlyRows, activePlanningYear())
-    );
+    const investmentReserve = calculateReserveSummary(state.settings, investmentAccount.yearlyRows);
     const activeReserve = calculateReserveSummary(planningSettings, activePlanningPositions());
     renderPositions();
     renderPositionCostDialog();
-    renderInvestmentIncludeList(reserve);
-    renderCalculations(reserve, activeReserve);
+    renderInvestmentIncludeList(investmentReserve);
+    renderCalculations(investmentReserve, activeReserve);
     syncPlanningInputsFromState();
     syncRealEstateInputsFromState();
     syncCombinedToggleInputsFromState();
@@ -5583,6 +5601,7 @@ function selectInvestmentAccount(accountId: string): void {
   if (!accountId || accountId === state.ui.selectedInvestmentAccountId) return;
   if (!state.planningAccounts.some((account) => account.id === accountId)) return;
   state.ui = { ...state.ui, selectedInvestmentAccountId: accountId };
+  hideInvestmentIncludePopup();
   renderAll();
 }
 
@@ -7160,29 +7179,81 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
       : `${money(summary.totalCashback)} jaehrlich aus Jahrestabelle`
   );
 
-  const savingsPositions = positionsForPlanningYear(
-    selectedInvestmentPlanningAccount().yearlyRows,
-    activePlanningYear()
-  ).filter(
-    (position) => position.active && position.type === "savings" && positionFlow(position) === "expense"
-  );
+  const savingsPositions = selectableInvestmentSavingsPositions(selectedInvestmentPlanningAccount().yearlyRows);
   if (!savingsPositions.length) {
     list.innerHTML = `<div class="include-empty">Keine Sparrate angelegt.</div>`;
+    hideInvestmentIncludePopup();
     return;
   }
 
   const blockedPositionIds = new Set(otherDepots.flatMap((item) => depotInvestmentSettings(item).includedIds));
-  const blockedRealEstateIds = realEstateSelectedSourceIds();
-  const blockedCashIds = combinedCashSelectedPositionIds();
   const visibleSavingsPositions = savingsPositions.filter(
     (position) => !blockedPositionIds.has(position.id) || settings.includedIds.includes(position.id)
   );
   if (!visibleSavingsPositions.length) {
     list.innerHTML = `<div class="include-empty">Alle Sparraten sind in anderen Depots eingeplant.</div>`;
+    hideInvestmentIncludePopup();
     return;
   }
 
-  list.innerHTML = visibleSavingsPositions
+  const selection = investmentSavingsSelectionSummary(visibleSavingsPositions, settings.includedIds, state.settings.year);
+  list.innerHTML = investmentIncludeSummaryButton(visibleSavingsPositions.length, selection);
+  renderInvestmentIncludePopup(visibleSavingsPositions, settings);
+}
+
+function investmentIncludeSummaryButton(
+  totalCount: number,
+  selection: { selectedCount: number; yearlyAmount: number }
+): string {
+  const active = selection.selectedCount > 0;
+  return `
+    <button
+      class="investment-include-summary-button ${active ? "active" : ""}"
+      type="button"
+      data-action="toggle-investment-include-popup"
+      aria-expanded="${investmentIncludePopupOpen}"
+      aria-controls="investmentIncludePopup"
+    >
+      <span>Sparraten auswaehlen</span>
+      <strong>${intNumber(selection.selectedCount)} aktiv · ${money(selection.yearlyAmount)} jaehrlich</strong>
+      <small>${intNumber(totalCount)} verfuegbar</small>
+    </button>
+  `;
+}
+
+function renderInvestmentIncludePopup(positions: ReservePosition[], settings: InvestmentSettings): void {
+  const popup = document.querySelector<HTMLDivElement>("#investmentIncludePopup");
+  if (!popup) return;
+  if (!investmentIncludePopupOpen) {
+    popup.hidden = true;
+    popup.innerHTML = "";
+    return;
+  }
+
+  const selection = investmentSavingsSelectionSummary(positions, settings.includedIds, state.settings.year);
+  popup.innerHTML = `
+    <div class="investment-include-dialog">
+      <div class="chart-popup-head">
+        <div>
+          <span>Investierbare Positionen</span>
+          <strong>${intNumber(selection.selectedCount)} aktiv · ${money(selection.yearlyAmount)} jaehrlich</strong>
+        </div>
+        <button class="chart-popup-close" type="button" data-action="close-investment-include-popup" aria-label="Popup schliessen">x</button>
+      </div>
+      <div class="include-list investment-include-position-list">${investmentIncludePositionRows(positions, settings)}</div>
+      <div class="investment-include-actions">
+        <span>${intNumber(positions.length)} verfuegbar</span>
+        <button class="button" type="button" data-action="close-investment-include-popup">Fertig</button>
+      </div>
+    </div>
+  `;
+  popup.hidden = false;
+}
+
+function investmentIncludePositionRows(positions: ReservePosition[], settings: InvestmentSettings): string {
+  const blockedRealEstateIds = realEstateSelectedSourceIds();
+  const blockedCashIds = combinedCashSelectedPositionIds();
+  return positions
     .map((position) => {
       const checked = settings.includedIds.includes(position.id) ? "checked" : "";
       const blockedByRealEstate = blockedRealEstateIds.has(position.id);
@@ -8118,6 +8189,12 @@ function setInvestmentDepot(depot: InvestmentDepotKey): void {
     activeDepot: depot
   };
   hideInvestmentChartPopup();
+  hideInvestmentIncludePopup();
+  renderAll();
+}
+
+function toggleInvestmentIncludePopup(): void {
+  investmentIncludePopupOpen = !investmentIncludePopupOpen;
   renderAll();
 }
 
@@ -9194,6 +9271,15 @@ function hideCombinedCashPositionPopup(): void {
   if (popup) popup.hidden = true;
 }
 
+function hideInvestmentIncludePopup(): void {
+  investmentIncludePopupOpen = false;
+  const popup = document.querySelector<HTMLDivElement>("#investmentIncludePopup");
+  if (popup) popup.hidden = true;
+  document
+    .querySelector<HTMLButtonElement>("[data-action='toggle-investment-include-popup']")
+    ?.setAttribute("aria-expanded", "false");
+}
+
 function hideStatutoryPensionYearPopup(): void {
   const popup = document.querySelector<HTMLDivElement>("#statutoryPensionYearPopup");
   if (popup) popup.hidden = true;
@@ -9264,7 +9350,7 @@ function investmentPositionsForProjection(
       virtualInvestmentPosition(CASHBACK_INVESTMENT_POSITION_ID, "Cashback aus Jahrestabelle", summary.totalCashback)
     );
   }
-  return [...positionsForPlanningYear(account.yearlyRows, activePlanningYear()), ...virtualPositions];
+  return [...account.yearlyRows, ...virtualPositions];
 }
 
 function investmentSettingsForProjection(

@@ -106,6 +106,19 @@ export function selectedSavingsContributionForProjectionYear(
   return total;
 }
 
+export function investmentSavingsSelectionSummary(
+  positions: ReservePosition[],
+  selectedIds: string[],
+  baseYear: number
+): { selectedCount: number; yearlyAmount: number } {
+  const selected = new Set(selectedIds);
+  const savingsPositions = selectableInvestmentSavingsPositions(positions);
+  return {
+    selectedCount: savingsPositions.filter((position) => selected.has(position.id)).length,
+    yearlyAmount: selectedSavingsContributionForProjectionYear(savingsPositions, selectedIds, baseYear, 0)
+  };
+}
+
 export function selectedRecurringInvestmentContributionForProjectionYear(
   positions: ReservePosition[],
   settings: InvestmentSettings,
@@ -147,12 +160,12 @@ export function selectedInvestmentStartYear(
   }, fallbackYear);
 }
 
-function selectedInvestmentPositions(positions: ReservePosition[], settings: InvestmentSettings): ReservePosition[] {
+export function selectableInvestmentSavingsPositions(positions: ReservePosition[]): ReservePosition[] {
   return positions.filter(
-    (position) =>
-      position.type === "savings" &&
-      positionFlow(position) === "expense" &&
-      settings.includedIds.includes(position.id) &&
-      position.active
+    (position) => position.active && position.type === "savings" && positionFlow(position) === "expense"
   );
+}
+
+function selectedInvestmentPositions(positions: ReservePosition[], settings: InvestmentSettings): ReservePosition[] {
+  return selectableInvestmentSavingsPositions(positions).filter((position) => settings.includedIds.includes(position.id));
 }

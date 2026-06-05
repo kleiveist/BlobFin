@@ -65,6 +65,25 @@ describe("investment calculator", () => {
     expect(projection.points.some((point) => point.phase === "payout")).toBe(true);
   });
 
+  it("includes selected savings rates from every planning year in depot projections", () => {
+    const state = defaultAppState();
+    const template = state.positions.find((position) => position.id === "investitionsrate")!;
+    const positions = [
+      { ...template, id: "start-rate", planningYear: null, amount: 100 },
+      { ...template, id: "current-year-rate", planningYear: state.settings.year, amount: 50 },
+      { ...template, id: "future-year-rate", planningYear: state.settings.year + 7, amount: 25 }
+    ];
+    const investment = {
+      ...state.investment,
+      includedIds: ["start-rate", "current-year-rate", "future-year-rate"]
+    };
+
+    const projection = buildAssetProjection(state.settings.year, positions, investment);
+
+    expect(projection.monthlyRate).toBe(175);
+    expect(projection.annualSavingsRate).toBe(2100);
+  });
+
   it("adds retirement depot allowances and enforces retirement age 65", () => {
     const state = defaultAppState();
     state.investment = {

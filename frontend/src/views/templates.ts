@@ -448,6 +448,7 @@ export function renderAppShell(): string {
               </button>
             </div>
             <div id="investmentIncludeList" class="include-list"></div>
+            <div id="investmentIncludePopup" class="investment-include-popup" role="dialog" aria-modal="true" aria-label="Investierbare Positionen auswaehlen" hidden></div>
           </div>
 
           <div class="investment-controls">

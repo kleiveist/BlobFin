@@ -136,6 +136,10 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("Kosten- und Ruecklagenpositionen");
     expect(html).toContain("Jahrestabellen pro Konto");
     expect(html).toContain("Investment- und Auszahlungsplanung");
+    expect(html).toContain('id="investmentIncludeList"');
+    expect(html).toContain('id="investmentIncludePopup"');
+    expect(html).toContain('data-action="toggle-interest-investment"');
+    expect(html).toContain('data-action="toggle-cashback-investment"');
   });
 
   it("renders statutory pension as its own page outside combined wealth", () => {
