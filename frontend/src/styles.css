@@ -315,6 +315,57 @@ button:focus-visible {
   color: #fff;
 }
 
+.planning-year-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.planning-year-active-label {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.planning-year-navigation {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.planning-year-button {
+  flex: 0 0 auto;
+  min-width: 76px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 8px 11px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.planning-year-button.current {
+  border-color: var(--gold);
+  box-shadow: inset 0 -3px 0 var(--gold);
+  color: var(--text);
+}
+
+.planning-year-button.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.planning-year-button.active.current {
+  box-shadow: inset 0 -3px 0 var(--gold-soft);
+}
+
 .app-settings {
   position: relative;
 }
@@ -1250,6 +1301,12 @@ th {
 .position-table .label-col {
   width: 76px;
   min-width: 76px;
+}
+
+.position-table .planning-year-col,
+.position-table .planning-year-cell {
+  width: 104px;
+  min-width: 104px;
 }
 
 .position-table .day-col,

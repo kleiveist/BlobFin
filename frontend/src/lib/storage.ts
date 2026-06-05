@@ -376,6 +376,7 @@ function normalizeAppUiState(value: unknown, accounts: PlanningAccount[]): AppUi
   if (!isRecord(value)) {
     return {
       ...fallback,
+      selectedPlanningYear: fallback.selectedPlanningYear,
       selectedPlanningAccountId: firstAccountId,
       selectedInvestmentAccountId: firstAccountId,
       selectedRealEstateAccountIds: accountIds,
@@ -405,6 +406,7 @@ function normalizeAppUiState(value: unknown, accounts: PlanningAccount[]): AppUi
 
   return {
     activeSection: normalizeAppSectionId(value.activeSection, fallback.activeSection),
+    selectedPlanningYear: normalizePlanningYearSelection(value.selectedPlanningYear, fallback.selectedPlanningYear),
     selectedPlanningAccountId: normalizedPlanningAccountId,
     selectedInvestmentAccountId: normalizedInvestmentAccountId,
     selectedRealEstateAccountIds,
@@ -424,6 +426,12 @@ function normalizeSelectedAccountIds(value: unknown, accountIds: string[], fallb
     .map((item) => String(item))
     .filter((accountId, index, items) => items.indexOf(accountId) === index && accountIds.includes(accountId));
   return selected;
+}
+
+function normalizePlanningYearSelection(value: unknown, fallback: number | null): number | null {
+  if (value === null || value === undefined || value === "" || value === "start") return null;
+  const parsed = Math.round(numberOrDefault(value, Number.NaN));
+  return Number.isFinite(parsed) && parsed >= 2000 && parsed <= 2200 ? parsed : fallback;
 }
 
 function normalizeInvestmentByAccountId(
@@ -1165,8 +1173,10 @@ function normalizePositions(
       const type = typeForFlow(rawType, flow);
       const name = String(item.name || "Position");
       const costBreakdown = normalizePositionCostBreakdown(item.costBreakdown);
+      const planningYear = normalizePlanningYearSelection(item.planningYear ?? item.planYear, null);
       const position: ReservePosition = {
         id: String(item.id || createId()),
+        planningYear,
         flow,
         active: booleanOrDefault(item.active, true),
         visible: booleanOrDefault(item.visible ?? item.view, true),
@@ -1200,6 +1210,9 @@ function normalizePositions(
         position.interestBearing = false;
       } else if (position.payoutType === "once") {
         position.interestBearing = false;
+      }
+      if (position.payoutType === "once") {
+        position.planningYear = normalizePlanningYearSelection(position.payoutYear, null);
       }
       if (position.flow === "income") {
         position.interestBearing = false;
@@ -1265,6 +1278,7 @@ function migrateMonthlyNetIncomePosition(settings: PlanningSettings, positions: 
   return [
     {
       id: "nettoeinkommen",
+      planningYear: null,
       flow: "income",
       active: true,
       visible: true,

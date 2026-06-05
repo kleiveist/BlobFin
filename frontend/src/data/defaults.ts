@@ -50,6 +50,7 @@ export function defaultPositions(): ReservePosition[] {
   return [
     {
       id: "nettoeinkommen",
+      planningYear: null,
       flow: "income",
       active: true,
       visible: true,
@@ -68,6 +69,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "dispo-reserve",
+      planningYear: null,
       flow: "expense",
       active: true,
       visible: true,
@@ -86,6 +88,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "kfz-ruecklage",
+      planningYear: null,
       flow: "expense",
       active: true,
       visible: true,
@@ -104,6 +107,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "katzen-ruecklage",
+      planningYear: null,
       flow: "expense",
       active: true,
       visible: true,
@@ -122,6 +126,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "uni-gebuehr",
+      planningYear: null,
       flow: "expense",
       active: true,
       visible: true,
@@ -140,6 +145,7 @@ export function defaultPositions(): ReservePosition[] {
     },
     {
       id: "investitionsrate",
+      planningYear: null,
       flow: "expense",
       active: true,
       visible: true,
@@ -213,6 +219,7 @@ export function defaultPositionTableViewState(): PositionTableViewState {
 export function defaultAppUiState(): AppUiState {
   return {
     activeSection: "home",
+    selectedPlanningYear: null,
     selectedPlanningAccountId: "default-account",
     selectedInvestmentAccountId: "default-account",
     selectedRealEstateAccountIds: ["default-account"],

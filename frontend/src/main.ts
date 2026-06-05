@@ -107,6 +107,13 @@ import {
   positionTableSelectOptions,
   positionTableSortLabel
 } from "./lib/positionTableView";
+import {
+  normalizePositionPlanningYear,
+  planningYearOptions,
+  positionPlanningYear,
+  positionsForPlanningYear,
+  sanitizePlanningYearSelection
+} from "./lib/planningYears";
 import { loadState, resetStoredState, saveState } from "./lib/storage";
 import type {
   AppSectionId,
@@ -133,6 +140,7 @@ import type {
   InvestmentSettings,
   PlanningAccount,
   PlanningSettings,
+  PlanningYearSelection,
   PositionCostBreakdownItem,
   PositionTableFilterColumn,
   PositionTableFilterOperator,
@@ -170,6 +178,7 @@ import {
 const root = requireRootElement();
 const INTEREST_INVESTMENT_POSITION_ID = "__account-interest-investment";
 const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
+const FORM_RENDER_DEBOUNCE_MS = 40;
 const CHILD_DEPOT_MIN_PAYOUT_AGE = 18;
 const CHILD_DEPOT_DEFAULT_PAYOUT_AGE = 18;
 const CHILD_DEPOT_MAX_PAYOUT_AGE = 25;
@@ -436,6 +445,8 @@ let latestRealEstateResult: RealEstateFinancingResult | null = null;
 let selectedCombinedWealthYear: number | null = null;
 let latestCombinedWealthYears: CombinedWealthYear[] = [];
 let combinedCashPopupAccountId: string | null = null;
+let renderAllTimer: number | null = null;
+let renderAllRunning = false;
 let combinedWealthLineVisibility: CombinedWealthLineVisibility = {
   pensionConsumedCumulative: true,
   taxCumulative: true,
@@ -467,6 +478,7 @@ function loadInitialState(): AppState {
 function sanitizeAppState(appState: AppState): AppState {
   const fallbackUi = {
     activeSection: "home" as AppSectionId,
+    selectedPlanningYear: null as PlanningYearSelection,
     selectedPlanningAccountId: "default-account",
     selectedInvestmentAccountId: "default-account",
     selectedRealEstateAccountIds: ["default-account"],
@@ -542,6 +554,7 @@ function sanitizeAppState(appState: AppState): AppState {
       selectedRealEstateWithdrawalGainAccountIds: normalizedRealEstateAccountIds,
       selectedCombinedAccountIds,
       selectedCombinedLeadInvestmentAccountId: normalizedCombinedLeadInvestmentAccountId,
+      selectedPlanningYear: sanitizePlanningYearSelection(ui.selectedPlanningYear, appState.settings.year),
       activeSection: appSectionIdFromValue(ui.activeSection) ?? "home"
     },
     combinedWealth: normalizeCombinedWealthState(
@@ -677,6 +690,44 @@ function selectedCombinedLeadInvestmentPlanningAccount(): PlanningAccount | null
     state.ui = { ...state.ui, selectedCombinedLeadInvestmentAccountId: lead.id };
   }
   return lead;
+}
+
+function normalizeActivePlanningYear(): void {
+  const selectedPlanningYear = sanitizePlanningYearSelection(state.ui.selectedPlanningYear, state.settings.year);
+  if (selectedPlanningYear !== state.ui.selectedPlanningYear) {
+    state.ui = { ...state.ui, selectedPlanningYear };
+  }
+}
+
+function activePlanningYear(): PlanningYearSelection {
+  return sanitizePlanningYearSelection(state.ui.selectedPlanningYear, state.settings.year);
+}
+
+function activePlanningSettings(): PlanningSettings {
+  return {
+    ...state.settings,
+    year: activePlanningYear() ?? state.settings.year
+  };
+}
+
+function activePlanningYearLabel(): string {
+  const year = activePlanningYear();
+  return year === null ? "Start" : String(year);
+}
+
+function activePlanningPositions(): ReservePosition[] {
+  return positionsForPlanningYear(state.positions, activePlanningYear());
+}
+
+function planningAccountForActiveYear(account: PlanningAccount): PlanningAccount {
+  return {
+    ...account,
+    yearlyRows: positionsForPlanningYear(account.yearlyRows, activePlanningYear())
+  };
+}
+
+function planningAccountsForActiveYear(): PlanningAccount[] {
+  return state.planningAccounts.map(planningAccountForActiveYear);
 }
 
 function synchronizeAccountScopedState(): void {
@@ -835,26 +886,26 @@ function bindEvents(): void {
 
     if (target.dataset.setting) {
       updatePlanningSetting(target.dataset.setting as keyof PlanningSettings, target.value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.investment) {
       updateInvestmentSetting(target.dataset.investment as keyof InvestmentSettings, target.value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.realEstateField) {
       const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
       updateRealEstateField(target.dataset.realEstateField as RealEstateField, value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.realEstateRange) {
       updateRealEstateField(target.dataset.realEstateRange as RealEstateField, target.value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
@@ -914,7 +965,7 @@ function bindEvents(): void {
 
     if (target.dataset.retirementAge) {
       updateRetirementAge(target.value);
-      renderAll();
+      requestRenderAll();
     }
   });
 
@@ -935,7 +986,7 @@ function bindEvents(): void {
     if (target.dataset.realEstateField) {
       const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
       updateRealEstateField(target.dataset.realEstateField as RealEstateField, value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
@@ -947,13 +998,13 @@ function bindEvents(): void {
         target.dataset.incomeField,
         value
       );
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.incomeSetting) {
       updateIncomeSetting(target.dataset.incomeSetting as keyof IncomeTrackerSettings, target.value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
@@ -964,26 +1015,26 @@ function bindEvents(): void {
         target.dataset.positionCostField,
         target.value
       );
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.positionId && target.dataset.positionField) {
       const value = target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value;
       updatePosition(target.dataset.positionId, target.dataset.positionField as keyof ReservePosition, value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.includePosition && target instanceof HTMLInputElement) {
       toggleInvestmentPosition(target.dataset.includePosition, target.checked);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.combinedCashPosition && target instanceof HTMLInputElement) {
       toggleCombinedCashPosition(target.dataset.combinedCashPosition, target.checked);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
@@ -997,25 +1048,25 @@ function bindEvents(): void {
         target.dataset.realEstateSourcePosition,
         target.checked
       );
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.combinedToggle && target instanceof HTMLInputElement) {
       updateCombinedToggle(target.dataset.combinedToggle as CombinedToggleKey, target.checked);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.combinedNumber) {
       updateCombinedNumber(target.dataset.combinedNumber as CombinedNumberKey, target.value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
     if (target.dataset.statutoryPensionField) {
       updateStatutoryPensionField(target.dataset.statutoryPensionField, target.value);
-      renderAll();
+      requestRenderAll();
       return;
     }
 
@@ -1025,7 +1076,7 @@ function bindEvents(): void {
         target.dataset.statutoryPensionScenarioField,
         target.value
       );
-      renderAll();
+      requestRenderAll();
       return;
     }
 
@@ -1135,6 +1186,10 @@ function bindEvents(): void {
     }
     if (action === "add-position") addPosition();
     if (action === "reset") resetState();
+    if (action === "select-planning-year") {
+      setSelectedPlanningYear(button.dataset.planningYear || "start");
+      return;
+    }
     if (action === "show-income-positions") setSelectedPositionMode("income");
     if (action === "show-expense-positions") setSelectedPositionMode("expense");
     if (action?.startsWith("set-position-cadence-")) {
@@ -1318,7 +1373,7 @@ function bindEvents(): void {
     if (action === "export-year") {
       void exportCsvFile(
         "jahreskalkulator-ruecklagen.csv",
-        exportYearTableCsv(state.settings, state.positions, showResultMaxNeeded),
+        exportYearTableCsv(activePlanningSettings(), activePlanningPositions(), showResultMaxNeeded),
         "Jahrestabellen-Export"
       );
     }
@@ -1393,35 +1448,62 @@ function bindEvents(): void {
   window.addEventListener("resize", drawCurrentInvestmentChart);
 }
 
+function requestRenderAll(): void {
+  if (renderAllTimer !== null) window.clearTimeout(renderAllTimer);
+  renderAllTimer = window.setTimeout(() => {
+    renderAllTimer = null;
+    renderAll();
+  }, FORM_RENDER_DEBOUNCE_MS);
+}
+
 function renderAll(): void {
-  syncActivePlanningAccountFromPositions();
-  syncPositionsFromActivePlanningAccount();
-  synchronizeAccountScopedState();
-  normalizeInvestmentBounds();
-  normalizeInvestmentDepotSelections();
-  normalizeInvestmentSelectionIds();
-  normalizeRealEstateSourceIds();
-  normalizeCombinedCashPositionIds();
-  state.investmentByAccountId = {
-    ...state.investmentByAccountId,
-    [state.ui.selectedInvestmentAccountId]: state.investment
-  };
-  updateModuleVisibility();
-  renderPlanningAccounts();
-  const investmentAccount = selectedInvestmentPlanningAccount();
-  const reserve = calculateReserveSummary(state.settings, investmentAccount.yearlyRows);
-  const activeReserve = calculateReserveSummary(state.settings, state.positions);
-  renderPositions();
-  renderPositionCostDialog();
-  renderInvestmentIncludeList(reserve);
-  renderCalculations(reserve, activeReserve);
-  syncPlanningInputsFromState();
-  syncRealEstateInputsFromState();
-  syncCombinedToggleInputsFromState();
-  syncInvestmentInputsFromState();
-  syncSettingsAccordionState();
-  renderIncomeTracker();
-  saveState(state);
+  if (renderAllRunning) {
+    requestRenderAll();
+    return;
+  }
+  if (renderAllTimer !== null) {
+    window.clearTimeout(renderAllTimer);
+    renderAllTimer = null;
+  }
+  renderAllRunning = true;
+  try {
+    syncActivePlanningAccountFromPositions();
+    syncPositionsFromActivePlanningAccount();
+    normalizeActivePlanningYear();
+    synchronizeAccountScopedState();
+    normalizeInvestmentBounds();
+    normalizeInvestmentDepotSelections();
+    normalizeInvestmentSelectionIds();
+    normalizeRealEstateSourceIds();
+    normalizeCombinedCashPositionIds();
+    state.investmentByAccountId = {
+      ...state.investmentByAccountId,
+      [state.ui.selectedInvestmentAccountId]: state.investment
+    };
+    updateModuleVisibility();
+    renderPlanningAccounts();
+    renderPlanningYearNavigation();
+    const investmentAccount = selectedInvestmentPlanningAccount();
+    const planningSettings = activePlanningSettings();
+    const reserve = calculateReserveSummary(
+      planningSettings,
+      positionsForPlanningYear(investmentAccount.yearlyRows, activePlanningYear())
+    );
+    const activeReserve = calculateReserveSummary(planningSettings, activePlanningPositions());
+    renderPositions();
+    renderPositionCostDialog();
+    renderInvestmentIncludeList(reserve);
+    renderCalculations(reserve, activeReserve);
+    syncPlanningInputsFromState();
+    syncRealEstateInputsFromState();
+    syncCombinedToggleInputsFromState();
+    syncInvestmentInputsFromState();
+    syncSettingsAccordionState();
+    renderIncomeTracker();
+    saveState(state);
+  } finally {
+    renderAllRunning = false;
+  }
 }
 
 function renderCalculations(
@@ -4930,6 +5012,7 @@ function renderPositions(): void {
             position.visible ? "checked" : ""
           } /></td>
           <td class="label-cell">${positionIconSelect(position)}</td>
+          <td class="planning-year-cell">${positionPlanningYearSelect(position)}</td>
           <td class="name-cell"><input class="name-input" value="${escapeHtml(position.name)}" data-position-id="${
             position.id
           }" data-position-field="name" /></td>
@@ -5117,8 +5200,44 @@ function renderPlanningAccounts(): void {
   }
 
   summary.textContent = `Konten gesamt: ${state.planningAccounts.length} | mixed: ${totalsByType.mixed} | cost_reserve: ${totalsByType.costReserve} | annual_table: ${totalsByType.annualTable}`;
-  yearAccountName.textContent = `(aktiv: ${activeAccount.name})`;
+  yearAccountName.textContent = `(aktiv: ${activeAccount.name}, ${activePlanningYearLabel()})`;
   renderPlanningAccountDialog();
+}
+
+function renderPlanningYearNavigation(): void {
+  const host = document.querySelector<HTMLDivElement>("#planningYearNavigation");
+  const label = document.querySelector<HTMLSpanElement>("#planningYearActiveLabel");
+  if (!host) return;
+
+  const selectedYear = activePlanningYear();
+  const currentYear = new Date().getFullYear();
+  const yearButtons = planningYearOptions(state.settings.year)
+    .map((year) => {
+      const active = selectedYear === year;
+      const current = currentYear === year;
+      return `
+        <button
+          class="planning-year-button ${active ? "active" : ""} ${current ? "current" : ""}"
+          type="button"
+          data-action="select-planning-year"
+          data-planning-year="${year}"
+          aria-pressed="${active}"
+        >${year}</button>
+      `;
+    })
+    .join("");
+
+  host.innerHTML = `
+    <button
+      class="planning-year-button ${selectedYear === null ? "active" : ""}"
+      type="button"
+      data-action="select-planning-year"
+      data-planning-year="start"
+      aria-pressed="${selectedYear === null}"
+    >Start</button>
+    ${yearButtons}
+  `;
+  if (label) label.textContent = activePlanningYearLabel();
 }
 
 function renderCombinedModuleControls(): void {
@@ -6171,6 +6290,7 @@ function renderPositionTableHead(): void {
       ${positionSortableHeader("active", "Aktiv", "check-col")}
       ${positionSortableHeader("visible", "View", "check-col")}
       ${positionSortableHeader("label", "Label", "label-col")}
+      <th class="planning-year-col">Planung</th>
       ${positionSortableHeader("name", "Name", "name-col")}
       ${positionTableShowsTypeColumn(selectedPositionMode) ? positionSortableHeader("type", "Art") : ""}
       ${positionSortableHeader("amount", "Betrag", "amount-col")}
@@ -6210,7 +6330,7 @@ function positionSortableHeader(column: PositionTableFilterColumn, label: string
 }
 
 function positionTableColumnCount(mode: PositionTableMode, cadence: PositionTableCadence | null = null): number {
-  let count = 9;
+  let count = 10;
   if (positionTableShowsTypeColumn(mode)) count += 1;
   if (mode === "income") count += cadence === null || cadence === "none" ? 3 : 1;
   else if (mode === "expense" && (cadence === "monthly" || cadence === "yearly")) count += 0;
@@ -6235,6 +6355,25 @@ function positionTableHidesExpenseMonthRange(): boolean {
 
 function positionTableShowsPayoutMonthColumn(position: ReservePosition): boolean {
   return !(selectedPositionMode === "savings" && position.type === "savings" && position.payoutType === "none");
+}
+
+function positionPlanningYearSelect(position: ReservePosition): string {
+  const planningYear = positionPlanningYear(position);
+  const startOption =
+    position.payoutType === "once"
+      ? ""
+      : `<option value="start" ${planningYear === null ? "selected" : ""}>Start</option>`;
+  return `
+    <select class="planning-year-select" data-position-id="${escapeHtml(position.id)}" data-position-field="planningYear" aria-label="Planungsjahr">
+      ${startOption}
+      ${planningYearOptions(state.settings.year)
+        .map(
+          (year) =>
+            `<option value="${year}" ${planningYear === year ? "selected" : ""}>${year}</option>`
+        )
+        .join("")}
+    </select>
+  `;
 }
 
 function positionAmountCell(position: ReservePosition): string {
@@ -6606,8 +6745,8 @@ function renderAccountYearTables(): void {
   }
   if (!host) return;
   host.innerHTML = renderAccountYearTableOverview({
-    accounts: state.planningAccounts,
-    settings: state.settings,
+    accounts: planningAccountsForActiveYear(),
+    settings: activePlanningSettings(),
     activeAccountId: state.ui.selectedPlanningAccountId,
     showMaxNeeded: showResultMaxNeeded
   });
@@ -6693,15 +6832,17 @@ function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSumm
 
 function buildReserveChartModel(summary: ReturnType<typeof calculateReserveSummary>): ReserveChartModel {
   const factors = reserveChartScenarioFactors();
+  const chartPositions = activePlanningPositions();
+  const chartSettings = activePlanningSettings();
   const months = summary.rows.map((row) => {
-    const reserves = state.positions.reduce((sum, position) => {
+    const reserves = chartPositions.reduce((sum, position) => {
       return position.type === "reserve"
-        ? sum + calculatePlannedOutflowForSingleMonth(position, state.settings.year, row.monthNumber)
+        ? sum + calculatePlannedOutflowForSingleMonth(position, chartSettings.year, row.monthNumber)
         : sum;
     }, 0);
-    const savings = state.positions.reduce((sum, position) => {
+    const savings = chartPositions.reduce((sum, position) => {
       return position.type === "savings"
-        ? sum + calculatePlannedOutflowForSingleMonth(position, state.settings.year, row.monthNumber)
+        ? sum + calculatePlannedOutflowForSingleMonth(position, chartSettings.year, row.monthNumber)
         : sum;
     }, 0);
     const selectedBase = reserveChartHighlightId
@@ -6874,7 +7015,7 @@ function reserveChartInsight(totals: ReserveChartTotals, summary: ReturnType<typ
 }
 
 function reserveChartPositions(): ReserveChartPosition[] {
-  return state.positions
+  return activePlanningPositions()
     .map((position) => {
       const category = reservePositionCategory(position);
       const total = reservePositionYearValue(position);
@@ -6894,7 +7035,7 @@ function reservePositionCategory(position: ReservePosition): Exclude<ReserveChar
 }
 
 function reserveHighlightedPositionCategory(): Exclude<ReserveChartCategory, "all"> | null {
-  const position = state.positions.find((item) => item.id === reserveChartHighlightId);
+  const position = activePlanningPositions().find((item) => item.id === reserveChartHighlightId);
   return position ? reservePositionCategory(position) : null;
 }
 
@@ -6907,12 +7048,13 @@ function reservePositionYearValue(position: ReservePosition): number {
 }
 
 function reservePositionMonthValue(positionId: string, month: number): number {
-  const position = state.positions.find((item) => item.id === positionId);
+  const position = activePlanningPositions().find((item) => item.id === positionId);
   if (!position) return 0;
+  const year = activePlanningSettings().year;
   if (isIncomePosition(position)) {
-    return calculatePlannedIncomeForSingleMonth(position, state.settings.year, month);
+    return calculatePlannedIncomeForSingleMonth(position, year, month);
   }
-  return calculatePlannedOutflowForSingleMonth(position, state.settings.year, month);
+  return calculatePlannedOutflowForSingleMonth(position, year, month);
 }
 
 function reserveChartAdjustedValue(value: number): number {
@@ -6975,7 +7117,7 @@ function reserveChartPositionButton(position: ReserveChartPosition): string {
         <span>${escapeHtml(position.name)}</span>
       </span>
       <strong>${money(position.total)}</strong>
-      <small>${labelForType(state.positions.find((item) => item.id === position.id)?.type || "temporary")}</small>
+      <small>${labelForType(activePlanningPositions().find((item) => item.id === position.id)?.type || "temporary")}</small>
     </button>
   `;
 }
@@ -7018,7 +7160,10 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
       : `${money(summary.totalCashback)} jaehrlich aus Jahrestabelle`
   );
 
-  const savingsPositions = selectedInvestmentPlanningAccount().yearlyRows.filter(
+  const savingsPositions = positionsForPlanningYear(
+    selectedInvestmentPlanningAccount().yearlyRows,
+    activePlanningYear()
+  ).filter(
     (position) => position.active && position.type === "savings" && positionFlow(position) === "expense"
   );
   if (!savingsPositions.length) {
@@ -8145,6 +8290,15 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
       case "cashback":
         next.cashback = positionFlow(next) === "expense" && next.type === "temporary" && Boolean(value);
         break;
+      case "planningYear":
+        next.planningYear = sanitizePlanningYearSelection(value, state.settings.year);
+        if (next.payoutType === "once") {
+          const nextPlanningYear =
+            next.planningYear ?? normalizePositionPlanningYear(next.payoutYear) ?? state.settings.year;
+          next.planningYear = nextPlanningYear;
+          next.payoutYear = nextPlanningYear;
+        }
+        break;
       case "amount":
       case "startMonth":
       case "endMonth":
@@ -8152,6 +8306,9 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
       case "payoutMonth":
       case "payoutDay":
         next[field] = numberValue(String(value));
+        if (field === "payoutYear" && next.payoutType === "once") {
+          next.planningYear = normalizePositionPlanningYear(next.payoutYear);
+        }
         break;
       case "type":
         if (isPositionType(value)) {
@@ -8171,7 +8328,9 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
           next.payoutType = value;
           if (positionFlow(next) === "income" && value === "none") next.type = "incomeTemporary";
           if (next.payoutType === "once") {
-            next.payoutYear = Number(next.payoutYear || state.settings.year);
+            next.payoutYear =
+              normalizePositionPlanningYear(next.planningYear) ?? Number(next.payoutYear || state.settings.year);
+            next.planningYear = normalizePositionPlanningYear(next.payoutYear);
             if (next.type !== "savings") {
               next.startMonth = next.payoutMonth;
               next.endMonth = next.payoutMonth;
@@ -8206,6 +8365,9 @@ function updatePosition(id: string, field: keyof ReservePosition, value: string 
     }
 
     if (next.payoutType === "once") {
+      const payoutYear = normalizePositionPlanningYear(next.payoutYear) ?? state.settings.year;
+      next.payoutYear = payoutYear;
+      next.planningYear = payoutYear;
       if (next.type !== "savings") {
         next.startMonth = next.payoutMonth;
         next.endMonth = next.payoutMonth;
@@ -8228,6 +8390,11 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
   const type = typeForFlow(position.type, requestedFlow);
   const flow = flowForType(type);
   const payoutType = normalizePayoutType(position.payoutType, flow, type);
+  const payoutYear = finiteIntegerInRange(position.payoutYear, 2000, 2200, fallbackYear);
+  const planningYear =
+    payoutType === "once"
+      ? normalizePositionPlanningYear(payoutYear)
+      : normalizePositionPlanningYear(position.planningYear);
   const payoutMonth = finiteIntegerInRange(position.payoutMonth, 1, 12, 12);
   const costBreakdown = normalizePositionCostBreakdown(position.costBreakdown);
   const canUseCostBreakdown = positionCostBreakdownAllowed(flow, type, payoutType);
@@ -8250,6 +8417,7 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
   return {
     ...position,
     id: String(position.id || createId()),
+    planningYear,
     flow,
     active: Boolean(position.active),
     visible: Boolean(position.visible),
@@ -8260,7 +8428,7 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
     startMonth,
     endMonth,
     payoutType,
-    payoutYear: finiteIntegerInRange(position.payoutYear, 2000, 2200, fallbackYear),
+    payoutYear,
     payoutMonth,
     payoutDay: finiteIntegerInRange(position.payoutDay, 1, 31, 31),
     interestBearing: !isIncome && payoutType !== "once" && Boolean(position.interestBearing),
@@ -8302,10 +8470,14 @@ function addPosition(): string {
   const startMonth = isOnce ? payoutMonth : 1;
   const endMonth = isOnce ? payoutMonth : 12;
   const id = createId();
+  const selectedPlanningYear = activePlanningYear();
+  const payoutYear = selectedPlanningYear ?? state.settings.year;
+  const planningYear = isOnce ? payoutYear : selectedPlanningYear;
   state.positions = [
     ...state.positions,
     {
       id,
+      planningYear,
       flow,
       active: true,
       visible: true,
@@ -8316,7 +8488,7 @@ function addPosition(): string {
       startMonth,
       endMonth,
       payoutType,
-      payoutYear: state.settings.year,
+      payoutYear,
       payoutMonth,
       payoutDay: isIncome ? 1 : 14,
       interestBearing: false,
@@ -8444,7 +8616,7 @@ function toggleResultMaxNeeded(): void {
 
 function showReserveChartPopup(): void {
   reserveChartOpen = true;
-  renderReserveChartPopup(calculateReserveSummary(state.settings, state.positions));
+  renderReserveChartPopup(calculateReserveSummary(activePlanningSettings(), activePlanningPositions()));
 }
 
 function hideReserveChartPopup(): void {
@@ -8490,6 +8662,16 @@ function setSelectedPositionMode(mode: PositionTableMode): void {
   renderPositions();
 }
 
+function setSelectedPlanningYear(value: string): void {
+  state.ui = {
+    ...state.ui,
+    selectedPlanningYear: sanitizePlanningYearSelection(value, state.settings.year)
+  };
+  reserveChartHighlightId = null;
+  positionCostDialogId = null;
+  renderAll();
+}
+
 function setSelectedPositionCadence(cadence: PositionTableCadence): void {
   const cadences = positionCadencesForTableMode(selectedPositionMode);
   if (!cadences.includes(cadence)) return;
@@ -8502,7 +8684,7 @@ function setSelectedPositionCadence(cadence: PositionTableCadence): void {
 
 function positionTableSourcePositions(): ReservePosition[] {
   const cadence = activePositionCadence();
-  return state.positions.filter((position) => {
+  return activePlanningPositions().filter((position) => {
     if (positionTableMode(position) !== selectedPositionMode) return false;
     return positionMatchesTableCadence(position, selectedPositionMode, cadence);
   });
@@ -9082,7 +9264,7 @@ function investmentPositionsForProjection(
       virtualInvestmentPosition(CASHBACK_INVESTMENT_POSITION_ID, "Cashback aus Jahrestabelle", summary.totalCashback)
     );
   }
-  return [...account.yearlyRows, ...virtualPositions];
+  return [...positionsForPlanningYear(account.yearlyRows, activePlanningYear()), ...virtualPositions];
 }
 
 function investmentSettingsForProjection(

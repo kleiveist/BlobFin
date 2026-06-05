@@ -12,6 +12,7 @@ import {
 } from "./format";
 import { defaultPositionIconForPosition, normalizePositionIcon, positionIconLabel } from "./positionIcons";
 import { flowForType, isIncomeType, typeForFlow } from "./positionKinds";
+import { positionPlanningYear } from "./planningYears";
 import type {
   PlanningSettings,
   PayoutType,
@@ -156,6 +157,7 @@ export function exportPositionsCsv(positions: ReservePosition[]): string {
       "Abgangstag",
       "Zinsen",
       "Cashback",
+      "Planungsjahr",
       "Datensatz",
       "Positions-ID",
       "Detail-Nr",
@@ -255,9 +257,14 @@ function parsePositionCsvPosition(row: string[], get: CsvRowGetter): ReservePosi
     get(row, ["label", "icon", "symbol", "bild"], -1),
     defaultPositionIconForPosition({ flow, type, name })
   );
+  const planningYear = parsePlanningYearValue(get(row, ["planungsjahr", "planjahr", "planningyear"], -1));
+  const exportedId = cleanText(
+    get(row, ["positionsid", "positionid", "positionsschluessel", "positionkey", "csvpositionid"], -1)
+  );
 
   const position: ReservePosition = {
-    id: createId(),
+    id: exportedId || createId(),
+    planningYear,
     flow,
     active: parseBooleanValue(get(row, ["aktiv", "active"], 0), true),
     visible: parseBooleanValue(get(row, ["view", "visible", "sichtbar", "anzeigen"], -1), true),
@@ -295,6 +302,9 @@ function parsePositionCsvPosition(row: string[], get: CsvRowGetter): ReservePosi
   } else if (position.payoutType === "once") {
     position.interestBearing = false;
   }
+  if (position.payoutType === "once") {
+    position.planningYear = parsePlanningYearValue(position.payoutYear);
+  }
 
   if (position.type !== "savings" && position.startMonth > position.endMonth) {
     const startMonth = position.startMonth;
@@ -321,7 +331,8 @@ function positionCsvBaseRow(position: ReservePosition, amount: number): string[]
     monthName(position.payoutMonth),
     String(position.payoutDay),
     position.interestBearing ? "Ja" : "Nein",
-    position.cashback ? "Ja" : "Nein"
+    position.cashback ? "Ja" : "Nein",
+    formatPlanningYearCsv(positionPlanningYear(position))
   ];
 }
 
@@ -351,7 +362,8 @@ function positionCsvGroupKey(row: string[], get: CsvRowGetter): string {
       get(row, ["jahr", "abgangsjahr", "eingangsjahr", "payoutyear", "year"], -1),
       defaultPlanningSettings().year
     ),
-    parseMonthValue(get(row, ["monat", "abgangsmonat", "eingangsmonat", "payoutmonth"], 7), 12)
+    parseMonthValue(get(row, ["monat", "abgangsmonat", "eingangsmonat", "payoutmonth"], 7), 12),
+    parsePlanningYearValue(get(row, ["planungsjahr", "planjahr", "planningyear"], -1)) ?? "start"
   ].join("|");
 }
 
@@ -411,6 +423,17 @@ function positionCostBreakdownAllowed(flow: PositionFlow, type: PositionType, pa
 function parseYearValue(value: unknown, fallback: number): number {
   const parsed = Math.round(parseMoneyValue(value));
   return parsed > 0 ? parsed : fallback;
+}
+
+function parsePlanningYearValue(value: unknown): number | null {
+  const normalized = normalizeHeader(value);
+  if (!normalized || normalized === "start") return null;
+  const parsed = Math.round(parseMoneyValue(value));
+  return parsed >= 2000 && parsed <= 2200 ? parsed : null;
+}
+
+function formatPlanningYearCsv(value: ReservePosition["planningYear"]): string {
+  return typeof value === "number" ? String(value) : "Start";
 }
 
 function parseBooleanValue(value: unknown, fallback: boolean): boolean {

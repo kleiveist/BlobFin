@@ -130,6 +130,9 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-module-section="cost_reserve_positions"');
     expect(html).not.toContain('data-module-section="year_table"');
     expect(html).not.toContain('data-module-section="investment_planning"');
+    expect(html.indexOf("Konto-Module")).toBeLessThan(html.indexOf("Jahresplanung"));
+    expect(html.indexOf("Jahresplanung")).toBeLessThan(html.indexOf("Kosten- und Ruecklagenpositionen"));
+    expect(html).toContain('id="planningYearNavigation"');
     expect(html).toContain("Kosten- und Ruecklagenpositionen");
     expect(html).toContain("Jahrestabellen pro Konto");
     expect(html).toContain("Investment- und Auszahlungsplanung");

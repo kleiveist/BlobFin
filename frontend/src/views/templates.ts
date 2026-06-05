@@ -155,6 +155,14 @@ export function renderAppShell(): string {
         <div id="planningAccountDialogHost"></div>
       </section>
 
+      <section class="panel planning-year-panel" data-module-section="planning_scenarios">
+        <div class="section-heading">
+          <h2>Jahresplanung</h2>
+          <span id="planningYearActiveLabel" class="planning-year-active-label">Start</span>
+        </div>
+        <div id="planningYearNavigation" class="planning-year-navigation" role="tablist" aria-label="Jahresplanung"></div>
+      </section>
+
       <section class="panel" data-module-section="planning_scenarios">
         <div class="toolbar">
           <div class="section-heading position-toolbar-heading">

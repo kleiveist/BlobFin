@@ -146,6 +146,68 @@ describe("storage", () => {
     expect(loaded.positionTableView.income).toEqual({ filters: [], sort: null, selectedLabels: [] });
   });
 
+  it("treats saved positions without planning year as start positions", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const legacyPositions = state.positions.map((position) => {
+      const legacyPosition = { ...position };
+      delete legacyPosition.planningYear;
+      return legacyPosition;
+    });
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        positions: legacyPositions,
+        planningAccounts: state.planningAccounts.map((account) => ({
+          ...account,
+          yearlyRows: legacyPositions
+        }))
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.positions.every((position) => position.planningYear === null)).toBe(true);
+    expect(loaded.planningAccounts[0].yearlyRows.every((position) => position.planningYear === null)).toBe(true);
+  });
+
+  it("assigns saved one-time positions without planning year to their payout year", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const legacyOncePosition = {
+      ...state.positions[0],
+      id: "legacy-once-expense",
+      flow: "expense" as const,
+      type: "temporary" as const,
+      payoutType: "once" as const,
+      payoutYear: 2033,
+      payoutMonth: 6,
+      startMonth: 1,
+      endMonth: 12
+    };
+    delete legacyOncePosition.planningYear;
+
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        positions: [legacyOncePosition],
+        planningAccounts: state.planningAccounts.map((account) => ({
+          ...account,
+          yearlyRows: [legacyOncePosition]
+        }))
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.positions[0]?.planningYear).toBe(2033);
+    expect(loaded.positions[0]?.startMonth).toBe(6);
+    expect(loaded.positions[0]?.endMonth).toBe(6);
+    expect(loaded.planningAccounts[0].yearlyRows[0]?.planningYear).toBe(2033);
+  });
+
   it("migrates saved table view settings without label quick filters", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();

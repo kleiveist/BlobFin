@@ -3,6 +3,7 @@ export type ExpensePositionType = "fixed" | "reserve" | "temporary" | "savings";
 export type IncomePositionType = "incomeMonthly" | "incomeYearly" | "incomeTemporary";
 export type PositionType = ExpensePositionType | IncomePositionType;
 export type PayoutType = "none" | "monthly" | "yearly" | "once";
+export type PlanningYearSelection = number | null;
 export type ThemeMode = "light" | "dark";
 export type InvestmentDepotKey = "standard" | "retirement" | "child";
 export type CombinedWealthDepotKey = InvestmentDepotKey;
@@ -79,6 +80,7 @@ export interface PositionCostBreakdownItem {
 
 export interface ReservePosition {
   id: string;
+  planningYear?: PlanningYearSelection;
   flow: PositionFlow;
   active: boolean;
   visible: boolean;
@@ -116,6 +118,7 @@ export interface PlanningAccount {
 
 export interface AppUiState {
   activeSection: AppSectionId;
+  selectedPlanningYear: PlanningYearSelection;
   selectedPlanningAccountId: string;
   selectedInvestmentAccountId: string;
   selectedRealEstateAccountIds: string[];

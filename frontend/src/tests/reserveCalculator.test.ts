@@ -437,12 +437,18 @@ describe("reserve calculator", () => {
 
   it("round-trips positions through semicolon csv", () => {
     const state = defaultAppState();
-    const csv = exportPositionsCsv(state.positions);
+    const positions = state.positions.map((position, index) => ({
+      ...position,
+      planningYear: index === 1 ? 2033 : position.planningYear
+    }));
+    const csv = exportPositionsCsv(positions);
     const imported = positionsFromCsvRows(parseCsv(csv));
     const dispo = imported.find((position) => position.id !== "nettoeinkommen" && position.name === "Dispo-Reserve");
     const uniFee = imported.find((position) => position.name === "Uni-Gebuehr");
     const kfzReserve = imported.find((position) => position.name === "Kfz-Versicherung Ruecklage");
 
+    expect(csv).toContain("Planungsjahr");
+    expect(csv).not.toContain("Basis-ID");
     expect(csv).toContain("Temporaere Ausgabe");
     expect(csv).toContain("Auto");
     expect(imported).toHaveLength(state.positions.length);
@@ -452,7 +458,8 @@ describe("reserve calculator", () => {
       name: "Nettoeinkommen",
       flow: "income",
       type: "incomeMonthly",
-      amount: 0
+      amount: 0,
+      planningYear: null
     });
     expect(dispo).toMatchObject({
       active: true,
@@ -461,7 +468,8 @@ describe("reserve calculator", () => {
       flow: "expense",
       type: "fixed",
       amount: 500,
-      interestBearing: false
+      interestBearing: false,
+      planningYear: 2033
     });
     expect(uniFee).toMatchObject({
       flow: "expense",
@@ -472,6 +480,25 @@ describe("reserve calculator", () => {
     expect(positionTableMode(uniFee!)).toBe("expense");
     expect(kfzReserve?.icon).toBe("car");
     expect(imported[imported.length - 1]?.type).toBe("savings");
+  });
+
+  it("imports one-time csv positions without planning year into their payout year", () => {
+    const csv = [
+      "Name;Betrag;Art;Abgang;Abgangsjahr;Abgangsmonat",
+      "Einmaliger Laptop;1200;Temporaere Ausgabe;Einmalig;2033;Juni"
+    ].join("\n");
+
+    const imported = positionsFromCsvRows(parseCsv(csv));
+
+    expect(imported[0]).toMatchObject({
+      name: "Einmaliger Laptop",
+      type: "temporary",
+      payoutType: "once",
+      payoutYear: 2033,
+      planningYear: 2033,
+      startMonth: 6,
+      endMonth: 6
+    });
   });
 
   it("round-trips amount detail popup rows through positions csv", () => {
