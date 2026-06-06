@@ -482,6 +482,71 @@ describe("reserve calculator", () => {
     expect(imported[imported.length - 1]?.type).toBe("savings");
   });
 
+  it("round-trips planning years through positions csv for all position modes and cadences", () => {
+    const position = (
+      id: string,
+      flow: ReservePosition["flow"],
+      type: ReservePosition["type"],
+      payoutType: ReservePosition["payoutType"],
+      planningYear: ReservePosition["planningYear"],
+      payoutYear = 2026
+    ): ReservePosition => ({
+      id,
+      planningYear,
+      flow,
+      active: true,
+      visible: true,
+      name: id,
+      type,
+      amount: 100,
+      startMonth: 1,
+      endMonth: 12,
+      payoutType,
+      payoutYear,
+      payoutMonth: 6,
+      payoutDay: 15,
+      interestBearing: false,
+      cashback: false
+    });
+    const positions: ReservePosition[] = [
+      position("income-monthly-start", "income", "incomeMonthly", "monthly", null),
+      position("income-yearly-2026", "income", "incomeYearly", "yearly", 2026),
+      position("income-once-2033", "income", "incomeTemporary", "once", 2033, 2033),
+      position("income-none-2028", "income", "incomeTemporary", "none", 2028),
+      position("expense-monthly-start", "expense", "temporary", "monthly", null),
+      position("expense-yearly-2026", "expense", "temporary", "yearly", 2026),
+      position("expense-once-2033", "expense", "temporary", "once", 2033, 2033),
+      position("expense-none-2028", "expense", "fixed", "none", 2028),
+      position("reserve-monthly-2026", "expense", "reserve", "monthly", 2026),
+      position("savings-monthly-start", "expense", "savings", "monthly", null),
+      position("savings-once-2033", "expense", "savings", "once", 2033, 2033),
+      position("savings-none-2028", "expense", "savings", "none", 2028)
+    ];
+
+    const csv = exportPositionsCsv(positions);
+    const imported = positionsFromCsvRows(parseCsv(csv));
+
+    expect(csv).toContain("Planungsjahr");
+    expect(csv).toContain("Start");
+    expect(csv).toContain("2026");
+    expect(csv).toContain("2028");
+    expect(csv).toContain("2033");
+    expect(imported.map((position) => [position.id, position.planningYear])).toEqual([
+      ["income-monthly-start", null],
+      ["income-yearly-2026", 2026],
+      ["income-once-2033", 2033],
+      ["income-none-2028", 2028],
+      ["expense-monthly-start", null],
+      ["expense-yearly-2026", 2026],
+      ["expense-once-2033", 2033],
+      ["expense-none-2028", 2028],
+      ["reserve-monthly-2026", 2026],
+      ["savings-monthly-start", null],
+      ["savings-once-2033", 2033],
+      ["savings-none-2028", 2028]
+    ]);
+  });
+
   it("imports one-time csv positions without planning year into their payout year", () => {
     const csv = [
       "Name;Betrag;Art;Abgang;Abgangsjahr;Abgangsmonat",
