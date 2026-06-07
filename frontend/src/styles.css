@@ -2824,6 +2824,44 @@ tfoot th {
   box-shadow: 0 0 0 2px var(--focus), var(--shadow);
 }
 
+.overview-card-group {
+  cursor: default;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.overview-card-group:hover {
+  border-color: var(--border);
+  box-shadow: none;
+  transform: none;
+}
+
+.overview-card-primary {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 14px;
+  padding: 18px;
+  text-align: left;
+  width: 100%;
+}
+
+.overview-card-primary:hover,
+.overview-card-primary.active,
+.overview-subcard:hover,
+.overview-subcard.active {
+  background: var(--accent-soft);
+}
+
+.overview-card-primary.active,
+.overview-subcard.active {
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
 .overview-card-top {
   display: flex;
   align-items: center;
@@ -2894,6 +2932,61 @@ tfoot th {
   font-size: 0.82rem;
   font-weight: 900;
   padding: 9px 12px;
+}
+
+.overview-subcard-list {
+  border-top: 1px solid var(--row-border);
+  display: grid;
+  padding: 10px;
+}
+
+.overview-subcard {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 10px;
+  text-align: left;
+}
+
+.overview-subcard .overview-card-icon {
+  height: 34px;
+  width: 34px;
+}
+
+.overview-subcard .overview-card-icon svg {
+  height: 20px;
+  width: 20px;
+}
+
+.overview-subcard-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.overview-subcard-copy strong {
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.overview-subcard-copy small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.overview-subcard-action {
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
 }
 
 .section-overview-card {
@@ -4830,6 +4923,147 @@ tfoot th {
   margin-bottom: 10px;
 }
 
+.income-planning-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.income-planning-heading {
+  align-items: flex-start;
+}
+
+.income-planning-category-select {
+  min-width: 220px;
+}
+
+.income-planning-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.income-planning-metric.realistic {
+  border-color: rgba(46, 125, 88, 0.35);
+}
+
+.income-planning-metric.high {
+  border-color: rgba(184, 134, 11, 0.45);
+}
+
+.income-planning-metric.unrealistic {
+  border-color: rgba(185, 70, 70, 0.45);
+}
+
+.income-planning-warnings {
+  display: grid;
+  gap: 8px;
+}
+
+.income-planning-warning {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+
+.income-planning-warning.realistic {
+  border-color: rgba(46, 125, 88, 0.35);
+}
+
+.income-planning-warning.high {
+  border-color: rgba(184, 134, 11, 0.45);
+}
+
+.income-planning-warning.unrealistic {
+  border-color: rgba(185, 70, 70, 0.45);
+}
+
+.income-planning-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.34fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.income-planning-source-list,
+.income-planning-assumptions,
+.income-planning-scenarios {
+  display: grid;
+  gap: 10px;
+}
+
+.income-planning-source-row {
+  display: grid;
+  grid-template-columns: minmax(78px, 0.4fr) minmax(150px, 0.9fr) minmax(180px, 1.2fr) repeat(9, minmax(110px, 0.7fr)) 44px;
+  gap: 8px;
+  align-items: end;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.income-planning-source-active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.income-planning-source-row:not(.active) {
+  opacity: 0.68;
+}
+
+.income-planning-source-row .field {
+  min-width: 0;
+}
+
+.income-planning-source-row .field.compact {
+  min-width: 104px;
+}
+
+.income-planning-source-name {
+  min-width: 180px;
+}
+
+.income-planning-scenario {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.income-planning-scenario-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.income-planning-scenario-head span,
+.income-planning-scenario small {
+  color: var(--muted);
+}
+
+.income-planning-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.income-planning-scenario-grid ol {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
 .income-module-section {
   scroll-margin-top: 16px;
 }
@@ -6588,6 +6822,23 @@ tfoot th {
 
   .income-tab-switch {
     grid-template-columns: 1fr;
+  }
+
+  .income-planning-metric-grid,
+  .income-planning-layout,
+  .income-planning-scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .income-planning-source-row {
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+
+  .income-planning-warning,
+  .income-planning-scenario-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .income-tax-adjustment-amount {

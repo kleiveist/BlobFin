@@ -2,6 +2,7 @@ import type {
   AppState,
   AppUiState,
   CombinedWealthToggles,
+  IncomePlanningState,
   IncomeTrackerState,
   InvestmentSettings,
   PlanningAccount,
@@ -12,6 +13,7 @@ import type {
   ReservePosition,
   StatutoryPensionSettings
 } from "../types";
+import { buildIncomePlanningSource } from "../domain/incomePlanning";
 
 export const MONTHS = [
   "Januar",
@@ -382,6 +384,23 @@ export function defaultIncomeTrackerState(): IncomeTrackerState {
   };
 }
 
+export function defaultIncomePlanningState(): IncomePlanningState {
+  const startYear = defaultPlanningSettings().year;
+  return {
+    sources: [
+      buildIncomePlanningSource("main_job", "income-plan-main-job", startYear),
+      buildIncomePlanningSource("online_sales", "income-plan-online-sales", startYear),
+      buildIncomePlanningSource("self_employment", "income-plan-self-employment", startYear)
+    ],
+    assumptions: {
+      sleepHoursPerDay: 7,
+      freeTimeHoursPerDay: 2,
+      privateCommitmentsHoursPerWeek: 12,
+      weeklyBufferHours: 8
+    }
+  };
+}
+
 export function defaultAppState(): AppState {
   const planningAccounts = defaultPlanningAccounts();
   const investment = defaultInvestmentSettings();
@@ -394,6 +413,7 @@ export function defaultAppState(): AppState {
     combinedWealth: defaultCombinedWealthToggles(),
     statutoryPension: defaultStatutoryPensionSettings(),
     incomeTracker: defaultIncomeTrackerState(),
+    incomePlanning: defaultIncomePlanningState(),
     positions: planningAccounts[0].yearlyRows,
     investmentByAccountId: {
       [planningAccounts[0].id]: investment

@@ -4,6 +4,7 @@ import {
   createId,
   defaultAppState,
   defaultCombinedWealthToggles,
+  defaultIncomePlanningState,
   defaultIncomeTrackerState,
   defaultInvestmentSettings,
   defaultInvestmentSettingsForNewAccount
@@ -19,6 +20,13 @@ import {
   type IncomeAnalysisLabelDetails,
   type IncomeAnalysisLabelGroup
 } from "./domain/incomeAnalysis";
+import {
+  buildIncomePlanningModel,
+  buildIncomePlanningSource,
+  INCOME_PLANNING_CATEGORY_CONFIGS,
+  incomePlanningCategoryConfig,
+  type IncomePlanningModel
+} from "./domain/incomePlanning";
 import {
   buildIncomeChartModel,
   buildIncomeTrackerModel,
@@ -135,6 +143,12 @@ import type {
   IncomeResolvedSource,
   IncomeTaxDeductionField,
   IncomeTaxDeductionItems,
+  IncomePlanningAssumptions,
+  IncomePlanningCategory,
+  IncomePlanningLevel,
+  IncomePlanningPhase,
+  IncomePlanningSource,
+  IncomePlanningSourceStatus,
   IncomeTrackerSettings,
   IncomeYearEntry,
   IncomeYearEntrySource,
@@ -194,6 +208,7 @@ const COMBINED_DEPOTS: Array<{ key: CombinedWealthDepotKey; label: string }> = [
 const APP_SECTION_IDS: AppSectionId[] = [
   "home",
   "income",
+  "income_planning",
   "planning_scenarios",
   "real_estate_financing",
   "statutory_pension",
@@ -545,6 +560,7 @@ function sanitizeAppState(appState: AppState): AppState {
   }, {});
   const investment = investmentByAccountId[selectedInvestmentAccountId] ?? defaultInvestmentSettingsForNewAccount();
   const incomeTracker = appState.incomeTracker ?? defaultIncomeTrackerState();
+  const incomePlanning = appState.incomePlanning ?? defaultIncomePlanningState();
 
   investmentAccountContextId = selectedInvestmentAccountId;
   return {
@@ -570,6 +586,7 @@ function sanitizeAppState(appState: AppState): AppState {
     positions,
     investmentByAccountId,
     investment,
+    incomePlanning,
     incomeTracker: {
       ...incomeTracker,
       yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules(incomeTracker.yearlyEntries)
@@ -944,6 +961,10 @@ function bindEvents(): void {
       return;
     }
 
+    if (handleIncomePlanningControl(target, "live")) {
+      return;
+    }
+
     if (target.dataset.positionCostPositionId && target.dataset.positionCostItemId && target.dataset.positionCostField) {
       updatePositionCostBreakdownItem(
         target.dataset.positionCostPositionId,
@@ -1010,6 +1031,10 @@ function bindEvents(): void {
     if (target.dataset.incomeSetting) {
       updateIncomeSetting(target.dataset.incomeSetting as keyof IncomeTrackerSettings, target.value);
       requestRenderAll();
+      return;
+    }
+
+    if (handleIncomePlanningControl(target, "full")) {
       return;
     }
 
@@ -1264,6 +1289,8 @@ function bindEvents(): void {
     if (action?.startsWith("income-remove-")) removeIncomeEntry(action);
     if (action === "income-export-csv") void exportIncomeCsv();
     if (action === "income-export-pdf") exportIncomePdf();
+    if (action === "income-planning-add-source") addIncomePlanningSource();
+    if (action === "income-planning-remove-source") removeIncomePlanningSource(button.dataset.incomePlanningSourceId || "");
     if (action === "add-planning-account") addPlanningAccount();
     if (action === "rename-planning-account") renamePlanningAccount();
     if (action === "cancel-planning-account-dialog") closePlanningAccountDialog();
@@ -1520,6 +1547,7 @@ function renderAll(): void {
     syncInvestmentInputsFromState();
     syncSettingsAccordionState();
     renderIncomeTracker();
+    renderIncomePlanning();
     saveState(state);
   } finally {
     renderAllRunning = false;
@@ -1727,6 +1755,419 @@ function renderIncomeTracker(): void {
   renderIncomeAnalysisDialog(model);
   renderIncomeYearLabelPicker();
   renderIncomeMilestoneTypePicker();
+}
+
+function renderIncomePlanning(): void {
+  const panel = document.querySelector<HTMLElement>('[data-module-section="income_planning"]');
+  if (!panel) return;
+  renderIncomePlanningCategorySelect();
+  renderIncomePlanningSources();
+  renderIncomePlanningAssumptions();
+  renderIncomePlanningSummary();
+}
+
+function renderIncomePlanningSummary(): void {
+  const model = buildIncomePlanningModel(state.incomePlanning);
+  renderIncomePlanningMetrics(model);
+  renderIncomePlanningWarnings(model);
+  renderIncomePlanningScenarios(model);
+}
+
+function renderIncomePlanningCategorySelect(): void {
+  const select = document.querySelector<HTMLSelectElement>("#incomePlanningCategorySelect");
+  if (!select) return;
+  const selected = isIncomePlanningCategory(select.value) ? select.value : "main_job";
+  select.innerHTML = INCOME_PLANNING_CATEGORY_CONFIGS.map(
+    (config) =>
+      `<option value="${escapeHtml(config.id)}" ${config.id === selected ? "selected" : ""}>${escapeHtml(
+        config.label
+      )}</option>`
+  ).join("");
+}
+
+function renderIncomePlanningMetrics(model: IncomePlanningModel): void {
+  const host = document.querySelector<HTMLDivElement>("#incomePlanningMetricGrid");
+  if (!host) return;
+  host.innerHTML = `
+    ${incomePlanningMetric("Arbeitszeit", `${hoursLabel(model.totalWorkHours)} / Woche`, `${model.activeSources.length} aktive Quellen`, model.status)}
+    ${incomePlanningMetric("Freie Reserve", `${hoursLabel(model.remainingFlexibleHours)} / Woche`, "nach Schlaf, Freizeit und Puffer", model.remainingFlexibleHours < 0 ? "unrealistic" : model.status)}
+    ${incomePlanningMetric("Monatseinkommen", money(model.totalMonthlyIncome), "erwartbar pro Monat", "realistic")}
+    ${incomePlanningMetric("Belastung", incomePlanningStatusLabel(model.status), `${hoursLabel(model.usedHours)} von 168h verplant`, model.status)}
+  `;
+}
+
+function incomePlanningMetric(
+  label: string,
+  value: string,
+  detail: string,
+  status: IncomePlanningModel["status"]
+): string {
+  return `
+    <article class="metric-card income-planning-metric ${escapeHtml(status)}">
+      <span class="metric-label">${escapeHtml(label)}</span>
+      <strong class="metric-value">${escapeHtml(value)}</strong>
+      <small class="metric-detail">${escapeHtml(detail)}</small>
+    </article>
+  `;
+}
+
+function renderIncomePlanningWarnings(model: IncomePlanningModel): void {
+  const host = document.querySelector<HTMLDivElement>("#incomePlanningWarnings");
+  if (!host) return;
+  host.innerHTML = model.warnings.length
+    ? model.warnings
+        .map(
+          (warning) => `
+            <div class="income-planning-warning ${escapeHtml(model.status)}">
+              <strong>${escapeHtml(incomePlanningStatusLabel(model.status))}</strong>
+              <span>${escapeHtml(warning)}</span>
+            </div>
+          `
+        )
+        .join("")
+    : `
+      <div class="income-planning-warning realistic">
+        <strong>Realistisch</strong>
+        <span>Die Kombination passt in die aktuelle Zeitplanung.</span>
+      </div>
+    `;
+}
+
+function renderIncomePlanningSources(): void {
+  const host = document.querySelector<HTMLDivElement>("#incomePlanningSources");
+  if (!host) return;
+  host.innerHTML = state.incomePlanning.sources.length
+    ? state.incomePlanning.sources.map(incomePlanningSourceRow).join("")
+    : '<div class="chart-empty">Noch keine Einkommensquelle geplant.</div>';
+}
+
+function incomePlanningSourceRow(source: IncomePlanningSource): string {
+  return `
+    <div class="income-planning-source-row ${source.active ? "active" : ""}">
+      <label class="income-planning-source-active">
+        <input type="checkbox" ${source.active ? "checked" : ""} data-income-planning-source-id="${escapeHtml(
+          source.id
+        )}" data-income-planning-source-field="active" />
+        <span>Aktiv</span>
+      </label>
+      <label class="field">
+        <span>Kategorie</span>
+        <select data-income-planning-source-id="${escapeHtml(source.id)}" data-income-planning-source-field="category">
+          ${INCOME_PLANNING_CATEGORY_CONFIGS.map(
+            (config) =>
+              `<option value="${escapeHtml(config.id)}" ${config.id === source.category ? "selected" : ""}>${escapeHtml(
+                config.label
+              )}</option>`
+          ).join("")}
+        </select>
+      </label>
+      <label class="field income-planning-source-name">
+        <span>Name</span>
+        <input type="text" value="${escapeHtml(source.name)}" data-income-planning-source-id="${escapeHtml(
+          source.id
+        )}" data-income-planning-source-field="name" />
+      </label>
+      <label class="field compact">
+        <span>Std./Woche</span>
+        <input type="number" min="0" max="100" step="0.5" value="${source.hoursPerWeek}" data-income-planning-source-id="${escapeHtml(
+          source.id
+        )}" data-income-planning-source-field="hoursPerWeek" />
+      </label>
+      <label class="field compact">
+        <span>EUR/Monat</span>
+        <input type="number" min="0" step="10" value="${source.expectedMonthlyIncome}" data-income-planning-source-id="${escapeHtml(
+          source.id
+        )}" data-income-planning-source-field="expectedMonthlyIncome" />
+      </label>
+      <label class="field compact">
+        <span>Startmonat</span>
+        <select data-income-planning-source-id="${escapeHtml(source.id)}" data-income-planning-source-field="startMonth">
+          ${Array.from({ length: 12 }, (_, index) => index + 1)
+            .map(
+              (month) =>
+                `<option value="${month}" ${month === source.startMonth ? "selected" : ""}>${escapeHtml(
+                  monthName(month)
+                )}</option>`
+            )
+            .join("")}
+        </select>
+      </label>
+      <label class="field compact">
+        <span>Startjahr</span>
+        <input type="number" min="1900" max="2200" step="1" value="${source.startYear}" data-income-planning-source-id="${escapeHtml(
+          source.id
+        )}" data-income-planning-source-field="startYear" />
+      </label>
+      <label class="field compact">
+        <span>Phase</span>
+        ${incomePlanningSelect(source.id, "phase", incomePlanningPhaseOptions(), source.phase)}
+      </label>
+      <label class="field compact">
+        <span>Status</span>
+        ${incomePlanningSelect(source.id, "status", incomePlanningStatusOptions(), source.status)}
+      </label>
+      <label class="field compact">
+        <span>Risiko</span>
+        ${incomePlanningSelect(source.id, "risk", incomePlanningLevelOptions(), source.risk)}
+      </label>
+      <label class="field compact">
+        <span>Stabilitaet</span>
+        ${incomePlanningSelect(source.id, "stability", incomePlanningLevelOptions(), source.stability)}
+      </label>
+      <label class="field compact">
+        <span>Skalierung</span>
+        ${incomePlanningSelect(source.id, "scalability", incomePlanningLevelOptions(), source.scalability)}
+      </label>
+      <button class="icon-button danger" type="button" data-action="income-planning-remove-source" data-income-planning-source-id="${escapeHtml(
+        source.id
+      )}" aria-label="Einkommensquelle entfernen">x</button>
+    </div>
+  `;
+}
+
+function incomePlanningSelect(
+  sourceId: string,
+  field: keyof IncomePlanningSource,
+  options: Array<{ value: string; label: string }>,
+  selected: string
+): string {
+  return `
+    <select data-income-planning-source-id="${escapeHtml(sourceId)}" data-income-planning-source-field="${escapeHtml(
+      field
+    )}">
+      ${options
+        .map(
+          (option) =>
+            `<option value="${escapeHtml(option.value)}" ${option.value === selected ? "selected" : ""}>${escapeHtml(
+              option.label
+            )}</option>`
+        )
+        .join("")}
+    </select>
+  `;
+}
+
+function renderIncomePlanningAssumptions(): void {
+  const host = document.querySelector<HTMLDivElement>("#incomePlanningAssumptions");
+  if (!host) return;
+  const assumptions = state.incomePlanning.assumptions;
+  host.innerHTML = `
+    ${incomePlanningAssumptionField("sleepHoursPerDay", "Schlaf pro Tag", assumptions.sleepHoursPerDay, 0.5)}
+    ${incomePlanningAssumptionField("freeTimeHoursPerDay", "Freizeit pro Tag", assumptions.freeTimeHoursPerDay, 0.5)}
+    ${incomePlanningAssumptionField("privateCommitmentsHoursPerWeek", "Private Verpflichtungen/Woche", assumptions.privateCommitmentsHoursPerWeek, 0.5)}
+    ${incomePlanningAssumptionField("weeklyBufferHours", "Wochenpuffer", assumptions.weeklyBufferHours, 0.5)}
+  `;
+}
+
+function incomePlanningAssumptionField(
+  field: keyof IncomePlanningAssumptions,
+  label: string,
+  value: number,
+  step: number
+): string {
+  return `
+    <label class="field">
+      <span>${escapeHtml(label)}</span>
+      <input type="number" min="0" step="${step}" value="${value}" data-income-planning-assumption="${escapeHtml(field)}" />
+    </label>
+  `;
+}
+
+function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
+  const host = document.querySelector<HTMLDivElement>("#incomePlanningScenarios");
+  if (!host) return;
+  host.innerHTML = model.scenarios.length
+    ? model.scenarios
+        .map(
+          (scenario) => `
+            <div class="income-planning-scenario">
+              <div class="income-planning-scenario-head">
+                <strong>${escapeHtml(scenario.title)}</strong>
+                <span>${hoursLabel(scenario.hoursPerWeek)} / Woche | ${money(scenario.monthlyIncome)} / Monat</span>
+              </div>
+              <p>${escapeHtml(scenario.goal)}</p>
+              <div class="income-planning-scenario-grid">
+                ${incomePlanningScenarioList("Schritte", scenario.steps)}
+                ${incomePlanningScenarioList("Voraussetzungen", scenario.requirements)}
+                ${incomePlanningScenarioList("Risiken", scenario.risks)}
+              </div>
+              <small>${escapeHtml(scenario.loadNote)}</small>
+            </div>
+          `
+        )
+        .join("")
+    : '<div class="chart-empty">Aktiviere mindestens eine Quelle, um Ziel-Szenarien zu sehen.</div>';
+}
+
+function incomePlanningScenarioList(label: string, items: string[]): string {
+  return `
+    <div>
+      <strong>${escapeHtml(label)}</strong>
+      <ol>
+        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ol>
+    </div>
+  `;
+}
+
+function incomePlanningPhaseOptions(): Array<{ value: IncomePlanningPhase; label: string }> {
+  return [
+    { value: "idea", label: "Idee" },
+    { value: "setup", label: "Aufbau" },
+    { value: "growth", label: "Entwicklung" },
+    { value: "established", label: "Etabliert" }
+  ];
+}
+
+function incomePlanningStatusOptions(): Array<{ value: IncomePlanningSourceStatus; label: string }> {
+  return [
+    { value: "idea", label: "Idee" },
+    { value: "planned", label: "Geplant" },
+    { value: "active", label: "Aktiv" },
+    { value: "paused", label: "Pausiert" }
+  ];
+}
+
+function incomePlanningLevelOptions(): Array<{ value: IncomePlanningLevel; label: string }> {
+  return [
+    { value: "low", label: "Niedrig" },
+    { value: "medium", label: "Mittel" },
+    { value: "high", label: "Hoch" }
+  ];
+}
+
+function incomePlanningStatusLabel(status: IncomePlanningModel["status"]): string {
+  if (status === "unrealistic") return "Unrealistisch";
+  if (status === "high") return "Hohe Belastung";
+  return "Realistisch";
+}
+
+function hoursLabel(value: number): string {
+  return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(value)} h`;
+}
+
+function handleIncomePlanningControl(
+  target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  renderMode: "live" | "full" = "full"
+): boolean {
+  if (target.dataset.incomePlanningAssumption) {
+    updateIncomePlanningAssumption(
+      target.dataset.incomePlanningAssumption as keyof IncomePlanningAssumptions,
+      target.value
+    );
+    if (renderMode === "live") renderIncomePlanningSummary();
+    else renderIncomePlanning();
+    saveState(state);
+    return true;
+  }
+
+  if (target.dataset.incomePlanningSourceId && target.dataset.incomePlanningSourceField) {
+    const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
+    updateIncomePlanningSource(
+      target.dataset.incomePlanningSourceId,
+      target.dataset.incomePlanningSourceField as keyof IncomePlanningSource,
+      value
+    );
+    if (renderMode === "live") renderIncomePlanningSummary();
+    else renderIncomePlanning();
+    saveState(state);
+    return true;
+  }
+
+  return false;
+}
+
+function addIncomePlanningSource(): void {
+  const select = document.querySelector<HTMLSelectElement>("#incomePlanningCategorySelect");
+  const category = isIncomePlanningCategory(select?.value) ? select.value : "other";
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    sources: [
+      ...state.incomePlanning.sources,
+      buildIncomePlanningSource(category, createId(), state.settings.year)
+    ]
+  };
+  renderIncomePlanning();
+  saveState(state);
+}
+
+function removeIncomePlanningSource(sourceId: string): void {
+  if (!sourceId) return;
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    sources: state.incomePlanning.sources.filter((source) => source.id !== sourceId)
+  };
+  renderIncomePlanning();
+  saveState(state);
+}
+
+function updateIncomePlanningAssumption(field: keyof IncomePlanningAssumptions, value: string): void {
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    assumptions: {
+      ...state.incomePlanning.assumptions,
+      [field]: Math.max(0, numberValue(value))
+    }
+  };
+}
+
+function updateIncomePlanningSource(
+  sourceId: string,
+  field: keyof IncomePlanningSource,
+  value: string
+): void {
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    sources: state.incomePlanning.sources.map((source) => {
+      if (source.id !== sourceId) return source;
+      if (field === "active") return { ...source, active: value === "true" };
+      if (field === "category") {
+        const category = isIncomePlanningCategory(value) ? value : source.category;
+        const config = incomePlanningCategoryConfig(category);
+        return {
+          ...source,
+          category,
+          name: config.defaultName,
+          hoursPerWeek: config.defaultHoursPerWeek,
+          expectedMonthlyIncome: config.defaultMonthlyIncome,
+          phase: config.defaultPhase,
+          status: config.defaultStatus,
+          risk: config.risk,
+          stability: config.stability,
+          scalability: config.scalability
+        };
+      }
+      if (field === "name") return { ...source, name: value };
+      if (field === "hoursPerWeek") return { ...source, hoursPerWeek: clamp(numberValue(value), 0, 100) };
+      if (field === "expectedMonthlyIncome") {
+        return { ...source, expectedMonthlyIncome: Math.max(0, numberValue(value)) };
+      }
+      if (field === "startMonth") return { ...source, startMonth: Math.round(clamp(numberValue(value), 1, 12)) };
+      if (field === "startYear") return { ...source, startYear: Math.round(clamp(numberValue(value), 1900, 2200)) };
+      if (field === "phase" && isIncomePlanningPhase(value)) return { ...source, phase: value };
+      if (field === "status" && isIncomePlanningSourceStatus(value)) return { ...source, status: value };
+      if (field === "risk" && isIncomePlanningLevel(value)) return { ...source, risk: value };
+      if (field === "stability" && isIncomePlanningLevel(value)) return { ...source, stability: value };
+      if (field === "scalability" && isIncomePlanningLevel(value)) return { ...source, scalability: value };
+      return source;
+    })
+  };
+}
+
+function isIncomePlanningCategory(value: unknown): value is IncomePlanningCategory {
+  return INCOME_PLANNING_CATEGORY_CONFIGS.some((config) => config.id === value);
+}
+
+function isIncomePlanningPhase(value: unknown): value is IncomePlanningPhase {
+  return value === "idea" || value === "setup" || value === "growth" || value === "established";
+}
+
+function isIncomePlanningSourceStatus(value: unknown): value is IncomePlanningSourceStatus {
+  return value === "idea" || value === "planned" || value === "active" || value === "paused";
+}
+
+function isIncomePlanningLevel(value: unknown): value is IncomePlanningLevel {
+  return value === "low" || value === "medium" || value === "high";
 }
 
 function incomeTrackerModel(): IncomeTrackerModel {

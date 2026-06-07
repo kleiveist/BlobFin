@@ -91,7 +91,14 @@ describe("storage", () => {
   it("persists combined app section ids", () => {
     const storage = new MemoryStorage();
 
-    for (const section of ["income", "planning_scenarios", "real_estate_financing", "combined_wealth", "statutory_pension"] as const) {
+    for (const section of [
+      "income",
+      "income_planning",
+      "planning_scenarios",
+      "real_estate_financing",
+      "combined_wealth",
+      "statutory_pension"
+    ] as const) {
       const state = defaultAppState();
       state.ui.activeSection = section;
 
@@ -100,6 +107,23 @@ describe("storage", () => {
 
       expect(loaded.ui.activeSection).toBe(section);
     }
+  });
+
+  it("adds missing income planning defaults to saved app state", () => {
+    const storage = new MemoryStorage();
+    const legacyState: Partial<ReturnType<typeof defaultAppState>> = { ...defaultAppState() };
+    delete legacyState.incomePlanning;
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacyState));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.incomePlanning.sources.map((source) => source.category)).toEqual([
+      "main_job",
+      "online_sales",
+      "self_employment"
+    ]);
+    expect(loaded.incomePlanning.assumptions.sleepHoursPerDay).toBe(7);
+    expect(loaded.incomePlanning.assumptions.weeklyBufferHours).toBe(8);
   });
 
   it("maps old income page section ids to the combined income page", () => {

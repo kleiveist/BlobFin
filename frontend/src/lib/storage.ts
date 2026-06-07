@@ -3,6 +3,7 @@ import {
   defaultAppUiState,
   defaultAppState,
   defaultCombinedWealthToggles,
+  defaultIncomePlanningState,
   defaultIncomeTrackerState,
   defaultInvestmentSettings,
   defaultInvestmentSettingsForNewAccount,
@@ -14,6 +15,7 @@ import {
   defaultStatutoryPensionSettings
 } from "../data/defaults";
 import { DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT } from "../domain/incomeTracker";
+import { INCOME_PLANNING_CATEGORY_IDS, incomePlanningCategoryConfig } from "../domain/incomePlanning";
 import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
 import { STATUTORY_PENSION_DEDUCTION_PERCENT_MAX } from "../domain/statutoryPension";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
@@ -33,6 +35,13 @@ import type {
   CareerMilestoneImpact,
   CombinedWealthDepotKey,
   CombinedWealthToggles,
+  IncomePlanningAssumptions,
+  IncomePlanningCategory,
+  IncomePlanningLevel,
+  IncomePlanningPhase,
+  IncomePlanningSource,
+  IncomePlanningSourceStatus,
+  IncomePlanningState,
   IncomePerson,
   IncomeProjectionMode,
   IncomeEmploymentContext,
@@ -152,6 +161,7 @@ function normalizeState(value: unknown): AppState {
     combinedWealth,
     statutoryPension: normalizeStatutoryPensionSettings(value.statutoryPension),
     incomeTracker: normalizeIncomeTrackerState(value.incomeTracker),
+    incomePlanning: normalizeIncomePlanningState(value.incomePlanning),
     positions,
     investmentByAccountId,
     investment,
@@ -196,6 +206,7 @@ function normalizeLegacyState(value: unknown): AppState {
     combinedWealth: defaultCombinedWealthToggles(),
     statutoryPension: defaultStatutoryPensionSettings(),
     incomeTracker: defaultIncomeTrackerState(),
+    incomePlanning: defaultIncomePlanningState(),
     positions,
     investmentByAccountId,
     investment,
@@ -490,6 +501,7 @@ function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSecti
   }
   if (
     value === "home" ||
+    value === "income_planning" ||
     value === "real_estate_financing" ||
     value === "statutory_pension" ||
     value === "combined_wealth"
@@ -821,6 +833,80 @@ function normalizeStatutoryPensionIncomeMode(
   fallback: StatutoryPensionIncomeMode
 ): StatutoryPensionIncomeMode {
   return value === "constant" || value === "income_projection" ? value : fallback;
+}
+
+function normalizeIncomePlanningState(value: unknown): IncomePlanningState {
+  const fallback = defaultIncomePlanningState();
+  if (!isRecord(value)) return fallback;
+  return {
+    sources: Array.isArray(value.sources)
+      ? value.sources.map(normalizeIncomePlanningSource).filter((source): source is IncomePlanningSource => source !== null)
+      : fallback.sources,
+    assumptions: normalizeIncomePlanningAssumptions(value.assumptions)
+  };
+}
+
+function normalizeIncomePlanningSource(value: unknown): IncomePlanningSource | null {
+  if (!isRecord(value)) return null;
+  const category = normalizeIncomePlanningCategory(value.category);
+  const config = incomePlanningCategoryConfig(category);
+  return {
+    id: String(value.id || createId()),
+    active: booleanOrDefault(value.active, true),
+    category,
+    name: String(value.name || config.defaultName),
+    hoursPerWeek: clampNumber(numberOrDefault(value.hoursPerWeek, config.defaultHoursPerWeek), 0, 100),
+    expectedMonthlyIncome: clampNumber(
+      numberOrDefault(value.expectedMonthlyIncome, config.defaultMonthlyIncome),
+      0,
+      1000000
+    ),
+    startMonth: Math.round(clampNumber(numberOrDefault(value.startMonth, 1), 1, 12)),
+    startYear: Math.round(clampNumber(numberOrDefault(value.startYear, defaultPlanningSettings().year), 1900, 2200)),
+    phase: normalizeIncomePlanningPhase(value.phase, config.defaultPhase),
+    status: normalizeIncomePlanningSourceStatus(value.status, config.defaultStatus),
+    risk: normalizeIncomePlanningLevel(value.risk, config.risk),
+    stability: normalizeIncomePlanningLevel(value.stability, config.stability),
+    scalability: normalizeIncomePlanningLevel(value.scalability, config.scalability)
+  };
+}
+
+function normalizeIncomePlanningAssumptions(value: unknown): IncomePlanningAssumptions {
+  const fallback = defaultIncomePlanningState().assumptions;
+  const assumptions = isRecord(value) ? value : {};
+  return {
+    sleepHoursPerDay: clampNumber(numberOrDefault(assumptions.sleepHoursPerDay, fallback.sleepHoursPerDay), 0, 24),
+    freeTimeHoursPerDay: clampNumber(numberOrDefault(assumptions.freeTimeHoursPerDay, fallback.freeTimeHoursPerDay), 0, 24),
+    privateCommitmentsHoursPerWeek: clampNumber(
+      numberOrDefault(assumptions.privateCommitmentsHoursPerWeek, fallback.privateCommitmentsHoursPerWeek),
+      0,
+      168
+    ),
+    weeklyBufferHours: clampNumber(numberOrDefault(assumptions.weeklyBufferHours, fallback.weeklyBufferHours), 0, 168)
+  };
+}
+
+function normalizeIncomePlanningCategory(value: unknown): IncomePlanningCategory {
+  return INCOME_PLANNING_CATEGORY_IDS.includes(value as IncomePlanningCategory)
+    ? (value as IncomePlanningCategory)
+    : "other";
+}
+
+function normalizeIncomePlanningPhase(value: unknown, fallback: IncomePlanningPhase): IncomePlanningPhase {
+  return value === "idea" || value === "setup" || value === "growth" || value === "established"
+    ? value
+    : fallback;
+}
+
+function normalizeIncomePlanningSourceStatus(
+  value: unknown,
+  fallback: IncomePlanningSourceStatus
+): IncomePlanningSourceStatus {
+  return value === "idea" || value === "planned" || value === "active" || value === "paused" ? value : fallback;
+}
+
+function normalizeIncomePlanningLevel(value: unknown, fallback: IncomePlanningLevel): IncomePlanningLevel {
+  return value === "low" || value === "medium" || value === "high" ? value : fallback;
 }
 
 function normalizeIncomeTrackerState(value: unknown): IncomeTrackerState {

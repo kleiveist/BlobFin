@@ -11,6 +11,7 @@ export type PositionTableMode = PositionFlow | "reserve" | "savings";
 export type AppSectionId =
   | "home"
   | "income"
+  | "income_planning"
   | "planning_scenarios"
   | "real_estate_financing"
   | "statutory_pension"
@@ -27,6 +28,22 @@ export type IncomeMinijobType = "commercial" | "private_household";
 export type IncomeStudentEmploymentMode = "minijob" | "short_term";
 export type CareerMilestoneImpact = "positive" | "negative" | "neutral";
 export type IncomeProjectionMode = "off" | "historical_average" | "manual";
+export type IncomePlanningCategory =
+  | "main_job"
+  | "part_time_job"
+  | "minijob"
+  | "self_employment"
+  | "small_business"
+  | "online_sales"
+  | "rental"
+  | "capital_income"
+  | "trainer_volunteer"
+  | "board_advisory"
+  | "project_work"
+  | "other";
+export type IncomePlanningPhase = "idea" | "setup" | "growth" | "established";
+export type IncomePlanningSourceStatus = "idea" | "planned" | "active" | "paused";
+export type IncomePlanningLevel = "low" | "medium" | "high";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -361,6 +378,34 @@ export interface IncomeTrackerState {
   settings: IncomeTrackerSettings;
 }
 
+export interface IncomePlanningSource {
+  id: string;
+  active: boolean;
+  category: IncomePlanningCategory;
+  name: string;
+  hoursPerWeek: number;
+  expectedMonthlyIncome: number;
+  startMonth: number;
+  startYear: number;
+  phase: IncomePlanningPhase;
+  status: IncomePlanningSourceStatus;
+  risk: IncomePlanningLevel;
+  stability: IncomePlanningLevel;
+  scalability: IncomePlanningLevel;
+}
+
+export interface IncomePlanningAssumptions {
+  sleepHoursPerDay: number;
+  freeTimeHoursPerDay: number;
+  privateCommitmentsHoursPerWeek: number;
+  weeklyBufferHours: number;
+}
+
+export interface IncomePlanningState {
+  sources: IncomePlanningSource[];
+  assumptions: IncomePlanningAssumptions;
+}
+
 export interface CombinedWealthYear {
   year: number;
   cashValue: number;
@@ -397,6 +442,7 @@ export interface AppState {
   combinedWealth: CombinedWealthToggles;
   statutoryPension: StatutoryPensionSettings;
   incomeTracker: IncomeTrackerState;
+  incomePlanning: IncomePlanningState;
   positions: ReservePosition[];
   investmentByAccountId: Record<string, InvestmentSettings>;
   investment: InvestmentSettings;

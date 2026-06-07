@@ -4,7 +4,16 @@ import { normalizePositionIcon, positionIconLabel, positionIconSvg } from "../li
 import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, ReservePosition } from "../types";
 
-type OverviewIconName = "income" | "portfolio" | "table" | "investment" | "property" | "combine" | "account" | "pension";
+type OverviewIconName =
+  | "income"
+  | "income_plan"
+  | "portfolio"
+  | "table"
+  | "investment"
+  | "property"
+  | "combine"
+  | "account"
+  | "pension";
 
 interface OverviewCardConfig {
   sectionId: string;
@@ -14,6 +23,15 @@ interface OverviewCardConfig {
   actionLabel: string;
   icon: OverviewIconName;
   badge?: string;
+  subcards?: OverviewSubCardConfig[];
+}
+
+interface OverviewSubCardConfig {
+  sectionId: string;
+  title: string;
+  subtitle: string;
+  actionLabel: string;
+  icon: OverviewIconName;
 }
 
 interface ModuleTopBarAction {
@@ -92,7 +110,16 @@ export function renderAppShell(): string {
                 "Jahreswerte pflegen, Steuer- und Abgabenpositionen auswerten und Einkommensentwicklung transparent sehen.",
               actionLabel: "Einkommen oeffnen",
               icon: "income",
-              badge: "Einkommen"
+              badge: "Einkommen",
+              subcards: [
+                {
+                  sectionId: "income_planning",
+                  title: "Einkommensplanung",
+                  subtitle: "Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien",
+                  actionLabel: "Oeffnen",
+                  icon: "income_plan"
+                }
+              ]
             },
             {
               sectionId: "statutory_pension",
@@ -138,6 +165,47 @@ export function renderAppShell(): string {
           "module",
           "landing-main-grid"
         )}
+      </section>
+
+      <section class="panel income-planning-panel" data-module-section="income_planning">
+        ${moduleTopBar("Einkommensplanung", "Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien")}
+        <div class="section-heading income-planning-heading">
+          <div>
+            <h2>Einkommensplanungs-Dashboard</h2>
+            <p class="planning-account-summary">
+              Plane zusaetzliche Einkommensquellen getrennt von Jahresnettoeinkommen und Kontoplanung.
+            </p>
+          </div>
+          <div class="button-row">
+            <select id="incomePlanningCategorySelect" class="income-planning-category-select" aria-label="Einkommensquelle auswaehlen"></select>
+            <button class="button" type="button" data-action="income-planning-add-source">Quelle hinzufuegen</button>
+          </div>
+        </div>
+        <div id="incomePlanningMetricGrid" class="income-planning-metric-grid"></div>
+        <div id="incomePlanningWarnings" class="income-planning-warnings"></div>
+        <div class="income-planning-layout">
+          <section class="income-card income-planning-sources-card">
+            <div class="income-section-head">
+              <h3>Einkommensquellen</h3>
+              <p>Stunden, Einkommen, Status und Belastbarkeit je Quelle planen.</p>
+            </div>
+            <div id="incomePlanningSources" class="income-planning-source-list"></div>
+          </section>
+          <section class="income-card income-planning-assumptions-card">
+            <div class="income-section-head">
+              <h3>Zeitannahmen</h3>
+              <p>Schlaf, Freizeit, private Verpflichtungen und Puffer begrenzen die planbare Arbeitszeit.</p>
+            </div>
+            <div id="incomePlanningAssumptions" class="income-planning-assumptions"></div>
+          </section>
+        </div>
+        <section class="income-card income-planning-scenarios-card">
+          <div class="income-section-head">
+            <h3>Ziel-Szenarien</h3>
+            <p>Automatische Schritte, Voraussetzungen und Risiken fuer aktive Quellen.</p>
+          </div>
+          <div id="incomePlanningScenarios" class="income-planning-scenarios"></div>
+        </section>
       </section>
 
       <section class="panel account-panel" data-module-section="planning_scenarios">
@@ -959,6 +1027,33 @@ function SectionCard(card: OverviewCardConfig): string {
 }
 
 function overviewCard(card: OverviewCardConfig, className: string): string {
+  if (card.subcards?.length) {
+    return `
+      <article class="overview-card ${className} overview-card-group">
+        <button
+          class="overview-card-primary"
+          type="button"
+          data-action="open-section-${card.sectionId}"
+          data-section-id="${card.sectionId}"
+          aria-pressed="false"
+        >
+          <span class="overview-card-top">
+            ${overviewIcon(card.icon)}
+            ${card.badge ? `<span class="overview-card-badge">${card.badge}</span>` : ""}
+          </span>
+          <span class="overview-card-copy">
+            <strong>${card.title}</strong>
+            <span>${card.subtitle}</span>
+            <small>${card.description}</small>
+          </span>
+          <span class="overview-card-action">${card.actionLabel}</span>
+        </button>
+        <div class="overview-subcard-list">
+          ${card.subcards.map(overviewSubCard).join("")}
+        </div>
+      </article>
+    `;
+  }
   return `
     <button
       class="overview-card ${className}"
@@ -977,6 +1072,25 @@ function overviewCard(card: OverviewCardConfig, className: string): string {
         <small>${card.description}</small>
       </span>
       <span class="overview-card-action">${card.actionLabel}</span>
+    </button>
+  `;
+}
+
+function overviewSubCard(card: OverviewSubCardConfig): string {
+  return `
+    <button
+      class="overview-subcard"
+      type="button"
+      data-action="open-section-${card.sectionId}"
+      data-section-id="${card.sectionId}"
+      aria-pressed="false"
+    >
+      ${overviewIcon(card.icon)}
+      <span class="overview-subcard-copy">
+        <strong>${card.title}</strong>
+        <small>${card.subtitle}</small>
+      </span>
+      <span class="overview-subcard-action">${card.actionLabel}</span>
     </button>
   `;
 }
@@ -1005,6 +1119,8 @@ function overviewIcon(icon: OverviewIconName): string {
   const paths: Record<OverviewIconName, string> = {
     income:
       '<path d="M5 19V5" /><path d="M5 19h14" /><path d="M8 15h2" /><path d="M12 11h2" /><path d="M16 7h2" /><path d="M8 11l3-3 3 2 4-5" />',
+    income_plan:
+      '<path d="M4 19V5" /><path d="M4 19h16" /><path d="M7 15h3" /><path d="M12 11h3" /><path d="M17 8h2" /><path d="M7 8h5" /><path d="m14 16 2 2 4-5" />',
     portfolio:
       '<rect x="4" y="7" width="16" height="12" rx="2" /><path d="M9 7V5h6v2" /><path d="M4 12h16" /><path d="M10 12v2h4v-2" />',
     table:

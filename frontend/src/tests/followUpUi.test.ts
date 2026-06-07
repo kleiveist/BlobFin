@@ -72,7 +72,7 @@ const combinedYear: CombinedWealthYear = {
 };
 
 describe("follow-up ui rendering", () => {
-  it("renders a visual landing page with the four combined module entries", () => {
+  it("renders a visual landing page with the combined module entries", () => {
     const html = renderAppShell();
 
     expect(html).toContain('data-module-section="home"');
@@ -81,6 +81,7 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-module-section="income_overview"');
     expect(html).not.toContain('data-module-section="investment_overview"');
     expect(html).toContain('data-action="open-section-income"');
+    expect(html).toContain('data-action="open-section-income_planning"');
     expect(html).toContain('data-action="open-section-planning_scenarios"');
     expect(html).toContain('data-action="open-section-real_estate_financing"');
     expect(html).toContain('data-action="open-section-combined_wealth"');
@@ -91,10 +92,15 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-action="open-section-cost_reserve_positions"');
     expect(html).not.toContain('data-action="open-section-year_table"');
     expect(html).not.toContain('data-action="open-section-investment_planning"');
-    expect(count(html, 'class="overview-card module-overview-card"')).toBe(5);
+    expect(count(html, 'class="overview-card module-overview-card')).toBe(5);
+    expect(html).toContain('class="overview-subcard"');
     expect(html.indexOf("Jahresnettoeinkommen")).toBeLessThan(html.indexOf("Gesetzliche Rente"));
+    expect(html.indexOf("Jahresnettoeinkommen")).toBeLessThan(html.indexOf("Einkommensplanung"));
+    expect(html.indexOf("Einkommensplanung")).toBeLessThan(html.indexOf("Gesetzliche Rente"));
     expect(html.indexOf("Gesetzliche Rente")).toBeLessThan(html.indexOf("Planungen und Szenarien"));
     expect(html).toContain("Jahresnettoeinkommen");
+    expect(html).toContain("Einkommensplanung");
+    expect(html).toContain("Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien");
     expect(html).toContain("Planungen und Szenarien");
     expect(html).toContain("Immobilien");
     expect(html).toContain("Vermoegen");
@@ -103,6 +109,18 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("Rente oeffnen");
     expect(html).not.toContain("Vermoegen und Altersvorsorge");
     expect(html).not.toContain("Vorsorge oeffnen");
+  });
+
+  it("renders the income planning dashboard as an independent page", () => {
+    const html = renderAppShell();
+
+    expect(html).toContain('data-module-section="income_planning"');
+    expect(html).toContain("Einkommensplanungs-Dashboard");
+    expect(html).toContain('id="incomePlanningMetricGrid"');
+    expect(html).toContain('id="incomePlanningSources"');
+    expect(html).toContain('id="incomePlanningAssumptions"');
+    expect(html).toContain('id="incomePlanningScenarios"');
+    expect(html).toContain('data-action="income-planning-add-source"');
   });
 
   it("structures income as one combined page with insights before status", () => {
