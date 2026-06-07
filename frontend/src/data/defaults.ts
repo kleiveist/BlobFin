@@ -388,9 +388,9 @@ export function defaultIncomePlanningState(): IncomePlanningState {
   const startYear = defaultPlanningSettings().year;
   return {
     sources: [
-      buildIncomePlanningSource("main_job", "income-plan-main-job", startYear),
+      buildIncomePlanningSource("salary", "income-plan-main-job", startYear),
       buildIncomePlanningSource("online_sales", "income-plan-online-sales", startYear),
-      buildIncomePlanningSource("self_employment", "income-plan-self-employment", startYear)
+      buildIncomePlanningSource("self_employed", "income-plan-self-employment", startYear)
     ],
     assumptions: {
       sleepHoursPerDay: 7,

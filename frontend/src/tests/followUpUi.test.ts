@@ -119,8 +119,15 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('id="incomePlanningMetricGrid"');
     expect(html).toContain('id="incomePlanningSources"');
     expect(html).toContain('id="incomePlanningAssumptions"');
+    expect(html).toContain('id="incomePlanningTimeCharts"');
     expect(html).toContain('id="incomePlanningScenarios"');
+    expect(html).toContain('id="incomePlanningCategoryButton"');
+    expect(html).toContain('id="incomePlanningCategoryPicker"');
+    expect(html).toContain('data-action="open-income-planning-category-picker"');
     expect(html).toContain('data-action="income-planning-add-source"');
+    expect(html.indexOf('id="incomePlanningAssumptions"')).toBeLessThan(
+      html.indexOf('id="incomePlanningSources"')
+    );
   });
 
   it("structures income as one combined page with insights before status", () => {

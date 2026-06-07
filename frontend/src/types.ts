@@ -29,17 +29,27 @@ export type IncomeStudentEmploymentMode = "minijob" | "short_term";
 export type CareerMilestoneImpact = "positive" | "negative" | "neutral";
 export type IncomeProjectionMode = "off" | "historical_average" | "manual";
 export type IncomePlanningCategory =
-  | "main_job"
-  | "part_time_job"
+  | "salary"
+  | "training_allowance"
   | "minijob"
-  | "self_employment"
-  | "small_business"
+  | "pocket_money"
+  | "self_employed"
+  | "freelance"
+  | "side_income"
   | "online_sales"
-  | "rental"
-  | "capital_income"
-  | "trainer_volunteer"
-  | "board_advisory"
-  | "project_work"
+  | "garage_parking_rental"
+  | "fees"
+  | "dividends"
+  | "asset_income"
+  | "insurance_payouts"
+  | "bonus"
+  | "severance_payment"
+  | "volunteer_allowance"
+  | "trainer_allowance"
+  | "child_youth_jobs"
+  | "board"
+  | "office_holder"
+  | "supervisory_board"
   | "other";
 export type IncomePlanningPhase = "idea" | "setup" | "growth" | "established";
 export type IncomePlanningSourceStatus = "idea" | "planned" | "active" | "paused";

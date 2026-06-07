@@ -887,9 +887,38 @@ function normalizeIncomePlanningAssumptions(value: unknown): IncomePlanningAssum
 }
 
 function normalizeIncomePlanningCategory(value: unknown): IncomePlanningCategory {
-  return INCOME_PLANNING_CATEGORY_IDS.includes(value as IncomePlanningCategory)
-    ? (value as IncomePlanningCategory)
-    : "other";
+  const raw = String(value ?? "");
+  const legacyCategories: Record<string, IncomePlanningCategory> = {
+    main_job: "salary",
+    part_time_job: "salary",
+    self_employment: "self_employed",
+    small_business: "self_employed",
+    rental: "garage_parking_rental",
+    capital_income: "dividends",
+    trainer_volunteer: "trainer_allowance",
+    board_advisory: "supervisory_board",
+    project_work: "freelance"
+  };
+  if (legacyCategories[raw]) return legacyCategories[raw];
+  const normalized = normalizeIncomeTaxRuleLabel(raw);
+  if (INCOME_PLANNING_CATEGORY_IDS.includes(normalized as IncomePlanningCategory)) {
+    return normalized as IncomePlanningCategory;
+  }
+  const key = incomePlanningCategoryKey(raw);
+  const labelMatch = INCOME_PLANNING_CATEGORY_IDS.find(
+    (category) => incomePlanningCategoryKey(incomePlanningCategoryConfig(category).label) === key
+  );
+  return labelMatch ?? "other";
+}
+
+function incomePlanningCategoryKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function normalizeIncomePlanningPhase(value: unknown, fallback: IncomePlanningPhase): IncomePlanningPhase {

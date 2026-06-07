@@ -4932,8 +4932,58 @@ tfoot th {
   align-items: flex-start;
 }
 
-.income-planning-category-select {
+.income-planning-category-button,
+.income-planning-label-button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
   min-width: 220px;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.income-planning-category-button:hover,
+.income-planning-label-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.income-planning-category-button .position-icon-svg,
+.income-planning-label-button .position-icon-svg {
+  color: var(--accent-strong);
+}
+
+.income-planning-category-button span,
+.income-planning-label-button span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.income-planning-category-button small,
+.income-planning-label-button small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.income-planning-category-button strong,
+.income-planning-label-button strong {
+  overflow: hidden;
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .income-planning-metric-grid {
@@ -4981,6 +5031,121 @@ tfoot th {
   border-color: rgba(185, 70, 70, 0.45);
 }
 
+.income-planning-time-card {
+  display: grid;
+  gap: 14px;
+}
+
+.income-planning-time-block {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.42fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.income-planning-time-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.income-planning-time-chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.income-planning-donut {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--row-border);
+}
+
+.income-planning-donut::after {
+  position: absolute;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: var(--surface);
+  content: "";
+}
+
+.income-planning-donut span {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  max-width: 84px;
+  text-align: center;
+}
+
+.income-planning-donut strong {
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.income-planning-donut small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.income-planning-time-chart-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.income-planning-time-chart-copy > strong {
+  font-size: 0.96rem;
+  font-weight: 950;
+}
+
+.income-planning-time-legend {
+  display: grid;
+  gap: 6px;
+}
+
+.income-planning-time-legend-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.income-planning-time-legend-item i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.income-planning-time-legend-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-planning-time-legend-item strong {
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .income-planning-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.34fr);
@@ -4997,7 +5162,7 @@ tfoot th {
 
 .income-planning-source-row {
   display: grid;
-  grid-template-columns: minmax(78px, 0.4fr) minmax(150px, 0.9fr) minmax(180px, 1.2fr) repeat(9, minmax(110px, 0.7fr)) 44px;
+  grid-template-columns: minmax(78px, 0.4fr) minmax(150px, 0.85fr) minmax(150px, 0.95fr) minmax(72px, 0.4fr) minmax(86px, 0.48fr) minmax(92px, 0.52fr) minmax(82px, 0.46fr) minmax(86px, 0.48fr) minmax(78px, 0.44fr) repeat(3, minmax(82px, 0.46fr)) 44px;
   gap: 8px;
   align-items: end;
   border: 1px solid var(--border);
@@ -5025,11 +5190,53 @@ tfoot th {
 }
 
 .income-planning-source-row .field.compact {
-  min-width: 104px;
+  min-width: 86px;
+}
+
+.income-planning-source-row .income-planning-label-button {
+  min-width: 0;
+  width: 100%;
+}
+
+.income-planning-source-row .income-planning-detail-field select,
+.income-planning-source-row .income-planning-detail-field input {
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.income-planning-source-row .income-planning-hours-field {
+  min-width: 72px;
+}
+
+.income-planning-source-row .income-planning-hours-field input {
+  min-width: 64px;
+}
+
+.income-planning-source-row .income-planning-income-field {
+  min-width: 86px;
+}
+
+.income-planning-source-row .income-planning-income-field input {
+  min-width: 78px;
+}
+
+.income-planning-source-row .income-planning-start-month-field {
+  min-width: 92px;
+}
+
+.income-planning-source-row .income-planning-start-year-field,
+.income-planning-source-row .income-planning-phase-field,
+.income-planning-source-row .income-planning-status-field,
+.income-planning-source-row .income-planning-level-field {
+  min-width: 78px;
 }
 
 .income-planning-source-name {
-  min-width: 180px;
+  min-width: 150px;
+}
+
+.income-planning-source-name input {
+  min-width: 140px;
 }
 
 .income-planning-scenario {
@@ -6825,9 +7032,20 @@ tfoot th {
   }
 
   .income-planning-metric-grid,
+  .income-planning-time-block,
+  .income-planning-time-charts,
   .income-planning-layout,
   .income-planning-scenario-grid {
     grid-template-columns: 1fr;
+  }
+
+  .income-planning-time-chart {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .income-planning-time-chart-copy {
+    width: 100%;
   }
 
   .income-planning-source-row {

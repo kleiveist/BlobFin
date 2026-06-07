@@ -177,28 +177,35 @@ export function renderAppShell(): string {
             </p>
           </div>
           <div class="button-row">
-            <select id="incomePlanningCategorySelect" class="income-planning-category-select" aria-label="Einkommensquelle auswaehlen"></select>
+            <button
+              id="incomePlanningCategoryButton"
+              class="income-planning-category-button"
+              type="button"
+              data-action="open-income-planning-category-picker"
+              aria-label="Einkommensquelle auswaehlen"
+            ></button>
             <button class="button" type="button" data-action="income-planning-add-source">Quelle hinzufuegen</button>
           </div>
         </div>
         <div id="incomePlanningMetricGrid" class="income-planning-metric-grid"></div>
         <div id="incomePlanningWarnings" class="income-planning-warnings"></div>
-        <div class="income-planning-layout">
-          <section class="income-card income-planning-sources-card">
-            <div class="income-section-head">
-              <h3>Einkommensquellen</h3>
-              <p>Stunden, Einkommen, Status und Belastbarkeit je Quelle planen.</p>
-            </div>
-            <div id="incomePlanningSources" class="income-planning-source-list"></div>
-          </section>
-          <section class="income-card income-planning-assumptions-card">
-            <div class="income-section-head">
-              <h3>Zeitannahmen</h3>
-              <p>Schlaf, Freizeit, private Verpflichtungen und Puffer begrenzen die planbare Arbeitszeit.</p>
-            </div>
+        <section class="income-card income-planning-time-card">
+          <div class="income-section-head">
+            <h3>Zeitannahmen</h3>
+            <p>Schlaf, Freizeit, private Verpflichtungen und Puffer begrenzen die planbare Arbeitszeit.</p>
+          </div>
+          <div class="income-planning-time-block">
             <div id="incomePlanningAssumptions" class="income-planning-assumptions"></div>
-          </section>
-        </div>
+            <div id="incomePlanningTimeCharts" class="income-planning-time-charts"></div>
+          </div>
+        </section>
+        <section class="income-card income-planning-sources-card">
+          <div class="income-section-head">
+            <h3>Einkommensquellen</h3>
+            <p>Stunden, Einkommen, Status und Belastbarkeit je Quelle planen.</p>
+          </div>
+          <div id="incomePlanningSources" class="income-planning-source-list"></div>
+        </section>
         <section class="income-card income-planning-scenarios-card">
           <div class="income-section-head">
             <h3>Ziel-Szenarien</h3>
@@ -206,6 +213,7 @@ export function renderAppShell(): string {
           </div>
           <div id="incomePlanningScenarios" class="income-planning-scenarios"></div>
         </section>
+        <div id="incomePlanningCategoryPicker" class="position-icon-picker income-year-label-picker income-planning-category-picker" role="dialog" aria-label="Kategorie auswaehlen" hidden></div>
       </section>
 
       <section class="panel account-panel" data-module-section="planning_scenarios">

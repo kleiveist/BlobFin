@@ -118,12 +118,31 @@ describe("storage", () => {
     const loaded = loadState(storage);
 
     expect(loaded.incomePlanning.sources.map((source) => source.category)).toEqual([
-      "main_job",
+      "salary",
       "online_sales",
-      "self_employment"
+      "self_employed"
     ]);
     expect(loaded.incomePlanning.assumptions.sleepHoursPerDay).toBe(7);
     expect(loaded.incomePlanning.assumptions.weeklyBufferHours).toBe(8);
+  });
+
+  it("maps legacy income planning categories to yearly income labels", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState() as any;
+    state.incomePlanning.sources = [
+      { ...state.incomePlanning.sources[0], category: "main_job" },
+      { ...state.incomePlanning.sources[1], category: "self_employment" },
+      { ...state.incomePlanning.sources[2], category: "board_advisory" }
+    ];
+    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.incomePlanning.sources.map((source) => source.category)).toEqual([
+      "salary",
+      "self_employed",
+      "supervisory_board"
+    ]);
   });
 
   it("maps old income page section ids to the combined income page", () => {

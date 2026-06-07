@@ -1,3 +1,4 @@
+import { INCOME_YEAR_LABEL_OPTIONS } from "./incomeLabels";
 import type {
   IncomePlanningAssumptions,
   IncomePlanningCategory,
@@ -9,24 +10,15 @@ import type {
 } from "../types";
 
 export const INCOME_PLANNING_WEEK_HOURS = 168;
-export const INCOME_PLANNING_CATEGORY_IDS: IncomePlanningCategory[] = [
-  "main_job",
-  "part_time_job",
-  "minijob",
-  "self_employment",
-  "small_business",
-  "online_sales",
-  "rental",
-  "capital_income",
-  "trainer_volunteer",
-  "board_advisory",
-  "project_work",
-  "other"
-];
+export const INCOME_PLANNING_CATEGORY_IDS: IncomePlanningCategory[] = INCOME_YEAR_LABEL_OPTIONS.map(
+  (option) => option.id as IncomePlanningCategory
+);
 
 export interface IncomePlanningCategoryConfig {
   id: IncomePlanningCategory;
   label: string;
+  icon: string;
+  description: string;
   defaultName: string;
   defaultHoursPerWeek: number;
   defaultMonthlyIncome: number;
@@ -69,11 +61,26 @@ export interface IncomePlanningModel {
   scenarios: IncomePlanningScenario[];
 }
 
-export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = [
-  {
-    id: "main_job",
-    label: "Hauptjob / Gehalt",
-    defaultName: "Hauptjob",
+type IncomePlanningCategoryOverride = Partial<
+  Omit<IncomePlanningCategoryConfig, "id" | "label" | "icon" | "description">
+>;
+
+const DEFAULT_CATEGORY_CONFIG: IncomePlanningCategoryOverride = {
+  defaultHoursPerWeek: 4,
+  defaultMonthlyIncome: 200,
+  defaultPhase: "idea",
+  defaultStatus: "planned",
+  risk: "medium",
+  stability: "medium",
+  scalability: "medium",
+  steps: ["Idee beschreiben", "Zeitbudget setzen", "Erwartbares Einkommen schaetzen", "Risiken pruefen"],
+  requirements: ["Konkrete Einkommensidee", "Realistische Testphase"],
+  risks: ["Unklare Annahmen", "Unterschaetzter Aufwand"]
+};
+
+const INCOME_PLANNING_CATEGORY_OVERRIDES: Partial<Record<IncomePlanningCategory, IncomePlanningCategoryOverride>> = {
+  salary: {
+    defaultName: "Gehalt",
     defaultHoursPerWeek: 40,
     defaultMonthlyIncome: 3200,
     defaultPhase: "established",
@@ -86,26 +93,20 @@ export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = 
     requirements: ["Vertragliche Wochenarbeitszeit", "Belastbare Freizeitplanung"],
     risks: ["Ueberplanung durch unterschaetzte Arbeitslast"]
   },
-  {
-    id: "part_time_job",
-    label: "Teilzeitjob",
-    defaultName: "Teilzeitjob",
-    defaultHoursPerWeek: 25,
-    defaultMonthlyIncome: 1600,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
+  training_allowance: {
+    defaultHoursPerWeek: 35,
+    defaultMonthlyIncome: 900,
+    defaultPhase: "established",
+    defaultStatus: "active",
     risk: "low",
     stability: "medium",
-    scalability: "low",
-    goal: "Planbare Zusatz- oder Haupteinnahme mit reduzierter Wochenarbeitszeit aufbauen.",
-    steps: ["Stundenmodell festlegen", "Arbeitgeber oder Branche auswaehlen", "Starttermin und Probephase planen"],
-    requirements: ["Zeitfenster im Wochenplan", "Vertragliche Rahmenbedingungen"],
-    risks: ["Geringe Flexibilitaet bei parallelen Projekten"]
+    scalability: "medium",
+    goal: "Ausbildung oder duales Studium mit realistischem Zeitbudget einplanen.",
+    steps: ["Wochenarbeitszeit und Schule/Studium addieren", "Lernzeiten einplanen", "Freie Zeit regelmaessig pruefen"],
+    requirements: ["Ausbildungs- oder Studienplan", "Zeit fuer Lernen und Erholung"],
+    risks: ["Doppelbelastung aus Arbeit und Lernphasen"]
   },
-  {
-    id: "minijob",
-    label: "Minijob",
-    defaultName: "Minijob",
+  minijob: {
     defaultHoursPerWeek: 8,
     defaultMonthlyIncome: 538,
     defaultPhase: "setup",
@@ -118,9 +119,20 @@ export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = 
     requirements: ["Regelmaessige freie Zeitfenster", "Abstimmung mit bestehender Arbeit"],
     risks: ["Dauerhafte Wochenend- oder Abendbelastung"]
   },
-  {
-    id: "self_employment",
-    label: "Selbststaendigkeit",
+  pocket_money: {
+    defaultHoursPerWeek: 0.5,
+    defaultMonthlyIncome: 50,
+    defaultPhase: "established",
+    defaultStatus: "active",
+    risk: "low",
+    stability: "medium",
+    scalability: "low",
+    goal: "Kleine regelmaessige Einnahme ohne relevante Arbeitslast beruecksichtigen.",
+    steps: ["Betrag festhalten", "Regelmaessigkeit pruefen", "Nicht als Arbeitszeit ueberplanen"],
+    requirements: ["Verlaessliche Zahlung"],
+    risks: ["Kann kurzfristig wegfallen"]
+  },
+  self_employed: {
     defaultName: "Nebenberufliche Selbststaendigkeit",
     defaultHoursPerWeek: 8,
     defaultMonthlyIncome: 600,
@@ -134,26 +146,34 @@ export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = 
     requirements: ["Klare Leistung oder Produktidee", "Zeit fuer Akquise", "Grundkenntnisse zu Abrechnung und Steuern"],
     risks: ["Unklare Nachfrage", "Unterschaetzter Akquiseaufwand", "Schwankende Einnahmen"]
   },
-  {
-    id: "small_business",
-    label: "Kleingewerbe",
-    defaultName: "Kleingewerbe",
+  freelance: {
     defaultHoursPerWeek: 6,
-    defaultMonthlyIncome: 350,
+    defaultMonthlyIncome: 500,
+    defaultPhase: "setup",
+    defaultStatus: "planned",
+    risk: "medium",
+    stability: "low",
+    scalability: "medium",
+    goal: "Freiberufliche oder projektbezogene Einkuenfte planbar aufbauen.",
+    steps: ["Angebot definieren", "Honorar und Aufwand schaetzen", "Akquiseweg festlegen", "Kapazitaet blocken"],
+    requirements: ["Projektfaehige Kompetenzen", "Klare Verfuegbarkeit"],
+    risks: ["Projektspitzen", "Leerlauf zwischen Projekten"]
+  },
+  side_income: {
+    defaultHoursPerWeek: 4,
+    defaultMonthlyIncome: 250,
     defaultPhase: "setup",
     defaultStatus: "planned",
     risk: "medium",
     stability: "medium",
     scalability: "medium",
-    goal: "Kleines Gewerbe mit ueberschaubarem Aufwand testen.",
-    steps: ["Angebot festlegen", "Kosten und Preise pruefen", "Verkaufsweg einrichten", "Monatliche Entwicklung tracken"],
-    requirements: ["Einfache Buchhaltung", "Verkaufs- oder Kundenkanal"],
-    risks: ["Verwaltungsaufwand", "Unregelmaessige Nachfrage"]
+    goal: "Weitere laufende Nebeneinkuenfte mit begrenzter Zusatzlast pruefen.",
+    steps: ["Quelle konkretisieren", "Regelmaessige Wochenstunden setzen", "Einnahmen monatlich plausibilisieren"],
+    requirements: ["Freie Zeitfenster", "Klare Einkommensannahme"],
+    risks: ["Unterschaetzter Zusatzaufwand"]
   },
-  {
-    id: "online_sales",
-    label: "Onlineverkaeufe",
-    defaultName: "Onlineverkaeufe",
+  online_sales: {
+    defaultName: "Online-Verkaeufe",
     defaultHoursPerWeek: 3,
     defaultMonthlyIncome: 150,
     defaultPhase: "setup",
@@ -166,42 +186,111 @@ export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = 
     requirements: ["Verkaufbare Artikel", "Klare Versand- und Zahlungsabwicklung"],
     risks: ["Zeitverlust durch Einzelabwicklung", "Unregelmaessige Nachfrage"]
   },
-  {
-    id: "rental",
-    label: "Vermietung",
-    defaultName: "Vermietung",
-    defaultHoursPerWeek: 2,
-    defaultMonthlyIncome: 400,
+  garage_parking_rental: {
+    defaultHoursPerWeek: 1,
+    defaultMonthlyIncome: 120,
     defaultPhase: "established",
     defaultStatus: "planned",
-    risk: "medium",
+    risk: "low",
     stability: "high",
-    scalability: "medium",
-    goal: "Vermietung als relativ stabile Einkommensquelle einplanen.",
-    steps: ["Objekt oder Flaeche pruefen", "Miete und Nebenkosten kalkulieren", "Verwaltung und Instandhaltung einplanen"],
-    requirements: ["Vermietbares Objekt", "Ruecklagen fuer Instandhaltung"],
-    risks: ["Leerstand", "Reparaturen", "Verwaltungsaufwand"]
+    scalability: "low",
+    goal: "Garage oder Stellplatz als zeitarmes Zusatzeinkommen einplanen.",
+    steps: ["Vermietbarkeit pruefen", "Preis und Nebenkosten klaeren", "Verwaltungsaufwand eintragen"],
+    requirements: ["Vermietbarer Stellplatz", "Klare Nutzungsbedingungen"],
+    risks: ["Leerstand", "Kleiner Verwaltungsaufwand"]
   },
-  {
-    id: "capital_income",
-    label: "Dividenden / Kapitalertraege",
-    defaultName: "Kapitalertraege",
-    defaultHoursPerWeek: 1,
+  fees: {
+    defaultHoursPerWeek: 4,
+    defaultMonthlyIncome: 300,
+    defaultPhase: "setup",
+    defaultStatus: "planned",
+    risk: "medium",
+    stability: "low",
+    scalability: "medium",
+    goal: "Gagen oder Honorare mit schwankender Auslastung planen.",
+    steps: ["Angebot oder Auftrittsformat festlegen", "Termine und Vorbereitung schaetzen", "Mindesthonorar definieren"],
+    requirements: ["Buchbare Leistung", "Zeit fuer Vorbereitung"],
+    risks: ["Unregelmaessige Termine", "Vorbereitungsaufwand"]
+  },
+  dividends: {
+    defaultHoursPerWeek: 0.5,
     defaultMonthlyIncome: 100,
     defaultPhase: "growth",
     defaultStatus: "planned",
     risk: "medium",
     stability: "medium",
     scalability: "high",
-    goal: "Kapitalertraege als zeitarmes Zusatzeinkommen aufbauen.",
+    goal: "Dividenden als zeitarmes Zusatzeinkommen aufbauen.",
     steps: ["Investitionsstrategie definieren", "Risikoprofil festlegen", "Regelmaessige Ueberpruefung planen"],
     requirements: ["Investierbares Kapital", "Risikobewusstsein"],
     risks: ["Kursschwankungen", "Keine garantierten Ausschuettungen"]
   },
-  {
-    id: "trainer_volunteer",
-    label: "Uebungsleiter / Ehrenamt",
-    defaultName: "Uebungsleiter / Ehrenamt",
+  asset_income: {
+    defaultHoursPerWeek: 1,
+    defaultMonthlyIncome: 150,
+    defaultPhase: "growth",
+    defaultStatus: "planned",
+    risk: "medium",
+    stability: "medium",
+    scalability: "high",
+    goal: "Einnahmen aus Vermoegen mit geringem Wochenaufwand bewerten.",
+    steps: ["Vermoegensquelle bestimmen", "Erwartbaren Cashflow schaetzen", "Risiko und Liquiditaet pruefen"],
+    requirements: ["Bestehendes oder geplantes Vermoegen", "Risikoprofil"],
+    risks: ["Schwankende Ertraege", "Kapitalbindung"]
+  },
+  insurance_payouts: {
+    defaultHoursPerWeek: 0.5,
+    defaultMonthlyIncome: 200,
+    defaultPhase: "idea",
+    defaultStatus: "planned",
+    risk: "low",
+    stability: "low",
+    scalability: "low",
+    goal: "Versicherungsauszahlungen als moegliche, nicht dauerhaft skalierbare Einnahme beruecksichtigen.",
+    steps: ["Anspruch und Zeitpunkt klaeren", "Einmaligkeit dokumentieren", "Keine dauerhafte Arbeitszeit verplanen"],
+    requirements: ["Konkreter Auszahlungsanspruch"],
+    risks: ["Einmalige Zahlung", "Unsicherer Zeitpunkt"]
+  },
+  bonus: {
+    defaultHoursPerWeek: 0,
+    defaultMonthlyIncome: 300,
+    defaultPhase: "idea",
+    defaultStatus: "planned",
+    risk: "medium",
+    stability: "low",
+    scalability: "low",
+    goal: "Sonderzahlungen konservativ in die Einkommensplanung aufnehmen.",
+    steps: ["Bedingungen pruefen", "Wahrscheinlichkeit einschaetzen", "Nicht als dauerhafte Arbeitszeit planen"],
+    requirements: ["Konkrete Zusage oder Zielregel"],
+    risks: ["Nicht garantierte Zahlung"]
+  },
+  severance_payment: {
+    defaultHoursPerWeek: 0,
+    defaultMonthlyIncome: 0,
+    defaultPhase: "idea",
+    defaultStatus: "planned",
+    risk: "medium",
+    stability: "low",
+    scalability: "low",
+    goal: "Abfindung oder Ausgleichszahlung als einmaliges Szenario pruefen.",
+    steps: ["Anspruch und Zeitpunkt klaeren", "Steuerliche Wirkung separat pruefen", "Einmaligen Charakter beruecksichtigen"],
+    requirements: ["Konkreter Auszahlungsgrund", "Dokumentierte Annahme"],
+    risks: ["Unsicherer Betrag", "Einmalige Zahlung"]
+  },
+  volunteer_allowance: {
+    defaultHoursPerWeek: 3,
+    defaultMonthlyIncome: 200,
+    defaultPhase: "setup",
+    defaultStatus: "planned",
+    risk: "low",
+    stability: "medium",
+    scalability: "low",
+    goal: "Ehrenamtliche Verguetung mit festen Terminen realistisch planen.",
+    steps: ["Passende Organisation finden", "Zeitfenster festlegen", "Pauschalen und Nachweise pruefen"],
+    requirements: ["Regelmaessige freie Zeit", "Organisation oder Verein"],
+    risks: ["Feste Termine", "Begrenzte Skalierbarkeit"]
+  },
+  trainer_allowance: {
     defaultHoursPerWeek: 4,
     defaultMonthlyIncome: 250,
     defaultPhase: "setup",
@@ -209,15 +298,25 @@ export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = 
     risk: "low",
     stability: "medium",
     scalability: "low",
-    goal: "Verguetete Taetigkeit mit sozialem oder fachlichem Bezug planen.",
+    goal: "Uebungsleiter-Taetigkeit mit sozialem oder fachlichem Bezug planen.",
     steps: ["Passende Organisation finden", "Zeitfenster festlegen", "Pauschalen und Nachweise pruefen"],
     requirements: ["Qualifikation oder Erfahrung", "Regelmaessige freie Zeit"],
     risks: ["Feste Termine", "Begrenzte Skalierbarkeit"]
   },
-  {
-    id: "board_advisory",
-    label: "Aufsichtsrat / Beirat",
-    defaultName: "Aufsichtsrat / Beirat",
+  child_youth_jobs: {
+    defaultHoursPerWeek: 4,
+    defaultMonthlyIncome: 200,
+    defaultPhase: "setup",
+    defaultStatus: "planned",
+    risk: "low",
+    stability: "medium",
+    scalability: "low",
+    goal: "Kinder- oder Jugendjob mit begrenztem Wochenaufwand planen.",
+    steps: ["Erlaubte Taetigkeit klaeren", "Schule und Freizeit schuetzen", "Arbeitszeiten begrenzen"],
+    requirements: ["Altersgerechte Taetigkeit", "Freie Zeitfenster"],
+    risks: ["Belastung neben Schule oder Ausbildung"]
+  },
+  board: {
     defaultHoursPerWeek: 3,
     defaultMonthlyIncome: 500,
     defaultPhase: "idea",
@@ -225,44 +324,67 @@ export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = 
     risk: "high",
     stability: "medium",
     scalability: "medium",
-    goal: "Langfristig eine verguetete Position in Aufsichtsrat oder Beirat erreichen.",
-    steps: ["Fachliches Profil schaerfen", "Berufserfahrung dokumentieren", "Netzwerk aufbauen", "Sichtbarkeit erhoehen", "Passende Branchen identifizieren"],
+    goal: "Langfristig eine verguetete Vorstandsrolle erreichen.",
+    steps: ["Fachliches Profil schaerfen", "Berufserfahrung dokumentieren", "Netzwerk aufbauen", "Sichtbarkeit erhoehen", "Passende Organisationen identifizieren"],
     requirements: ["Nachweisbares Profil", "Relevantes Netzwerk", "Strategische Positionierung"],
-    risks: ["Langer Aufbauzeitraum", "Abhaengigkeit von Empfehlungen", "Hohe Verantwortung"]
+    risks: ["Langer Aufbauzeitraum", "Hohe Verantwortung"]
   },
-  {
-    id: "project_work",
-    label: "Projektarbeit",
-    defaultName: "Projektarbeit",
-    defaultHoursPerWeek: 6,
-    defaultMonthlyIncome: 450,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "low",
-    scalability: "medium",
-    goal: "Zeitlich begrenzte Projekte als Zusatzquelle planen.",
-    steps: ["Projektart definieren", "Aufwand und Honorar schaetzen", "Akquiseweg festlegen", "Kapazitaet blocken"],
-    requirements: ["Projektfaehige Kompetenzen", "Klare Verfuegbarkeit"],
-    risks: ["Projektspitzen", "Leerlauf zwischen Projekten"]
-  },
-  {
-    id: "other",
-    label: "Sonstiges Einkommen",
-    defaultName: "Sonstiges Einkommen",
-    defaultHoursPerWeek: 4,
-    defaultMonthlyIncome: 200,
+  office_holder: {
+    defaultHoursPerWeek: 3,
+    defaultMonthlyIncome: 300,
     defaultPhase: "idea",
     defaultStatus: "planned",
     risk: "medium",
     stability: "medium",
+    scalability: "low",
+    goal: "Verguetetes Amt oder Mandat mit realistischem Zeitbudget pruefen.",
+    steps: ["Passendes Amt identifizieren", "Voraussetzungen klaeren", "Regeltermine einplanen"],
+    requirements: ["Eignung oder Wahl/Benennung", "Zeit fuer Termine"],
+    risks: ["Feste Verpflichtungen", "Begrenzte Skalierbarkeit"]
+  },
+  supervisory_board: {
+    defaultName: "Aufsichtsrat",
+    defaultHoursPerWeek: 3,
+    defaultMonthlyIncome: 500,
+    defaultPhase: "idea",
+    defaultStatus: "planned",
+    risk: "high",
+    stability: "medium",
     scalability: "medium",
-    goal: "Weitere Einkommensidee strukturiert pruefen.",
-    steps: ["Idee beschreiben", "Zeitbudget setzen", "Erwartbares Einkommen schaetzen", "Risiken pruefen"],
-    requirements: ["Konkrete Einkommensidee", "Realistische Testphase"],
-    risks: ["Unklare Annahmen", "Unterschaetzter Aufwand"]
+    goal: "Langfristig eine verguetete Position in einem Aufsichtsrat erreichen.",
+    steps: ["Fachliches Profil schaerfen", "Berufserfahrung dokumentieren", "Netzwerk aufbauen", "Sichtbarkeit erhoehen", "Passende Branchen identifizieren"],
+    requirements: ["Nachweisbares Profil", "Relevantes Netzwerk", "Strategische Positionierung"],
+    risks: ["Langer Aufbauzeitraum", "Abhaengigkeit von Empfehlungen", "Hohe Verantwortung"]
+  },
+  other: {
+    defaultName: "Sonstiges Einkommen",
+    goal: "Weitere Einkommensidee strukturiert pruefen."
   }
-];
+};
+
+export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = INCOME_YEAR_LABEL_OPTIONS.map(
+  (option) => {
+    const overrides = INCOME_PLANNING_CATEGORY_OVERRIDES[option.id as IncomePlanningCategory] ?? {};
+    return {
+      id: option.id as IncomePlanningCategory,
+      label: option.label,
+      icon: option.icon,
+      description: option.description,
+      defaultName: overrides.defaultName ?? option.label,
+      defaultHoursPerWeek: overrides.defaultHoursPerWeek ?? DEFAULT_CATEGORY_CONFIG.defaultHoursPerWeek ?? 4,
+      defaultMonthlyIncome: overrides.defaultMonthlyIncome ?? DEFAULT_CATEGORY_CONFIG.defaultMonthlyIncome ?? 200,
+      defaultPhase: overrides.defaultPhase ?? DEFAULT_CATEGORY_CONFIG.defaultPhase ?? "idea",
+      defaultStatus: overrides.defaultStatus ?? DEFAULT_CATEGORY_CONFIG.defaultStatus ?? "planned",
+      risk: overrides.risk ?? DEFAULT_CATEGORY_CONFIG.risk ?? "medium",
+      stability: overrides.stability ?? DEFAULT_CATEGORY_CONFIG.stability ?? "medium",
+      scalability: overrides.scalability ?? DEFAULT_CATEGORY_CONFIG.scalability ?? "medium",
+      goal: overrides.goal ?? `${option.label} als Einkommensquelle realistisch pruefen.`,
+      steps: overrides.steps ?? DEFAULT_CATEGORY_CONFIG.steps ?? [],
+      requirements: overrides.requirements ?? DEFAULT_CATEGORY_CONFIG.requirements ?? [],
+      risks: overrides.risks ?? DEFAULT_CATEGORY_CONFIG.risks ?? []
+    };
+  }
+);
 
 export function incomePlanningCategoryConfig(category: IncomePlanningCategory): IncomePlanningCategoryConfig {
   return (

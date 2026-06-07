@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultIncomePlanningState } from "../data/defaults";
-import { buildIncomePlanningModel, buildIncomePlanningSource } from "../domain/incomePlanning";
+import { INCOME_YEAR_LABEL_OPTIONS } from "../domain/incomeLabels";
+import {
+  buildIncomePlanningModel,
+  buildIncomePlanningSource,
+  INCOME_PLANNING_CATEGORY_CONFIGS
+} from "../domain/incomePlanning";
 import type { IncomePlanningState } from "../types";
 
 describe("income planning", () => {
@@ -21,9 +26,9 @@ describe("income planning", () => {
     const state: IncomePlanningState = {
       ...defaultIncomePlanningState(),
       sources: [
-        buildIncomePlanningSource("main_job", "main", 2026, { hoursPerWeek: 40 }),
-        buildIncomePlanningSource("part_time_job", "part-time", 2026, { hoursPerWeek: 30 }),
-        buildIncomePlanningSource("self_employment", "self", 2026, { hoursPerWeek: 25 })
+        buildIncomePlanningSource("salary", "main", 2026, { hoursPerWeek: 40 }),
+        buildIncomePlanningSource("side_income", "part-time", 2026, { hoursPerWeek: 30 }),
+        buildIncomePlanningSource("self_employed", "self", 2026, { hoursPerWeek: 25 })
       ]
     };
 
@@ -35,12 +40,12 @@ describe("income planning", () => {
     expect(model.warnings.join(" ")).toContain("zeitlich unrealistisch");
   });
 
-  it("creates scenario steps for self employment and board advisory planning", () => {
+  it("creates scenario steps for self employment and supervisory board planning", () => {
     const state: IncomePlanningState = {
       ...defaultIncomePlanningState(),
       sources: [
-        buildIncomePlanningSource("self_employment", "self", 2026),
-        buildIncomePlanningSource("board_advisory", "board", 2026)
+        buildIncomePlanningSource("self_employed", "self", 2026),
+        buildIncomePlanningSource("supervisory_board", "board", 2026)
       ]
     };
 
@@ -50,5 +55,14 @@ describe("income planning", () => {
     expect(model.scenarios[0].steps).toContain("Geschaeftsidee definieren");
     expect(model.scenarios[1].steps).toContain("Netzwerk aufbauen");
     expect(model.scenarios[1].goal).toContain("Aufsichtsrat");
+  });
+
+  it("uses the yearly income labels as planning categories", () => {
+    expect(INCOME_PLANNING_CATEGORY_CONFIGS.map((config) => config.id)).toEqual(
+      INCOME_YEAR_LABEL_OPTIONS.map((option) => option.id)
+    );
+    expect(INCOME_PLANNING_CATEGORY_CONFIGS.map((config) => config.label)).toEqual(
+      INCOME_YEAR_LABEL_OPTIONS.map((option) => option.label)
+    );
   });
 });

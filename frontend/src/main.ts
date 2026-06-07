@@ -20,6 +20,7 @@ import {
   type IncomeAnalysisLabelDetails,
   type IncomeAnalysisLabelGroup
 } from "./domain/incomeAnalysis";
+import { INCOME_YEAR_LABEL_OPTIONS } from "./domain/incomeLabels";
 import {
   buildIncomePlanningModel,
   buildIncomePlanningSource,
@@ -250,30 +251,6 @@ const INCOME_TAX_DEDUCTION_ROWS: Array<{
   { field: "careInsurance", nr: "26", label: "Arbeitnehmerbeitraege zur sozialen PV", category: "social" },
   { field: "unemploymentInsurance", nr: "27", label: "Arbeitnehmerbeitraege zur AV", category: "social" }
 ];
-const INCOME_YEAR_LABEL_OPTIONS: Array<{ id: string; label: string; icon: string; description: string }> = [
-  { id: "salary", label: "Gehalt", icon: "coins", description: "Regelmaessiges Arbeitsentgelt" },
-  { id: "training_allowance", label: "Ausbildungsverguetung", icon: "education", description: "Verguetung waehrend Ausbildung oder dualem Studium" },
-  { id: "minijob", label: "Minijob", icon: "job_badge", description: "Geringfuegige Beschaeftigung oder kleiner Nebenjob" },
-  { id: "pocket_money", label: "Taschengeld", icon: "pocket_money", description: "Regelmaessiges oder einmaliges Taschengeld" },
-  { id: "self_employed", label: "Selbststaendigkeit", icon: "briefcase", description: "Einkommen aus eigener Taetigkeit" },
-  { id: "freelance", label: "Freiberuflich", icon: "pen", description: "Freiberufliche oder projektbezogene Einkuenfte" },
-  { id: "side_income", label: "Nebeneinkuenfte", icon: "income_plus", description: "Weitere laufende Einkommensquellen" },
-  { id: "online_sales", label: "Online-Verkaeufe", icon: "online_sales", description: "Einnahmen aus privaten oder gewerblichen Online-Verkaeufen" },
-  { id: "garage_parking_rental", label: "Garage / Stellplatz", icon: "parking", description: "Einnahmen aus Garage oder Stellplatz" },
-  { id: "fees", label: "Gagen", icon: "stage", description: "Gagen, Honorare oder Auftrittserloese" },
-  { id: "dividends", label: "Dividenden", icon: "dividend", description: "Ausschuettungen aus Aktien oder Fonds" },
-  { id: "asset_income", label: "Einnahme aus Vermoegen", icon: "safe", description: "Einnahmen aus Vermoegen, Kapital oder Besitz" },
-  { id: "insurance_payouts", label: "Versicherungsauszahlungen", icon: "insurance_payouts", description: "Auszahlungen oder Erstattungen aus Versicherungen" },
-  { id: "bonus", label: "Sonderzahlung", icon: "gift", description: "Bonus, Praemie oder Einmalzahlung" },
-  { id: "severance_payment", label: "Abfindung", icon: "shield", description: "Abfindung oder Ausgleichszahlung" },
-  { id: "volunteer_allowance", label: "Ehrenamtspauschale", icon: "volunteer_hand", description: "Ehrenamtliche Verguetung bis zum konfigurierten Freibetrag" },
-  { id: "trainer_allowance", label: "Übungsleiterpauschale", icon: "whistle", description: "Eigenes Label fuer Verguetung im Uebungsleiterfreibetrag" },
-  { id: "child_youth_jobs", label: "Kinder- und Jugendjobs", icon: "newspaper_route", description: "Zum Beispiel Zeitung austragen; nicht als lohnsteuerpflichtiger Arbeitslohn gefuehrt" },
-  { id: "board", label: "Vorstand", icon: "boardroom", description: "Vorstandsverguetung" },
-  { id: "office_holder", label: "Amtstraeger", icon: "stamp", description: "Verguetung fuer Amt oder Mandat" },
-  { id: "supervisory_board", label: "Aufsichtsrat", icon: "oversight", description: "Aufsichtsratsverguetung" },
-  { id: "other", label: "Sonstiges", icon: "tag", description: "Andere Einkommensart" }
-];
 const INCOME_EMPLOYMENT_CONTEXT_OPTIONS: Array<{ value: IncomeEmploymentContext; label: string }> = [
   { value: "job_loss", label: "Verlust des Arbeitsplatzes" },
   { value: "earned_claim", label: "Bereits entstandener Anspruch" },
@@ -455,6 +432,8 @@ let incomeAnalysisDataView: IncomeAnalysisDataView = "deductions";
 let incomeAnalysisYearFilter: IncomeAnalysisYearFilter = "all";
 let incomeAnalysisSelectedLabels: string[] = [];
 let incomeYearLabelPicker: { entryId: string; top: number; left: number } | null = null;
+let incomePlanningCategoryPicker: { sourceId: string | null; top: number; left: number } | null = null;
+let incomePlanningNewCategory: IncomePlanningCategory = "salary";
 let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 let positionFilterDrafts = createPositionFilterDrafts();
@@ -1153,6 +1132,9 @@ function bindEvents(): void {
       if (incomeYearLabelPicker && !target?.closest("#incomeYearLabelPicker")) {
         hideIncomeYearLabelPicker();
       }
+      if (incomePlanningCategoryPicker && !target?.closest("#incomePlanningCategoryPicker")) {
+        hideIncomePlanningCategoryPicker();
+      }
       if (incomeMilestoneTypePicker && !target?.closest("#incomeMilestoneTypePicker")) {
         hideIncomeMilestoneTypePicker();
       }
@@ -1191,6 +1173,9 @@ function bindEvents(): void {
     }
     if (action !== "open-income-year-label-picker" && action !== "select-income-year-label") {
       hideIncomeYearLabelPicker();
+    }
+    if (action !== "open-income-planning-category-picker" && action !== "select-income-planning-category") {
+      hideIncomePlanningCategoryPicker();
     }
     if (action !== "open-income-milestone-type-picker" && action !== "select-income-milestone-type") {
       hideIncomeMilestoneTypePicker();
@@ -1388,6 +1373,14 @@ function bindEvents(): void {
     if (action === "select-income-year-label") {
       selectIncomeYearLabel(button.dataset.incomeYearId || "", button.dataset.incomeLabel || "");
     }
+    if (action === "open-income-planning-category-picker") showIncomePlanningCategoryPicker(button);
+    if (action === "close-income-planning-category-picker") hideIncomePlanningCategoryPicker();
+    if (action === "select-income-planning-category") {
+      selectIncomePlanningCategory(
+        button.dataset.incomePlanningSourceId || null,
+        button.dataset.incomePlanningCategory || ""
+      );
+    }
     if (action === "open-income-milestone-type-picker") showIncomeMilestoneTypePicker(button);
     if (action === "close-income-milestone-type-picker") hideIncomeMilestoneTypePicker();
     if (action === "select-income-milestone-type") {
@@ -1487,6 +1480,7 @@ function bindEvents(): void {
       closeIncomeTaxDialog();
       closeIncomeAnalysisDialog();
       hideIncomeYearLabelPicker();
+      hideIncomePlanningCategoryPicker();
       hideIncomeMilestoneTypePicker();
     }
   });
@@ -1764,25 +1758,97 @@ function renderIncomePlanning(): void {
   renderIncomePlanningSources();
   renderIncomePlanningAssumptions();
   renderIncomePlanningSummary();
+  renderIncomePlanningCategoryPicker();
 }
 
 function renderIncomePlanningSummary(): void {
   const model = buildIncomePlanningModel(state.incomePlanning);
   renderIncomePlanningMetrics(model);
   renderIncomePlanningWarnings(model);
+  renderIncomePlanningTimeCharts(model);
   renderIncomePlanningScenarios(model);
 }
 
 function renderIncomePlanningCategorySelect(): void {
-  const select = document.querySelector<HTMLSelectElement>("#incomePlanningCategorySelect");
-  if (!select) return;
-  const selected = isIncomePlanningCategory(select.value) ? select.value : "main_job";
-  select.innerHTML = INCOME_PLANNING_CATEGORY_CONFIGS.map(
-    (config) =>
-      `<option value="${escapeHtml(config.id)}" ${config.id === selected ? "selected" : ""}>${escapeHtml(
-        config.label
-      )}</option>`
-  ).join("");
+  const button = document.querySelector<HTMLButtonElement>("#incomePlanningCategoryButton");
+  if (!button) return;
+  button.innerHTML = incomePlanningCategoryButtonContent(incomePlanningNewCategory, "Quelle auswaehlen");
+  button.title = incomePlanningCategoryConfig(incomePlanningNewCategory).description;
+}
+
+function showIncomePlanningCategoryPicker(button: HTMLButtonElement): void {
+  const sourceId = button.dataset.incomePlanningSourceId || null;
+  const rect = button.getBoundingClientRect();
+  const panelWidth = 500;
+  const panelHeight = 420;
+  const left =
+    rect.right + 12 + panelWidth <= window.innerWidth
+      ? rect.right + 12
+      : Math.max(12, rect.left - panelWidth - 12);
+  const top = Math.max(12, Math.min(rect.top, window.innerHeight - panelHeight - 12));
+  incomePlanningCategoryPicker = { sourceId, top, left };
+  renderIncomePlanningCategoryPicker();
+}
+
+function hideIncomePlanningCategoryPicker(): void {
+  incomePlanningCategoryPicker = null;
+  renderIncomePlanningCategoryPicker();
+}
+
+function selectIncomePlanningCategory(sourceId: string | null, categoryValue: string): void {
+  if (!isIncomePlanningCategory(categoryValue)) return;
+  if (sourceId) {
+    updateIncomePlanningSource(sourceId, "category", categoryValue);
+  } else {
+    incomePlanningNewCategory = categoryValue;
+  }
+  incomePlanningCategoryPicker = null;
+  renderIncomePlanning();
+  saveState(state);
+}
+
+function renderIncomePlanningCategoryPicker(): void {
+  const picker = document.querySelector<HTMLDivElement>("#incomePlanningCategoryPicker");
+  if (!picker) return;
+  if (!incomePlanningCategoryPicker) {
+    picker.hidden = true;
+    return;
+  }
+
+  const source = incomePlanningCategoryPicker.sourceId
+    ? state.incomePlanning.sources.find((item) => item.id === incomePlanningCategoryPicker?.sourceId)
+    : null;
+  const activeCategory = source?.category ?? incomePlanningNewCategory;
+
+  picker.style.top = `${incomePlanningCategoryPicker.top}px`;
+  picker.style.left = `${incomePlanningCategoryPicker.left}px`;
+  picker.innerHTML = `
+    <div class="position-icon-picker-head">
+      <span>Einkommenslabel</span>
+      <button class="icon-button" type="button" data-action="close-income-planning-category-picker" aria-label="Kategorieauswahl schliessen">x</button>
+    </div>
+    <div class="position-icon-picker-grid income-year-label-grid">
+      ${INCOME_PLANNING_CATEGORY_CONFIGS.map((option) => {
+        const active = option.id === activeCategory;
+        return `
+          <button
+            class="position-icon-option income-year-label-option ${active ? "active" : ""}"
+            type="button"
+            data-action="select-income-planning-category"
+            data-income-planning-source-id="${escapeHtml(incomePlanningCategoryPicker?.sourceId ?? "")}"
+            data-income-planning-category="${escapeHtml(option.id)}"
+            aria-pressed="${active}"
+            title="${escapeHtml(option.description)}"
+          >
+            ${positionIconSvg(option.icon)}
+            <span>${escapeHtml(option.label)}</span>
+            <small>${escapeHtml(option.description)}</small>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+  picker.hidden = false;
 }
 
 function renderIncomePlanningMetrics(model: IncomePlanningModel): void {
@@ -1833,6 +1899,95 @@ function renderIncomePlanningWarnings(model: IncomePlanningModel): void {
     `;
 }
 
+interface IncomePlanningTimeSegment {
+  label: string;
+  value: number;
+  color: string;
+}
+
+function renderIncomePlanningTimeCharts(model: IncomePlanningModel): void {
+  const host = document.querySelector<HTMLDivElement>("#incomePlanningTimeCharts");
+  if (!host) return;
+  const remaining = Math.max(0, model.remainingFlexibleHours);
+  host.innerHTML = `
+    ${incomePlanningDonutChart(
+      "Wochenzeit",
+      hoursLabel(model.usedHours),
+      "verplant von 168 h",
+      [
+        { label: "Verplant", value: Math.min(168, Math.max(0, model.usedHours)), color: "var(--accent)" },
+        { label: "Freie Reserve", value: remaining, color: "var(--row-border)" }
+      ],
+      168
+    )}
+    ${incomePlanningDonutChart(
+      "Verbrauchte Wochenzeit",
+      hoursLabel(model.usedHours),
+      "Aufteilung der Woche",
+      [
+        { label: "Arbeitszeit", value: model.totalWorkHours, color: "#2e7d58" },
+        { label: "Schlaf", value: model.sleepHoursPerWeek, color: "#4f6f9f" },
+        { label: "Freizeit", value: model.freeTimeHoursPerWeek, color: "#9a5f9e" },
+        { label: "Privat", value: model.privateCommitmentsHoursPerWeek, color: "#b8860b" },
+        { label: "Puffer", value: model.weeklyBufferHours, color: "#c76f4c" },
+        { label: "Reserve", value: remaining, color: "var(--row-border)" }
+      ],
+      168
+    )}
+  `;
+}
+
+function incomePlanningDonutChart(
+  title: string,
+  value: string,
+  detail: string,
+  segments: IncomePlanningTimeSegment[],
+  total: number
+): string {
+  const visibleSegments = segments.filter((segment) => segment.value > 0);
+  const gradient = incomePlanningDonutGradient(visibleSegments, total);
+  return `
+    <article class="income-planning-time-chart">
+      <div class="income-planning-donut" style="background: ${gradient}">
+        <span>
+          <strong>${escapeHtml(value)}</strong>
+          <small>${escapeHtml(detail)}</small>
+        </span>
+      </div>
+      <div class="income-planning-time-chart-copy">
+        <strong>${escapeHtml(title)}</strong>
+        <div class="income-planning-time-legend">
+          ${visibleSegments.map((segment) => incomePlanningTimeLegendItem(segment, total)).join("")}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function incomePlanningTimeLegendItem(segment: IncomePlanningTimeSegment, total: number): string {
+  const share = total > 0 ? (segment.value / total) * 100 : 0;
+  return `
+    <span class="income-planning-time-legend-item">
+      <i style="background: ${segment.color}"></i>
+      <span>${escapeHtml(segment.label)}</span>
+      <strong>${hoursLabel(segment.value)} · ${escapeHtml(percent(share))}</strong>
+    </span>
+  `;
+}
+
+function incomePlanningDonutGradient(segments: IncomePlanningTimeSegment[], total: number): string {
+  if (!segments.length || total <= 0) return "conic-gradient(var(--row-border) 0deg 360deg)";
+  let cursor = 0;
+  const stops = segments.map((segment, index) => {
+    const next = index === segments.length - 1 ? 360 : Math.min(360, cursor + (Math.max(0, segment.value) / total) * 360);
+    const stop = `${segment.color} ${cursor.toFixed(2)}deg ${next.toFixed(2)}deg`;
+    cursor = next;
+    return stop;
+  });
+  if (cursor < 360) stops.push(`var(--row-border) ${cursor.toFixed(2)}deg 360deg`);
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
 function renderIncomePlanningSources(): void {
   const host = document.querySelector<HTMLDivElement>("#incomePlanningSources");
   if (!host) return;
@@ -1850,36 +2005,37 @@ function incomePlanningSourceRow(source: IncomePlanningSource): string {
         )}" data-income-planning-source-field="active" />
         <span>Aktiv</span>
       </label>
-      <label class="field">
+      <div class="field">
         <span>Kategorie</span>
-        <select data-income-planning-source-id="${escapeHtml(source.id)}" data-income-planning-source-field="category">
-          ${INCOME_PLANNING_CATEGORY_CONFIGS.map(
-            (config) =>
-              `<option value="${escapeHtml(config.id)}" ${config.id === source.category ? "selected" : ""}>${escapeHtml(
-                config.label
-              )}</option>`
-          ).join("")}
-        </select>
-      </label>
+        <button
+          class="income-planning-label-button"
+          type="button"
+          data-action="open-income-planning-category-picker"
+          data-income-planning-source-id="${escapeHtml(source.id)}"
+          title="${escapeHtml(incomePlanningCategoryConfig(source.category).description)}"
+        >
+          ${incomePlanningCategoryButtonContent(source.category)}
+        </button>
+      </div>
       <label class="field income-planning-source-name">
         <span>Name</span>
         <input type="text" value="${escapeHtml(source.name)}" data-income-planning-source-id="${escapeHtml(
           source.id
         )}" data-income-planning-source-field="name" />
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-hours-field">
         <span>Std./Woche</span>
         <input type="number" min="0" max="100" step="0.5" value="${source.hoursPerWeek}" data-income-planning-source-id="${escapeHtml(
           source.id
         )}" data-income-planning-source-field="hoursPerWeek" />
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-income-field">
         <span>EUR/Monat</span>
         <input type="number" min="0" step="10" value="${source.expectedMonthlyIncome}" data-income-planning-source-id="${escapeHtml(
           source.id
         )}" data-income-planning-source-field="expectedMonthlyIncome" />
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-start-month-field">
         <span>Startmonat</span>
         <select data-income-planning-source-id="${escapeHtml(source.id)}" data-income-planning-source-field="startMonth">
           ${Array.from({ length: 12 }, (_, index) => index + 1)
@@ -1892,29 +2048,29 @@ function incomePlanningSourceRow(source: IncomePlanningSource): string {
             .join("")}
         </select>
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-start-year-field">
         <span>Startjahr</span>
         <input type="number" min="1900" max="2200" step="1" value="${source.startYear}" data-income-planning-source-id="${escapeHtml(
           source.id
         )}" data-income-planning-source-field="startYear" />
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-phase-field">
         <span>Phase</span>
         ${incomePlanningSelect(source.id, "phase", incomePlanningPhaseOptions(), source.phase)}
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-status-field">
         <span>Status</span>
         ${incomePlanningSelect(source.id, "status", incomePlanningStatusOptions(), source.status)}
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-level-field">
         <span>Risiko</span>
         ${incomePlanningSelect(source.id, "risk", incomePlanningLevelOptions(), source.risk)}
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-level-field">
         <span>Stabilitaet</span>
         ${incomePlanningSelect(source.id, "stability", incomePlanningLevelOptions(), source.stability)}
       </label>
-      <label class="field compact">
+      <label class="field compact income-planning-detail-field income-planning-level-field">
         <span>Skalierung</span>
         ${incomePlanningSelect(source.id, "scalability", incomePlanningLevelOptions(), source.scalability)}
       </label>
@@ -1922,6 +2078,17 @@ function incomePlanningSourceRow(source: IncomePlanningSource): string {
         source.id
       )}" aria-label="Einkommensquelle entfernen">x</button>
     </div>
+  `;
+}
+
+function incomePlanningCategoryButtonContent(category: IncomePlanningCategory, eyebrow = "Kategorie"): string {
+  const config = incomePlanningCategoryConfig(category);
+  return `
+    ${positionIconSvg(config.icon)}
+    <span>
+      <small>${escapeHtml(eyebrow)}</small>
+      <strong>${escapeHtml(config.label)}</strong>
+    </span>
   `;
 }
 
@@ -2078,13 +2245,11 @@ function handleIncomePlanningControl(
 }
 
 function addIncomePlanningSource(): void {
-  const select = document.querySelector<HTMLSelectElement>("#incomePlanningCategorySelect");
-  const category = isIncomePlanningCategory(select?.value) ? select.value : "other";
   state.incomePlanning = {
     ...state.incomePlanning,
     sources: [
       ...state.incomePlanning.sources,
-      buildIncomePlanningSource(category, createId(), state.settings.year)
+      buildIncomePlanningSource(incomePlanningNewCategory, createId(), state.settings.year)
     ]
   };
   renderIncomePlanning();
