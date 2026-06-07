@@ -693,6 +693,44 @@ describe("storage", () => {
     expect(loaded.incomeTracker.yearlyEntries[0].requiresManualTaxReview).toBe(false);
   });
 
+  it("normalizes online sales and insurance payout income label aliases", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        incomeTracker: {
+          ...state.incomeTracker,
+          settings: {
+            ...state.incomeTracker.settings,
+            selectedYearlyLabels: ["onlineverkauf", "versicherungsauszahlung"]
+          },
+          yearlyEntries: [
+            {
+              id: "online-sales",
+              year: 2026,
+              label: "onlineverkaeufe"
+            },
+            {
+              id: "insurance-payouts",
+              year: 2026,
+              label: "versicherungsauszahlungen"
+            }
+          ]
+        }
+      })
+    );
+
+    const loaded = loadState(storage);
+
+    expect(loaded.incomeTracker.settings.selectedYearlyLabels).toEqual(["online_sales", "insurance_payouts"]);
+    expect(loaded.incomeTracker.yearlyEntries.map((entry) => entry.label)).toEqual([
+      "online_sales",
+      "insurance_payouts"
+    ]);
+  });
+
   it("loads saved capital gains tax fields", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();

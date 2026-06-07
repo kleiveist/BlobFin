@@ -85,6 +85,21 @@ export const INCOME_TAX_RULE_LABEL_ALIASES: Record<string, string> = {
   stellplatz: "garage_parking_rental",
   mini_job: "minijob",
   minijob: "minijob",
+  online_sale: "online_sales",
+  online_sales: "online_sales",
+  onlinesale: "online_sales",
+  onlinesales: "online_sales",
+  onlineverkauf: "online_sales",
+  onlineverkaeufe: "online_sales",
+  onlineverkaufe: "online_sales",
+  insurance_payout: "insurance_payouts",
+  insurance_payouts: "insurance_payouts",
+  insurancepayout: "insurance_payouts",
+  insurancepayouts: "insurance_payouts",
+  versicherungsauszahlung: "insurance_payouts",
+  versicherungsauszahlungen: "insurance_payouts",
+  versicherungserstattung: "insurance_payouts",
+  versicherungserstattungen: "insurance_payouts",
   severance: "severance_payment",
   trainer: "trainer_allowance",
   trainer_allowance: "trainer_allowance",
@@ -125,6 +140,14 @@ export function evaluateIncomeTaxAndContributionRules(input: IncomeTaxRuleInput)
 
   if (label === "child_youth_jobs") {
     return locked("incomeTaxRules.childYouthJobs.locked");
+  }
+
+  if (label === "online_sales") {
+    return locked("incomeTaxRules.onlineSales.locked");
+  }
+
+  if (label === "insurance_payouts") {
+    return locked("incomeTaxRules.insurancePayouts.locked");
   }
 
   if (isCapitalGainsTaxRuleLabel(label)) {

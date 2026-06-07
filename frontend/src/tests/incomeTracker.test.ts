@@ -355,6 +355,34 @@ describe("income tracker tax and contribution rules", () => {
     expect(above.taxableAmount).toBe(300);
   });
 
+  it("locks tax and contribution fields for online sales", () => {
+    const rule = evaluateIncomeTaxAndContributionRules({
+      label: "online_sales",
+      annualAmount: 1200,
+      year: 2026
+    });
+
+    expect(rule.taxFieldsEnabled).toBe(false);
+    expect(rule.contributionFieldsEnabled).toBe(false);
+    expect(rule.taxableAmount).toBe(0);
+    expect(rule.contributionRelevantAmount).toBe(0);
+    expect(rule.reasonKey).toBe("incomeTaxRules.onlineSales.locked");
+  });
+
+  it("locks tax and contribution fields for insurance payouts", () => {
+    const rule = evaluateIncomeTaxAndContributionRules({
+      label: "versicherungsauszahlung",
+      annualAmount: 1200,
+      year: 2026
+    });
+
+    expect(rule.taxFieldsEnabled).toBe(false);
+    expect(rule.contributionFieldsEnabled).toBe(false);
+    expect(rule.taxableAmount).toBe(0);
+    expect(rule.contributionRelevantAmount).toBe(0);
+    expect(rule.reasonKey).toBe("incomeTaxRules.insurancePayouts.locked");
+  });
+
   it("reads the 2026 minijob limits from yearly configuration and warns after annual limit overflow", () => {
     expect(taxRuleConfig[2026].minijobMonthlyLimit).toBe(603);
     expect(taxRuleConfig[2026].minijobAnnualLimit).toBe(7236);

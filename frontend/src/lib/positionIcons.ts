@@ -47,9 +47,19 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     svg: '<path d="M5 8h8"/><path d="M5 12h6"/><path d="M5 16h8"/><circle cx="17" cy="12" r="4"/><path d="M17 10v4"/><path d="M15 12h4"/>'
   },
   {
+    id: "online_sales",
+    label: "Online-Verkaeufe",
+    svg: '<rect x="4" y="5" width="16" height="12" rx="2"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="M9 21h6"/><path d="M12 17v4"/><path d="M17 11l2 2 2-2"/><path d="M19 8v5"/>'
+  },
+  {
     id: "shield",
     label: "Versicherung",
     svg: '<path d="M12 3 19 6v5.2c0 4.4-2.9 7.5-7 9.8-4.1-2.3-7-5.4-7-9.8V6l7-3Z"/><path d="m8.7 12 2.1 2.1 4.5-4.7"/>'
+  },
+  {
+    id: "insurance_payouts",
+    label: "Versicherungsauszahlungen",
+    svg: '<path d="M12 3 19 6v5c0 3.2-1.6 5.8-4.3 7.8"/><path d="M12 3 5 6v5c0 4.2 2.8 7.2 7 9"/><path d="M8 14h6a2 2 0 1 1 0 4h-2"/><path d="M10 12v8"/><path d="M14 12v8"/>'
   },
   {
     id: "car",
@@ -228,6 +238,10 @@ export function defaultPositionIconForPosition(
   position: Pick<ReservePosition, "flow" | "type" | "name">
 ): string {
   const name = normalizeHeader(position.name);
+  if (/(online|verkauf|verkaeufe|verkaufe|plattform|marktplatz)/.test(name)) return "online_sales";
+  if (/(versicherung.*(auszahlung|erstattung|leistung)|(auszahlung|erstattung|leistung).*versicherung)/.test(name)) {
+    return "insurance_payouts";
+  }
   if (/(auto|kfz|fahrzeug|wagen)/.test(name)) return "car";
   if (/(versicherung|schutz|haftpflicht)/.test(name)) return "shield";
   if (/(katze|hund|tier|pet)/.test(name)) return "pet";

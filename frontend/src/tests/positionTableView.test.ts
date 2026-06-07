@@ -6,6 +6,7 @@ import {
   positionCadencesForTableMode,
   typeForPositionTableSelection
 } from "../lib/positionKinds";
+import { defaultPositionIconForPosition, normalizePositionIcon, positionIconLabel } from "../lib/positionIcons";
 import { positionTableColumnsForMode, positionTableRows } from "../lib/positionTableView";
 import type { PositionTableView, ReservePosition } from "../types";
 
@@ -228,6 +229,34 @@ describe("position table view", () => {
 
     expect(carRows.map((position) => position.id)).toEqual(["car"]);
     expect(multipleRows.map((position) => position.id)).toEqual(["car", "tax"]);
+  });
+
+  it("normalizes and filters online sales and insurance payout labels", () => {
+    const positions = [
+      expensePosition("online", { icon: "online_sales" }),
+      expensePosition("insurance", { icon: "insurance_payouts" }),
+      expensePosition("tax", { icon: "tax" })
+    ];
+
+    const onlineRows = positionTableRows(positions, "expense", view({ selectedLabels: ["Online-Verkaeufe"] }));
+    const insuranceRows = positionTableRows(positions, "expense", view({ selectedLabels: ["Versicherungsauszahlungen"] }));
+
+    expect(normalizePositionIcon("Online-Verkaeufe")).toBe("online_sales");
+    expect(normalizePositionIcon("Versicherungsauszahlungen")).toBe("insurance_payouts");
+    expect(positionIconLabel("online_sales")).toBe("Online-Verkaeufe");
+    expect(positionIconLabel("insurance_payouts")).toBe("Versicherungsauszahlungen");
+    expect(defaultPositionIconForPosition({ flow: "income", type: "incomeTemporary", name: "Online Verkauf" })).toBe(
+      "online_sales"
+    );
+    expect(
+      defaultPositionIconForPosition({
+        flow: "income",
+        type: "incomeTemporary",
+        name: "Versicherung Auszahlung"
+      })
+    ).toBe("insurance_payouts");
+    expect(onlineRows.map((position) => position.id)).toEqual(["online"]);
+    expect(insuranceRows.map((position) => position.id)).toEqual(["insurance"]);
   });
 
   it("combines label quick filters with popup filters and sorting", () => {
