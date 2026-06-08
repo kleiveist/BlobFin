@@ -22,7 +22,10 @@ import {
   defaultIncomePlanningAssumptions,
   INCOME_PLANNING_CATEGORY_IDS,
   incomePlanningCategoryConfig,
+  incomePlanningDefaultManualColor,
+  incomePlanningDefaultWorkColor,
   incomePlanningSleepSlotDurationMinutes,
+  incomePlanningStripSlotPause,
   isIncomePlanningHabitChange,
   isIncomePlanningHabitDurationUnit,
   isIncomePlanningHabitStatus,
@@ -891,6 +894,7 @@ function normalizeIncomePlanningWorkBlock(value: unknown): IncomePlanningWorkBlo
     category,
     name: String(value.name || fallback.name),
     description: String(value.description || ""),
+    color: normalizeIncomePlanningColor(value.color, fallback.color ?? incomePlanningDefaultWorkColor(category)),
     slots: Array.isArray(value.slots)
       ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", 60)).filter(isSlot)
       : fallback.slots
@@ -925,10 +929,11 @@ function normalizeIncomePlanningHabit(value: unknown): IncomePlanningHabit | nul
   if (!isRecord(value)) return null;
   const fallback = defaultIncomePlanningState().habits[0];
   const durationMinutes = Math.round(clampNumber(numberOrDefault(value.durationMinutes, fallback.durationMinutes), 0, 1440));
+  const type = isIncomePlanningHabitType(value.type) ? value.type : fallback.type;
   return {
     id: String(value.id || createId()),
     active: booleanOrDefault(value.active, true),
-    type: isIncomePlanningHabitType(value.type) ? value.type : fallback.type,
+    type,
     name: String(value.name || fallback.name),
     description: String(value.description || ""),
     timing: String(value.timing || ""),
@@ -938,8 +943,12 @@ function normalizeIncomePlanningHabit(value: unknown): IncomePlanningHabit | nul
     replacementHabit: String(value.replacementHabit || ""),
     status: isIncomePlanningHabitStatus(value.status) ? value.status : fallback.status,
     priority: isIncomePlanningPriority(value.priority) ? value.priority : fallback.priority,
+    icon: normalizePositionIcon(value.icon, type === "bad" ? "snack" : "book"),
     slots: Array.isArray(value.slots)
-      ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", durationMinutes)).filter(isSlot)
+      ? value.slots
+          .map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", durationMinutes))
+          .filter(isSlot)
+          .map(incomePlanningStripSlotPause)
       : fallback.slots
   };
 }
@@ -954,6 +963,7 @@ function normalizeIncomePlanningManualBlock(value: unknown): IncomePlanningManua
     type,
     name: String(value.name || fallback.name),
     description: String(value.description || ""),
+    color: normalizeIncomePlanningColor(value.color, fallback.color ?? incomePlanningDefaultManualColor(type)),
     slots: Array.isArray(value.slots)
       ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", 60)).filter(isSlot)
       : fallback.slots
@@ -968,6 +978,11 @@ function normalizeIncomePlanningSlot(
   if (!isRecord(value)) return null;
   const startTime = normalizeIncomePlanningTime(value.startTime, "09:00");
   const endTime = normalizeIncomePlanningTime(value.endTime, "10:00");
+  const pauseStartTime = "pauseStartTime" in value ? normalizeIncomePlanningTime(value.pauseStartTime, "12:00") : null;
+  const pauseEndTime = "pauseEndTime" in value ? normalizeIncomePlanningTime(value.pauseEndTime, "12:30") : null;
+  const pauseDurationMinutes = Math.round(clampNumber(numberOrDefault(value.pauseDurationMinutes, fallbackDuration(pauseStartTime ?? "12:00", pauseEndTime ?? "12:30", 0)), 0, 168 * 60));
+  const hasPauseFields = Boolean(pauseStartTime && pauseEndTime);
+  const pauseEnabled = booleanOrDefault(value.pauseEnabled, hasPauseFields && pauseDurationMinutes > 0);
   return {
     id: String(value.id || createId()),
     day: isIncomePlanningWeekday(value.day) ? value.day : fallbackDay,
@@ -976,8 +991,16 @@ function normalizeIncomePlanningSlot(
     flexible: booleanOrDefault(value.flexible, false),
     durationMinutes: Math.round(
       clampNumber(numberOrDefault(value.durationMinutes, fallbackDuration(startTime, endTime, fallbackDurationMinutes)), 0, 168 * 60)
-    )
+    ),
+    ...(hasPauseFields
+      ? { pauseEnabled, pauseStartTime, pauseEndTime, pauseDurationMinutes }
+      : {})
   };
+}
+
+function normalizeIncomePlanningColor(value: unknown, fallback: string): string {
+  const color = String(value || "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color.toLowerCase() : fallback;
 }
 
 function normalizeIncomePlanningAssumptions(value: unknown): IncomePlanningAssumptions {

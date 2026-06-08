@@ -31,9 +31,15 @@ import {
   INCOME_PLANNING_WEEK_DAYS,
   incomePlanningDefaultWorkCategory,
   incomePlanningCategoryConfig,
+  incomePlanningDefaultManualColor,
+  incomePlanningDefaultWorkColor,
   incomePlanningAverageSleepHours,
+  incomePlanningSlotGrossDurationMinutes,
+  incomePlanningSlotNetDurationMinutes,
+  incomePlanningSlotPauseDurationMinutes,
   incomePlanningSleepSlotDurationMinutes,
   incomePlanningSlotCalendarSegments,
+  incomePlanningStripSlotPause,
   parseTimeMinutes,
   type IncomePlanningCalendarEntry,
   type IncomePlanningModel,
@@ -303,6 +309,16 @@ const CAREER_MILESTONE_IMPACT_OPTIONS: Array<{ value: CareerMilestoneImpact; lab
   { value: "neutral", label: "neutral" },
   { value: "negative", label: "negativ" }
 ];
+const INCOME_PLANNING_COLOR_OPTIONS = [
+  "#8a5a2b",
+  "#2f6fb0",
+  "#5f7f4f",
+  "#b8860b",
+  "#7d6bb3",
+  "#c76f4c",
+  "#6f7785",
+  "#4e9f6d"
+];
 const INCOME_PROJECTION_MODES: IncomeProjectionMode[] = ["off", "historical_average", "manual"];
 type NumericPlanningSetting = Exclude<keyof PlanningSettings, "endDate">;
 type NumericInvestmentSetting =
@@ -423,7 +439,16 @@ type AccountDialogState = {
 } | null;
 type IncomePlanningOwnerType = "work" | "habit" | "manual" | "assumption";
 type IncomePlanningDialogMode = "create" | "edit" | "create_slot";
-type IncomePlanningRepeatMode = "single" | "workdays" | "online_sales" | "weekend" | "daily";
+interface IncomePlanningSleepSlotGroup {
+  id: string;
+  fromDay: IncomePlanningWeekday;
+  toDay: IncomePlanningWeekday;
+  startTime: string;
+  endTime: string;
+  flexible: boolean;
+  durationMinutes: number;
+  slotIds: Partial<Record<IncomePlanningWeekday, string>>;
+}
 type IncomePlanningDialogState = {
   mode: IncomePlanningDialogMode;
   ownerType: IncomePlanningOwnerType;
@@ -439,17 +464,23 @@ type IncomePlanningDialogState = {
   priority: IncomePlanningHabit["priority"];
   name: string;
   description: string;
+  color: string;
+  habitIcon: string;
   timing: string;
   habitDurationMinutes: number;
   replacementHabit: string;
   sleepHoursPerDay: number;
-  sleepSlots: IncomePlanningSleepSlot[];
+  sleepSlotGroups: IncomePlanningSleepSlotGroup[];
   day: IncomePlanningWeekday;
+  toDay: IncomePlanningWeekday;
   startTime: string;
   endTime: string;
   flexible: boolean;
   slotDurationMinutes: number;
-  repeatMode: IncomePlanningRepeatMode;
+  pauseEnabled: boolean;
+  pauseStartTime: string;
+  pauseEndTime: string;
+  pauseDurationMinutes: number;
   error: string;
 } | null;
 interface IncomePlanningCalendarBackgroundEntry {
@@ -463,12 +494,15 @@ interface IncomePlanningCalendarBackgroundEntry {
   icon: string;
   type: IncomePlanningPlannerEntryType | "sleep";
   flexible: boolean;
+  color?: string;
+  sleepGroupId?: string;
 }
 type IncomePlanningDragMode = "move" | "resize-start" | "resize-end";
 type IncomePlanningDragState = {
   ownerType: Exclude<IncomePlanningOwnerType, "assumption">;
   ownerId: string;
   slotId: string;
+  slotPart: "main" | "pause";
   mode: IncomePlanningDragMode;
   pointerId: number;
   startClientX: number;
@@ -479,6 +513,18 @@ type IncomePlanningDragState = {
   dayWidth: number;
   columnHeight: number;
   element: HTMLElement;
+  moved: boolean;
+} | null;
+type IncomePlanningSleepDragState = {
+  groupId: string;
+  group: IncomePlanningSleepSlotGroup;
+  pointerId: number;
+  startClientY: number;
+  originalStartMinute: number;
+  durationMinutes: number;
+  overnight: boolean;
+  columnHeight: number;
+  elements: HTMLElement[];
   moved: boolean;
 } | null;
 
@@ -508,7 +554,9 @@ let incomeAnalysisSelectedLabels: string[] = [];
 let incomeYearLabelPicker: { entryId: string; top: number; left: number } | null = null;
 let incomePlanningDialog: IncomePlanningDialogState = null;
 let incomePlanningDragState: IncomePlanningDragState = null;
+let incomePlanningSleepDragState: IncomePlanningSleepDragState = null;
 let incomePlanningSuppressNextCalendarClick = false;
+let incomePlanningHabitIconPicker: { top: number; left: number } | null = null;
 let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 let positionFilterDrafts = createPositionFilterDrafts();
@@ -1218,6 +1266,9 @@ function bindEvents(): void {
       if (positionIconPicker && !target?.closest("#positionIconPicker")) {
         hidePositionIconPicker();
       }
+      if (incomePlanningHabitIconPicker && !target?.closest("#incomePlanningHabitIconPicker")) {
+        hideIncomePlanningHabitIconPicker();
+      }
       if (incomeYearLabelPicker && !target?.closest("#incomeYearLabelPicker")) {
         hideIncomeYearLabelPicker();
       }
@@ -1256,6 +1307,13 @@ function bindEvents(): void {
     const action = button.dataset.action;
     if (action !== "open-position-icon-picker" && action !== "select-position-icon") {
       hidePositionIconPicker();
+    }
+    if (
+      action !== "open-income-planning-habit-icon-picker" &&
+      action !== "select-income-planning-habit-icon" &&
+      action !== "close-income-planning-habit-icon-picker"
+    ) {
+      hideIncomePlanningHabitIconPicker();
     }
     if (action !== "open-income-year-label-picker" && action !== "select-income-year-label") {
       hideIncomeYearLabelPicker();
@@ -1383,7 +1441,7 @@ function bindEvents(): void {
     }
     if (action === "income-planning-edit-assumption") openIncomePlanningDialog("assumption", "edit");
     if (action === "income-planning-add-sleep-slot") addIncomePlanningDialogSleepSlot();
-    if (action === "income-planning-remove-sleep-slot") removeIncomePlanningDialogSleepSlot(button.dataset.incomePlanningSleepSlotId || "");
+    if (action === "income-planning-remove-sleep-slot") removeIncomePlanningDialogSleepSlot(button.dataset.incomePlanningSleepSlotGroupId || "");
     if (action === "income-planning-open-block") {
       openIncomePlanningDialog(
         incomePlanningOwnerTypeFromValue(button.dataset.incomePlanningOwnerType),
@@ -1394,6 +1452,15 @@ function bindEvents(): void {
     }
     if (action === "income-planning-close-dialog") closeIncomePlanningDialog();
     if (action === "income-planning-save-dialog") saveIncomePlanningDialog();
+    if (action === "income-planning-set-dialog-color") {
+      updateIncomePlanningDialogDraft("color", button.dataset.incomePlanningColor || "");
+      renderIncomePlanningDialog();
+    }
+    if (action === "open-income-planning-habit-icon-picker") showIncomePlanningHabitIconPicker(button);
+    if (action === "close-income-planning-habit-icon-picker") hideIncomePlanningHabitIconPicker();
+    if (action === "select-income-planning-habit-icon") {
+      selectIncomePlanningHabitIcon(button.dataset.incomePlanningHabitIcon || "");
+    }
     if (action === "add-planning-account") addPlanningAccount();
     if (action === "rename-planning-account") renamePlanningAccount();
     if (action === "cancel-planning-account-dialog") closePlanningAccountDialog();
@@ -1874,6 +1941,7 @@ function renderIncomePlanning(): void {
   renderIncomePlanningHabits();
   renderIncomePlanningSummary();
   renderIncomePlanningDialog();
+  renderIncomePlanningHabitIconPicker();
 }
 
 function renderIncomePlanningSummary(): void {
@@ -1889,7 +1957,8 @@ function renderIncomePlanningMetrics(model: IncomePlanningModel): void {
   const host = document.querySelector<HTMLDivElement>("#incomePlanningMetricGrid");
   if (!host) return;
   host.innerHTML = `
-    ${incomePlanningMetric("Arbeitszeit", `${hoursLabel(model.totalWorkHours)} / Woche`, `${model.activeWorkBlocks.length} aktive Bloecke`, model.status)}
+    ${incomePlanningMetric("Arbeitszeit", `${hoursLabel(model.totalWorkHours)} / Woche`, `${hoursLabel(model.grossWorkHours)} brutto`, model.status)}
+    ${incomePlanningMetric("Pausen", `${hoursLabel(model.pauseHours)} / Woche`, "separat von Arbeits-/Zeitbloecken", model.pauseHours > 0 ? "realistic" : model.status)}
     ${incomePlanningMetric("Habit-Zeit", `${hoursLabel(model.habitHours)} / Woche`, `${model.activeHabits.length} aktive Habits`, model.status)}
     ${incomePlanningMetric("Privat/Freizeit/Puffer", `${hoursLabel(model.manualHours)} / Woche`, `${model.activeManualBlocks.length} Zeitbloecke`, model.status)}
     ${incomePlanningMetric("Verplante Woche", `${hoursLabel(model.usedHours)} / Woche`, "inklusive Schlaf", model.status)}
@@ -1963,6 +2032,7 @@ function renderIncomePlanningTimeCharts(model: IncomePlanningModel): void {
       "Aufteilung der Woche",
       [
         { label: "Arbeitszeit", value: model.totalWorkHours, color: "#2e7d58" },
+        { label: "Pausen", value: model.pauseHours, color: "#6f7785" },
         { label: "Habits", value: model.habitHours, color: "#8f5aa8" },
         { label: "Schlaf", value: model.sleepHoursPerWeek, color: "#4f6f9f" },
         { label: "Privat/Freizeit/Puffer", value: model.manualHours, color: "#b8860b" },
@@ -2035,18 +2105,19 @@ function renderIncomePlanningSources(): void {
 function incomePlanningWorkBlockRow(workBlock: IncomePlanningWorkBlock): string {
   const model = buildIncomePlanningModel(state.incomePlanning);
   const hours = incomePlanningOwnerHours(model, workBlock.id);
+  const pauseHours = slotsPauseHours(workBlock.slots);
   const config = incomePlanningCategoryConfig(workBlock.category);
   return `
-    <article class="income-planning-block-card compact work ${workBlock.active ? "active" : ""}">
+    <article class="income-planning-block-card compact work ${workBlock.active ? "active" : ""}" style="${incomePlanningColorStyle(workBlock.color ?? incomePlanningDefaultWorkColor(workBlock.category))}">
       <div class="income-planning-work-card-main">
         <div class="income-planning-work-title">
           ${incomePlanningTypeLabel(config.label, config.icon)}
           <strong>${escapeHtml(workBlock.name)}</strong>
-          <small>${escapeHtml(workBlock.description || `${hoursLabel(hours)} / Woche`)}</small>
+          <small>${escapeHtml(workBlock.description || `${hoursLabel(hours)} netto · ${hoursLabel(slotsGrossHours(workBlock.slots))} brutto`)}</small>
         </div>
         <div class="income-planning-work-hours">
           <strong>${escapeHtml(hoursLabel(hours))}</strong>
-          <span>pro Woche</span>
+          <span>${escapeHtml(pauseHours > 0 ? `${hoursLabel(pauseHours)} Pause` : "pro Woche")}</span>
         </div>
         <div class="button-row">
           <button class="button secondary" type="button" data-action="income-planning-open-block" data-income-planning-owner-type="work" data-income-planning-owner-id="${escapeHtml(
@@ -2085,12 +2156,17 @@ function incomePlanningSlotSummary(ownerType: string, ownerId: string, slots: In
 }
 
 function incomePlanningSlotChip(ownerType: string, ownerId: string, slot: IncomePlanningSlot): string {
+  const pauseLabel =
+    ownerType !== "habit" && slot.pauseEnabled && slot.pauseStartTime && slot.pauseEndTime
+      ? `<small>Pause ${escapeHtml(slot.pauseStartTime)}-${escapeHtml(slot.pauseEndTime)}</small>`
+      : "";
   return `
     <button class="income-planning-slot-chip ${slot.flexible ? "flexible" : ""}" type="button" data-action="income-planning-open-block" data-income-planning-owner-type="${escapeHtml(
       ownerType
     )}" data-income-planning-owner-id="${escapeHtml(ownerId)}" data-income-planning-slot-id="${escapeHtml(slot.id)}">
       <strong>${escapeHtml(incomePlanningWeekdayLabel(slot.day))}</strong>
       <span>${escapeHtml(slot.flexible ? `flexibel · ${minutesLabel(slot.durationMinutes)}` : `${slot.startTime}-${slot.endTime}`)}</span>
+      ${pauseLabel}
     </button>
   `;
 }
@@ -2101,13 +2177,14 @@ function renderIncomePlanningAssumptions(): void {
   const assumptions = state.incomePlanning.assumptions;
   const sleepHours = incomePlanningAverageSleepHours(assumptions);
   const sleepWeekHours = hoursLabel(assumptions.sleepSlots.reduce((sum, slot) => sum + incomePlanningSleepSlotDurationMinutes(slot), 0) / 60);
+  const sleepGroupCount = incomePlanningSleepSlotGroupsFromSlots(assumptions.sleepSlots).length;
   host.innerHTML = `
     <article class="income-planning-block-card compact active">
       <div class="income-planning-compact-head">
         <div>
           <span>Zeitannahme</span>
           <strong>Schlaf</strong>
-          <small>${hoursLabel(sleepHours)} pro Tag · ${sleepWeekHours} / Woche · ${intNumber(assumptions.sleepSlots.length)} Slots</small>
+          <small>${hoursLabel(sleepHours)} pro Tag · ${sleepWeekHours} / Woche · ${intNumber(sleepGroupCount)} Schlafzeiten</small>
         </div>
         <button class="button secondary" type="button" data-action="income-planning-edit-assumption">Bearbeiten</button>
       </div>
@@ -2124,13 +2201,14 @@ function renderIncomePlanningManualBlocks(): void {
 }
 
 function incomePlanningManualBlockRow(block: IncomePlanningManualBlock): string {
+  const pauseHours = slotsPauseHours(block.slots);
   return `
-    <article class="income-planning-block-card compact ${block.active ? "active" : ""}">
+    <article class="income-planning-block-card compact ${block.active ? "active" : ""}" style="${incomePlanningColorStyle(block.color ?? incomePlanningDefaultManualColor(block.type))}">
       <div class="income-planning-compact-head">
         <div>
           <span>${escapeHtml(incomePlanningManualBlockTypeLabel(block.type))}</span>
           <strong>${escapeHtml(block.name)}</strong>
-          <small>${escapeHtml(block.description || `${hoursLabel(slotsHours(block.slots))} / Woche`)}</small>
+          <small>${escapeHtml(block.description || `${hoursLabel(slotsHours(block.slots))} / Woche${pauseHours > 0 ? ` · ${hoursLabel(pauseHours)} Pause` : ""}`)}</small>
         </div>
         <div class="button-row">
           <button class="button secondary" type="button" data-action="income-planning-open-block" data-income-planning-owner-type="manual" data-income-planning-owner-id="${escapeHtml(
@@ -2158,11 +2236,12 @@ function renderIncomePlanningHabits(): void {
 }
 
 function incomePlanningHabitRow(habit: IncomePlanningHabit): string {
+  const icon = normalizePositionIcon(habit.icon, habit.type === "bad" ? "snack" : "book");
   return `
     <article class="income-planning-block-card compact habit ${habit.active ? "active" : ""}">
       <div class="income-planning-compact-head">
         <div>
-          <span>${habit.type === "good" ? "Gute Habit" : "Schlechte Habit"} · ${escapeHtml(incomePlanningHabitChangeLabel(habit.goalChange))}</span>
+          <span>${positionIconSvg(icon, "position-icon-svg income-planning-type-icon")} ${habit.type === "good" ? "Gute Habit" : "Schlechte Habit"} · ${escapeHtml(incomePlanningHabitChangeLabel(habit.goalChange))}</span>
           <strong>${escapeHtml(habit.name)}</strong>
           <small>${escapeHtml(`${habit.timing || "ohne Zeitpunkt"} · ${habit.durationMinutes} min/${habit.durationUnit === "day" ? "Tag" : "Woche"}`)}</small>
         </div>
@@ -2193,16 +2272,17 @@ function renderIncomePlanningCareerLife(model: IncomePlanningModel): void {
   }
   const config = incomePlanningCategoryConfig(block.category);
   const hours = incomePlanningOwnerHours(model, block.id);
+  const pauseHours = slotsPauseHours(block.slots);
   host.innerHTML = `
-    <article class="income-planning-career-item">
+    <article class="income-planning-career-item" style="${incomePlanningColorStyle(block.color ?? incomePlanningDefaultWorkColor(block.category))}">
       <div class="income-planning-career-main">
         ${incomePlanningTypeLabel(config.label, config.icon)}
         <strong>${escapeHtml(block.name)}</strong>
-        <small>${escapeHtml(block.description || `${intNumber(block.slots.length)} Slot${block.slots.length === 1 ? "" : "s"}`)}</small>
+        <small>${escapeHtml(block.description || `${intNumber(block.slots.length)} Slot${block.slots.length === 1 ? "" : "s"} · ${hoursLabel(slotsGrossHours(block.slots))} brutto`)}</small>
       </div>
       <div class="income-planning-career-stats">
         <strong>${escapeHtml(hoursLabel(hours))}</strong>
-        <span>pro Woche</span>
+        <span>${escapeHtml(pauseHours > 0 ? `${hoursLabel(pauseHours)} Pause` : "netto/Woche")}</span>
       </div>
       <button class="button secondary" type="button" data-action="income-planning-open-block" data-income-planning-owner-type="work" data-income-planning-owner-id="${escapeHtml(
         block.id
@@ -2262,12 +2342,15 @@ function incomePlanningCalendarDayColumn(
 
 function incomePlanningCalendarBackgroundEntries(model: IncomePlanningModel): IncomePlanningCalendarBackgroundEntry[] {
   const flexibleEntries = model.calendarEntries.filter((entry) => entry.flexible && !entry.invalid).flatMap(incomePlanningFlexibleBackgroundEntries);
-  const sleepEntries = state.incomePlanning.assumptions.sleepSlots.flatMap(incomePlanningSleepBackgroundEntries);
+  const sleepEntries = incomePlanningSleepSlotGroupsFromSlots(state.incomePlanning.assumptions.sleepSlots).flatMap(
+    incomePlanningSleepBackgroundEntries
+  );
   return [...sleepEntries, ...flexibleEntries];
 }
 
 function incomePlanningFlexibleBackgroundEntries(entry: IncomePlanningCalendarEntry): IncomePlanningCalendarBackgroundEntry[] {
   const meta = incomePlanningCalendarEntryMeta(entry);
+  const color = incomePlanningCalendarEntryColor(entry);
   const segments = incomePlanningSlotCalendarSegments(entry);
   return segments.map((segment, index) => ({
     id: `${entry.id}:background:${index}`,
@@ -2279,11 +2362,22 @@ function incomePlanningFlexibleBackgroundEntries(entry: IncomePlanningCalendarEn
     detail: `flexibel · ${minutesLabel(entry.durationMinutes)}`,
     icon: meta.icon,
     type: entry.type,
-    flexible: true
+    flexible: true,
+    color
   }));
 }
 
-function incomePlanningSleepBackgroundEntries(slot: IncomePlanningSleepSlot): IncomePlanningCalendarBackgroundEntry[] {
+function incomePlanningSleepBackgroundEntries(group: IncomePlanningSleepSlotGroup): IncomePlanningCalendarBackgroundEntry[] {
+  const slots = incomePlanningSleepSlotsFromDialogGroups([group]);
+  return slots.flatMap((slot) => incomePlanningSleepSlotBackgroundEntries(slot, group.id, group.flexible, group.durationMinutes));
+}
+
+function incomePlanningSleepSlotBackgroundEntries(
+  slot: IncomePlanningSleepSlot,
+  groupId: string,
+  flexible: boolean,
+  durationMinutes: number
+): IncomePlanningCalendarBackgroundEntry[] {
   const segments = incomePlanningSlotCalendarSegments(slot);
   return segments.map((segment, index) => ({
     id: `${slot.id}:sleep:${index}`,
@@ -2292,10 +2386,11 @@ function incomePlanningSleepBackgroundEntries(slot: IncomePlanningSleepSlot): In
     endMinute: segment.endMinute,
     title: "Schlaf",
     label: "Schlaf",
-    detail: slot.flexible ? `flexibel · ${minutesLabel(slot.durationMinutes)}` : `${slot.startTime}-${slot.endTime}`,
+    detail: flexible ? `flexibel · ${minutesLabel(durationMinutes)}` : `${slot.startTime}-${slot.endTime}`,
     icon: "health",
     type: "sleep",
-    flexible: slot.flexible
+    flexible,
+    sleepGroupId: groupId
   }));
 }
 
@@ -2314,8 +2409,10 @@ function incomePlanningCalendarBackgroundBlock(entry: IncomePlanningCalendarBack
   return `
     <div
       class="${escapeHtml(classes)}"
-      style="--top:${top.toFixed(3)}%; --height:${height.toFixed(3)}%;"
+      style="--top:${top.toFixed(3)}%; --height:${height.toFixed(3)}%; ${entry.color ? incomePlanningColorStyle(entry.color) : ""}"
       data-income-planning-calendar-background="true"
+      data-income-planning-background-entry-id="${escapeHtml(entry.id)}"
+      ${entry.sleepGroupId ? `data-income-planning-sleep-group-id="${escapeHtml(entry.sleepGroupId)}"` : ""}
       aria-hidden="true"
       title="${escapeHtml(`${entry.title} · ${entry.detail}`)}"
     >
@@ -2332,6 +2429,7 @@ function incomePlanningCalendarBackgroundBlock(entry: IncomePlanningCalendarBack
 function incomePlanningCalendarEntryBlock(entry: IncomePlanningCalendarEntry): string {
   const ownerType = incomePlanningOwnerTypeForEntry(entry);
   const meta = incomePlanningCalendarEntryMeta(entry);
+  const color = incomePlanningCalendarEntryColor(entry);
   const start = clamp(entry.startMinute, 0, 24 * 60);
   const end = clamp(entry.endMinute, start + 15, 24 * 60);
   const top = (start / (24 * 60)) * 100;
@@ -2353,7 +2451,8 @@ function incomePlanningCalendarEntryBlock(entry: IncomePlanningCalendarEntry): s
       data-income-planning-owner-type="${escapeHtml(ownerType)}"
       data-income-planning-owner-id="${escapeHtml(entry.ownerId)}"
       data-income-planning-slot-id="${escapeHtml(entry.slotId)}"
-      style="--top:${top.toFixed(3)}%; --height:${height.toFixed(3)}%; --start-minute:${start}; --duration-minutes:${end - start};"
+      data-income-planning-slot-part="${escapeHtml(entry.slotPart)}"
+      style="--top:${top.toFixed(3)}%; --height:${height.toFixed(3)}%; --start-minute:${start}; --duration-minutes:${end - start}; ${incomePlanningColorStyle(color)}"
       title="${escapeHtml(`${incomePlanningEntryTime(entry)} · ${entry.title} · ${meta.label} · ${incomePlanningPlannerTypeLabel(entry.type)}`)}"
     >
       <span class="income-planning-calendar-resize top" data-income-planning-resize="start" aria-hidden="true"></span>
@@ -2370,18 +2469,34 @@ function incomePlanningCalendarEntryBlock(entry: IncomePlanningCalendarEntry): s
 }
 
 function incomePlanningCalendarEntryMeta(entry: IncomePlanningCalendarEntry): { label: string; icon: string } {
+  if (entry.type === "pause") return { label: "Pause", icon: "calendar" };
   const workBlock = state.incomePlanning.workBlocks.find((block) => block.id === entry.ownerId);
   if (workBlock && (entry.type === "career" || entry.type === "side_work")) {
     const config = incomePlanningCategoryConfig(workBlock.category);
     return { label: config.label, icon: config.icon };
   }
-  if (entry.type === "good_habit") return { label: "Gute Habit", icon: "health" };
-  if (entry.type === "bad_habit") return { label: "Schlechte Habit", icon: "phone" };
+  const habit = state.incomePlanning.habits.find((item) => item.id === entry.ownerId);
+  if (entry.type === "good_habit") return { label: "Gute Habit", icon: normalizePositionIcon(habit?.icon, "book") };
+  if (entry.type === "bad_habit") return { label: "Schlechte Habit", icon: normalizePositionIcon(habit?.icon, "snack") };
   if (entry.type === "replacement_habit") return { label: "Ersatz-Habit", icon: "gift" };
   if (entry.type === "private_commitment") return { label: "Privat", icon: "calendar" };
   if (entry.type === "free_time") return { label: "Freizeit", icon: "health" };
   if (entry.type === "buffer") return { label: "Puffer", icon: "calendar" };
   return { label: incomePlanningPlannerTypeLabel(entry.type), icon: "calendar" };
+}
+
+function incomePlanningCalendarEntryColor(entry: IncomePlanningCalendarEntry): string {
+  if (entry.type === "pause") return "#6f7785";
+  const workBlock = state.incomePlanning.workBlocks.find((block) => block.id === entry.ownerId);
+  if (workBlock && (entry.type === "career" || entry.type === "side_work")) {
+    return normalizeIncomePlanningColor(workBlock.color, incomePlanningDefaultWorkColor(workBlock.category));
+  }
+  const manualBlock = state.incomePlanning.manualBlocks.find((block) => block.id === entry.ownerId);
+  if (manualBlock) return normalizeIncomePlanningColor(manualBlock.color, incomePlanningDefaultManualColor(manualBlock.type));
+  if (entry.type === "good_habit") return "#4e9f6d";
+  if (entry.type === "bad_habit") return "#b94646";
+  if (entry.type === "replacement_habit") return "#8f5aa8";
+  return "#6f7785";
 }
 
 function incomePlanningEntryTime(entry: IncomePlanningCalendarEntry): string {
@@ -2471,6 +2586,7 @@ function incomePlanningWeekdayByIndex(index: number): IncomePlanningWeekday {
 function incomePlanningPlannerTypeLabel(type: IncomePlanningPlannerEntryType): string {
   if (type === "career") return "Hauptjob";
   if (type === "side_work") return "Nebentaetigkeit";
+  if (type === "pause") return "Pause";
   if (type === "private_commitment") return "Private Verpflichtung";
   if (type === "free_time") return "Freizeit";
   if (type === "buffer") return "Puffer";
@@ -2491,6 +2607,13 @@ function incomePlanningHabitChangeLabel(value: IncomePlanningHabit["goalChange"]
 function incomePlanningOwnerTypeForEntry(entry: IncomePlanningCalendarEntry): Exclude<IncomePlanningOwnerType, "assumption"> {
   if (entry.type === "career" || entry.type === "side_work") return "work";
   if (entry.type === "good_habit" || entry.type === "bad_habit" || entry.type === "replacement_habit") return "habit";
+  if (entry.type === "pause") return incomePlanningOwnerTypeForId(entry.ownerId);
+  return "manual";
+}
+
+function incomePlanningOwnerTypeForId(ownerId: string): Exclude<IncomePlanningOwnerType, "assumption"> {
+  if (state.incomePlanning.workBlocks.some((block) => block.id === ownerId)) return "work";
+  if (state.incomePlanning.habits.some((habit) => habit.id === ownerId)) return "habit";
   return "manual";
 }
 
@@ -2500,20 +2623,47 @@ function incomePlanningOwnerTypeFromValue(value: unknown): Exclude<IncomePlannin
 }
 
 function incomePlanningOwnerHours(model: IncomePlanningModel, ownerId: string): number {
+  const workBlock = state.incomePlanning.workBlocks.find((block) => block.id === ownerId);
+  if (workBlock) return slotsHours(workBlock.slots);
+  const manualBlock = state.incomePlanning.manualBlocks.find((block) => block.id === ownerId);
+  if (manualBlock) return slotsHours(manualBlock.slots);
   const minutes = model.calendarEntries
-    .filter((entry) => entry.ownerId === ownerId)
+    .filter((entry) => entry.ownerId === ownerId && entry.type !== "pause")
     .reduce((sum, entry) => sum + entry.durationMinutes, 0);
   return Math.round((minutes / 60 + Number.EPSILON) * 10) / 10;
 }
 
 function slotsHours(slots: IncomePlanningSlot[]): number {
-  const minutes = slots.reduce((sum, slot) => {
-    if (slot.flexible) return sum + slot.durationMinutes;
-    const start = parseTimeMinutes(slot.startTime);
-    const end = parseTimeMinutes(slot.endTime);
-    return sum + (start !== null && end !== null && end > start ? end - start : slot.durationMinutes);
-  }, 0);
+  const minutes = slots.reduce((sum, slot) => sum + incomePlanningSlotNetDurationMinutes(slot), 0);
   return Math.round((minutes / 60 + Number.EPSILON) * 10) / 10;
+}
+
+function slotsGrossHours(slots: IncomePlanningSlot[]): number {
+  const minutes = slots.reduce((sum, slot) => sum + incomePlanningSlotGrossDurationMinutes(slot), 0);
+  return Math.round((minutes / 60 + Number.EPSILON) * 10) / 10;
+}
+
+function slotsPauseHours(slots: IncomePlanningSlot[]): number {
+  const minutes = slots.reduce((sum, slot) => sum + incomePlanningSlotPauseDurationMinutes(slot), 0);
+  return Math.round((minutes / 60 + Number.EPSILON) * 10) / 10;
+}
+
+function normalizeIncomePlanningColor(value: unknown, fallback = "#6f7785"): string {
+  const color = String(value || "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color.toLowerCase() : fallback;
+}
+
+function incomePlanningColorStyle(color: string): string {
+  const normalized = normalizeIncomePlanningColor(color);
+  return `--entry-color:${normalized}; --entry-bg:${hexToRgba(normalized, 0.14)};`;
+}
+
+function hexToRgba(color: string, alpha: number): string {
+  const normalized = normalizeIncomePlanningColor(color);
+  const red = Number.parseInt(normalized.slice(1, 3), 16);
+  const green = Number.parseInt(normalized.slice(3, 5), 16);
+  const blue = Number.parseInt(normalized.slice(5, 7), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${clamp(alpha, 0, 1)})`;
 }
 
 function snapIncomePlanningMinute(value: number): number {
@@ -2576,8 +2726,12 @@ function renderIncomePlanningDialog(): void {
 
 function incomePlanningDialogTitle(dialog: NonNullable<IncomePlanningDialogState>): string {
   if (dialog.ownerType === "assumption") return "Zeitannahme bearbeiten";
-  if (dialog.mode === "create") return "Neuer Zeitblock";
+  if (dialog.ownerType === "work" && dialog.mode === "create") return "Neuer Taetigkeitsblock";
+  if (dialog.ownerType === "manual" && dialog.mode === "create") return "Neuer Zeitblock";
+  if (dialog.ownerType === "habit" && dialog.mode === "create") return "Neue Habit";
   if (dialog.mode === "create_slot") return "Slot hinzufuegen";
+  if (dialog.ownerType === "work") return "Taetigkeitsblock bearbeiten";
+  if (dialog.ownerType === "habit") return "Habit bearbeiten";
   return "Zeitblock bearbeiten";
 }
 
@@ -2589,7 +2743,8 @@ function incomePlanningDialogSubtitle(dialog: NonNullable<IncomePlanningDialogSt
 }
 
 function incomePlanningAssumptionDialogFields(dialog: NonNullable<IncomePlanningDialogState>): string {
-  const averageSleepHours = incomePlanningAverageSleepHours({ sleepHoursPerDay: dialog.sleepHoursPerDay, sleepSlots: dialog.sleepSlots });
+  const sleepSlots = incomePlanningSleepSlotsFromDialogGroups(dialog.sleepSlotGroups);
+  const averageSleepHours = incomePlanningAverageSleepHours({ sleepHoursPerDay: dialog.sleepHoursPerDay, sleepSlots });
   return `
     <section class="income-planning-dialog-section">
       <strong>Basis</strong>
@@ -2602,47 +2757,48 @@ function incomePlanningAssumptionDialogFields(dialog: NonNullable<IncomePlanning
     </section>
     <section class="income-planning-dialog-section">
       <div class="income-planning-dialog-section-head">
-        <strong>Schlafslots</strong>
-        <button class="button secondary" type="button" data-action="income-planning-add-sleep-slot">Schlafslot hinzufuegen</button>
+        <strong>Schlafzeiten</strong>
+        <button class="button secondary" type="button" data-action="income-planning-add-sleep-slot">Schlafzeit hinzufuegen</button>
       </div>
       <div class="income-planning-sleep-slot-list">
-        ${dialog.sleepSlots.length
-          ? dialog.sleepSlots.map(incomePlanningSleepSlotDialogRow).join("")
-          : '<div class="chart-empty">Noch keine Schlafslots geplant.</div>'}
+        ${dialog.sleepSlotGroups.length
+          ? dialog.sleepSlotGroups.map(incomePlanningSleepSlotGroupDialogRow).join("")
+          : '<div class="chart-empty">Noch keine Schlafzeiten geplant.</div>'}
       </div>
     </section>
   `;
 }
 
-function incomePlanningSleepSlotDialogRow(slot: IncomePlanningSleepSlot): string {
+function incomePlanningSleepSlotGroupDialogRow(group: IncomePlanningSleepSlotGroup): string {
   return `
     <div class="income-planning-sleep-slot-row">
-      ${incomePlanningSleepSlotSelectField(slot.id, "day", "Tag", incomePlanningWeekdayOptionItems(), slot.day)}
+      ${incomePlanningSleepSlotGroupSelectField(group.id, "fromDay", "Von", incomePlanningWeekdayOptionItems(), group.fromDay)}
+      ${incomePlanningSleepSlotGroupSelectField(group.id, "toDay", "Bis", incomePlanningWeekdayOptionItems(), group.toDay)}
       <label class="income-planning-source-active">
-        <input type="checkbox" ${slot.flexible ? "checked" : ""} data-income-planning-sleep-slot-id="${escapeHtml(slot.id)}" data-income-planning-sleep-slot-field="flexible" />
+        <input type="checkbox" ${group.flexible ? "checked" : ""} data-income-planning-sleep-slot-group-id="${escapeHtml(group.id)}" data-income-planning-sleep-slot-group-field="flexible" />
         <span>Flexibel</span>
       </label>
       <label class="field compact">
         <span>Start</span>
-        <input type="time" value="${escapeHtml(slot.startTime)}" data-income-planning-sleep-slot-id="${escapeHtml(slot.id)}" data-income-planning-sleep-slot-field="startTime" />
+        <input type="time" value="${escapeHtml(group.startTime)}" data-income-planning-sleep-slot-group-id="${escapeHtml(group.id)}" data-income-planning-sleep-slot-group-field="startTime" />
       </label>
       <label class="field compact">
         <span>Ende</span>
-        <input type="time" value="${escapeHtml(slot.endTime)}" data-income-planning-sleep-slot-id="${escapeHtml(slot.id)}" data-income-planning-sleep-slot-field="endTime" />
+        <input type="time" value="${escapeHtml(group.endTime)}" data-income-planning-sleep-slot-group-id="${escapeHtml(group.id)}" data-income-planning-sleep-slot-group-field="endTime" />
       </label>
       <label class="field compact">
         <span>Minuten</span>
-        <input type="number" min="15" max="10080" step="15" value="${slot.durationMinutes}" data-income-planning-sleep-slot-id="${escapeHtml(slot.id)}" data-income-planning-sleep-slot-field="durationMinutes" />
+        <input type="number" min="15" max="10080" step="15" value="${group.durationMinutes}" data-income-planning-sleep-slot-group-id="${escapeHtml(group.id)}" data-income-planning-sleep-slot-group-field="durationMinutes" />
       </label>
-      <button class="icon-button danger" type="button" data-action="income-planning-remove-sleep-slot" data-income-planning-sleep-slot-id="${escapeHtml(
-        slot.id
-      )}" aria-label="Schlafslot entfernen">x</button>
+      <button class="icon-button danger" type="button" data-action="income-planning-remove-sleep-slot" data-income-planning-sleep-slot-group-id="${escapeHtml(
+        group.id
+      )}" aria-label="Schlafzeit entfernen">x</button>
     </div>
   `;
 }
 
-function incomePlanningSleepSlotSelectField(
-  slotId: string,
+function incomePlanningSleepSlotGroupSelectField(
+  groupId: string,
   field: string,
   label: string,
   options: Array<{ value: string; label: string }>,
@@ -2651,7 +2807,7 @@ function incomePlanningSleepSlotSelectField(
   return `
     <label class="field compact">
       <span>${escapeHtml(label)}</span>
-      <select data-income-planning-sleep-slot-id="${escapeHtml(slotId)}" data-income-planning-sleep-slot-field="${escapeHtml(field)}">
+      <select data-income-planning-sleep-slot-group-id="${escapeHtml(groupId)}" data-income-planning-sleep-slot-group-field="${escapeHtml(field)}">
         ${options.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === selected ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
       </select>
     </label>
@@ -2659,6 +2815,7 @@ function incomePlanningSleepSlotSelectField(
 }
 
 function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialogState>): string {
+  const isHabit = dialog.ownerType === "habit";
   return `
     <section class="income-planning-dialog-section">
       <strong>Basis</strong>
@@ -2675,16 +2832,17 @@ function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialo
           <span>Beschreibung</span>
           <input type="text" value="${escapeHtml(dialog.description)}" data-income-planning-dialog-field="description" />
         </label>
+        ${isHabit ? incomePlanningHabitIconDialogField(dialog) : incomePlanningColorDialogField(dialog)}
       </div>
     </section>
     <section class="income-planning-dialog-section">
-      <strong>${dialog.ownerType === "habit" ? "Art und Ziel" : "Art"}</strong>
+      <strong>${isHabit ? "Art und Ziel" : "Art"}</strong>
       <div class="income-planning-dialog-grid">
         ${dialog.ownerType === "work" ? incomePlanningDialogSelectField("category", "Arbeitsart", incomePlanningCategoryOptions(), dialog.category) : ""}
         ${dialog.ownerType === "manual" ? incomePlanningDialogSelectField("manualType", "Typ", incomePlanningManualBlockTypeOptions(), dialog.manualType) : ""}
-        ${dialog.ownerType === "habit" ? incomePlanningDialogSelectField("habitType", "Habit-Art", incomePlanningHabitTypeOptions(), dialog.habitType) : ""}
+        ${isHabit ? incomePlanningDialogSelectField("habitType", "Habit-Art", incomePlanningHabitTypeOptions(), dialog.habitType) : ""}
         ${
-          dialog.ownerType === "habit"
+          isHabit
             ? `
               ${incomePlanningDialogSelectField("habitGoalChange", "Zielaenderung", incomePlanningHabitChangeOptions(), dialog.habitGoalChange)}
               ${incomePlanningDialogSelectField("habitStatus", "Status", incomePlanningHabitStatusOptions(), dialog.habitStatus)}
@@ -2710,8 +2868,8 @@ function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialo
     <section class="income-planning-dialog-section income-planning-dialog-slot">
       <strong>Wochen-Slot</strong>
       <div class="income-planning-dialog-grid slot">
-        ${incomePlanningDialogSelectField("repeatMode", "Wiederholung", incomePlanningRepeatModeOptions(), dialog.repeatMode)}
-        ${incomePlanningDialogSelectField("day", "Tag", incomePlanningWeekdayOptionItems(), dialog.day)}
+        ${incomePlanningDialogSelectField("day", "Von", incomePlanningWeekdayOptionItems(), dialog.day)}
+        ${incomePlanningDialogSelectField("toDay", "Bis", incomePlanningWeekdayOptionItems(), dialog.toDay)}
         <label class="income-planning-source-active">
           <input type="checkbox" ${dialog.flexible ? "checked" : ""} data-income-planning-dialog-field="flexible" />
           <span>Flexibel</span>
@@ -2728,8 +2886,77 @@ function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialo
           <span>Minuten</span>
           <input type="number" min="15" max="10080" step="15" value="${dialog.slotDurationMinutes}" data-income-planning-dialog-field="slotDurationMinutes" />
         </label>
+        ${isHabit ? "" : incomePlanningPauseDialogFields(dialog)}
       </div>
     </section>
+  `;
+}
+
+function incomePlanningColorDialogField(dialog: NonNullable<IncomePlanningDialogState>): string {
+  const color = normalizeIncomePlanningColor(dialog.color, dialog.ownerType === "work" ? incomePlanningDefaultWorkColor(dialog.category) : incomePlanningDefaultManualColor(dialog.manualType));
+  return `
+    <div class="field income-planning-color-field">
+      <span>Farbe</span>
+      <div class="income-planning-color-control">
+        <input type="color" value="${escapeHtml(color)}" data-income-planning-dialog-field="color" aria-label="Blockfarbe" />
+        <div class="income-planning-color-swatches" aria-label="Farbauswahl">
+          ${INCOME_PLANNING_COLOR_OPTIONS.map(
+            (option) => `
+              <button
+                class="income-planning-color-swatch ${option === color ? "active" : ""}"
+                type="button"
+                style="--entry-color:${option}; --entry-bg:${hexToRgba(option, 0.18)};"
+                data-action="income-planning-set-dialog-color"
+                data-income-planning-color="${escapeHtml(option)}"
+                aria-label="Farbe ${escapeHtml(option)}"
+                aria-pressed="${option === color}"
+              ></button>
+            `
+          ).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function incomePlanningHabitIconDialogField(dialog: NonNullable<IncomePlanningDialogState>): string {
+  const icon = normalizePositionIcon(dialog.habitIcon, dialog.habitType === "bad" ? "snack" : "book");
+  const label = POSITION_ICONS.find((item) => item.id === icon)?.label ?? "Icon";
+  return `
+    <div class="field income-planning-icon-field">
+      <span>Icon</span>
+      <button class="income-planning-icon-button" type="button" data-action="open-income-planning-habit-icon-picker" title="Habit-Icon auswaehlen">
+        ${positionIconSvg(icon, "position-icon-svg income-planning-type-icon")}
+        <span>${escapeHtml(label)}</span>
+      </button>
+    </div>
+  `;
+}
+
+function incomePlanningPauseDialogFields(dialog: NonNullable<IncomePlanningDialogState>): string {
+  return `
+    <label class="income-planning-source-active income-planning-pause-toggle">
+      <input type="checkbox" ${dialog.pauseEnabled ? "checked" : ""} data-income-planning-dialog-field="pauseEnabled" />
+      <span>Pause</span>
+    </label>
+    ${
+      dialog.pauseEnabled
+        ? `
+          <label class="field compact">
+            <span>Pause Start</span>
+            <input type="time" value="${escapeHtml(dialog.pauseStartTime)}" data-income-planning-dialog-field="pauseStartTime" />
+          </label>
+          <label class="field compact">
+            <span>Pause Ende</span>
+            <input type="time" value="${escapeHtml(dialog.pauseEndTime)}" data-income-planning-dialog-field="pauseEndTime" />
+          </label>
+          <label class="field compact">
+            <span>Pause Minuten</span>
+            <input type="number" min="0" max="10080" step="5" value="${dialog.pauseDurationMinutes}" data-income-planning-dialog-field="pauseDurationMinutes" />
+          </label>
+        `
+        : ""
+    }
   `;
 }
 
@@ -2747,16 +2974,6 @@ function incomePlanningDialogSelectField(
       </select>
     </label>
   `;
-}
-
-function incomePlanningRepeatModeOptions(): Array<{ value: IncomePlanningRepeatMode; label: string }> {
-  return [
-    { value: "single", label: "Einzeltag" },
-    { value: "workdays", label: "Mo-Fr" },
-    { value: "online_sales", label: "Mo/Mi/Fr" },
-    { value: "weekend", label: "Wochenende" },
-    { value: "daily", label: "Taeglich" }
-  ];
 }
 
 function openIncomePlanningDialog(
@@ -2818,6 +3035,7 @@ function incomePlanningDialogDraft(
           ...(mode === "create_slot" ? {} : sourceSlots.find((item) => item.id === slotId) ?? sourceSlots[0]),
           ...slotSeed
         };
+  const slotRange = mode === "create_slot" ? { fromDay: slot.day, toDay: slot.day } : incomePlanningSlotRangeForSlots(sourceSlots, slot);
   return {
     mode,
     ownerType,
@@ -2833,101 +3051,130 @@ function incomePlanningDialogDraft(
     priority: habit?.priority ?? fallbackHabit.priority,
     name: workBlock?.name ?? manualBlock?.name ?? habit?.name ?? (ownerType === "manual" ? fallbackManual.name : ownerType === "habit" ? fallbackHabit.name : fallbackWork.name),
     description: workBlock?.description ?? manualBlock?.description ?? habit?.description ?? "",
+    color:
+      ownerType === "work"
+        ? normalizeIncomePlanningColor(workBlock?.color, incomePlanningDefaultWorkColor(workBlock?.category ?? fallbackWork.category))
+        : normalizeIncomePlanningColor(manualBlock?.color, incomePlanningDefaultManualColor(manualBlock?.type ?? "other_event")),
+    habitIcon: normalizePositionIcon(
+      habit?.icon,
+      (habit?.type ?? fallbackHabit.type) === "bad" ? "snack" : (fallbackHabit.icon ?? "book")
+    ),
     timing: habit?.timing ?? fallbackHabit.timing,
     habitDurationMinutes: habit?.durationMinutes ?? fallbackHabit.durationMinutes,
     replacementHabit: habit?.replacementHabit ?? "",
     sleepHoursPerDay: state.incomePlanning.assumptions.sleepHoursPerDay,
-    sleepSlots: state.incomePlanning.assumptions.sleepSlots.map((slot) => ({ ...slot })),
-    day: slot.day,
+    sleepSlotGroups: incomePlanningSleepSlotGroupsFromSlots(state.incomePlanning.assumptions.sleepSlots),
+    day: slotRange.fromDay,
+    toDay: slotRange.toDay,
     startTime: slot.startTime,
     endTime: slot.endTime,
     flexible: slot.flexible,
     slotDurationMinutes: slot.durationMinutes,
-    repeatMode: mode === "create_slot" ? "single" : incomePlanningRepeatModeForSlots(sourceSlots, slot),
+    pauseEnabled:
+      ownerType !== "habit" &&
+      Boolean(slot.pauseEnabled ?? (slot.pauseDurationMinutes && slot.pauseStartTime && slot.pauseEndTime)),
+    pauseStartTime: slot.pauseStartTime ?? "12:00",
+    pauseEndTime: slot.pauseEndTime ?? "12:30",
+    pauseDurationMinutes: slot.pauseDurationMinutes ?? 0,
     error: ""
   };
 }
 
-function incomePlanningRepeatModeForSlots(slots: IncomePlanningSlot[], selectedSlot: IncomePlanningSlot): IncomePlanningRepeatMode {
+function incomePlanningSlotRangeForSlots(
+  slots: IncomePlanningSlot[],
+  selectedSlot: IncomePlanningSlot
+): { fromDay: IncomePlanningWeekday; toDay: IncomePlanningWeekday } {
   const matchingDays = slots
     .filter(
       (slot) =>
         slot.startTime === selectedSlot.startTime &&
         slot.endTime === selectedSlot.endTime &&
         slot.flexible === selectedSlot.flexible &&
-        slot.durationMinutes === selectedSlot.durationMinutes
+        slot.durationMinutes === selectedSlot.durationMinutes &&
+        Boolean(slot.pauseEnabled) === Boolean(selectedSlot.pauseEnabled) &&
+        (slot.pauseStartTime ?? "") === (selectedSlot.pauseStartTime ?? "") &&
+        (slot.pauseEndTime ?? "") === (selectedSlot.pauseEndTime ?? "") &&
+        (slot.pauseDurationMinutes ?? 0) === (selectedSlot.pauseDurationMinutes ?? 0)
     )
     .map((slot) => slot.day);
-  const signature = INCOME_PLANNING_WEEK_DAYS.filter((day) => matchingDays.includes(day)).join(",");
-  if (signature === "monday,tuesday,wednesday,thursday,friday") return "workdays";
-  if (signature === "monday,wednesday,friday") return "online_sales";
-  if (signature === "saturday,sunday") return "weekend";
-  if (signature === INCOME_PLANNING_WEEK_DAYS.join(",")) return "daily";
-  return "single";
+  const rangeDays = INCOME_PLANNING_WEEK_DAYS.filter((day) => matchingDays.includes(day));
+  if (!rangeDays.length) {
+    return { fromDay: selectedSlot.day, toDay: selectedSlot.day };
+  }
+  return { fromDay: rangeDays[0], toDay: rangeDays[rangeDays.length - 1] };
 }
 
 function updateIncomePlanningDialogDraft(field: string, value: string): void {
   if (!incomePlanningDialog) return;
-  const numericFields = new Set(["habitDurationMinutes", "slotDurationMinutes", "sleepHoursPerDay"]);
-  const booleanFields = new Set(["active", "flexible"]);
+  const numericFields = new Set(["habitDurationMinutes", "slotDurationMinutes", "sleepHoursPerDay", "pauseDurationMinutes"]);
+  const booleanFields = new Set(["active", "flexible", "pauseEnabled"]);
   incomePlanningDialog = {
     ...incomePlanningDialog,
-    [field]: booleanFields.has(field) ? value === "true" : numericFields.has(field) ? numberValue(value) : value,
+    [field]: booleanFields.has(field)
+      ? value === "true"
+      : numericFields.has(field)
+        ? numberValue(value)
+        : field === "color"
+          ? normalizeIncomePlanningColor(value, incomePlanningDialog.color)
+          : value,
     error: ""
   } as NonNullable<IncomePlanningDialogState>;
 }
 
 function addIncomePlanningDialogSleepSlot(): void {
   if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "assumption") return;
-  const slot = normalizeIncomePlanningDialogSleepSlot({
+  const group = normalizeIncomePlanningDialogSleepSlotGroup({
     id: createId(),
-    day: "monday",
+    fromDay: "monday",
+    toDay: "friday",
     startTime: "21:00",
     endTime: "05:30",
     flexible: false,
-    durationMinutes: 8.5 * 60
+    durationMinutes: 8.5 * 60,
+    slotIds: {}
   });
   incomePlanningDialog = {
     ...incomePlanningDialog,
-    sleepSlots: [...incomePlanningDialog.sleepSlots, slot],
+    sleepSlotGroups: [...incomePlanningDialog.sleepSlotGroups, group],
     error: ""
   };
   renderIncomePlanningDialog();
 }
 
-function removeIncomePlanningDialogSleepSlot(slotId: string): void {
-  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "assumption" || !slotId) return;
+function removeIncomePlanningDialogSleepSlot(groupId: string): void {
+  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "assumption" || !groupId) return;
   incomePlanningDialog = {
     ...incomePlanningDialog,
-    sleepSlots: incomePlanningDialog.sleepSlots.filter((slot) => slot.id !== slotId),
+    sleepSlotGroups: incomePlanningDialog.sleepSlotGroups.filter((group) => group.id !== groupId),
     error: ""
   };
   renderIncomePlanningDialog();
 }
 
-function updateIncomePlanningDialogSleepSlot(slotId: string, field: keyof IncomePlanningSleepSlot, value: string): void {
-  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "assumption" || !slotId) return;
+function updateIncomePlanningDialogSleepSlotGroup(groupId: string, field: keyof IncomePlanningSleepSlotGroup, value: string): void {
+  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "assumption" || !groupId) return;
   incomePlanningDialog = {
     ...incomePlanningDialog,
-    sleepSlots: incomePlanningDialog.sleepSlots.map((slot) =>
-      slot.id === slotId ? normalizeIncomePlanningDialogSleepSlot(updateIncomePlanningSleepSlotField(slot, field, value)) : slot
+    sleepSlotGroups: incomePlanningDialog.sleepSlotGroups.map((group) =>
+      group.id === groupId ? normalizeIncomePlanningDialogSleepSlotGroup(updateIncomePlanningSleepSlotGroupField(group, field, value)) : group
     ),
     error: ""
   };
   renderIncomePlanningDialog();
 }
 
-function updateIncomePlanningSleepSlotField(
-  slot: IncomePlanningSleepSlot,
-  field: keyof IncomePlanningSleepSlot,
+function updateIncomePlanningSleepSlotGroupField(
+  group: IncomePlanningSleepSlotGroup,
+  field: keyof IncomePlanningSleepSlotGroup,
   value: string
-): IncomePlanningSleepSlot {
-  if (field === "day" && isIncomePlanningWeekday(value)) return { ...slot, day: value };
-  if (field === "flexible") return { ...slot, flexible: value === "true" };
-  if (field === "startTime") return { ...slot, startTime: value };
-  if (field === "endTime") return { ...slot, endTime: value };
-  if (field === "durationMinutes") return { ...slot, durationMinutes: Math.round(clamp(numberValue(value), 15, 10080)) };
-  return slot;
+): IncomePlanningSleepSlotGroup {
+  if (field === "fromDay" && isIncomePlanningWeekday(value)) return { ...group, fromDay: value };
+  if (field === "toDay" && isIncomePlanningWeekday(value)) return { ...group, toDay: value };
+  if (field === "flexible") return { ...group, flexible: value === "true" };
+  if (field === "startTime") return { ...group, startTime: value };
+  if (field === "endTime") return { ...group, endTime: value };
+  if (field === "durationMinutes") return { ...group, durationMinutes: Math.round(clamp(numberValue(value), 15, 10080)) };
+  return group;
 }
 
 function normalizeIncomePlanningDialogSleepSlot(slot: IncomePlanningSleepSlot): IncomePlanningSleepSlot {
@@ -2940,16 +3187,98 @@ function normalizeIncomePlanningDialogSleepSlot(slot: IncomePlanningSleepSlot): 
   };
 }
 
+function normalizeIncomePlanningDialogSleepSlotGroup(group: IncomePlanningSleepSlotGroup): IncomePlanningSleepSlotGroup {
+  const durationMinutes = group.flexible
+    ? Math.round(clamp(group.durationMinutes, 15, 10080))
+    : incomePlanningSleepSlotDurationMinutes({
+        id: group.id,
+        day: group.fromDay,
+        startTime: group.startTime,
+        endTime: group.endTime,
+        flexible: false,
+        durationMinutes: group.durationMinutes
+      });
+  return {
+    ...group,
+    durationMinutes
+  };
+}
+
+function incomePlanningSleepSlotGroupsFromSlots(slots: IncomePlanningSleepSlot[]): IncomePlanningSleepSlotGroup[] {
+  const groups: IncomePlanningSleepSlotGroup[] = [];
+  for (const rawSlot of slots) {
+    const slot = normalizeIncomePlanningDialogSleepSlot(rawSlot);
+    const last = groups[groups.length - 1];
+    if (last && incomePlanningSleepSlotGroupMatchesSlot(last, slot) && incomePlanningNextWeekday(last.toDay) === slot.day) {
+      last.toDay = slot.day;
+      last.slotIds = { ...last.slotIds, [slot.day]: slot.id };
+    } else {
+      groups.push({
+        id: slot.id || createId(),
+        fromDay: slot.day,
+        toDay: slot.day,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        flexible: slot.flexible,
+        durationMinutes: slot.durationMinutes,
+        slotIds: { [slot.day]: slot.id }
+      });
+    }
+  }
+  return groups;
+}
+
+function incomePlanningSleepSlotGroupMatchesSlot(group: IncomePlanningSleepSlotGroup, slot: IncomePlanningSleepSlot): boolean {
+  return (
+    group.startTime === slot.startTime &&
+    group.endTime === slot.endTime &&
+    group.flexible === slot.flexible &&
+    group.durationMinutes === slot.durationMinutes
+  );
+}
+
+function incomePlanningSleepSlotsFromDialogGroups(groups: IncomePlanningSleepSlotGroup[]): IncomePlanningSleepSlot[] {
+  return groups.flatMap((group) =>
+    incomePlanningSleepSlotGroupDays(group).map((day) =>
+      normalizeIncomePlanningDialogSleepSlot({
+        id: group.slotIds[day] ?? `${group.id}-${day}`,
+        day,
+        startTime: group.startTime,
+        endTime: group.endTime,
+        flexible: group.flexible,
+        durationMinutes: group.durationMinutes
+      })
+    )
+  );
+}
+
+function incomePlanningSleepSlotGroupDays(group: IncomePlanningSleepSlotGroup): IncomePlanningWeekday[] {
+  const days: IncomePlanningWeekday[] = [];
+  const startIndex = incomePlanningWeekdayIndex(group.fromDay);
+  for (let offset = 0; offset < INCOME_PLANNING_WEEK_DAYS.length; offset += 1) {
+    const day = INCOME_PLANNING_WEEK_DAYS[(startIndex + offset) % INCOME_PLANNING_WEEK_DAYS.length];
+    days.push(day);
+    if (day === group.toDay) break;
+  }
+  return days;
+}
+
+function incomePlanningNextWeekday(day: IncomePlanningWeekday): IncomePlanningWeekday {
+  return INCOME_PLANNING_WEEK_DAYS[(incomePlanningWeekdayIndex(day) + 1) % INCOME_PLANNING_WEEK_DAYS.length];
+}
+
 function closeIncomePlanningDialog(): void {
   incomePlanningDialog = null;
+  incomePlanningHabitIconPicker = null;
   renderIncomePlanningDialog();
+  renderIncomePlanningHabitIconPicker();
 }
 
 function saveIncomePlanningDialog(): void {
   if (!incomePlanningDialog) return;
   const draft = incomePlanningDialog;
   if (draft.ownerType === "assumption") {
-    const sleepSlots = draft.sleepSlots.map(normalizeIncomePlanningDialogSleepSlot);
+    const sleepSlots = incomePlanningSleepSlotsFromDialogGroups(draft.sleepSlotGroups);
     state.incomePlanning = {
       ...state.incomePlanning,
       assumptions: {
@@ -2989,14 +3318,32 @@ function incomePlanningSlotsFromDialog(draft: NonNullable<IncomePlanningDialogSt
   const end = parseTimeMinutes(draft.endTime);
   if (!draft.flexible && (start === null || end === null || end - start < 15)) return [];
   const durationMinutes = draft.flexible ? clamp(Math.round(draft.slotDurationMinutes), 15, 10080) : (end ?? 0) - (start ?? 0);
-  return incomePlanningRepeatDays(draft.repeatMode, draft.day).map((day, index) => ({
-    id: draft.repeatMode === "single" && index === 0 ? draft.slotId || createId() : createId(),
+  const pause = incomePlanningPauseFromDialog(draft);
+  const slots = incomePlanningDayRange(draft.day, draft.toDay).map((day, index) => ({
+    id: draft.day === draft.toDay && index === 0 ? draft.slotId || createId() : createId(),
     day,
     startTime: draft.startTime,
     endTime: draft.endTime,
     flexible: draft.flexible,
-    durationMinutes
+    durationMinutes,
+    ...pause
   }));
+  return draft.ownerType === "habit" ? slots.map(incomePlanningStripSlotPause) : slots;
+}
+
+function incomePlanningPauseFromDialog(draft: NonNullable<IncomePlanningDialogState>): Partial<IncomePlanningSlot> {
+  if (draft.ownerType === "habit") return {};
+  const durationMinutes = Math.round(clamp(draft.pauseDurationMinutes, 0, 10080));
+  const start = parseTimeMinutes(draft.pauseStartTime);
+  const end = parseTimeMinutes(draft.pauseEndTime);
+  const validClockPause = start !== null && end !== null && end > start;
+  const calculatedDuration = validClockPause ? end - start : durationMinutes;
+  return {
+    pauseEnabled: draft.pauseEnabled,
+    pauseStartTime: draft.pauseStartTime,
+    pauseEndTime: draft.pauseEndTime,
+    pauseDurationMinutes: calculatedDuration
+  };
 }
 
 function incomePlanningApplyDialogSlots(
@@ -3004,7 +3351,7 @@ function incomePlanningApplyDialogSlots(
   existingSlots: IncomePlanningSlot[],
   newSlots: IncomePlanningSlot[]
 ): IncomePlanningSlot[] {
-  if (draft.repeatMode !== "single") {
+  if (draft.day !== draft.toDay) {
     return draft.mode === "create_slot" ? [...existingSlots, ...newSlots] : newSlots;
   }
   const slot = newSlots[0];
@@ -3013,12 +3360,15 @@ function incomePlanningApplyDialogSlots(
   return [...existingSlots, { ...slot, id: createId() }];
 }
 
-function incomePlanningRepeatDays(mode: IncomePlanningRepeatMode, selectedDay: IncomePlanningWeekday): IncomePlanningWeekday[] {
-  if (mode === "workdays") return ["monday", "tuesday", "wednesday", "thursday", "friday"];
-  if (mode === "online_sales") return ["monday", "wednesday", "friday"];
-  if (mode === "weekend") return ["saturday", "sunday"];
-  if (mode === "daily") return INCOME_PLANNING_WEEK_DAYS;
-  return [selectedDay];
+function incomePlanningDayRange(fromDay: IncomePlanningWeekday, toDay: IncomePlanningWeekday): IncomePlanningWeekday[] {
+  const days: IncomePlanningWeekday[] = [];
+  const startIndex = incomePlanningWeekdayIndex(fromDay);
+  for (let offset = 0; offset < INCOME_PLANNING_WEEK_DAYS.length; offset += 1) {
+    const day = INCOME_PLANNING_WEEK_DAYS[(startIndex + offset) % INCOME_PLANNING_WEEK_DAYS.length];
+    days.push(day);
+    if (day === toDay) break;
+  }
+  return days;
 }
 
 function createIncomePlanningOwnerFromDialog(draft: NonNullable<IncomePlanningDialogState>, slots: IncomePlanningSlot[]): void {
@@ -3032,6 +3382,7 @@ function createIncomePlanningOwnerFromDialog(draft: NonNullable<IncomePlanningDi
           active: draft.active,
           name: draft.name || incomePlanningCategoryConfig(draft.category).defaultName,
           description: draft.description,
+          color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultWorkColor(draft.category)),
           slots
         })
       ]
@@ -3047,6 +3398,7 @@ function createIncomePlanningOwnerFromDialog(draft: NonNullable<IncomePlanningDi
           active: draft.active,
           name: draft.name || incomePlanningManualBlockTypeLabel(draft.manualType),
           description: draft.description,
+          color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultManualColor(draft.manualType)),
           slots
         })
       ]
@@ -3062,6 +3414,7 @@ function createIncomePlanningOwnerFromDialog(draft: NonNullable<IncomePlanningDi
           type: draft.habitType,
           name: draft.name || "Habit",
           description: draft.description,
+          icon: normalizePositionIcon(draft.habitIcon, draft.habitType === "bad" ? "snack" : "book"),
           timing: draft.timing,
           durationMinutes: clamp(Math.round(draft.habitDurationMinutes), 0, 1440),
           durationUnit: draft.habitDurationUnit,
@@ -3081,10 +3434,17 @@ function applyIncomePlanningDialogOwnerFields(draft: NonNullable<IncomePlanningD
   if (draft.ownerType === "work") {
     state.incomePlanning = {
       ...state.incomePlanning,
-      workBlocks: state.incomePlanning.workBlocks.map((block) =>
-        block.id === draft.ownerId
-          ? { ...block, active: draft.active, category: draft.category, name: draft.name, description: draft.description }
-          : block
+    workBlocks: state.incomePlanning.workBlocks.map((block) =>
+      block.id === draft.ownerId
+        ? {
+            ...block,
+            active: draft.active,
+            category: draft.category,
+            name: draft.name,
+            description: draft.description,
+            color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultWorkColor(draft.category))
+          }
+        : block
       )
     };
     enforceIncomePlanningMainJob(draft.ownerId);
@@ -3092,10 +3452,17 @@ function applyIncomePlanningDialogOwnerFields(draft: NonNullable<IncomePlanningD
   if (draft.ownerType === "manual") {
     state.incomePlanning = {
       ...state.incomePlanning,
-      manualBlocks: state.incomePlanning.manualBlocks.map((block) =>
-        block.id === draft.ownerId
-          ? { ...block, active: draft.active, type: draft.manualType, name: draft.name, description: draft.description }
-          : block
+    manualBlocks: state.incomePlanning.manualBlocks.map((block) =>
+      block.id === draft.ownerId
+        ? {
+            ...block,
+            active: draft.active,
+            type: draft.manualType,
+            name: draft.name,
+            description: draft.description,
+            color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultManualColor(draft.manualType))
+          }
+        : block
       )
     };
   }
@@ -3110,6 +3477,7 @@ function applyIncomePlanningDialogOwnerFields(draft: NonNullable<IncomePlanningD
               type: draft.habitType,
               name: draft.name,
               description: draft.description,
+              icon: normalizePositionIcon(draft.habitIcon, draft.habitType === "bad" ? "snack" : "book"),
               timing: draft.timing,
               durationMinutes: clamp(Math.round(draft.habitDurationMinutes), 0, 1440),
               durationUnit: draft.habitDurationUnit,
@@ -3136,11 +3504,11 @@ function handleIncomePlanningControl(
   target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
   renderMode: "live" | "full" = "full"
 ): boolean {
-  if (target.dataset.incomePlanningSleepSlotId && target.dataset.incomePlanningSleepSlotField) {
+  if (target.dataset.incomePlanningSleepSlotGroupId && target.dataset.incomePlanningSleepSlotGroupField) {
     const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
-    updateIncomePlanningDialogSleepSlot(
-      target.dataset.incomePlanningSleepSlotId,
-      target.dataset.incomePlanningSleepSlotField as keyof IncomePlanningSleepSlot,
+    updateIncomePlanningDialogSleepSlotGroup(
+      target.dataset.incomePlanningSleepSlotGroupId,
+      target.dataset.incomePlanningSleepSlotGroupField as keyof IncomePlanningSleepSlotGroup,
       value
     );
     return true;
@@ -3148,7 +3516,9 @@ function handleIncomePlanningControl(
 
   if (target.dataset.incomePlanningDialogField) {
     const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
-    updateIncomePlanningDialogDraft(target.dataset.incomePlanningDialogField, value);
+    const field = target.dataset.incomePlanningDialogField;
+    updateIncomePlanningDialogDraft(field, value);
+    if (field === "pauseEnabled") renderIncomePlanningDialog();
     return true;
   }
 
@@ -3285,10 +3655,15 @@ function updateIncomePlanningWorkBlock(
       if (field === "active") return { ...workBlock, active: value === "true" };
       if (field === "category") {
         const category = isIncomePlanningCategory(value) ? value : workBlock.category;
-        return buildIncomePlanningWorkBlock(category, workBlock.id, { active: workBlock.active });
+        return {
+          ...workBlock,
+          category,
+          color: normalizeIncomePlanningColor(workBlock.color, incomePlanningDefaultWorkColor(category))
+        };
       }
       if (field === "name") return { ...workBlock, name: value };
       if (field === "description") return { ...workBlock, description: value };
+      if (field === "color") return { ...workBlock, color: normalizeIncomePlanningColor(value, workBlock.color ?? incomePlanningDefaultWorkColor(workBlock.category)) };
       return workBlock;
     })
   };
@@ -3303,6 +3678,7 @@ function updateIncomePlanningHabit(habitId: string, field: keyof IncomePlanningH
       if (field === "type" && isIncomePlanningHabitType(value)) return { ...habit, type: value };
       if (field === "name") return { ...habit, name: value };
       if (field === "description") return { ...habit, description: value };
+      if (field === "icon") return { ...habit, icon: normalizePositionIcon(value, habit.type === "bad" ? "snack" : "book") };
       if (field === "timing") return { ...habit, timing: value };
       if (field === "durationMinutes") return { ...habit, durationMinutes: Math.round(clamp(numberValue(value), 0, 1440)) };
       if (field === "durationUnit" && isIncomePlanningHabitDurationUnit(value)) return { ...habit, durationUnit: value };
@@ -3328,6 +3704,7 @@ function updateIncomePlanningManualBlock(
       if (field === "type" && isIncomePlanningManualBlockType(value)) return { ...block, type: value };
       if (field === "name") return { ...block, name: value };
       if (field === "description") return { ...block, description: value };
+      if (field === "color") return { ...block, color: normalizeIncomePlanningColor(value, block.color ?? incomePlanningDefaultManualColor(block.type)) };
       return block;
     })
   };
@@ -3354,17 +3731,32 @@ function updateIncomePlanningSlotField(slot: IncomePlanningSlot, field: keyof In
   if (field === "startTime") return { ...slot, startTime: value };
   if (field === "endTime") return { ...slot, endTime: value };
   if (field === "durationMinutes") return { ...slot, durationMinutes: Math.round(clamp(numberValue(value), 0, 10080)) };
+  if (field === "pauseEnabled") return { ...slot, pauseEnabled: value === "true" };
+  if (field === "pauseStartTime") return { ...slot, pauseStartTime: value };
+  if (field === "pauseEndTime") return { ...slot, pauseEndTime: value };
+  if (field === "pauseDurationMinutes") return { ...slot, pauseDurationMinutes: Math.round(clamp(numberValue(value), 0, 10080)) };
   return slot;
 }
 
 function normalizeIncomePlanningSlotAfterEdit(slot: IncomePlanningSlot): IncomePlanningSlot {
-  if (slot.flexible) return slot;
-  const start = parseTimeMinutes(slot.startTime);
-  const end = parseTimeMinutes(slot.endTime);
+  const normalizedPause = normalizeIncomePlanningSlotPause(slot);
+  if (normalizedPause.flexible) return normalizedPause;
+  const start = parseTimeMinutes(normalizedPause.startTime);
+  const end = parseTimeMinutes(normalizedPause.endTime);
   if (start !== null && end !== null && end > start) {
-    return { ...slot, durationMinutes: end - start };
+    return { ...normalizedPause, durationMinutes: end - start };
   }
-  return slot;
+  return normalizedPause;
+}
+
+function normalizeIncomePlanningSlotPause(slot: IncomePlanningSlot): IncomePlanningSlot {
+  const pauseEnabled = Boolean(slot.pauseEnabled);
+  const pauseDurationMinutes = Math.round(clamp(slot.pauseDurationMinutes ?? 0, 0, 10080));
+  if (!slot.pauseStartTime || !slot.pauseEndTime) return { ...slot, pauseEnabled: false };
+  const start = parseTimeMinutes(slot.pauseStartTime);
+  const end = parseTimeMinutes(slot.pauseEndTime);
+  if (start === null || end === null || end <= start) return { ...slot, pauseEnabled, pauseDurationMinutes };
+  return { ...slot, pauseEnabled, pauseDurationMinutes: end - start };
 }
 
 function updateIncomePlanningOwnerSlots(
@@ -3384,7 +3776,7 @@ function updateIncomePlanningOwnerSlots(
     state.incomePlanning = {
       ...state.incomePlanning,
       habits: state.incomePlanning.habits.map((habit) =>
-        habit.id === ownerId ? { ...habit, slots: updater(habit.slots) } : habit
+        habit.id === ownerId ? { ...habit, slots: updater(habit.slots).map(incomePlanningStripSlotPause) } : habit
       )
     };
   }
@@ -3413,23 +3805,30 @@ function defaultIncomePlanningSlot(ownerType: string): IncomePlanningSlot {
 
 function startIncomePlanningCalendarDrag(event: PointerEvent): void {
   const target = event.target as HTMLElement | null;
+  const sleepBlock = target?.closest<HTMLElement>("[data-income-planning-sleep-group-id]");
+  if (sleepBlock) {
+    startIncomePlanningSleepCalendarDrag(event, sleepBlock);
+    return;
+  }
   const block = target?.closest<HTMLElement>("[data-income-planning-calendar-block]");
   if (!block) return;
   const ownerType = incomePlanningOwnerTypeFromValue(block.dataset.incomePlanningOwnerType);
   const ownerId = block.dataset.incomePlanningOwnerId || "";
   const slotId = block.dataset.incomePlanningSlotId || "";
+  const slotPart = block.dataset.incomePlanningSlotPart === "pause" ? "pause" : "main";
   const slot = incomePlanningSlotById(ownerType, ownerId, slotId);
   const column = block.closest<HTMLElement>("[data-income-planning-calendar-day]");
   const days = document.querySelector<HTMLElement>("#incomePlanningCalendarDays");
   if (!ownerId || !slotId || !slot || !column || !days) return;
-  const startMinute = parseTimeMinutes(slot.startTime);
-  const endMinute = parseTimeMinutes(slot.endTime);
-  if (slot.flexible || startMinute === null || endMinute === null || endMinute <= startMinute) return;
+  const startMinute = parseTimeMinutes(slotPart === "pause" ? slot.pauseStartTime ?? "" : slot.startTime);
+  const endMinute = parseTimeMinutes(slotPart === "pause" ? slot.pauseEndTime ?? "" : slot.endTime);
+  if ((slotPart === "main" && slot.flexible) || startMinute === null || endMinute === null || endMinute <= startMinute) return;
   const resizeHandle = target?.closest<HTMLElement>("[data-income-planning-resize]");
   incomePlanningDragState = {
     ownerType,
     ownerId,
     slotId,
+    slotPart,
     mode: resizeHandle?.dataset.incomePlanningResize === "start" ? "resize-start" : resizeHandle?.dataset.incomePlanningResize === "end" ? "resize-end" : "move",
     pointerId: event.pointerId,
     startClientX: event.clientX,
@@ -3448,6 +3847,15 @@ function startIncomePlanningCalendarDrag(event: PointerEvent): void {
 }
 
 function moveIncomePlanningCalendarDrag(event: PointerEvent): void {
+  if (incomePlanningSleepDragState && event.pointerId === incomePlanningSleepDragState.pointerId) {
+    const next = incomePlanningSleepDragPreview(event);
+    incomePlanningSleepDragState.moved =
+      incomePlanningSleepDragState.moved ||
+      Math.abs(event.clientY - incomePlanningSleepDragState.startClientY) > 3;
+    applyIncomePlanningSleepDragPreview(next);
+    event.preventDefault();
+    return;
+  }
   if (!incomePlanningDragState || event.pointerId !== incomePlanningDragState.pointerId) return;
   const next = incomePlanningDragPreview(event);
   incomePlanningDragState.moved =
@@ -3464,6 +3872,22 @@ function moveIncomePlanningCalendarDrag(event: PointerEvent): void {
 }
 
 function finishIncomePlanningCalendarDrag(event: PointerEvent): void {
+  if (incomePlanningSleepDragState && event.pointerId === incomePlanningSleepDragState.pointerId) {
+    const dragState = incomePlanningSleepDragState;
+    const next = incomePlanningSleepDragPreview(event);
+    dragState.elements.forEach((element) => {
+      element.classList.remove("dragging");
+      element.releasePointerCapture?.(event.pointerId);
+    });
+    incomePlanningSleepDragState = null;
+    if (dragState.moved) {
+      updateIncomePlanningSleepGroupTime(dragState.groupId, next.startMinute, next.endMinute);
+      renderIncomePlanning();
+      saveState(state);
+      incomePlanningSuppressNextCalendarClick = true;
+    }
+    return;
+  }
   if (!incomePlanningDragState || event.pointerId !== incomePlanningDragState.pointerId) return;
   const dragState = incomePlanningDragState;
   const next = incomePlanningDragPreview(event);
@@ -3471,13 +3895,92 @@ function finishIncomePlanningCalendarDrag(event: PointerEvent): void {
   dragState.element.releasePointerCapture?.(event.pointerId);
   incomePlanningDragState = null;
   if (dragState.moved) {
-    updateIncomePlanningSlot(dragState.ownerType, dragState.ownerId, dragState.slotId, "day", next.day);
-    updateIncomePlanningSlot(dragState.ownerType, dragState.ownerId, dragState.slotId, "startTime", formatIncomePlanningTime(next.startMinute));
-    updateIncomePlanningSlot(dragState.ownerType, dragState.ownerId, dragState.slotId, "endTime", formatIncomePlanningTime(next.endMinute));
+    if (dragState.slotPart === "pause") {
+      updateIncomePlanningPauseAfterCalendarDrag(dragState, next);
+    } else {
+      updateIncomePlanningMainSlotAfterCalendarDrag(dragState, next);
+    }
     renderIncomePlanning();
     saveState(state);
     incomePlanningSuppressNextCalendarClick = true;
   }
+}
+
+function updateIncomePlanningPauseAfterCalendarDrag(
+  dragState: NonNullable<IncomePlanningDragState>,
+  next: { day: IncomePlanningWeekday; startMinute: number; endMinute: number }
+): void {
+  updateIncomePlanningOwnerSlots(dragState.ownerType, dragState.ownerId, (slots) =>
+    slots.map((slot) => {
+      if (slot.id !== dragState.slotId) return slot;
+      const clamped = incomePlanningClampedPauseRange(slot, next.startMinute, next.endMinute);
+      return normalizeIncomePlanningSlotAfterEdit({
+        ...slot,
+        pauseEnabled: true,
+        pauseStartTime: formatIncomePlanningTime(clamped.startMinute),
+        pauseEndTime: formatIncomePlanningTime(clamped.endMinute),
+        pauseDurationMinutes: clamped.endMinute - clamped.startMinute
+      });
+    })
+  );
+}
+
+function updateIncomePlanningMainSlotAfterCalendarDrag(
+  dragState: NonNullable<IncomePlanningDragState>,
+  next: { day: IncomePlanningWeekday; startMinute: number; endMinute: number }
+): void {
+  updateIncomePlanningOwnerSlots(dragState.ownerType, dragState.ownerId, (slots) =>
+    slots.map((slot) => {
+      if (slot.id !== dragState.slotId) return slot;
+      const updated: IncomePlanningSlot = {
+        ...slot,
+        day: next.day,
+        startTime: formatIncomePlanningTime(next.startMinute),
+        endTime: formatIncomePlanningTime(next.endMinute),
+        durationMinutes: next.endMinute - next.startMinute
+      };
+      return normalizeIncomePlanningSlotAfterEdit(incomePlanningSlotWithClampedPause(updated, dragState, next));
+    })
+  );
+}
+
+function incomePlanningClampedPauseRange(
+  slot: IncomePlanningSlot,
+  pauseStartMinute: number,
+  pauseEndMinute: number
+): { startMinute: number; endMinute: number } {
+  const slotStart = parseTimeMinutes(slot.startTime);
+  const slotEnd = parseTimeMinutes(slot.endTime);
+  if (slotStart === null || slotEnd === null || slotEnd <= slotStart) {
+    return { startMinute: pauseStartMinute, endMinute: pauseEndMinute };
+  }
+  const duration = Math.min(Math.max(15, pauseEndMinute - pauseStartMinute), slotEnd - slotStart);
+  const startMinute = clamp(pauseStartMinute, slotStart, Math.max(slotStart, slotEnd - duration));
+  return { startMinute, endMinute: startMinute + duration };
+}
+
+function incomePlanningSlotWithClampedPause(
+  slot: IncomePlanningSlot,
+  dragState: NonNullable<IncomePlanningDragState>,
+  next: { startMinute: number; endMinute: number }
+): IncomePlanningSlot {
+  if (!slot.pauseEnabled || !slot.pauseStartTime || !slot.pauseEndTime) return slot;
+  const pauseStart = parseTimeMinutes(slot.pauseStartTime);
+  const pauseEnd = parseTimeMinutes(slot.pauseEndTime);
+  if (pauseStart === null || pauseEnd === null || pauseEnd <= pauseStart) return slot;
+  const pauseDuration = Math.min(pauseEnd - pauseStart, Math.max(0, next.endMinute - next.startMinute));
+  const shiftedPauseStart = dragState.mode === "move" ? pauseStart + (next.startMinute - dragState.originalStartMinute) : pauseStart;
+  const clampedPauseStart = clamp(
+    snapIncomePlanningMinute(shiftedPauseStart),
+    next.startMinute,
+    Math.max(next.startMinute, next.endMinute - pauseDuration)
+  );
+  return {
+    ...slot,
+    pauseStartTime: formatIncomePlanningTime(clampedPauseStart),
+    pauseEndTime: formatIncomePlanningTime(clampedPauseStart + pauseDuration),
+    pauseDurationMinutes: pauseDuration
+  };
 }
 
 function incomePlanningDragPreview(event: PointerEvent): {
@@ -3518,6 +4021,101 @@ function incomePlanningDragPreview(event: PointerEvent): {
   );
   const day = incomePlanningWeekdayByIndex(incomePlanningWeekdayIndex(incomePlanningDragState.originalDay) + dayDelta);
   return { day, startMinute, endMinute: startMinute + duration };
+}
+
+function startIncomePlanningSleepCalendarDrag(event: PointerEvent, block: HTMLElement): void {
+  const groupId = block.dataset.incomePlanningSleepGroupId || "";
+  const group = incomePlanningSleepSlotGroupsFromSlots(state.incomePlanning.assumptions.sleepSlots).find((item) => item.id === groupId);
+  const column = block.closest<HTMLElement>("[data-income-planning-calendar-day]");
+  if (!groupId || !group || !column) return;
+  const startMinute = parseTimeMinutes(group.startTime);
+  const endMinute = parseTimeMinutes(group.endTime);
+  if (startMinute === null || endMinute === null) return;
+  const durationMinutes = incomePlanningSleepClockDurationMinutes(startMinute, endMinute, group.durationMinutes);
+  const elements = Array.from(document.querySelectorAll<HTMLElement>("[data-income-planning-sleep-group-id]")).filter(
+    (element) => element.dataset.incomePlanningSleepGroupId === groupId
+  );
+  incomePlanningSleepDragState = {
+    groupId,
+    group,
+    pointerId: event.pointerId,
+    startClientY: event.clientY,
+    originalStartMinute: startMinute,
+    durationMinutes,
+    overnight: endMinute <= startMinute,
+    columnHeight: Math.max(1, column.getBoundingClientRect().height),
+    elements,
+    moved: false
+  };
+  elements.forEach((element) => element.classList.add("dragging"));
+  block.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+}
+
+function incomePlanningSleepDragPreview(event: PointerEvent): { startMinute: number; endMinute: number } {
+  if (!incomePlanningSleepDragState) return { startMinute: 21 * 60, endMinute: 5 * 60 + 30 };
+  const verticalDelta = snapIncomePlanningMinute(
+    ((event.clientY - incomePlanningSleepDragState.startClientY) / incomePlanningSleepDragState.columnHeight) * 24 * 60
+  );
+  const duration = clamp(incomePlanningSleepDragState.durationMinutes, 15, 23 * 60 + 45);
+  const minStart = incomePlanningSleepDragState.overnight ? Math.max(0, 24 * 60 - duration + 15) : 0;
+  const maxStart = incomePlanningSleepDragState.overnight ? 23 * 60 + 45 : Math.max(0, 24 * 60 - duration);
+  const startMinute = clamp(
+    snapIncomePlanningMinute(incomePlanningSleepDragState.originalStartMinute + verticalDelta),
+    minStart,
+    maxStart
+  );
+  return {
+    startMinute,
+    endMinute: (startMinute + duration) % (24 * 60)
+  };
+}
+
+function applyIncomePlanningSleepDragPreview(next: { startMinute: number; endMinute: number }): void {
+  if (!incomePlanningSleepDragState) return;
+  const previewGroup = normalizeIncomePlanningDialogSleepSlotGroup({
+    ...incomePlanningSleepDragState.group,
+    startTime: formatIncomePlanningTime(next.startMinute),
+    endTime: formatIncomePlanningTime(next.endMinute)
+  });
+  const entries = new Map(incomePlanningSleepBackgroundEntries(previewGroup).map((entry) => [entry.id, entry]));
+  incomePlanningSleepDragState.elements.forEach((element) => {
+    const entry = entries.get(element.dataset.incomePlanningBackgroundEntryId || "");
+    if (!entry) return;
+    const start = clamp(entry.startMinute, 0, 24 * 60);
+    const end = clamp(entry.endMinute, start + 15, 24 * 60);
+    const top = (start / (24 * 60)) * 100;
+    const height = ((end - start) / (24 * 60)) * 100;
+    element.style.setProperty("--top", `${top.toFixed(3)}%`);
+    element.style.setProperty("--height", `${height.toFixed(3)}%`);
+  });
+}
+
+function updateIncomePlanningSleepGroupTime(groupId: string, startMinute: number, endMinute: number): void {
+  const groups = incomePlanningSleepSlotGroupsFromSlots(state.incomePlanning.assumptions.sleepSlots).map((group) =>
+    group.id === groupId
+      ? normalizeIncomePlanningDialogSleepSlotGroup({
+          ...group,
+          startTime: formatIncomePlanningTime(startMinute),
+          endTime: formatIncomePlanningTime(endMinute)
+        })
+      : group
+  );
+  const sleepSlots = incomePlanningSleepSlotsFromDialogGroups(groups);
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    assumptions: {
+      ...state.incomePlanning.assumptions,
+      sleepHoursPerDay: clamp(incomePlanningAverageSleepHours({ sleepHoursPerDay: state.incomePlanning.assumptions.sleepHoursPerDay, sleepSlots }), 0, 24),
+      sleepSlots
+    }
+  };
+}
+
+function incomePlanningSleepClockDurationMinutes(startMinute: number, endMinute: number, fallbackDurationMinutes: number): number {
+  if (endMinute > startMinute) return endMinute - startMinute;
+  if (endMinute < startMinute) return 24 * 60 - startMinute + endMinute;
+  return clamp(Math.round(fallbackDurationMinutes), 15, 23 * 60 + 45);
 }
 
 function incomePlanningSlotById(
@@ -7629,6 +8227,75 @@ function renderIncomeMilestoneTypePicker(): void {
             ${positionIconSvg(option.icon)}
             <span>${escapeHtml(option.type)}</span>
             <small>${escapeHtml(option.description)}</small>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+  picker.hidden = false;
+}
+
+function showIncomePlanningHabitIconPicker(button: HTMLButtonElement): void {
+  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "habit") return;
+  const rect = button.getBoundingClientRect();
+  const panelWidth = 320;
+  const panelHeight = 360;
+  const left =
+    rect.right + 12 + panelWidth <= window.innerWidth
+      ? rect.right + 12
+      : Math.max(12, rect.left - panelWidth - 12);
+  const top = Math.max(12, Math.min(rect.top, window.innerHeight - panelHeight - 12));
+  incomePlanningHabitIconPicker = { top, left };
+  renderIncomePlanningHabitIconPicker();
+}
+
+function hideIncomePlanningHabitIconPicker(): void {
+  incomePlanningHabitIconPicker = null;
+  renderIncomePlanningHabitIconPicker();
+}
+
+function selectIncomePlanningHabitIcon(icon: string): void {
+  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "habit") return;
+  incomePlanningDialog = {
+    ...incomePlanningDialog,
+    habitIcon: normalizePositionIcon(icon, incomePlanningDialog.habitType === "bad" ? "snack" : "book"),
+    error: ""
+  };
+  incomePlanningHabitIconPicker = null;
+  renderIncomePlanningDialog();
+  renderIncomePlanningHabitIconPicker();
+}
+
+function renderIncomePlanningHabitIconPicker(): void {
+  const picker = document.querySelector<HTMLDivElement>("#incomePlanningHabitIconPicker");
+  if (!picker) return;
+  if (!incomePlanningHabitIconPicker || !incomePlanningDialog || incomePlanningDialog.ownerType !== "habit") {
+    picker.hidden = true;
+    return;
+  }
+
+  const currentIcon = normalizePositionIcon(incomePlanningDialog.habitIcon, incomePlanningDialog.habitType === "bad" ? "snack" : "book");
+  picker.style.top = `${incomePlanningHabitIconPicker.top}px`;
+  picker.style.left = `${incomePlanningHabitIconPicker.left}px`;
+  picker.innerHTML = `
+    <div class="position-icon-picker-head">
+      <span>Habit-Icon</span>
+      <button class="icon-button" type="button" data-action="close-income-planning-habit-icon-picker" aria-label="Iconauswahl schliessen">x</button>
+    </div>
+    <div class="position-icon-picker-grid">
+      ${POSITION_ICONS.map((icon) => {
+        const active = icon.id === currentIcon;
+        return `
+          <button
+            class="position-icon-option ${active ? "active" : ""}"
+            type="button"
+            data-action="select-income-planning-habit-icon"
+            data-income-planning-habit-icon="${icon.id}"
+            aria-pressed="${active}"
+            title="${escapeHtml(icon.label)}"
+          >
+            ${positionIconSvg(icon.id)}
+            <span>${escapeHtml(icon.label)}</span>
           </button>
         `;
       }).join("")}

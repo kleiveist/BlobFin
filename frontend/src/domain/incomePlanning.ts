@@ -58,7 +58,8 @@ export type IncomePlanningPlannerEntryType =
   | "good_habit"
   | "bad_habit"
   | "replacement_habit"
-  | "other_event";
+  | "other_event"
+  | "pause";
 
 export interface IncomePlanningCalendarEntry {
   id: string;
@@ -75,6 +76,7 @@ export interface IncomePlanningCalendarEntry {
   invalid: boolean;
   startMinute: number;
   endMinute: number;
+  slotPart: "main" | "pause";
 }
 
 export interface IncomePlanningSlotCalendarSegment {
@@ -90,8 +92,11 @@ export interface IncomePlanningModel {
   activeHabits: IncomePlanningHabit[];
   activeManualBlocks: IncomePlanningManualBlock[];
   calendarEntries: IncomePlanningCalendarEntry[];
+  grossWorkHours: number;
   totalWorkHours: number;
+  pauseHours: number;
   habitHours: number;
+  grossManualHours: number;
   manualHours: number;
   sleepHoursPerWeek: number;
   usedHours: number;
@@ -270,6 +275,7 @@ export function buildIncomePlanningWorkBlock(
     category,
     name: config.defaultName,
     description: "",
+    color: incomePlanningDefaultWorkColor(category),
     slots,
     ...overrides
   };
@@ -282,7 +288,7 @@ export function buildIncomePlanningHabit(
   const durationMinutes = overrides.durationMinutes ?? 30;
   const durationUnit = overrides.durationUnit ?? "day";
   const slots = overrides.slots ?? dailyHabitSlots(id, durationMinutes, "21:30");
-  return {
+  const habit: IncomePlanningHabit = {
     id,
     active: true,
     type: "good",
@@ -295,8 +301,13 @@ export function buildIncomePlanningHabit(
     replacementHabit: "",
     status: "planned",
     priority: "medium",
+    icon: "book",
     slots,
     ...overrides
+  };
+  return {
+    ...habit,
+    icon: overrides.icon ?? (habit.type === "bad" ? "snack" : "book")
   };
 }
 
@@ -313,6 +324,7 @@ export function buildIncomePlanningManualBlock(
     type,
     name: config.name,
     description: "",
+    color: incomePlanningDefaultManualColor(type),
     slots,
     ...overrides
   };
@@ -333,11 +345,16 @@ export function buildIncomePlanningModel(state: IncomePlanningState): IncomePlan
     .map((entry) => ({ ...entry, conflict: conflictResult.entryIds.has(entry.id) }))
     .sort(compareCalendarEntries);
 
-  const totalWorkMinutes = sumEntryMinutes(calendarEntries, ["career", "side_work"]);
+  const grossWorkMinutes = sumSlotsDuration(activeWorkBlocks.flatMap((block) => block.slots), "gross");
+  const workPauseMinutes = sumSlotsDuration(activeWorkBlocks.flatMap((block) => block.slots), "pause");
+  const totalWorkMinutes = sumSlotsDuration(activeWorkBlocks.flatMap((block) => block.slots), "net");
   const habitMinutes = sumEntryMinutes(calendarEntries, ["good_habit", "bad_habit", "replacement_habit"]);
-  const manualMinutes = sumEntryMinutes(calendarEntries, ["private_commitment", "free_time", "buffer", "other_event"]);
+  const grossManualMinutes = sumSlotsDuration(activeManualBlocks.flatMap((block) => block.slots), "gross");
+  const manualPauseMinutes = sumSlotsDuration(activeManualBlocks.flatMap((block) => block.slots), "pause");
+  const manualMinutes = sumSlotsDuration(activeManualBlocks.flatMap((block) => block.slots), "net");
+  const pauseMinutes = workPauseMinutes + manualPauseMinutes;
   const sleepMinutes = incomePlanningSleepMinutes(state.assumptions);
-  const usedMinutes = sleepMinutes + totalWorkMinutes + habitMinutes + manualMinutes;
+  const usedMinutes = sleepMinutes + totalWorkMinutes + pauseMinutes + habitMinutes + manualMinutes;
   const remainingMinutes = INCOME_PLANNING_WEEK_MINUTES - usedMinutes;
   const nonSleepMinutes = usedMinutes - sleepMinutes;
   const totalWorkHours = minutesToHours(totalWorkMinutes);
@@ -357,8 +374,11 @@ export function buildIncomePlanningModel(state: IncomePlanningState): IncomePlan
     activeHabits,
     activeManualBlocks,
     calendarEntries,
+    grossWorkHours: minutesToHours(grossWorkMinutes),
     totalWorkHours,
+    pauseHours: minutesToHours(pauseMinutes),
     habitHours: minutesToHours(habitMinutes),
+    grossManualHours: minutesToHours(grossManualMinutes),
     manualHours: minutesToHours(manualMinutes),
     sleepHoursPerWeek: minutesToHours(sleepMinutes),
     usedHours,
@@ -380,17 +400,23 @@ export function buildIncomePlanningModel(state: IncomePlanningState): IncomePlan
 
 function workBlockCalendarEntries(block: IncomePlanningWorkBlock): CalendarEntryDraft[] {
   const type: IncomePlanningPlannerEntryType = isIncomePlanningMainJobCategory(block.category) ? "career" : "side_work";
-  return block.slots.map((slot) => calendarEntryFromSlot(block.id, slot, block.name, type));
+  return block.slots.flatMap((slot) => calendarEntriesFromSlot(block.id, slot, block.name, type));
 }
 
 function habitCalendarEntries(habit: IncomePlanningHabit): CalendarEntryDraft[] {
   const slots = habit.slots.length ? habit.slots : habitFallbackSlots(habit);
   const ownType: IncomePlanningPlannerEntryType = habit.type === "good" ? "good_habit" : "bad_habit";
-  const entries = slots.map((slot) => calendarEntryFromSlot(habit.id, slot, habit.name, ownType));
+  const entries = slots.map((slot) => calendarEntryFromSlot(habit.id, incomePlanningStripSlotPause(slot), habit.name, ownType));
   if (habit.type === "bad" && habit.goalChange === "replace" && habit.replacementHabit.trim()) {
     entries.push(
       ...slots.map((slot) =>
-        calendarEntryFromSlot(habit.id, slot, habit.replacementHabit.trim(), "replacement_habit", `${habit.id}:replacement`)
+        calendarEntryFromSlot(
+          habit.id,
+          incomePlanningStripSlotPause(slot),
+          habit.replacementHabit.trim(),
+          "replacement_habit",
+          `${habit.id}:replacement`
+        )
       )
     );
   }
@@ -398,7 +424,20 @@ function habitCalendarEntries(habit: IncomePlanningHabit): CalendarEntryDraft[] 
 }
 
 function manualBlockCalendarEntries(block: IncomePlanningManualBlock): CalendarEntryDraft[] {
-  return block.slots.map((slot) => calendarEntryFromSlot(block.id, slot, block.name, plannerTypeForManualBlock(block.type)));
+  return block.slots.flatMap((slot) => calendarEntriesFromSlot(block.id, slot, block.name, plannerTypeForManualBlock(block.type)));
+}
+
+function calendarEntriesFromSlot(
+  ownerId: string,
+  slot: IncomePlanningSlot,
+  title: string,
+  type: IncomePlanningPlannerEntryType,
+  idPrefix = ownerId
+): CalendarEntryDraft[] {
+  const entries = [calendarEntryFromSlot(ownerId, slot, title, type, idPrefix)];
+  const pauseEntry = pauseCalendarEntryFromSlot(ownerId, slot, idPrefix);
+  if (pauseEntry) entries.push(pauseEntry);
+  return entries;
 }
 
 function calendarEntryFromSlot(
@@ -419,21 +458,70 @@ function calendarEntryFromSlot(
     startTime: slot.startTime,
     endTime: slot.endTime,
     flexible: slot.flexible,
-    durationMinutes: slotDurationMinutes(slot),
+    durationMinutes: incomePlanningSlotGrossDurationMinutes(slot),
     title,
     type,
     invalid,
     startMinute: startMinute ?? 0,
-    endMinute: endMinute ?? 0
+    endMinute: endMinute ?? 0,
+    slotPart: "main"
   };
 }
 
-function slotDurationMinutes(slot: IncomePlanningSlot): number {
+function pauseCalendarEntryFromSlot(ownerId: string, slot: IncomePlanningSlot, idPrefix = ownerId): CalendarEntryDraft | null {
+  const durationMinutes = incomePlanningSlotPauseDurationMinutes(slot);
+  if (slot.flexible || durationMinutes <= 0 || !slot.pauseStartTime || !slot.pauseEndTime) return null;
+  const startMinute = parseTimeMinutes(slot.pauseStartTime);
+  const endMinute = parseTimeMinutes(slot.pauseEndTime);
+  const invalid = startMinute === null || endMinute === null || endMinute <= startMinute;
+  return {
+    id: `${idPrefix}:${slot.id}:pause`,
+    ownerId,
+    slotId: slot.id,
+    day: slot.day,
+    startTime: slot.pauseStartTime,
+    endTime: slot.pauseEndTime,
+    flexible: false,
+    durationMinutes: invalid ? durationMinutes : endMinute - startMinute,
+    title: "Pause",
+    type: "pause",
+    invalid,
+    startMinute: startMinute ?? 0,
+    endMinute: endMinute ?? 0,
+    slotPart: "pause"
+  };
+}
+
+export function incomePlanningSlotGrossDurationMinutes(slot: IncomePlanningSlot): number {
   if (slot.flexible) return Math.max(0, Math.round(slot.durationMinutes));
   const start = parseTimeMinutes(slot.startTime);
   const end = parseTimeMinutes(slot.endTime);
   if (start !== null && end !== null && end > start) return end - start;
   return Math.max(0, Math.round(slot.durationMinutes));
+}
+
+export function incomePlanningSlotPauseDurationMinutes(slot: IncomePlanningSlot): number {
+  if (!slot.pauseEnabled || !slot.pauseStartTime || !slot.pauseEndTime) return 0;
+  const start = parseTimeMinutes(slot.pauseStartTime);
+  const end = parseTimeMinutes(slot.pauseEndTime);
+  const fallback = Math.max(0, Math.round(slot.pauseDurationMinutes ?? 0));
+  const duration = start !== null && end !== null && end > start ? end - start : fallback;
+  return Math.min(incomePlanningSlotGrossDurationMinutes(slot), Math.max(0, duration));
+}
+
+export function incomePlanningSlotNetDurationMinutes(slot: IncomePlanningSlot): number {
+  return Math.max(0, incomePlanningSlotGrossDurationMinutes(slot) - incomePlanningSlotPauseDurationMinutes(slot));
+}
+
+export function incomePlanningStripSlotPause(slot: IncomePlanningSlot): IncomePlanningSlot {
+  return {
+    id: slot.id,
+    day: slot.day,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    flexible: slot.flexible,
+    durationMinutes: slot.durationMinutes
+  };
 }
 
 export function incomePlanningSleepSlotDurationMinutes(slot: IncomePlanningSleepSlot): number {
@@ -503,7 +591,7 @@ function detectConflicts(entries: CalendarEntryDraft[]): { entryIds: Set<string>
     for (let nextIndex = index + 1; nextIndex < timedEntries.length; nextIndex += 1) {
       const first = timedEntries[index];
       const second = timedEntries[nextIndex];
-      if (first.day !== second.day) continue;
+      if (first.day !== second.day || first.type === "pause" || second.type === "pause") continue;
       if (first.startMinute < second.endMinute && second.startMinute < first.endMinute) {
         entryIds.add(first.id);
         entryIds.add(second.id);
@@ -549,6 +637,14 @@ function incomePlanningWarnings(input: {
 
 function sumEntryMinutes(entries: IncomePlanningCalendarEntry[], types: IncomePlanningPlannerEntryType[]): number {
   return entries.reduce((sum, entry) => (types.includes(entry.type) ? sum + entry.durationMinutes : sum), 0);
+}
+
+function sumSlotsDuration(slots: IncomePlanningSlot[], mode: "gross" | "net" | "pause"): number {
+  return slots.reduce((sum, slot) => {
+    if (mode === "gross") return sum + incomePlanningSlotGrossDurationMinutes(slot);
+    if (mode === "pause") return sum + incomePlanningSlotPauseDurationMinutes(slot);
+    return sum + incomePlanningSlotNetDurationMinutes(slot);
+  }, 0);
 }
 
 function plannerTypeForManualBlock(type: IncomePlanningManualBlockType): IncomePlanningPlannerEntryType {
@@ -617,6 +713,20 @@ function manualBlockDefaults(type: IncomePlanningManualBlockType): { name: strin
     return { name: "Wochenpuffer", slots: [slot("manual-buffer-slot", flexibleSlot("sunday", 8 * 60))] };
   }
   return { name: "Sonstiges Ereignis", slots: [slot("manual-other-slot", flexibleSlot("sunday", 60))] };
+}
+
+export function incomePlanningDefaultWorkColor(category: IncomePlanningCategory): string {
+  if (isIncomePlanningMainJobCategory(category)) return "#8a5a2b";
+  if (category === "online_sales") return "#2f6fb0";
+  if (category === "self_employed" || category === "freelance") return "#5f7f4f";
+  return "#2f6fb0";
+}
+
+export function incomePlanningDefaultManualColor(type: IncomePlanningManualBlockType): string {
+  if (type === "private_commitment") return "#b8860b";
+  if (type === "free_time") return "#7d6bb3";
+  if (type === "buffer") return "#c76f4c";
+  return "#6f7785";
 }
 
 function timedSlot(day: IncomePlanningWeekday, startTime: string, endTime: string): IncomePlanningSlotTemplate {

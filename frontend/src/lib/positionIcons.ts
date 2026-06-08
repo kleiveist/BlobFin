@@ -102,6 +102,16 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     svg: '<path d="m3 9 9-5 9 5-9 5-9-5Z"/><path d="M7 11.5v4c2.8 2 7.2 2 10 0v-4"/><path d="M21 9v6"/>'
   },
   {
+    id: "book",
+    label: "Buch",
+    svg: '<path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H19v17H7.5A2.5 2.5 0 0 0 5 21.5v-17Z"/><path d="M5 18.5A2.5 2.5 0 0 1 7.5 16H19"/><path d="M9 6h6"/><path d="M9 10h5"/>'
+  },
+  {
+    id: "snack",
+    label: "Snack",
+    svg: '<path d="M7 8h10l-1 12H8L7 8Z"/><path d="M6 5h12"/><path d="M9 5V3h6v2"/><path d="M10 11h4"/><path d="M10.5 15h3"/>'
+  },
+  {
     id: "briefcase",
     label: "Selbststaendigkeit",
     svg: '<rect x="4" y="7" width="16" height="12" rx="2"/><path d="M9 7V5h6v2"/><path d="M4 12h16"/><path d="M10 12v2h4v-2"/>'

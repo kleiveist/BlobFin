@@ -225,6 +225,65 @@ describe("storage", () => {
     expect(loaded.incomePlanning.assumptions.sleepSlots).toHaveLength(7);
   });
 
+  it("migrates legacy slot pauses while stripping pauses from habits", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState() as any;
+    const pausedSlot = {
+      id: "slot",
+      day: "monday",
+      startTime: "06:30",
+      endTime: "15:45",
+      flexible: false,
+      durationMinutes: 555,
+      pauseStartTime: "12:00",
+      pauseEndTime: "12:30",
+      pauseDurationMinutes: 30
+    };
+    state.incomePlanning = {
+      workBlocks: [
+        {
+          id: "work",
+          active: true,
+          category: "salary",
+          name: "Job",
+          description: "",
+          slots: [pausedSlot]
+        }
+      ],
+      habits: [
+        {
+          id: "habit",
+          active: true,
+          type: "good",
+          name: "Buch lesen",
+          description: "",
+          timing: "abends",
+          durationMinutes: 30,
+          durationUnit: "day",
+          goalChange: "build",
+          replacementHabit: "",
+          status: "planned",
+          priority: "medium",
+          slots: [pausedSlot]
+        }
+      ],
+      manualBlocks: [],
+      assumptions: { sleepHoursPerDay: 8 }
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.incomePlanning.workBlocks[0].slots[0]).toMatchObject({
+      pauseEnabled: true,
+      pauseStartTime: "12:00",
+      pauseEndTime: "12:30",
+      pauseDurationMinutes: 30
+    });
+    expect(loaded.incomePlanning.habits[0].slots[0]).not.toHaveProperty("pauseEnabled");
+    expect(loaded.incomePlanning.habits[0].slots[0]).not.toHaveProperty("pauseStartTime");
+  });
+
   it("maps old income page section ids to the combined income page", () => {
     const storage = new MemoryStorage();
 

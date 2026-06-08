@@ -17,8 +17,11 @@ describe("income planning", () => {
   it("calculates the default time budget without income amounts", () => {
     const model = buildIncomePlanningModel(defaultIncomePlanningState());
 
+    expect(model.grossWorkHours).toBe(51.3);
     expect(model.totalWorkHours).toBe(51.3);
+    expect(model.pauseHours).toBe(0);
     expect(model.habitHours).toBe(3.5);
+    expect(model.grossManualHours).toBe(34);
     expect(model.manualHours).toBe(34);
     expect(model.sleepHoursPerWeek).toBe(62.5);
     expect(model.usedHours).toBe(151.3);
@@ -182,6 +185,111 @@ describe("income planning", () => {
     expect(model.totalWorkHours).toBe(4);
     expect(model.conflictCount).toBe(0);
     expect(model.calendarEntries.every((entry) => entry.flexible)).toBe(true);
+  });
+
+  it("subtracts enabled slot pauses from net work time without counting them as conflicts", () => {
+    const state: IncomePlanningState = {
+      ...defaultIncomePlanningState(),
+      workBlocks: [
+        buildIncomePlanningWorkBlock("salary", "main", {
+          slots: [
+            {
+              id: "main-slot",
+              day: "monday",
+              startTime: "06:30",
+              endTime: "15:45",
+              flexible: false,
+              durationMinutes: 555,
+              pauseEnabled: true,
+              pauseStartTime: "12:00",
+              pauseEndTime: "12:30",
+              pauseDurationMinutes: 30
+            }
+          ]
+        })
+      ],
+      habits: [],
+      manualBlocks: []
+    };
+
+    const model = buildIncomePlanningModel(state);
+    const pauseEntry = model.calendarEntries.find((entry) => entry.type === "pause");
+
+    expect(model.grossWorkHours).toBe(9.3);
+    expect(model.totalWorkHours).toBe(8.8);
+    expect(model.pauseHours).toBe(0.5);
+    expect(model.conflictCount).toBe(0);
+    expect(pauseEntry).toMatchObject({
+      day: "monday",
+      startTime: "12:00",
+      endTime: "12:30",
+      slotPart: "pause",
+      title: "Pause"
+    });
+  });
+
+  it("keeps disabled pause values without subtracting or rendering a pause entry", () => {
+    const state: IncomePlanningState = {
+      ...defaultIncomePlanningState(),
+      workBlocks: [
+        buildIncomePlanningWorkBlock("salary", "main", {
+          slots: [
+            {
+              id: "main-slot",
+              day: "monday",
+              startTime: "06:30",
+              endTime: "15:45",
+              flexible: false,
+              durationMinutes: 555,
+              pauseEnabled: false,
+              pauseStartTime: "12:00",
+              pauseEndTime: "12:30",
+              pauseDurationMinutes: 30
+            }
+          ]
+        })
+      ],
+      habits: [],
+      manualBlocks: []
+    };
+
+    const model = buildIncomePlanningModel(state);
+
+    expect(model.totalWorkHours).toBe(9.3);
+    expect(model.pauseHours).toBe(0);
+    expect(model.calendarEntries.some((entry) => entry.type === "pause")).toBe(false);
+  });
+
+  it("ignores pause fields on habit slots", () => {
+    const state: IncomePlanningState = {
+      ...defaultIncomePlanningState(),
+      workBlocks: [],
+      manualBlocks: [],
+      habits: [
+        buildIncomePlanningHabit("book", {
+          slots: [
+            {
+              id: "book-slot",
+              day: "monday",
+              startTime: "21:30",
+              endTime: "22:00",
+              flexible: false,
+              durationMinutes: 30,
+              pauseEnabled: true,
+              pauseStartTime: "21:40",
+              pauseEndTime: "21:50",
+              pauseDurationMinutes: 10
+            }
+          ]
+        })
+      ]
+    };
+
+    const model = buildIncomePlanningModel(state);
+
+    expect(model.habitHours).toBe(0.5);
+    expect(model.pauseHours).toBe(0);
+    expect(model.calendarEntries.map((entry) => entry.type)).toEqual(["good_habit"]);
   });
 
   it("uses the yearly income labels as work planning categories", () => {

@@ -130,6 +130,7 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('id="incomePlanningHabits"');
     expect(html).toContain('id="incomePlanningWeeklyPlanner"');
     expect(html).toContain('id="incomePlanningDialogRoot"');
+    expect(html).toContain('id="incomePlanningHabitIconPicker"');
     expect(html).toContain("Kompakte 7-Tage-Grafik");
     expect(html).toContain("Berufsleben / Hauptjob");
     expect(html).toContain('data-action="income-planning-add-work-block"');

@@ -516,6 +516,7 @@ export function renderAppShell(): string {
         <div id="incomeAnalysisDialogRoot"></div>
         <div id="incomeYearLabelPicker" class="position-icon-picker income-year-label-picker" role="dialog" aria-label="Einkommenslabel auswaehlen" hidden></div>
         <div id="incomeMilestoneTypePicker" class="position-icon-picker income-milestone-type-picker" role="dialog" aria-label="Meilenstein-Typ auswaehlen" hidden></div>
+        <div id="incomePlanningHabitIconPicker" class="position-icon-picker income-planning-habit-icon-picker" role="dialog" aria-label="Habit-Icon auswaehlen" hidden></div>
       </div>
 
       <section class="panel investment-panel" data-module-section="planning_scenarios">

@@ -406,6 +406,10 @@ export interface IncomePlanningSlot {
   endTime: string;
   flexible: boolean;
   durationMinutes: number;
+  pauseEnabled?: boolean;
+  pauseStartTime?: string;
+  pauseEndTime?: string;
+  pauseDurationMinutes?: number;
 }
 
 export interface IncomePlanningSleepSlot {
@@ -423,6 +427,7 @@ export interface IncomePlanningWorkBlock {
   category: IncomePlanningCategory;
   name: string;
   description: string;
+  color?: string;
   slots: IncomePlanningSlot[];
 }
 
@@ -439,6 +444,7 @@ export interface IncomePlanningHabit {
   replacementHabit: string;
   status: IncomePlanningHabitStatus;
   priority: IncomePlanningPriority;
+  icon?: string;
   slots: IncomePlanningSlot[];
 }
 
@@ -448,6 +454,7 @@ export interface IncomePlanningManualBlock {
   type: IncomePlanningManualBlockType;
   name: string;
   description: string;
+  color?: string;
   slots: IncomePlanningSlot[];
 }
 
