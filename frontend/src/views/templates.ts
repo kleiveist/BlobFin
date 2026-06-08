@@ -116,7 +116,7 @@ export function renderAppShell(): string {
                   sectionId: "income_planning",
                   title: "Einkommensplanung",
                   subtitle: "Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien",
-                  actionLabel: "Oeffnen",
+                  actionLabel: "Zeitbudget planen",
                   icon: "income_plan"
                 }
               ]
@@ -171,49 +171,69 @@ export function renderAppShell(): string {
         ${moduleTopBar("Einkommensplanung", "Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien")}
         <div class="section-heading income-planning-heading">
           <div>
-            <h2>Einkommensplanungs-Dashboard</h2>
+            <h2>Zeitbudget-Dashboard</h2>
             <p class="planning-account-summary">
-              Plane zusaetzliche Einkommensquellen getrennt von Jahresnettoeinkommen und Kontoplanung.
+              Plane Arbeitszeit, Nebentaetigkeiten, Habits und private Zeitbloecke als Wochenbudget.
             </p>
           </div>
-          <div class="button-row">
-            <button
-              id="incomePlanningCategoryButton"
-              class="income-planning-category-button"
-              type="button"
-              data-action="open-income-planning-category-picker"
-              aria-label="Einkommensquelle auswaehlen"
-            ></button>
-            <button class="button" type="button" data-action="income-planning-add-source">Quelle hinzufuegen</button>
-          </div>
         </div>
-        <div id="incomePlanningMetricGrid" class="income-planning-metric-grid"></div>
-        <div id="incomePlanningWarnings" class="income-planning-warnings"></div>
-        <section class="income-card income-planning-time-card">
+        <section class="income-card income-planning-summary-card">
+          <div id="incomePlanningMetricGrid" class="income-planning-metric-grid"></div>
+          <div id="incomePlanningWarnings" class="income-planning-warnings"></div>
+          <div id="incomePlanningTimeCharts" class="income-planning-time-charts"></div>
+        </section>
+        <section class="income-card income-planning-weekly-card">
           <div class="income-section-head">
-            <h3>Zeitannahmen</h3>
-            <p>Schlaf, Freizeit, private Verpflichtungen und Puffer begrenzen die planbare Arbeitszeit.</p>
+            <h3>Wochenplaner / Kalender</h3>
+            <p>Kompakte 7-Tage-Grafik mit 24h-Achse, Dragging und Popup-Datenerfassung.</p>
+          </div>
+          <div id="incomePlanningWeeklyPlanner" class="income-planning-weekly-planner"></div>
+        </section>
+        <section class="income-card income-planning-work-card">
+          <div class="income-section-head income-planning-card-head">
+            <div>
+              <h3>Zeitplanung fuer Arbeit und Nebentaetigkeiten</h3>
+              <p>Kompakte Uebersicht; Details und Slots werden per Popup gepflegt.</p>
+            </div>
+            <div class="button-row">
+              <button class="button" type="button" data-action="income-planning-add-work-block">Taetigkeit hinzufuegen</button>
+            </div>
+          </div>
+          <div id="incomePlanningWorkBlocks" class="income-planning-block-list"></div>
+        </section>
+        <section class="income-card income-planning-career-card">
+          <div class="income-section-head">
+            <h3>Berufsleben</h3>
+            <p>Aktive Gehalts- und Ausbildungsbloecke als berufliche Zeitbasis.</p>
+          </div>
+          <div id="incomePlanningCareerLife" class="income-planning-career-life"></div>
+        </section>
+        <section class="income-card income-planning-time-card">
+          <div class="income-section-head income-planning-card-head">
+            <div>
+              <h3>Zeitannahmen</h3>
+              <p>Schlaf sowie private Verpflichtungen, Freizeit, Puffer und sonstige Ereignisse.</p>
+            </div>
+            <button class="button secondary" type="button" data-action="income-planning-add-manual-block">Zeitblock hinzufuegen</button>
           </div>
           <div class="income-planning-time-block">
-            <div id="incomePlanningAssumptions" class="income-planning-assumptions"></div>
-            <div id="incomePlanningTimeCharts" class="income-planning-time-charts"></div>
+            <div class="income-planning-time-controls">
+              <div id="incomePlanningAssumptions" class="income-planning-assumptions"></div>
+              <div id="incomePlanningManualBlocks" class="income-planning-block-list"></div>
+            </div>
           </div>
         </section>
-        <section class="income-card income-planning-sources-card">
-          <div class="income-section-head">
-            <h3>Einkommensquellen</h3>
-            <p>Stunden, Einkommen, Status und Belastbarkeit je Quelle planen.</p>
+        <section class="income-card income-planning-habits-card">
+          <div class="income-section-head income-planning-card-head">
+            <div>
+              <h3>Habits</h3>
+              <p>Gute und schlechte Gewohnheiten als planbare Zeitbloecke erfassen.</p>
+            </div>
+            <button class="button" type="button" data-action="income-planning-add-habit">Habit hinzufuegen</button>
           </div>
-          <div id="incomePlanningSources" class="income-planning-source-list"></div>
+          <div id="incomePlanningHabits" class="income-planning-block-list"></div>
         </section>
-        <section class="income-card income-planning-scenarios-card">
-          <div class="income-section-head">
-            <h3>Ziel-Szenarien</h3>
-            <p>Automatische Schritte, Voraussetzungen und Risiken fuer aktive Quellen.</p>
-          </div>
-          <div id="incomePlanningScenarios" class="income-planning-scenarios"></div>
-        </section>
-        <div id="incomePlanningCategoryPicker" class="position-icon-picker income-year-label-picker income-planning-category-picker" role="dialog" aria-label="Kategorie auswaehlen" hidden></div>
+        <div id="incomePlanningDialogRoot"></div>
       </section>
 
       <section class="panel account-panel" data-module-section="planning_scenarios">

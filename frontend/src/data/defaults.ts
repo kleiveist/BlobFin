@@ -13,7 +13,11 @@ import type {
   ReservePosition,
   StatutoryPensionSettings
 } from "../types";
-import { buildIncomePlanningSource } from "../domain/incomePlanning";
+import {
+  buildIncomePlanningHabit,
+  buildIncomePlanningManualBlock,
+  buildIncomePlanningWorkBlock
+} from "../domain/incomePlanning";
 
 export const MONTHS = [
   "Januar",
@@ -385,18 +389,33 @@ export function defaultIncomeTrackerState(): IncomeTrackerState {
 }
 
 export function defaultIncomePlanningState(): IncomePlanningState {
-  const startYear = defaultPlanningSettings().year;
   return {
-    sources: [
-      buildIncomePlanningSource("salary", "income-plan-main-job", startYear),
-      buildIncomePlanningSource("online_sales", "income-plan-online-sales", startYear),
-      buildIncomePlanningSource("self_employed", "income-plan-self-employment", startYear)
+    workBlocks: [
+      buildIncomePlanningWorkBlock("salary", "income-plan-main-job"),
+      buildIncomePlanningWorkBlock("online_sales", "income-plan-online-sales"),
+      buildIncomePlanningWorkBlock("self_employed", "income-plan-self-employment")
+    ],
+    habits: [
+      buildIncomePlanningHabit("income-plan-book-reading"),
+      buildIncomePlanningHabit("income-plan-phone-in-bed", {
+        active: false,
+        type: "bad",
+        name: "Handy im Bett",
+        description: "Scrollen direkt vor dem Schlafen.",
+        timing: "vor dem Schlafen",
+        goalChange: "replace",
+        replacementHabit: "Buch lesen",
+        status: "difficult",
+        priority: "high"
+      })
+    ],
+    manualBlocks: [
+      buildIncomePlanningManualBlock("private_commitment", "income-plan-private-commitments"),
+      buildIncomePlanningManualBlock("free_time", "income-plan-free-time"),
+      buildIncomePlanningManualBlock("buffer", "income-plan-weekly-buffer")
     ],
     assumptions: {
-      sleepHoursPerDay: 7,
-      freeTimeHoursPerDay: 2,
-      privateCommitmentsHoursPerWeek: 12,
-      weeklyBufferHours: 8
+      sleepHoursPerDay: 7
     }
   };
 }

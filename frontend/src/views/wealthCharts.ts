@@ -282,7 +282,7 @@ export function renderCombinedWealthChart(input: CombinedWealthChartInput): stri
       selected: input.selectedYear === point.year,
       action: "select-combined-wealth-year",
       value: point.totalNetWealth,
-      valueLabel: input.formatMoney(point.totalNetWealth),
+      valueLabel: `${input.formatMoney(point.totalNetWealth)} Nettovermoegen`,
       barTotal:
         Math.max(0, point.cashValue) +
         Math.max(0, point.depotValue) +

@@ -2,17 +2,42 @@ import { INCOME_YEAR_LABEL_OPTIONS } from "./incomeLabels";
 import type {
   IncomePlanningAssumptions,
   IncomePlanningCategory,
-  IncomePlanningLevel,
-  IncomePlanningPhase,
-  IncomePlanningSource,
-  IncomePlanningSourceStatus,
-  IncomePlanningState
+  IncomePlanningHabit,
+  IncomePlanningHabitChange,
+  IncomePlanningHabitDurationUnit,
+  IncomePlanningHabitStatus,
+  IncomePlanningHabitType,
+  IncomePlanningManualBlock,
+  IncomePlanningManualBlockType,
+  IncomePlanningPriority,
+  IncomePlanningSlot,
+  IncomePlanningState,
+  IncomePlanningWeekday,
+  IncomePlanningWorkBlock
 } from "../types";
 
 export const INCOME_PLANNING_WEEK_HOURS = 168;
+export const INCOME_PLANNING_WEEK_MINUTES = INCOME_PLANNING_WEEK_HOURS * 60;
+export const INCOME_PLANNING_WEEK_DAYS: IncomePlanningWeekday[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday"
+];
 export const INCOME_PLANNING_CATEGORY_IDS: IncomePlanningCategory[] = INCOME_YEAR_LABEL_OPTIONS.map(
   (option) => option.id as IncomePlanningCategory
 );
+
+export interface IncomePlanningSlotTemplate {
+  day: IncomePlanningWeekday;
+  startTime: string;
+  endTime: string;
+  flexible: boolean;
+  durationMinutes: number;
+}
 
 export interface IncomePlanningCategoryConfig {
   id: IncomePlanningCategory;
@@ -20,345 +45,160 @@ export interface IncomePlanningCategoryConfig {
   icon: string;
   description: string;
   defaultName: string;
-  defaultHoursPerWeek: number;
-  defaultMonthlyIncome: number;
-  defaultPhase: IncomePlanningPhase;
-  defaultStatus: IncomePlanningSourceStatus;
-  risk: IncomePlanningLevel;
-  stability: IncomePlanningLevel;
-  scalability: IncomePlanningLevel;
-  goal: string;
-  steps: string[];
-  requirements: string[];
-  risks: string[];
+  defaultSlots: IncomePlanningSlotTemplate[];
 }
 
-export interface IncomePlanningScenario {
-  sourceId: string;
+export type IncomePlanningPlannerEntryType =
+  | "career"
+  | "side_work"
+  | "private_commitment"
+  | "free_time"
+  | "buffer"
+  | "good_habit"
+  | "bad_habit"
+  | "replacement_habit"
+  | "other_event";
+
+export interface IncomePlanningCalendarEntry {
+  id: string;
+  ownerId: string;
+  slotId: string;
+  day: IncomePlanningWeekday;
+  startTime: string;
+  endTime: string;
+  flexible: boolean;
+  durationMinutes: number;
   title: string;
-  goal: string;
-  hoursPerWeek: number;
-  monthlyIncome: number;
-  steps: string[];
-  requirements: string[];
-  risks: string[];
-  loadNote: string;
+  type: IncomePlanningPlannerEntryType;
+  conflict: boolean;
+  invalid: boolean;
+  startMinute: number;
+  endMinute: number;
 }
 
 export interface IncomePlanningModel {
-  activeSources: IncomePlanningSource[];
+  activeWorkBlocks: IncomePlanningWorkBlock[];
+  careerWorkBlocks: IncomePlanningWorkBlock[];
+  activeHabits: IncomePlanningHabit[];
+  activeManualBlocks: IncomePlanningManualBlock[];
+  calendarEntries: IncomePlanningCalendarEntry[];
   totalWorkHours: number;
-  totalMonthlyIncome: number;
+  habitHours: number;
+  manualHours: number;
   sleepHoursPerWeek: number;
-  freeTimeHoursPerWeek: number;
-  privateCommitmentsHoursPerWeek: number;
-  weeklyBufferHours: number;
-  fixedNeedHours: number;
   usedHours: number;
   remainingFlexibleHours: number;
+  conflictCount: number;
+  invalidSlotCount: number;
   status: "realistic" | "high" | "unrealistic";
   warnings: string[];
-  scenarios: IncomePlanningScenario[];
 }
 
-type IncomePlanningCategoryOverride = Partial<
-  Omit<IncomePlanningCategoryConfig, "id" | "label" | "icon" | "description">
->;
+type IncomePlanningCategoryOverride = Partial<Omit<IncomePlanningCategoryConfig, "id" | "label" | "icon" | "description">>;
+type CalendarEntryDraft = Omit<IncomePlanningCalendarEntry, "conflict">;
 
-const DEFAULT_CATEGORY_CONFIG: IncomePlanningCategoryOverride = {
-  defaultHoursPerWeek: 4,
-  defaultMonthlyIncome: 200,
-  defaultPhase: "idea",
-  defaultStatus: "planned",
-  risk: "medium",
-  stability: "medium",
-  scalability: "medium",
-  steps: ["Idee beschreiben", "Zeitbudget setzen", "Erwartbares Einkommen schaetzen", "Risiken pruefen"],
-  requirements: ["Konkrete Einkommensidee", "Realistische Testphase"],
-  risks: ["Unklare Annahmen", "Unterschaetzter Aufwand"]
+const INCOME_PLANNING_DAY_INDEX: Record<IncomePlanningWeekday, number> = {
+  monday: 0,
+  tuesday: 1,
+  wednesday: 2,
+  thursday: 3,
+  friday: 4,
+  saturday: 5,
+  sunday: 6
 };
+
+const DEFAULT_WORK_SLOTS: IncomePlanningSlotTemplate[] = [
+  flexibleSlot("sunday", 4 * 60)
+];
 
 const INCOME_PLANNING_CATEGORY_OVERRIDES: Partial<Record<IncomePlanningCategory, IncomePlanningCategoryOverride>> = {
   salary: {
     defaultName: "Gehalt",
-    defaultHoursPerWeek: 40,
-    defaultMonthlyIncome: 3200,
-    defaultPhase: "established",
-    defaultStatus: "active",
-    risk: "low",
-    stability: "high",
-    scalability: "low",
-    goal: "Bestehendes Haupteinkommen als Zeitbasis beruecksichtigen.",
-    steps: ["Arbeitszeit realistisch eintragen", "Pendeln und Nebenaufgaben pruefen", "Restzeit fuer Zusatzquellen begrenzen"],
-    requirements: ["Vertragliche Wochenarbeitszeit", "Belastbare Freizeitplanung"],
-    risks: ["Ueberplanung durch unterschaetzte Arbeitslast"]
+    defaultSlots: [
+      timedSlot("monday", "08:00", "16:00"),
+      timedSlot("tuesday", "08:00", "16:00"),
+      timedSlot("wednesday", "08:00", "16:00"),
+      timedSlot("thursday", "08:00", "16:00"),
+      timedSlot("friday", "08:00", "16:00")
+    ]
   },
   training_allowance: {
-    defaultHoursPerWeek: 35,
-    defaultMonthlyIncome: 900,
-    defaultPhase: "established",
-    defaultStatus: "active",
-    risk: "low",
-    stability: "medium",
-    scalability: "medium",
-    goal: "Ausbildung oder duales Studium mit realistischem Zeitbudget einplanen.",
-    steps: ["Wochenarbeitszeit und Schule/Studium addieren", "Lernzeiten einplanen", "Freie Zeit regelmaessig pruefen"],
-    requirements: ["Ausbildungs- oder Studienplan", "Zeit fuer Lernen und Erholung"],
-    risks: ["Doppelbelastung aus Arbeit und Lernphasen"]
+    defaultName: "Ausbildung",
+    defaultSlots: [
+      timedSlot("monday", "08:00", "15:00"),
+      timedSlot("tuesday", "08:00", "15:00"),
+      timedSlot("wednesday", "08:00", "15:00"),
+      timedSlot("thursday", "08:00", "15:00"),
+      timedSlot("friday", "08:00", "15:00")
+    ]
   },
   minijob: {
-    defaultHoursPerWeek: 8,
-    defaultMonthlyIncome: 538,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
-    risk: "low",
-    stability: "medium",
-    scalability: "low",
-    goal: "Begrenztes Zusatzeinkommen mit klarer Stundenobergrenze planen.",
-    steps: ["Geeignete Stelle finden", "Monatliche Grenze pruefen", "Arbeitszeiten mit Hauptjob abgleichen"],
-    requirements: ["Regelmaessige freie Zeitfenster", "Abstimmung mit bestehender Arbeit"],
-    risks: ["Dauerhafte Wochenend- oder Abendbelastung"]
-  },
-  pocket_money: {
-    defaultHoursPerWeek: 0.5,
-    defaultMonthlyIncome: 50,
-    defaultPhase: "established",
-    defaultStatus: "active",
-    risk: "low",
-    stability: "medium",
-    scalability: "low",
-    goal: "Kleine regelmaessige Einnahme ohne relevante Arbeitslast beruecksichtigen.",
-    steps: ["Betrag festhalten", "Regelmaessigkeit pruefen", "Nicht als Arbeitszeit ueberplanen"],
-    requirements: ["Verlaessliche Zahlung"],
-    risks: ["Kann kurzfristig wegfallen"]
+    defaultName: "Nebenjob",
+    defaultSlots: [timedSlot("saturday", "10:00", "14:00"), timedSlot("sunday", "10:00", "14:00")]
   },
   self_employed: {
-    defaultName: "Nebenberufliche Selbststaendigkeit",
-    defaultHoursPerWeek: 8,
-    defaultMonthlyIncome: 600,
-    defaultPhase: "idea",
-    defaultStatus: "planned",
-    risk: "high",
-    stability: "low",
-    scalability: "high",
-    goal: "Nebenberufliche Selbststaendigkeit starten und langfristig etablieren.",
-    steps: ["Geschaeftsidee definieren", "Zeitbudget festlegen", "Einnahmen und Kosten planen", "Erste Kunden gewinnen", "Steuerliche und rechtliche Rahmenbedingungen pruefen"],
-    requirements: ["Klare Leistung oder Produktidee", "Zeit fuer Akquise", "Grundkenntnisse zu Abrechnung und Steuern"],
-    risks: ["Unklare Nachfrage", "Unterschaetzter Akquiseaufwand", "Schwankende Einnahmen"]
+    defaultName: "Selbststaendigkeit",
+    defaultSlots: [
+      timedSlot("tuesday", "18:00", "20:00"),
+      timedSlot("thursday", "18:00", "20:00"),
+      timedSlot("saturday", "10:00", "14:00")
+    ]
   },
   freelance: {
-    defaultHoursPerWeek: 6,
-    defaultMonthlyIncome: 500,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "low",
-    scalability: "medium",
-    goal: "Freiberufliche oder projektbezogene Einkuenfte planbar aufbauen.",
-    steps: ["Angebot definieren", "Honorar und Aufwand schaetzen", "Akquiseweg festlegen", "Kapazitaet blocken"],
-    requirements: ["Projektfaehige Kompetenzen", "Klare Verfuegbarkeit"],
-    risks: ["Projektspitzen", "Leerlauf zwischen Projekten"]
+    defaultName: "Freiberufliche Arbeit",
+    defaultSlots: [timedSlot("tuesday", "18:00", "21:00"), timedSlot("thursday", "18:00", "21:00")]
   },
   side_income: {
-    defaultHoursPerWeek: 4,
-    defaultMonthlyIncome: 250,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "medium",
-    scalability: "medium",
-    goal: "Weitere laufende Nebeneinkuenfte mit begrenzter Zusatzlast pruefen.",
-    steps: ["Quelle konkretisieren", "Regelmaessige Wochenstunden setzen", "Einnahmen monatlich plausibilisieren"],
-    requirements: ["Freie Zeitfenster", "Klare Einkommensannahme"],
-    risks: ["Unterschaetzter Zusatzaufwand"]
+    defaultName: "Nebentaetigkeit",
+    defaultSlots: [timedSlot("monday", "18:00", "20:00"), timedSlot("wednesday", "18:00", "20:00")]
   },
   online_sales: {
     defaultName: "Online-Verkaeufe",
-    defaultHoursPerWeek: 3,
-    defaultMonthlyIncome: 150,
-    defaultPhase: "setup",
-    defaultStatus: "active",
-    risk: "low",
-    stability: "low",
-    scalability: "medium",
-    goal: "Kleine Zusatzverkaeufe mit geringem Wochenaufwand realistisch planen.",
-    steps: ["Verkaufsplattform auswaehlen", "Artikel und Preise festlegen", "Versandprozess standardisieren", "Zeitaufwand je Verkauf messen"],
-    requirements: ["Verkaufbare Artikel", "Klare Versand- und Zahlungsabwicklung"],
-    risks: ["Zeitverlust durch Einzelabwicklung", "Unregelmaessige Nachfrage"]
+    defaultSlots: [
+      timedSlot("monday", "18:00", "19:00"),
+      timedSlot("wednesday", "18:00", "19:00"),
+      timedSlot("friday", "18:00", "19:00")
+    ]
   },
   garage_parking_rental: {
-    defaultHoursPerWeek: 1,
-    defaultMonthlyIncome: 120,
-    defaultPhase: "established",
-    defaultStatus: "planned",
-    risk: "low",
-    stability: "high",
-    scalability: "low",
-    goal: "Garage oder Stellplatz als zeitarmes Zusatzeinkommen einplanen.",
-    steps: ["Vermietbarkeit pruefen", "Preis und Nebenkosten klaeren", "Verwaltungsaufwand eintragen"],
-    requirements: ["Vermietbarer Stellplatz", "Klare Nutzungsbedingungen"],
-    risks: ["Leerstand", "Kleiner Verwaltungsaufwand"]
-  },
-  fees: {
-    defaultHoursPerWeek: 4,
-    defaultMonthlyIncome: 300,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "low",
-    scalability: "medium",
-    goal: "Gagen oder Honorare mit schwankender Auslastung planen.",
-    steps: ["Angebot oder Auftrittsformat festlegen", "Termine und Vorbereitung schaetzen", "Mindesthonorar definieren"],
-    requirements: ["Buchbare Leistung", "Zeit fuer Vorbereitung"],
-    risks: ["Unregelmaessige Termine", "Vorbereitungsaufwand"]
+    defaultName: "Verwaltung Stellplatz",
+    defaultSlots: [flexibleSlot("sunday", 60)]
   },
   dividends: {
-    defaultHoursPerWeek: 0.5,
-    defaultMonthlyIncome: 100,
-    defaultPhase: "growth",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "medium",
-    scalability: "high",
-    goal: "Dividenden als zeitarmes Zusatzeinkommen aufbauen.",
-    steps: ["Investitionsstrategie definieren", "Risikoprofil festlegen", "Regelmaessige Ueberpruefung planen"],
-    requirements: ["Investierbares Kapital", "Risikobewusstsein"],
-    risks: ["Kursschwankungen", "Keine garantierten Ausschuettungen"]
+    defaultName: "Investmentpflege",
+    defaultSlots: [flexibleSlot("sunday", 30)]
   },
   asset_income: {
-    defaultHoursPerWeek: 1,
-    defaultMonthlyIncome: 150,
-    defaultPhase: "growth",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "medium",
-    scalability: "high",
-    goal: "Einnahmen aus Vermoegen mit geringem Wochenaufwand bewerten.",
-    steps: ["Vermoegensquelle bestimmen", "Erwartbaren Cashflow schaetzen", "Risiko und Liquiditaet pruefen"],
-    requirements: ["Bestehendes oder geplantes Vermoegen", "Risikoprofil"],
-    risks: ["Schwankende Ertraege", "Kapitalbindung"]
-  },
-  insurance_payouts: {
-    defaultHoursPerWeek: 0.5,
-    defaultMonthlyIncome: 200,
-    defaultPhase: "idea",
-    defaultStatus: "planned",
-    risk: "low",
-    stability: "low",
-    scalability: "low",
-    goal: "Versicherungsauszahlungen als moegliche, nicht dauerhaft skalierbare Einnahme beruecksichtigen.",
-    steps: ["Anspruch und Zeitpunkt klaeren", "Einmaligkeit dokumentieren", "Keine dauerhafte Arbeitszeit verplanen"],
-    requirements: ["Konkreter Auszahlungsanspruch"],
-    risks: ["Einmalige Zahlung", "Unsicherer Zeitpunkt"]
+    defaultName: "Vermoegensverwaltung",
+    defaultSlots: [flexibleSlot("sunday", 60)]
   },
   bonus: {
-    defaultHoursPerWeek: 0,
-    defaultMonthlyIncome: 300,
-    defaultPhase: "idea",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "low",
-    scalability: "low",
-    goal: "Sonderzahlungen konservativ in die Einkommensplanung aufnehmen.",
-    steps: ["Bedingungen pruefen", "Wahrscheinlichkeit einschaetzen", "Nicht als dauerhafte Arbeitszeit planen"],
-    requirements: ["Konkrete Zusage oder Zielregel"],
-    risks: ["Nicht garantierte Zahlung"]
+    defaultName: "Sonderaufgabe",
+    defaultSlots: []
   },
   severance_payment: {
-    defaultHoursPerWeek: 0,
-    defaultMonthlyIncome: 0,
-    defaultPhase: "idea",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "low",
-    scalability: "low",
-    goal: "Abfindung oder Ausgleichszahlung als einmaliges Szenario pruefen.",
-    steps: ["Anspruch und Zeitpunkt klaeren", "Steuerliche Wirkung separat pruefen", "Einmaligen Charakter beruecksichtigen"],
-    requirements: ["Konkreter Auszahlungsgrund", "Dokumentierte Annahme"],
-    risks: ["Unsicherer Betrag", "Einmalige Zahlung"]
-  },
-  volunteer_allowance: {
-    defaultHoursPerWeek: 3,
-    defaultMonthlyIncome: 200,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
-    risk: "low",
-    stability: "medium",
-    scalability: "low",
-    goal: "Ehrenamtliche Verguetung mit festen Terminen realistisch planen.",
-    steps: ["Passende Organisation finden", "Zeitfenster festlegen", "Pauschalen und Nachweise pruefen"],
-    requirements: ["Regelmaessige freie Zeit", "Organisation oder Verein"],
-    risks: ["Feste Termine", "Begrenzte Skalierbarkeit"]
-  },
-  trainer_allowance: {
-    defaultHoursPerWeek: 4,
-    defaultMonthlyIncome: 250,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
-    risk: "low",
-    stability: "medium",
-    scalability: "low",
-    goal: "Uebungsleiter-Taetigkeit mit sozialem oder fachlichem Bezug planen.",
-    steps: ["Passende Organisation finden", "Zeitfenster festlegen", "Pauschalen und Nachweise pruefen"],
-    requirements: ["Qualifikation oder Erfahrung", "Regelmaessige freie Zeit"],
-    risks: ["Feste Termine", "Begrenzte Skalierbarkeit"]
+    defaultName: "Uebergangsplanung",
+    defaultSlots: [flexibleSlot("sunday", 60)]
   },
   child_youth_jobs: {
-    defaultHoursPerWeek: 4,
-    defaultMonthlyIncome: 200,
-    defaultPhase: "setup",
-    defaultStatus: "planned",
-    risk: "low",
-    stability: "medium",
-    scalability: "low",
-    goal: "Kinder- oder Jugendjob mit begrenztem Wochenaufwand planen.",
-    steps: ["Erlaubte Taetigkeit klaeren", "Schule und Freizeit schuetzen", "Arbeitszeiten begrenzen"],
-    requirements: ["Altersgerechte Taetigkeit", "Freie Zeitfenster"],
-    risks: ["Belastung neben Schule oder Ausbildung"]
+    defaultName: "Kinder- oder Jugendjob",
+    defaultSlots: [timedSlot("saturday", "10:00", "12:00")]
   },
   board: {
-    defaultHoursPerWeek: 3,
-    defaultMonthlyIncome: 500,
-    defaultPhase: "idea",
-    defaultStatus: "planned",
-    risk: "high",
-    stability: "medium",
-    scalability: "medium",
-    goal: "Langfristig eine verguetete Vorstandsrolle erreichen.",
-    steps: ["Fachliches Profil schaerfen", "Berufserfahrung dokumentieren", "Netzwerk aufbauen", "Sichtbarkeit erhoehen", "Passende Organisationen identifizieren"],
-    requirements: ["Nachweisbares Profil", "Relevantes Netzwerk", "Strategische Positionierung"],
-    risks: ["Langer Aufbauzeitraum", "Hohe Verantwortung"]
+    defaultName: "Beirat",
+    defaultSlots: [flexibleSlot("wednesday", 2 * 60)]
   },
   office_holder: {
-    defaultHoursPerWeek: 3,
-    defaultMonthlyIncome: 300,
-    defaultPhase: "idea",
-    defaultStatus: "planned",
-    risk: "medium",
-    stability: "medium",
-    scalability: "low",
-    goal: "Verguetetes Amt oder Mandat mit realistischem Zeitbudget pruefen.",
-    steps: ["Passendes Amt identifizieren", "Voraussetzungen klaeren", "Regeltermine einplanen"],
-    requirements: ["Eignung oder Wahl/Benennung", "Zeit fuer Termine"],
-    risks: ["Feste Verpflichtungen", "Begrenzte Skalierbarkeit"]
+    defaultName: "Amt",
+    defaultSlots: [flexibleSlot("wednesday", 2 * 60)]
   },
   supervisory_board: {
     defaultName: "Aufsichtsrat",
-    defaultHoursPerWeek: 3,
-    defaultMonthlyIncome: 500,
-    defaultPhase: "idea",
-    defaultStatus: "planned",
-    risk: "high",
-    stability: "medium",
-    scalability: "medium",
-    goal: "Langfristig eine verguetete Position in einem Aufsichtsrat erreichen.",
-    steps: ["Fachliches Profil schaerfen", "Berufserfahrung dokumentieren", "Netzwerk aufbauen", "Sichtbarkeit erhoehen", "Passende Branchen identifizieren"],
-    requirements: ["Nachweisbares Profil", "Relevantes Netzwerk", "Strategische Positionierung"],
-    risks: ["Langer Aufbauzeitraum", "Abhaengigkeit von Empfehlungen", "Hohe Verantwortung"]
+    defaultSlots: [flexibleSlot("wednesday", 2 * 60)]
   },
   other: {
-    defaultName: "Sonstiges Einkommen",
-    goal: "Weitere Einkommensidee strukturiert pruefen."
+    defaultName: "Sonstige Arbeit",
+    defaultSlots: DEFAULT_WORK_SLOTS
   }
 };
 
@@ -370,150 +210,405 @@ export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = 
       label: option.label,
       icon: option.icon,
       description: option.description,
-      defaultName: overrides.defaultName ?? option.label,
-      defaultHoursPerWeek: overrides.defaultHoursPerWeek ?? DEFAULT_CATEGORY_CONFIG.defaultHoursPerWeek ?? 4,
-      defaultMonthlyIncome: overrides.defaultMonthlyIncome ?? DEFAULT_CATEGORY_CONFIG.defaultMonthlyIncome ?? 200,
-      defaultPhase: overrides.defaultPhase ?? DEFAULT_CATEGORY_CONFIG.defaultPhase ?? "idea",
-      defaultStatus: overrides.defaultStatus ?? DEFAULT_CATEGORY_CONFIG.defaultStatus ?? "planned",
-      risk: overrides.risk ?? DEFAULT_CATEGORY_CONFIG.risk ?? "medium",
-      stability: overrides.stability ?? DEFAULT_CATEGORY_CONFIG.stability ?? "medium",
-      scalability: overrides.scalability ?? DEFAULT_CATEGORY_CONFIG.scalability ?? "medium",
-      goal: overrides.goal ?? `${option.label} als Einkommensquelle realistisch pruefen.`,
-      steps: overrides.steps ?? DEFAULT_CATEGORY_CONFIG.steps ?? [],
-      requirements: overrides.requirements ?? DEFAULT_CATEGORY_CONFIG.requirements ?? [],
-      risks: overrides.risks ?? DEFAULT_CATEGORY_CONFIG.risks ?? []
+      defaultName: overrides.defaultName ?? `${option.label} planen`,
+      defaultSlots: overrides.defaultSlots ?? DEFAULT_WORK_SLOTS
     };
   }
 );
 
 export function incomePlanningCategoryConfig(category: IncomePlanningCategory): IncomePlanningCategoryConfig {
-  return (
-    INCOME_PLANNING_CATEGORY_CONFIGS.find((config) => config.id === category) ??
-    INCOME_PLANNING_CATEGORY_CONFIGS[INCOME_PLANNING_CATEGORY_CONFIGS.length - 1]
-  );
+  return INCOME_PLANNING_CATEGORY_CONFIGS.find((config) => config.id === category) ?? INCOME_PLANNING_CATEGORY_CONFIGS[0];
 }
 
-export function buildIncomePlanningSource(
+export function buildIncomePlanningWorkBlock(
   category: IncomePlanningCategory,
   id: string,
-  startYear: number,
-  overrides: Partial<IncomePlanningSource> = {}
-): IncomePlanningSource {
+  overrides: Partial<IncomePlanningWorkBlock> = {}
+): IncomePlanningWorkBlock {
   const config = incomePlanningCategoryConfig(category);
+  const slots = overrides.slots ?? slotsFromTemplates(id, config.defaultSlots);
   return {
     id,
     active: true,
     category,
     name: config.defaultName,
-    hoursPerWeek: config.defaultHoursPerWeek,
-    expectedMonthlyIncome: config.defaultMonthlyIncome,
-    startMonth: 1,
-    startYear,
-    phase: config.defaultPhase,
-    status: config.defaultStatus,
-    risk: config.risk,
-    stability: config.stability,
-    scalability: config.scalability,
+    description: "",
+    slots,
+    ...overrides
+  };
+}
+
+export function buildIncomePlanningHabit(
+  id: string,
+  overrides: Partial<IncomePlanningHabit> = {}
+): IncomePlanningHabit {
+  const durationMinutes = overrides.durationMinutes ?? 30;
+  const durationUnit = overrides.durationUnit ?? "day";
+  const slots = overrides.slots ?? dailyHabitSlots(id, durationMinutes, "21:30");
+  return {
+    id,
+    active: true,
+    type: "good",
+    name: "Buch lesen",
+    description: "",
+    timing: "vor dem Schlafen",
+    durationMinutes,
+    durationUnit,
+    goalChange: "build",
+    replacementHabit: "",
+    status: "planned",
+    priority: "medium",
+    slots,
+    ...overrides
+  };
+}
+
+export function buildIncomePlanningManualBlock(
+  type: IncomePlanningManualBlockType,
+  id: string,
+  overrides: Partial<IncomePlanningManualBlock> = {}
+): IncomePlanningManualBlock {
+  const config = manualBlockDefaults(type);
+  const slots = overrides.slots ?? config.slots;
+  return {
+    id,
+    active: true,
+    type,
+    name: config.name,
+    description: "",
+    slots,
     ...overrides
   };
 }
 
 export function buildIncomePlanningModel(state: IncomePlanningState): IncomePlanningModel {
-  const activeSources = state.sources.filter((source) => source.active);
-  const totalWorkHours = roundHours(activeSources.reduce((sum, source) => sum + positiveNumber(source.hoursPerWeek), 0));
-  const totalMonthlyIncome = activeSources.reduce(
-    (sum, source) => sum + positiveNumber(source.expectedMonthlyIncome),
-    0
-  );
-  const sleepHoursPerWeek = roundHours(positiveNumber(state.assumptions.sleepHoursPerDay) * 7);
-  const freeTimeHoursPerWeek = roundHours(positiveNumber(state.assumptions.freeTimeHoursPerDay) * 7);
-  const privateCommitmentsHoursPerWeek = roundHours(positiveNumber(state.assumptions.privateCommitmentsHoursPerWeek));
-  const weeklyBufferHours = roundHours(positiveNumber(state.assumptions.weeklyBufferHours));
-  const fixedNeedHours = roundHours(
-    sleepHoursPerWeek + freeTimeHoursPerWeek + privateCommitmentsHoursPerWeek + weeklyBufferHours
-  );
-  const usedHours = roundHours(totalWorkHours + fixedNeedHours);
-  const remainingFlexibleHours = roundHours(INCOME_PLANNING_WEEK_HOURS - usedHours);
+  const activeWorkBlocks = state.workBlocks.filter((block) => block.active);
+  const careerWorkBlocks = activeWorkBlocks.filter((block) => isCareerCategory(block.category));
+  const activeHabits = state.habits.filter((habit) => habit.active);
+  const activeManualBlocks = state.manualBlocks.filter((block) => block.active);
+  const drafts = [
+    ...activeWorkBlocks.flatMap(workBlockCalendarEntries),
+    ...activeHabits.flatMap(habitCalendarEntries),
+    ...activeManualBlocks.flatMap(manualBlockCalendarEntries)
+  ];
+  const conflictResult = detectConflicts(drafts);
+  const calendarEntries = drafts
+    .map((entry) => ({ ...entry, conflict: conflictResult.entryIds.has(entry.id) }))
+    .sort(compareCalendarEntries);
+
+  const totalWorkMinutes = sumEntryMinutes(calendarEntries, ["career", "side_work"]);
+  const habitMinutes = sumEntryMinutes(calendarEntries, ["good_habit", "bad_habit", "replacement_habit"]);
+  const manualMinutes = sumEntryMinutes(calendarEntries, ["private_commitment", "free_time", "buffer", "other_event"]);
+  const sleepMinutes = Math.round(positiveNumber(state.assumptions.sleepHoursPerDay) * 7 * 60);
+  const usedMinutes = sleepMinutes + totalWorkMinutes + habitMinutes + manualMinutes;
+  const remainingMinutes = INCOME_PLANNING_WEEK_MINUTES - usedMinutes;
+  const nonSleepMinutes = usedMinutes - sleepMinutes;
+  const totalWorkHours = minutesToHours(totalWorkMinutes);
+  const usedHours = minutesToHours(usedMinutes);
+  const remainingFlexibleHours = minutesToHours(remainingMinutes);
   const status =
-    remainingFlexibleHours < 0 || totalWorkHours > 65
+    remainingMinutes < 0 || nonSleepMinutes > 90 * 60
       ? "unrealistic"
-      : remainingFlexibleHours < 10 || totalWorkHours > 55
+      : remainingMinutes < 10 * 60 || totalWorkMinutes > 55 * 60 || conflictResult.count > 0
         ? "high"
         : "realistic";
+  const invalidSlotCount = calendarEntries.filter((entry) => entry.invalid).length;
 
   return {
-    activeSources,
+    activeWorkBlocks,
+    careerWorkBlocks,
+    activeHabits,
+    activeManualBlocks,
+    calendarEntries,
     totalWorkHours,
-    totalMonthlyIncome,
-    sleepHoursPerWeek,
-    freeTimeHoursPerWeek,
-    privateCommitmentsHoursPerWeek,
-    weeklyBufferHours,
-    fixedNeedHours,
+    habitHours: minutesToHours(habitMinutes),
+    manualHours: minutesToHours(manualMinutes),
+    sleepHoursPerWeek: minutesToHours(sleepMinutes),
     usedHours,
     remainingFlexibleHours,
+    conflictCount: conflictResult.count,
+    invalidSlotCount,
     status,
-    warnings: incomePlanningWarnings(state, status, totalWorkHours, remainingFlexibleHours),
-    scenarios: activeSources.map((source) => incomePlanningScenario(source, status))
+    warnings: incomePlanningWarnings({
+      sleepHoursPerDay: state.assumptions.sleepHoursPerDay,
+      status,
+      remainingMinutes,
+      totalWorkMinutes,
+      nonSleepMinutes,
+      conflictCount: conflictResult.count,
+      invalidSlotCount
+    })
   };
 }
 
-function incomePlanningScenario(source: IncomePlanningSource, status: IncomePlanningModel["status"]): IncomePlanningScenario {
-  const config = incomePlanningCategoryConfig(source.category);
-  const loadNote =
-    status === "unrealistic"
-      ? "Diese Quelle sollte erst nach Entlastung oder Reduktion anderer Quellen eingeplant werden."
-      : status === "high"
-        ? "Diese Quelle ist moeglich, erhoeht aber die Wochenbelastung deutlich."
-        : "Diese Quelle passt in die aktuelle Zeitplanung.";
+function workBlockCalendarEntries(block: IncomePlanningWorkBlock): CalendarEntryDraft[] {
+  const type: IncomePlanningPlannerEntryType = isCareerCategory(block.category) ? "career" : "side_work";
+  return block.slots.map((slot) => calendarEntryFromSlot(block.id, slot, block.name, type));
+}
+
+function habitCalendarEntries(habit: IncomePlanningHabit): CalendarEntryDraft[] {
+  const slots = habit.slots.length ? habit.slots : habitFallbackSlots(habit);
+  const ownType: IncomePlanningPlannerEntryType = habit.type === "good" ? "good_habit" : "bad_habit";
+  const entries = slots.map((slot) => calendarEntryFromSlot(habit.id, slot, habit.name, ownType));
+  if (habit.type === "bad" && habit.goalChange === "replace" && habit.replacementHabit.trim()) {
+    entries.push(
+      ...slots.map((slot) =>
+        calendarEntryFromSlot(habit.id, slot, habit.replacementHabit.trim(), "replacement_habit", `${habit.id}:replacement`)
+      )
+    );
+  }
+  return entries;
+}
+
+function manualBlockCalendarEntries(block: IncomePlanningManualBlock): CalendarEntryDraft[] {
+  return block.slots.map((slot) => calendarEntryFromSlot(block.id, slot, block.name, plannerTypeForManualBlock(block.type)));
+}
+
+function calendarEntryFromSlot(
+  ownerId: string,
+  slot: IncomePlanningSlot,
+  title: string,
+  type: IncomePlanningPlannerEntryType,
+  idPrefix = ownerId
+): CalendarEntryDraft {
+  const startMinute = parseTimeMinutes(slot.startTime);
+  const endMinute = parseTimeMinutes(slot.endTime);
+  const invalid = !slot.flexible && (startMinute === null || endMinute === null || endMinute <= startMinute);
   return {
-    sourceId: source.id,
-    title: `Szenario: ${source.name || config.label}`,
-    goal: config.goal,
-    hoursPerWeek: positiveNumber(source.hoursPerWeek),
-    monthlyIncome: positiveNumber(source.expectedMonthlyIncome),
-    steps: config.steps,
-    requirements: config.requirements,
-    risks: config.risks,
-    loadNote
+    id: `${idPrefix}:${slot.id}:${type}`,
+    ownerId,
+    slotId: slot.id,
+    day: slot.day,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    flexible: slot.flexible,
+    durationMinutes: slotDurationMinutes(slot),
+    title,
+    type,
+    invalid,
+    startMinute: startMinute ?? 0,
+    endMinute: endMinute ?? 0
   };
 }
 
-function incomePlanningWarnings(
-  state: IncomePlanningState,
-  status: IncomePlanningModel["status"],
-  totalWorkHours: number,
-  remainingFlexibleHours: number
-): string[] {
+function slotDurationMinutes(slot: IncomePlanningSlot): number {
+  if (slot.flexible) return Math.max(0, Math.round(slot.durationMinutes));
+  const start = parseTimeMinutes(slot.startTime);
+  const end = parseTimeMinutes(slot.endTime);
+  if (start !== null && end !== null && end > start) return end - start;
+  return Math.max(0, Math.round(slot.durationMinutes));
+}
+
+function habitFallbackSlots(habit: IncomePlanningHabit): IncomePlanningSlot[] {
+  if (habit.durationUnit === "day") {
+    return INCOME_PLANNING_WEEK_DAYS.map((day, index) => ({
+      id: `${habit.id}-fallback-${index + 1}`,
+      day,
+      startTime: "00:00",
+      endTime: "00:00",
+      flexible: true,
+      durationMinutes: Math.max(0, Math.round(habit.durationMinutes))
+    }));
+  }
+  return [
+    {
+      id: `${habit.id}-fallback-week`,
+      day: "sunday",
+      startTime: "00:00",
+      endTime: "00:00",
+      flexible: true,
+      durationMinutes: Math.max(0, Math.round(habit.durationMinutes))
+    }
+  ];
+}
+
+function detectConflicts(entries: CalendarEntryDraft[]): { entryIds: Set<string>; count: number } {
+  const entryIds = new Set<string>();
+  let count = 0;
+  const timedEntries = entries.filter((entry) => !entry.flexible && !entry.invalid);
+  for (let index = 0; index < timedEntries.length; index += 1) {
+    for (let nextIndex = index + 1; nextIndex < timedEntries.length; nextIndex += 1) {
+      const first = timedEntries[index];
+      const second = timedEntries[nextIndex];
+      if (first.day !== second.day) continue;
+      if (first.startMinute < second.endMinute && second.startMinute < first.endMinute) {
+        entryIds.add(first.id);
+        entryIds.add(second.id);
+        count += 1;
+      }
+    }
+  }
+  return { entryIds, count };
+}
+
+function incomePlanningWarnings(input: {
+  sleepHoursPerDay: number;
+  status: IncomePlanningModel["status"];
+  remainingMinutes: number;
+  totalWorkMinutes: number;
+  nonSleepMinutes: number;
+  conflictCount: number;
+  invalidSlotCount: number;
+}): string[] {
   const warnings: string[] = [];
-  if (positiveNumber(state.assumptions.sleepHoursPerDay) < 7) {
+  if (positiveNumber(input.sleepHoursPerDay) < 7) {
     warnings.push("Die Schlafannahme liegt unter 7 Stunden pro Tag.");
   }
-  if (positiveNumber(state.assumptions.freeTimeHoursPerDay) < 2) {
-    warnings.push("Die freie Zeit liegt unter 2 Stunden pro Tag.");
+  if (input.invalidSlotCount > 0) {
+    warnings.push(`${input.invalidSlotCount} Zeitblock-Eintrag ist ungueltig oder laeuft ueber Mitternacht.`);
   }
-  if (positiveNumber(state.assumptions.weeklyBufferHours) < 5) {
-    warnings.push("Der Wochenpuffer liegt unter 5 Stunden.");
+  if (input.conflictCount > 0) {
+    warnings.push(`${input.conflictCount} Ueberschneidung im Wochenplaner ist markiert.`);
   }
-  if (status === "unrealistic") {
-    warnings.push(
-      "Die geplante Kombination wirkt zeitlich unrealistisch. Es bleibt zu wenig Freizeit oder Erholungszeit uebrig."
-    );
-  } else if (status === "high") {
-    warnings.push(
-      "Deine Wochenbelastung ist sehr hoch. Pruefe, ob diese Einkommensquellen dauerhaft parallel machbar sind."
-    );
+  if (input.remainingMinutes < 0) {
+    warnings.push("Die geplante Woche ist ueberbucht. Es bleibt keine freie Reserve uebrig.");
+  } else if (input.status === "high") {
+    warnings.push("Die Wochenbelastung ist sehr hoch. Pruefe Arbeit, Habits und Puffer gemeinsam.");
   }
-  if (totalWorkHours > 55 && remainingFlexibleHours >= 0) {
+  if (input.totalWorkMinutes > 55 * 60) {
     warnings.push("Die reine Arbeitszeit liegt ueber 55 Stunden pro Woche.");
   }
+  if (input.nonSleepMinutes > 90 * 60) {
+    warnings.push("Neben Schlaf sind mehr als 90 Stunden verplant.");
+  }
   return warnings;
+}
+
+function sumEntryMinutes(entries: IncomePlanningCalendarEntry[], types: IncomePlanningPlannerEntryType[]): number {
+  return entries.reduce((sum, entry) => (types.includes(entry.type) ? sum + entry.durationMinutes : sum), 0);
+}
+
+function plannerTypeForManualBlock(type: IncomePlanningManualBlockType): IncomePlanningPlannerEntryType {
+  if (type === "private_commitment") return "private_commitment";
+  if (type === "free_time") return "free_time";
+  if (type === "buffer") return "buffer";
+  return "other_event";
+}
+
+function isCareerCategory(category: IncomePlanningCategory): boolean {
+  return category === "salary" || category === "training_allowance";
+}
+
+function compareCalendarEntries(first: IncomePlanningCalendarEntry, second: IncomePlanningCalendarEntry): number {
+  const dayDiff = INCOME_PLANNING_DAY_INDEX[first.day] - INCOME_PLANNING_DAY_INDEX[second.day];
+  if (dayDiff !== 0) return dayDiff;
+  if (first.flexible !== second.flexible) return first.flexible ? 1 : -1;
+  const timeDiff = first.startMinute - second.startMinute;
+  if (timeDiff !== 0) return timeDiff;
+  return first.title.localeCompare(second.title, "de");
+}
+
+function slotsFromTemplates(ownerId: string, templates: IncomePlanningSlotTemplate[]): IncomePlanningSlot[] {
+  return templates.map((slot, index) => ({
+    id: `${ownerId}-slot-${index + 1}`,
+    ...slot
+  }));
+}
+
+function dailyHabitSlots(ownerId: string, durationMinutes: number, startTime: string): IncomePlanningSlot[] {
+  const startMinutes = parseTimeMinutes(startTime) ?? 0;
+  const endTime = formatTimeMinutes(Math.min(23 * 60 + 59, startMinutes + durationMinutes));
+  return INCOME_PLANNING_WEEK_DAYS.map((day, index) => ({
+    id: `${ownerId}-slot-${index + 1}`,
+    day,
+    startTime,
+    endTime,
+    flexible: false,
+    durationMinutes
+  }));
+}
+
+function manualBlockDefaults(type: IncomePlanningManualBlockType): { name: string; slots: IncomePlanningSlot[] } {
+  if (type === "private_commitment") {
+    return { name: "Private Verpflichtungen", slots: [slot("manual-private-slot", flexibleSlot("sunday", 12 * 60))] };
+  }
+  if (type === "free_time") {
+    return { name: "Freizeit", slots: [slot("manual-free-time-slot", flexibleSlot("sunday", 14 * 60))] };
+  }
+  if (type === "buffer") {
+    return { name: "Wochenpuffer", slots: [slot("manual-buffer-slot", flexibleSlot("sunday", 8 * 60))] };
+  }
+  return { name: "Sonstiges Ereignis", slots: [slot("manual-other-slot", flexibleSlot("sunday", 60))] };
+}
+
+function timedSlot(day: IncomePlanningWeekday, startTime: string, endTime: string): IncomePlanningSlotTemplate {
+  const start = parseTimeMinutes(startTime) ?? 0;
+  const end = parseTimeMinutes(endTime) ?? start;
+  return {
+    day,
+    startTime,
+    endTime,
+    flexible: false,
+    durationMinutes: Math.max(0, end - start)
+  };
+}
+
+export function flexibleSlot(day: IncomePlanningWeekday, durationMinutes: number): IncomePlanningSlotTemplate {
+  return {
+    day,
+    startTime: "00:00",
+    endTime: "00:00",
+    flexible: true,
+    durationMinutes
+  };
+}
+
+export function slot(id: string, template: IncomePlanningSlotTemplate): IncomePlanningSlot {
+  return { id, ...template };
+}
+
+export function parseTimeMinutes(value: string): number | null {
+  const match = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function formatTimeMinutes(value: number): string {
+  const normalized = Math.max(0, Math.min(23 * 60 + 59, Math.round(value)));
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function minutesToHours(value: number): number {
+  return Math.round((value / 60 + Number.EPSILON) * 10) / 10;
 }
 
 function positiveNumber(value: number | null | undefined): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
-function roundHours(value: number): number {
-  return Math.round((value + Number.EPSILON) * 10) / 10;
+export function isIncomePlanningWeekday(value: unknown): value is IncomePlanningWeekday {
+  return INCOME_PLANNING_WEEK_DAYS.includes(value as IncomePlanningWeekday);
+}
+
+export function isIncomePlanningHabitType(value: unknown): value is IncomePlanningHabitType {
+  return value === "good" || value === "bad";
+}
+
+export function isIncomePlanningHabitChange(value: unknown): value is IncomePlanningHabitChange {
+  return value === "keep" || value === "reduce" || value === "replace" || value === "build";
+}
+
+export function isIncomePlanningHabitStatus(value: unknown): value is IncomePlanningHabitStatus {
+  return value === "planned" || value === "active" || value === "difficult" || value === "stable";
+}
+
+export function isIncomePlanningPriority(value: unknown): value is IncomePlanningPriority {
+  return value === "low" || value === "medium" || value === "high";
+}
+
+export function isIncomePlanningHabitDurationUnit(value: unknown): value is IncomePlanningHabitDurationUnit {
+  return value === "day" || value === "week";
+}
+
+export function isIncomePlanningManualBlockType(value: unknown): value is IncomePlanningManualBlockType {
+  return value === "private_commitment" || value === "free_time" || value === "buffer" || value === "other_event";
+}
+
+export function defaultIncomePlanningAssumptions(overrides: Partial<IncomePlanningAssumptions> = {}): IncomePlanningAssumptions {
+  return {
+    sleepHoursPerDay: 7,
+    ...overrides
+  };
 }

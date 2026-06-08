@@ -51,9 +51,20 @@ export type IncomePlanningCategory =
   | "office_holder"
   | "supervisory_board"
   | "other";
-export type IncomePlanningPhase = "idea" | "setup" | "growth" | "established";
-export type IncomePlanningSourceStatus = "idea" | "planned" | "active" | "paused";
-export type IncomePlanningLevel = "low" | "medium" | "high";
+export type IncomePlanningWeekday =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+export type IncomePlanningHabitType = "good" | "bad";
+export type IncomePlanningHabitChange = "keep" | "reduce" | "replace" | "build";
+export type IncomePlanningHabitStatus = "planned" | "active" | "difficult" | "stable";
+export type IncomePlanningPriority = "low" | "medium" | "high";
+export type IncomePlanningHabitDurationUnit = "day" | "week";
+export type IncomePlanningManualBlockType = "private_commitment" | "free_time" | "buffer" | "other_event";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -388,31 +399,57 @@ export interface IncomeTrackerState {
   settings: IncomeTrackerSettings;
 }
 
-export interface IncomePlanningSource {
+export interface IncomePlanningSlot {
+  id: string;
+  day: IncomePlanningWeekday;
+  startTime: string;
+  endTime: string;
+  flexible: boolean;
+  durationMinutes: number;
+}
+
+export interface IncomePlanningWorkBlock {
   id: string;
   active: boolean;
   category: IncomePlanningCategory;
   name: string;
-  hoursPerWeek: number;
-  expectedMonthlyIncome: number;
-  startMonth: number;
-  startYear: number;
-  phase: IncomePlanningPhase;
-  status: IncomePlanningSourceStatus;
-  risk: IncomePlanningLevel;
-  stability: IncomePlanningLevel;
-  scalability: IncomePlanningLevel;
+  description: string;
+  slots: IncomePlanningSlot[];
+}
+
+export interface IncomePlanningHabit {
+  id: string;
+  active: boolean;
+  type: IncomePlanningHabitType;
+  name: string;
+  description: string;
+  timing: string;
+  durationMinutes: number;
+  durationUnit: IncomePlanningHabitDurationUnit;
+  goalChange: IncomePlanningHabitChange;
+  replacementHabit: string;
+  status: IncomePlanningHabitStatus;
+  priority: IncomePlanningPriority;
+  slots: IncomePlanningSlot[];
+}
+
+export interface IncomePlanningManualBlock {
+  id: string;
+  active: boolean;
+  type: IncomePlanningManualBlockType;
+  name: string;
+  description: string;
+  slots: IncomePlanningSlot[];
 }
 
 export interface IncomePlanningAssumptions {
   sleepHoursPerDay: number;
-  freeTimeHoursPerDay: number;
-  privateCommitmentsHoursPerWeek: number;
-  weeklyBufferHours: number;
 }
 
 export interface IncomePlanningState {
-  sources: IncomePlanningSource[];
+  workBlocks: IncomePlanningWorkBlock[];
+  habits: IncomePlanningHabit[];
+  manualBlocks: IncomePlanningManualBlock[];
   assumptions: IncomePlanningAssumptions;
 }
 

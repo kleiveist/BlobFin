@@ -3,61 +3,139 @@ import { describe, expect, it } from "vitest";
 import { defaultIncomePlanningState } from "../data/defaults";
 import { INCOME_YEAR_LABEL_OPTIONS } from "../domain/incomeLabels";
 import {
+  buildIncomePlanningHabit,
   buildIncomePlanningModel,
-  buildIncomePlanningSource,
+  buildIncomePlanningWorkBlock,
   INCOME_PLANNING_CATEGORY_CONFIGS
 } from "../domain/incomePlanning";
-import type { IncomePlanningState } from "../types";
+import type { IncomePlanningSlot, IncomePlanningState } from "../types";
 
 describe("income planning", () => {
-  it("calculates the default example planning load", () => {
+  it("calculates the default time budget without income amounts", () => {
     const model = buildIncomePlanningModel(defaultIncomePlanningState());
 
     expect(model.totalWorkHours).toBe(51);
-    expect(model.fixedNeedHours).toBe(83);
-    expect(model.usedHours).toBe(134);
-    expect(model.remainingFlexibleHours).toBe(34);
-    expect(model.totalMonthlyIncome).toBe(3950);
+    expect(model.habitHours).toBe(3.5);
+    expect(model.manualHours).toBe(34);
+    expect(model.sleepHoursPerWeek).toBe(49);
+    expect(model.usedHours).toBe(137.5);
+    expect(model.remainingFlexibleHours).toBe(30.5);
+    expect(model.conflictCount).toBe(0);
     expect(model.status).toBe("realistic");
     expect(model.warnings).toHaveLength(0);
+    expect("totalMonthlyIncome" in model).toBe(false);
   });
 
-  it("warns when the planned combination is unrealistic", () => {
+  it("warns when the planned week is overbooked", () => {
     const state: IncomePlanningState = {
       ...defaultIncomePlanningState(),
-      sources: [
-        buildIncomePlanningSource("salary", "main", 2026, { hoursPerWeek: 40 }),
-        buildIncomePlanningSource("side_income", "part-time", 2026, { hoursPerWeek: 30 }),
-        buildIncomePlanningSource("self_employed", "self", 2026, { hoursPerWeek: 25 })
-      ]
+      workBlocks: [
+        buildIncomePlanningWorkBlock("salary", "main", { slots: [flexiblePlanningSlot("main-slot", 90)] }),
+        buildIncomePlanningWorkBlock("side_income", "part-time", { slots: [flexiblePlanningSlot("side-slot", 40)] })
+      ],
+      habits: [],
+      manualBlocks: []
     };
 
     const model = buildIncomePlanningModel(state);
 
-    expect(model.totalWorkHours).toBe(95);
+    expect(model.totalWorkHours).toBe(130);
     expect(model.remainingFlexibleHours).toBeLessThan(0);
     expect(model.status).toBe("unrealistic");
-    expect(model.warnings.join(" ")).toContain("zeitlich unrealistisch");
+    expect(model.warnings.join(" ")).toContain("ueberbucht");
   });
 
-  it("creates scenario steps for self employment and supervisory board planning", () => {
+  it("represents book reading before sleep as a good daily habit", () => {
     const state: IncomePlanningState = {
       ...defaultIncomePlanningState(),
-      sources: [
-        buildIncomePlanningSource("self_employed", "self", 2026),
-        buildIncomePlanningSource("supervisory_board", "board", 2026)
+      workBlocks: [],
+      manualBlocks: [],
+      habits: [
+        buildIncomePlanningHabit("book", {
+          type: "good",
+          name: "Buch lesen",
+          timing: "vor dem Schlafen",
+          durationMinutes: 30,
+          durationUnit: "day",
+          goalChange: "build",
+          slots: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(
+            (day, index) => ({
+              id: `book-${index}`,
+              day: day as IncomePlanningSlot["day"],
+              startTime: "21:30",
+              endTime: "22:00",
+              flexible: false,
+              durationMinutes: 30
+            })
+          )
+        })
       ]
     };
 
     const model = buildIncomePlanningModel(state);
 
-    expect(model.scenarios.map((scenario) => scenario.sourceId)).toEqual(["self", "board"]);
-    expect(model.scenarios[0].steps).toContain("Geschaeftsidee definieren");
-    expect(model.scenarios[1].steps).toContain("Netzwerk aufbauen");
-    expect(model.scenarios[1].goal).toContain("Aufsichtsrat");
+    expect(model.habitHours).toBe(3.5);
+    expect(model.calendarEntries[0]).toMatchObject({
+      day: "monday",
+      startTime: "21:30",
+      endTime: "22:00",
+      title: "Buch lesen",
+      type: "good_habit"
+    });
   });
 
-  it("uses the yearly income labels as planning categories", () => {
+  it("marks a bad habit and replacement habit in the same slot as conflicts", () => {
+    const state: IncomePlanningState = {
+      ...defaultIncomePlanningState(),
+      workBlocks: [],
+      manualBlocks: [],
+      habits: [
+        buildIncomePlanningHabit("phone", {
+          type: "bad",
+          name: "Handy im Bett",
+          replacementHabit: "Buch lesen",
+          goalChange: "replace",
+          slots: [
+            {
+              id: "phone-slot",
+              day: "monday",
+              startTime: "21:30",
+              endTime: "22:00",
+              flexible: false,
+              durationMinutes: 30
+            }
+          ]
+        })
+      ]
+    };
+
+    const model = buildIncomePlanningModel(state);
+
+    expect(model.habitHours).toBe(1);
+    expect(model.conflictCount).toBe(1);
+    expect(model.calendarEntries.map((entry) => entry.type).sort()).toEqual(["bad_habit", "replacement_habit"]);
+    expect(model.calendarEntries.every((entry) => entry.conflict)).toBe(true);
+  });
+
+  it("does not mark flexible overlapping time blocks as conflicts", () => {
+    const state: IncomePlanningState = {
+      ...defaultIncomePlanningState(),
+      workBlocks: [
+        buildIncomePlanningWorkBlock("side_income", "one", { slots: [flexiblePlanningSlot("one-slot", 2)] }),
+        buildIncomePlanningWorkBlock("self_employed", "two", { slots: [flexiblePlanningSlot("two-slot", 2)] })
+      ],
+      habits: [],
+      manualBlocks: []
+    };
+
+    const model = buildIncomePlanningModel(state);
+
+    expect(model.totalWorkHours).toBe(4);
+    expect(model.conflictCount).toBe(0);
+    expect(model.calendarEntries.every((entry) => entry.flexible)).toBe(true);
+  });
+
+  it("uses the yearly income labels as work planning categories", () => {
     expect(INCOME_PLANNING_CATEGORY_CONFIGS.map((config) => config.id)).toEqual(
       INCOME_YEAR_LABEL_OPTIONS.map((option) => option.id)
     );
@@ -66,3 +144,14 @@ describe("income planning", () => {
     );
   });
 });
+
+function flexiblePlanningSlot(id: string, hours: number): IncomePlanningSlot {
+  return {
+    id,
+    day: "sunday",
+    startTime: "00:00",
+    endTime: "00:00",
+    flexible: true,
+    durationMinutes: hours * 60
+  };
+}

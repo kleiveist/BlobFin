@@ -15,7 +15,20 @@ import {
   defaultStatutoryPensionSettings
 } from "../data/defaults";
 import { DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT } from "../domain/incomeTracker";
-import { INCOME_PLANNING_CATEGORY_IDS, incomePlanningCategoryConfig } from "../domain/incomePlanning";
+import {
+  buildIncomePlanningManualBlock,
+  buildIncomePlanningWorkBlock,
+  defaultIncomePlanningAssumptions,
+  INCOME_PLANNING_CATEGORY_IDS,
+  incomePlanningCategoryConfig,
+  isIncomePlanningHabitChange,
+  isIncomePlanningHabitDurationUnit,
+  isIncomePlanningHabitStatus,
+  isIncomePlanningHabitType,
+  isIncomePlanningManualBlockType,
+  isIncomePlanningPriority,
+  isIncomePlanningWeekday
+} from "../domain/incomePlanning";
 import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
 import { STATUTORY_PENSION_DEDUCTION_PERCENT_MAX } from "../domain/statutoryPension";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
@@ -37,11 +50,11 @@ import type {
   CombinedWealthToggles,
   IncomePlanningAssumptions,
   IncomePlanningCategory,
-  IncomePlanningLevel,
-  IncomePlanningPhase,
-  IncomePlanningSource,
-  IncomePlanningSourceStatus,
+  IncomePlanningHabit,
+  IncomePlanningManualBlock,
+  IncomePlanningSlot,
   IncomePlanningState,
+  IncomePlanningWorkBlock,
   IncomePerson,
   IncomeProjectionMode,
   IncomeEmploymentContext,
@@ -838,52 +851,187 @@ function normalizeStatutoryPensionIncomeMode(
 function normalizeIncomePlanningState(value: unknown): IncomePlanningState {
   const fallback = defaultIncomePlanningState();
   if (!isRecord(value)) return fallback;
+  const workBlocks = Array.isArray(value.workBlocks)
+    ? value.workBlocks
+        .map(normalizeIncomePlanningWorkBlock)
+        .filter((block): block is IncomePlanningWorkBlock => block !== null)
+    : Array.isArray(value.sources)
+      ? value.sources
+          .map(normalizeLegacyIncomePlanningSource)
+          .filter((block): block is IncomePlanningWorkBlock => block !== null)
+      : fallback.workBlocks;
+  const manualBlocks = Array.isArray(value.manualBlocks)
+    ? value.manualBlocks
+        .map(normalizeIncomePlanningManualBlock)
+        .filter((block): block is IncomePlanningManualBlock => block !== null)
+    : isRecord(value.assumptions)
+      ? migrateIncomePlanningAssumptionBlocks(value.assumptions)
+      : fallback.manualBlocks;
   return {
-    sources: Array.isArray(value.sources)
-      ? value.sources.map(normalizeIncomePlanningSource).filter((source): source is IncomePlanningSource => source !== null)
-      : fallback.sources,
+    workBlocks,
+    habits: Array.isArray(value.habits)
+      ? value.habits.map(normalizeIncomePlanningHabit).filter((habit): habit is IncomePlanningHabit => habit !== null)
+      : fallback.habits,
+    manualBlocks,
     assumptions: normalizeIncomePlanningAssumptions(value.assumptions)
   };
 }
 
-function normalizeIncomePlanningSource(value: unknown): IncomePlanningSource | null {
+function normalizeIncomePlanningWorkBlock(value: unknown): IncomePlanningWorkBlock | null {
   if (!isRecord(value)) return null;
   const category = normalizeIncomePlanningCategory(value.category);
+  const id = String(value.id || createId());
+  const fallback = buildIncomePlanningWorkBlock(category, id);
+  return {
+    id,
+    active: booleanOrDefault(value.active, true),
+    category,
+    name: String(value.name || fallback.name),
+    description: String(value.description || ""),
+    slots: Array.isArray(value.slots)
+      ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", 60)).filter(isSlot)
+      : fallback.slots
+  };
+}
+
+function normalizeLegacyIncomePlanningSource(value: unknown): IncomePlanningWorkBlock | null {
+  if (!isRecord(value)) return null;
+  const category = normalizeIncomePlanningCategory(value.category);
+  const id = String(value.id || createId());
   const config = incomePlanningCategoryConfig(category);
+  const fallbackHours = config.defaultSlots.reduce((sum, slot) => sum + slot.durationMinutes, 0) / 60;
+  const hoursPerWeek = clampNumber(numberOrDefault(value.hoursPerWeek, fallbackHours), 0, 168);
+  return buildIncomePlanningWorkBlock(category, id, {
+    active: booleanOrDefault(value.active, true),
+    name: String(value.name || config.defaultName),
+    description: "",
+    slots: [
+      {
+        id: `${id}-legacy-slot`,
+        day: "sunday",
+        startTime: "00:00",
+        endTime: "00:00",
+        flexible: true,
+        durationMinutes: Math.round(hoursPerWeek * 60)
+      }
+    ]
+  });
+}
+
+function normalizeIncomePlanningHabit(value: unknown): IncomePlanningHabit | null {
+  if (!isRecord(value)) return null;
+  const fallback = defaultIncomePlanningState().habits[0];
+  const durationMinutes = Math.round(clampNumber(numberOrDefault(value.durationMinutes, fallback.durationMinutes), 0, 1440));
   return {
     id: String(value.id || createId()),
     active: booleanOrDefault(value.active, true),
-    category,
-    name: String(value.name || config.defaultName),
-    hoursPerWeek: clampNumber(numberOrDefault(value.hoursPerWeek, config.defaultHoursPerWeek), 0, 100),
-    expectedMonthlyIncome: clampNumber(
-      numberOrDefault(value.expectedMonthlyIncome, config.defaultMonthlyIncome),
-      0,
-      1000000
-    ),
-    startMonth: Math.round(clampNumber(numberOrDefault(value.startMonth, 1), 1, 12)),
-    startYear: Math.round(clampNumber(numberOrDefault(value.startYear, defaultPlanningSettings().year), 1900, 2200)),
-    phase: normalizeIncomePlanningPhase(value.phase, config.defaultPhase),
-    status: normalizeIncomePlanningSourceStatus(value.status, config.defaultStatus),
-    risk: normalizeIncomePlanningLevel(value.risk, config.risk),
-    stability: normalizeIncomePlanningLevel(value.stability, config.stability),
-    scalability: normalizeIncomePlanningLevel(value.scalability, config.scalability)
+    type: isIncomePlanningHabitType(value.type) ? value.type : fallback.type,
+    name: String(value.name || fallback.name),
+    description: String(value.description || ""),
+    timing: String(value.timing || ""),
+    durationMinutes,
+    durationUnit: isIncomePlanningHabitDurationUnit(value.durationUnit) ? value.durationUnit : fallback.durationUnit,
+    goalChange: isIncomePlanningHabitChange(value.goalChange) ? value.goalChange : fallback.goalChange,
+    replacementHabit: String(value.replacementHabit || ""),
+    status: isIncomePlanningHabitStatus(value.status) ? value.status : fallback.status,
+    priority: isIncomePlanningPriority(value.priority) ? value.priority : fallback.priority,
+    slots: Array.isArray(value.slots)
+      ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", durationMinutes)).filter(isSlot)
+      : fallback.slots
+  };
+}
+
+function normalizeIncomePlanningManualBlock(value: unknown): IncomePlanningManualBlock | null {
+  if (!isRecord(value)) return null;
+  const type = isIncomePlanningManualBlockType(value.type) ? value.type : "other_event";
+  const fallback = buildIncomePlanningManualBlock(type, String(value.id || createId()));
+  return {
+    id: fallback.id,
+    active: booleanOrDefault(value.active, true),
+    type,
+    name: String(value.name || fallback.name),
+    description: String(value.description || ""),
+    slots: Array.isArray(value.slots)
+      ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", 60)).filter(isSlot)
+      : fallback.slots
+  };
+}
+
+function normalizeIncomePlanningSlot(
+  value: unknown,
+  fallbackDay: IncomePlanningSlot["day"],
+  fallbackDurationMinutes: number
+): IncomePlanningSlot | null {
+  if (!isRecord(value)) return null;
+  const startTime = normalizeIncomePlanningTime(value.startTime, "09:00");
+  const endTime = normalizeIncomePlanningTime(value.endTime, "10:00");
+  return {
+    id: String(value.id || createId()),
+    day: isIncomePlanningWeekday(value.day) ? value.day : fallbackDay,
+    startTime,
+    endTime,
+    flexible: booleanOrDefault(value.flexible, false),
+    durationMinutes: Math.round(
+      clampNumber(numberOrDefault(value.durationMinutes, fallbackDuration(startTime, endTime, fallbackDurationMinutes)), 0, 168 * 60)
+    )
   };
 }
 
 function normalizeIncomePlanningAssumptions(value: unknown): IncomePlanningAssumptions {
-  const fallback = defaultIncomePlanningState().assumptions;
+  const fallback = defaultIncomePlanningAssumptions();
   const assumptions = isRecord(value) ? value : {};
   return {
-    sleepHoursPerDay: clampNumber(numberOrDefault(assumptions.sleepHoursPerDay, fallback.sleepHoursPerDay), 0, 24),
-    freeTimeHoursPerDay: clampNumber(numberOrDefault(assumptions.freeTimeHoursPerDay, fallback.freeTimeHoursPerDay), 0, 24),
-    privateCommitmentsHoursPerWeek: clampNumber(
-      numberOrDefault(assumptions.privateCommitmentsHoursPerWeek, fallback.privateCommitmentsHoursPerWeek),
-      0,
-      168
-    ),
-    weeklyBufferHours: clampNumber(numberOrDefault(assumptions.weeklyBufferHours, fallback.weeklyBufferHours), 0, 168)
+    sleepHoursPerDay: clampNumber(numberOrDefault(assumptions.sleepHoursPerDay, fallback.sleepHoursPerDay), 0, 24)
   };
+}
+
+function migrateIncomePlanningAssumptionBlocks(value: Record<string, unknown>): IncomePlanningManualBlock[] {
+  const freeTimeMinutes = Math.round(clampNumber(numberOrDefault(value.freeTimeHoursPerDay, 2), 0, 24) * 7 * 60);
+  const privateMinutes = Math.round(clampNumber(numberOrDefault(value.privateCommitmentsHoursPerWeek, 12), 0, 168) * 60);
+  const bufferMinutes = Math.round(clampNumber(numberOrDefault(value.weeklyBufferHours, 8), 0, 168) * 60);
+  return [
+    buildIncomePlanningManualBlock("private_commitment", "income-plan-private-commitments", {
+      slots: [legacyFlexibleIncomePlanningSlot("income-plan-private-commitments-slot", privateMinutes)]
+    }),
+    buildIncomePlanningManualBlock("free_time", "income-plan-free-time", {
+      slots: [legacyFlexibleIncomePlanningSlot("income-plan-free-time-slot", freeTimeMinutes)]
+    }),
+    buildIncomePlanningManualBlock("buffer", "income-plan-weekly-buffer", {
+      slots: [legacyFlexibleIncomePlanningSlot("income-plan-weekly-buffer-slot", bufferMinutes)]
+    })
+  ];
+}
+
+function legacyFlexibleIncomePlanningSlot(id: string, durationMinutes: number): IncomePlanningSlot {
+  return {
+    id,
+    day: "sunday",
+    startTime: "00:00",
+    endTime: "00:00",
+    flexible: true,
+    durationMinutes
+  };
+}
+
+function isSlot(value: IncomePlanningSlot | null): value is IncomePlanningSlot {
+  return value !== null;
+}
+
+function normalizeIncomePlanningTime(value: unknown, fallback: string): string {
+  const time = String(value || "");
+  return /^([0-1]\d|2[0-3]):([0-5]\d)$/.test(time) ? time : fallback;
+}
+
+function fallbackDuration(startTime: string, endTime: string, fallback: number): number {
+  const start = timeMinutes(startTime);
+  const end = timeMinutes(endTime);
+  return start !== null && end !== null && end > start ? end - start : fallback;
+}
+
+function timeMinutes(value: string): number | null {
+  const match = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
 }
 
 function normalizeIncomePlanningCategory(value: unknown): IncomePlanningCategory {
@@ -919,23 +1067,6 @@ function incomePlanningCategoryKey(value: string): string {
     .replaceAll("ü", "ue")
     .replaceAll("ß", "ss")
     .replace(/[^a-z0-9]/g, "");
-}
-
-function normalizeIncomePlanningPhase(value: unknown, fallback: IncomePlanningPhase): IncomePlanningPhase {
-  return value === "idea" || value === "setup" || value === "growth" || value === "established"
-    ? value
-    : fallback;
-}
-
-function normalizeIncomePlanningSourceStatus(
-  value: unknown,
-  fallback: IncomePlanningSourceStatus
-): IncomePlanningSourceStatus {
-  return value === "idea" || value === "planned" || value === "active" || value === "paused" ? value : fallback;
-}
-
-function normalizeIncomePlanningLevel(value: unknown, fallback: IncomePlanningLevel): IncomePlanningLevel {
-  return value === "low" || value === "medium" || value === "high" ? value : fallback;
 }
 
 function normalizeIncomeTrackerState(value: unknown): IncomeTrackerState {

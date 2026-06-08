@@ -117,32 +117,110 @@ describe("storage", () => {
 
     const loaded = loadState(storage);
 
-    expect(loaded.incomePlanning.sources.map((source) => source.category)).toEqual([
+    expect(loaded.incomePlanning.workBlocks.map((block) => block.category)).toEqual([
       "salary",
       "online_sales",
       "self_employed"
     ]);
     expect(loaded.incomePlanning.assumptions.sleepHoursPerDay).toBe(7);
-    expect(loaded.incomePlanning.assumptions.weeklyBufferHours).toBe(8);
+    expect(loaded.incomePlanning.manualBlocks.map((block) => block.type)).toEqual([
+      "private_commitment",
+      "free_time",
+      "buffer"
+    ]);
+    expect(loaded.incomePlanning.habits.map((habit) => habit.name)).toContain("Buch lesen");
   });
 
-  it("maps legacy income planning categories to yearly income labels", () => {
+  it("migrates legacy income planning sources to work blocks", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState() as any;
-    state.incomePlanning.sources = [
-      { ...state.incomePlanning.sources[0], category: "main_job" },
-      { ...state.incomePlanning.sources[1], category: "self_employment" },
-      { ...state.incomePlanning.sources[2], category: "board_advisory" }
-    ];
+    state.incomePlanning = {
+      sources: [
+        { id: "main", active: true, category: "main_job", name: "Hauptjob", hoursPerWeek: 40, expectedMonthlyIncome: 3200 },
+        { id: "self", active: true, category: "self_employment", name: "Selbst", hoursPerWeek: 8, expectedMonthlyIncome: 600 },
+        { id: "board", active: true, category: "board_advisory", name: "Board", hoursPerWeek: 2, expectedMonthlyIncome: 200 }
+      ],
+      assumptions: {
+        sleepHoursPerDay: 7,
+        freeTimeHoursPerDay: 2,
+        privateCommitmentsHoursPerWeek: 12,
+        weeklyBufferHours: 8
+      }
+    };
     storage.setItem(STORAGE_KEY, JSON.stringify(state));
 
     const loaded = loadState(storage);
 
-    expect(loaded.incomePlanning.sources.map((source) => source.category)).toEqual([
+    expect(loaded.incomePlanning.workBlocks.map((block) => block.category)).toEqual([
       "salary",
       "self_employed",
       "supervisory_board"
     ]);
+    expect(loaded.incomePlanning.workBlocks.map((block) => block.slots[0].durationMinutes)).toEqual([
+      2400,
+      480,
+      120
+    ]);
+    expect(loaded.incomePlanning.manualBlocks.map((block) => block.slots[0].durationMinutes)).toEqual([
+      720,
+      840,
+      480
+    ]);
+  });
+
+  it("normalizes income planning habit and slot values", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState() as any;
+    state.incomePlanning = {
+      workBlocks: [
+        {
+          id: "work",
+          active: true,
+          category: "salary",
+          name: "Job",
+          description: "",
+          slots: [{ id: "slot", day: "bad-day", startTime: "bad", endTime: "25:00", flexible: false, durationMinutes: -10 }]
+        }
+      ],
+      habits: [
+        {
+          id: "habit",
+          active: true,
+          type: "bad-value",
+          name: "Habit",
+          description: "",
+          timing: "",
+          durationMinutes: 9999,
+          durationUnit: "bad-unit",
+          goalChange: "bad-change",
+          replacementHabit: "",
+          status: "bad-status",
+          priority: "bad-priority",
+          slots: []
+        }
+      ],
+      manualBlocks: [],
+      assumptions: { sleepHoursPerDay: 30 }
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.incomePlanning.workBlocks[0].slots[0]).toMatchObject({
+      day: "sunday",
+      startTime: "09:00",
+      endTime: "10:00",
+      durationMinutes: 0
+    });
+    expect(loaded.incomePlanning.habits[0]).toMatchObject({
+      type: "good",
+      durationMinutes: 1440,
+      durationUnit: "day",
+      goalChange: "build",
+      status: "planned",
+      priority: "medium"
+    });
+    expect(loaded.incomePlanning.assumptions.sleepHoursPerDay).toBe(24);
   });
 
   it("maps old income page section ids to the combined income page", () => {
