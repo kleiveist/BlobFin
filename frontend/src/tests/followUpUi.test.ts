@@ -93,14 +93,16 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-action="open-section-year_table"');
     expect(html).not.toContain('data-action="open-section-investment_planning"');
     expect(count(html, 'class="overview-card module-overview-card')).toBe(5);
-    expect(html).toContain('class="overview-subcard"');
+    expect(html).not.toContain('class="overview-subcard"');
+    expect(html).toContain('class="module-overview-grid landing-personal-grid"');
     expect(html.indexOf("Jahresnettoeinkommen")).toBeLessThan(html.indexOf("Gesetzliche Rente"));
-    expect(html.indexOf("Jahresnettoeinkommen")).toBeLessThan(html.indexOf("Einkommensplanung"));
-    expect(html.indexOf("Einkommensplanung")).toBeLessThan(html.indexOf("Gesetzliche Rente"));
     expect(html.indexOf("Gesetzliche Rente")).toBeLessThan(html.indexOf("Planungen und Szenarien"));
+    expect(html.indexOf("Planungen und Szenarien")).toBeLessThan(html.indexOf("Immobilien"));
+    expect(html.indexOf("Immobilien")).toBeLessThan(html.indexOf("Vermoegen"));
+    expect(html.indexOf("Vermoegen")).toBeLessThan(html.indexOf("Zeitbudget & Habits"));
     expect(html).toContain("Jahresnettoeinkommen");
-    expect(html).toContain("Einkommensplanung");
-    expect(html).toContain("Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien");
+    expect(html).toContain("Zeitbudget & Habits");
+    expect(html).toContain("Wochenplaner, Arbeit und Gewohnheiten");
     expect(html).toContain("Zeitbudget planen");
     expect(html).toContain("Planungen und Szenarien");
     expect(html).toContain("Immobilien");
@@ -108,6 +110,8 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("Vermoegen oeffnen");
     expect(html).toContain("Gesetzliche Rente");
     expect(html).toContain("Rente oeffnen");
+    expect(html).not.toContain("Einkommensplanung");
+    expect(html).not.toContain("Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien");
     expect(html).not.toContain("Vermoegen und Altersvorsorge");
     expect(html).not.toContain("Vorsorge oeffnen");
   });
@@ -116,7 +120,7 @@ describe("follow-up ui rendering", () => {
     const html = renderAppShell();
 
     expect(html).toContain('data-module-section="income_planning"');
-    expect(html).toContain("Zeitbudget-Dashboard");
+    expect(html).toContain("Zeitbudget & Habits");
     expect(html).toContain('id="incomePlanningMetricGrid"');
     expect(html).toContain('id="incomePlanningWorkBlocks"');
     expect(html).toContain('id="incomePlanningCareerLife"');
@@ -127,6 +131,7 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('id="incomePlanningWeeklyPlanner"');
     expect(html).toContain('id="incomePlanningDialogRoot"');
     expect(html).toContain("Kompakte 7-Tage-Grafik");
+    expect(html).toContain("Berufsleben / Hauptjob");
     expect(html).toContain('data-action="income-planning-add-work-block"');
     expect(html).toContain('data-action="income-planning-add-habit"');
     expect(html).toContain('data-action="income-planning-add-manual-block"');
@@ -135,7 +140,7 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-action="open-income-planning-category-picker"');
     expect(html).not.toContain("EUR/Monat");
     expect(html).not.toContain("Monatseinkommen");
-    expect(html.indexOf("Zeitbudget-Dashboard")).toBeLessThan(html.indexOf('id="incomePlanningMetricGrid"'));
+    expect(html.indexOf("Zeitbudget & Habits")).toBeLessThan(html.indexOf('id="incomePlanningMetricGrid"'));
     expect(html.indexOf('id="incomePlanningMetricGrid"')).toBeLessThan(html.indexOf('id="incomePlanningWarnings"'));
     expect(html.indexOf('id="incomePlanningWarnings"')).toBeLessThan(html.indexOf('id="incomePlanningTimeCharts"'));
     expect(html.indexOf('id="incomePlanningTimeCharts"')).toBeLessThan(html.indexOf('id="incomePlanningWeeklyPlanner"'));

@@ -122,7 +122,8 @@ describe("storage", () => {
       "online_sales",
       "self_employed"
     ]);
-    expect(loaded.incomePlanning.assumptions.sleepHoursPerDay).toBe(7);
+    expect(loaded.incomePlanning.assumptions.sleepHoursPerDay).toBe(8.9);
+    expect(loaded.incomePlanning.assumptions.sleepSlots).toHaveLength(7);
     expect(loaded.incomePlanning.manualBlocks.map((block) => block.type)).toEqual([
       "private_commitment",
       "free_time",
@@ -221,6 +222,7 @@ describe("storage", () => {
       priority: "medium"
     });
     expect(loaded.incomePlanning.assumptions.sleepHoursPerDay).toBe(24);
+    expect(loaded.incomePlanning.assumptions.sleepSlots).toHaveLength(7);
   });
 
   it("maps old income page section ids to the combined income page", () => {

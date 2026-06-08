@@ -110,16 +110,7 @@ export function renderAppShell(): string {
                 "Jahreswerte pflegen, Steuer- und Abgabenpositionen auswerten und Einkommensentwicklung transparent sehen.",
               actionLabel: "Einkommen oeffnen",
               icon: "income",
-              badge: "Einkommen",
-              subcards: [
-                {
-                  sectionId: "income_planning",
-                  title: "Einkommensplanung",
-                  subtitle: "Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien",
-                  actionLabel: "Zeitbudget planen",
-                  icon: "income_plan"
-                }
-              ]
+              badge: "Einkommen"
             },
             {
               sectionId: "statutory_pension",
@@ -165,13 +156,31 @@ export function renderAppShell(): string {
           "module",
           "landing-main-grid"
         )}
+        <div class="landing-personal-modules" aria-label="Persoenliche und organisatorische Planung">
+          ${ModuleOverviewGrid(
+            [
+              {
+                sectionId: "income_planning",
+                title: "Zeitbudget & Habits",
+                subtitle: "Wochenplaner, Arbeit und Gewohnheiten",
+                description:
+                  "Arbeitszeit, Nebentaetigkeiten, private Bloecke und Habits als Wochenplan koordinieren.",
+                actionLabel: "Zeitbudget planen",
+                icon: "income_plan",
+                badge: "Persoenlich"
+              }
+            ],
+            "section",
+            "landing-personal-grid"
+          )}
+        </div>
       </section>
 
       <section class="panel income-planning-panel" data-module-section="income_planning">
-        ${moduleTopBar("Einkommensplanung", "Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien")}
+        ${moduleTopBar("Zeitbudget & Habits", "Wochenplaner, Arbeit, Nebentaetigkeiten und Gewohnheiten")}
         <div class="section-heading income-planning-heading">
           <div>
-            <h2>Zeitbudget-Dashboard</h2>
+            <h2>Zeitbudget & Habits</h2>
             <p class="planning-account-summary">
               Plane Arbeitszeit, Nebentaetigkeiten, Habits und private Zeitbloecke als Wochenbudget.
             </p>
@@ -203,8 +212,8 @@ export function renderAppShell(): string {
         </section>
         <section class="income-card income-planning-career-card">
           <div class="income-section-head">
-            <h3>Berufsleben</h3>
-            <p>Aktive Gehalts- und Ausbildungsbloecke als berufliche Zeitbasis.</p>
+            <h3>Berufsleben / Hauptjob</h3>
+            <p>Ein aktiver Gehalts- oder Ausbildungsblock als berufliche Zeitbasis.</p>
           </div>
           <div id="incomePlanningCareerLife" class="income-planning-career-life"></div>
         </section>

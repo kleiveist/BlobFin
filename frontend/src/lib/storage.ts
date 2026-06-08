@@ -16,11 +16,13 @@ import {
 } from "../data/defaults";
 import { DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT } from "../domain/incomeTracker";
 import {
+  buildDefaultIncomePlanningSleepSlots,
   buildIncomePlanningManualBlock,
   buildIncomePlanningWorkBlock,
   defaultIncomePlanningAssumptions,
   INCOME_PLANNING_CATEGORY_IDS,
   incomePlanningCategoryConfig,
+  incomePlanningSleepSlotDurationMinutes,
   isIncomePlanningHabitChange,
   isIncomePlanningHabitDurationUnit,
   isIncomePlanningHabitStatus,
@@ -52,6 +54,7 @@ import type {
   IncomePlanningCategory,
   IncomePlanningHabit,
   IncomePlanningManualBlock,
+  IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningState,
   IncomePlanningWorkBlock,
@@ -980,8 +983,36 @@ function normalizeIncomePlanningSlot(
 function normalizeIncomePlanningAssumptions(value: unknown): IncomePlanningAssumptions {
   const fallback = defaultIncomePlanningAssumptions();
   const assumptions = isRecord(value) ? value : {};
+  const sleepSlots = Array.isArray(assumptions.sleepSlots)
+    ? assumptions.sleepSlots
+        .map((slotValue, index) => normalizeIncomePlanningSleepSlot(slotValue, fallback.sleepSlots[index] ?? fallback.sleepSlots[0]))
+        .filter((slot): slot is IncomePlanningSleepSlot => slot !== null)
+    : buildDefaultIncomePlanningSleepSlots();
   return {
-    sleepHoursPerDay: clampNumber(numberOrDefault(assumptions.sleepHoursPerDay, fallback.sleepHoursPerDay), 0, 24)
+    sleepHoursPerDay: clampNumber(numberOrDefault(assumptions.sleepHoursPerDay, fallback.sleepHoursPerDay), 0, 24),
+    sleepSlots: sleepSlots.length ? sleepSlots : fallback.sleepSlots
+  };
+}
+
+function normalizeIncomePlanningSleepSlot(
+  value: unknown,
+  fallback: IncomePlanningSleepSlot | undefined
+): IncomePlanningSleepSlot | null {
+  if (!isRecord(value)) return fallback ?? null;
+  const fallbackSlot = fallback ?? buildDefaultIncomePlanningSleepSlots()[0];
+  const startTime = normalizeIncomePlanningTime(value.startTime, fallbackSlot.startTime);
+  const endTime = normalizeIncomePlanningTime(value.endTime, fallbackSlot.endTime);
+  const slot = {
+    id: String(value.id || createId()),
+    day: isIncomePlanningWeekday(value.day) ? value.day : fallbackSlot.day,
+    startTime,
+    endTime,
+    flexible: booleanOrDefault(value.flexible, fallbackSlot.flexible),
+    durationMinutes: Math.round(clampNumber(numberOrDefault(value.durationMinutes, fallbackSlot.durationMinutes), 0, 168 * 60))
+  };
+  return {
+    ...slot,
+    durationMinutes: slot.flexible ? slot.durationMinutes : incomePlanningSleepSlotDurationMinutes(slot)
   };
 }
 

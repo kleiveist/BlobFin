@@ -10,6 +10,7 @@ import type {
   IncomePlanningManualBlock,
   IncomePlanningManualBlockType,
   IncomePlanningPriority,
+  IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningState,
   IncomePlanningWeekday,
@@ -76,6 +77,13 @@ export interface IncomePlanningCalendarEntry {
   endMinute: number;
 }
 
+export interface IncomePlanningSlotCalendarSegment {
+  day: IncomePlanningWeekday;
+  startMinute: number;
+  endMinute: number;
+  durationMinutes: number;
+}
+
 export interface IncomePlanningModel {
   activeWorkBlocks: IncomePlanningWorkBlock[];
   careerWorkBlocks: IncomePlanningWorkBlock[];
@@ -115,11 +123,11 @@ const INCOME_PLANNING_CATEGORY_OVERRIDES: Partial<Record<IncomePlanningCategory,
   salary: {
     defaultName: "Gehalt",
     defaultSlots: [
-      timedSlot("monday", "08:00", "16:00"),
-      timedSlot("tuesday", "08:00", "16:00"),
-      timedSlot("wednesday", "08:00", "16:00"),
-      timedSlot("thursday", "08:00", "16:00"),
-      timedSlot("friday", "08:00", "16:00")
+      timedSlot("monday", "06:30", "16:30"),
+      timedSlot("tuesday", "06:30", "16:30"),
+      timedSlot("wednesday", "06:30", "16:30"),
+      timedSlot("thursday", "06:30", "16:30"),
+      timedSlot("friday", "06:30", "16:30")
     ]
   },
   training_allowance: {
@@ -137,12 +145,8 @@ const INCOME_PLANNING_CATEGORY_OVERRIDES: Partial<Record<IncomePlanningCategory,
     defaultSlots: [timedSlot("saturday", "10:00", "14:00"), timedSlot("sunday", "10:00", "14:00")]
   },
   self_employed: {
-    defaultName: "Selbststaendigkeit",
-    defaultSlots: [
-      timedSlot("tuesday", "18:00", "20:00"),
-      timedSlot("thursday", "18:00", "20:00"),
-      timedSlot("saturday", "10:00", "14:00")
-    ]
+    defaultName: "Nebenberufliche Selbststaendigkeit",
+    defaultSlots: []
   },
   freelance: {
     defaultName: "Freiberufliche Arbeit",
@@ -155,9 +159,9 @@ const INCOME_PLANNING_CATEGORY_OVERRIDES: Partial<Record<IncomePlanningCategory,
   online_sales: {
     defaultName: "Online-Verkaeufe",
     defaultSlots: [
-      timedSlot("monday", "18:00", "19:00"),
-      timedSlot("wednesday", "18:00", "19:00"),
-      timedSlot("friday", "18:00", "19:00")
+      timedSlot("monday", "17:00", "17:25"),
+      timedSlot("wednesday", "17:00", "17:25"),
+      timedSlot("friday", "17:00", "17:25")
     ]
   },
   garage_parking_rental: {
@@ -218,6 +222,39 @@ export const INCOME_PLANNING_CATEGORY_CONFIGS: IncomePlanningCategoryConfig[] = 
 
 export function incomePlanningCategoryConfig(category: IncomePlanningCategory): IncomePlanningCategoryConfig {
   return INCOME_PLANNING_CATEGORY_CONFIGS.find((config) => config.id === category) ?? INCOME_PLANNING_CATEGORY_CONFIGS[0];
+}
+
+export function isIncomePlanningMainJobCategory(category: IncomePlanningCategory): boolean {
+  return category === "salary" || category === "training_allowance";
+}
+
+export function incomePlanningDefaultWorkCategory(workBlocks: IncomePlanningWorkBlock[]): IncomePlanningCategory {
+  return workBlocks.some((block) => block.active && isIncomePlanningMainJobCategory(block.category)) ? "side_income" : "salary";
+}
+
+export function enforceSingleActiveIncomePlanningMainJob(
+  workBlocks: IncomePlanningWorkBlock[],
+  primaryId: string
+): IncomePlanningWorkBlock[] {
+  const primary = workBlocks.find(
+    (block) => block.id === primaryId && block.active && isIncomePlanningMainJobCategory(block.category)
+  );
+  if (!primary) return workBlocks;
+  return workBlocks.map((block) =>
+    block.id !== primary.id && block.active && isIncomePlanningMainJobCategory(block.category) ? { ...block, active: false } : block
+  );
+}
+
+export function buildDefaultIncomePlanningSleepSlots(): IncomePlanningSleepSlot[] {
+  return [
+    sleepSlot("income-plan-sleep-sunday", "sunday", "21:00", "05:30", false),
+    sleepSlot("income-plan-sleep-monday", "monday", "21:00", "05:30", false),
+    sleepSlot("income-plan-sleep-tuesday", "tuesday", "21:00", "05:30", false),
+    sleepSlot("income-plan-sleep-wednesday", "wednesday", "21:00", "05:30", false),
+    sleepSlot("income-plan-sleep-thursday", "thursday", "21:00", "05:30", false),
+    sleepSlot("income-plan-sleep-friday", "friday", "23:00", "09:00", true),
+    sleepSlot("income-plan-sleep-saturday", "saturday", "23:00", "09:00", true)
+  ];
 }
 
 export function buildIncomePlanningWorkBlock(
@@ -283,7 +320,7 @@ export function buildIncomePlanningManualBlock(
 
 export function buildIncomePlanningModel(state: IncomePlanningState): IncomePlanningModel {
   const activeWorkBlocks = state.workBlocks.filter((block) => block.active);
-  const careerWorkBlocks = activeWorkBlocks.filter((block) => isCareerCategory(block.category));
+  const careerWorkBlocks = activeWorkBlocks.filter((block) => isIncomePlanningMainJobCategory(block.category));
   const activeHabits = state.habits.filter((habit) => habit.active);
   const activeManualBlocks = state.manualBlocks.filter((block) => block.active);
   const drafts = [
@@ -299,7 +336,7 @@ export function buildIncomePlanningModel(state: IncomePlanningState): IncomePlan
   const totalWorkMinutes = sumEntryMinutes(calendarEntries, ["career", "side_work"]);
   const habitMinutes = sumEntryMinutes(calendarEntries, ["good_habit", "bad_habit", "replacement_habit"]);
   const manualMinutes = sumEntryMinutes(calendarEntries, ["private_commitment", "free_time", "buffer", "other_event"]);
-  const sleepMinutes = Math.round(positiveNumber(state.assumptions.sleepHoursPerDay) * 7 * 60);
+  const sleepMinutes = incomePlanningSleepMinutes(state.assumptions);
   const usedMinutes = sleepMinutes + totalWorkMinutes + habitMinutes + manualMinutes;
   const remainingMinutes = INCOME_PLANNING_WEEK_MINUTES - usedMinutes;
   const nonSleepMinutes = usedMinutes - sleepMinutes;
@@ -330,7 +367,7 @@ export function buildIncomePlanningModel(state: IncomePlanningState): IncomePlan
     invalidSlotCount,
     status,
     warnings: incomePlanningWarnings({
-      sleepHoursPerDay: state.assumptions.sleepHoursPerDay,
+      sleepMinutes,
       status,
       remainingMinutes,
       totalWorkMinutes,
@@ -342,7 +379,7 @@ export function buildIncomePlanningModel(state: IncomePlanningState): IncomePlan
 }
 
 function workBlockCalendarEntries(block: IncomePlanningWorkBlock): CalendarEntryDraft[] {
-  const type: IncomePlanningPlannerEntryType = isCareerCategory(block.category) ? "career" : "side_work";
+  const type: IncomePlanningPlannerEntryType = isIncomePlanningMainJobCategory(block.category) ? "career" : "side_work";
   return block.slots.map((slot) => calendarEntryFromSlot(block.id, slot, block.name, type));
 }
 
@@ -399,6 +436,42 @@ function slotDurationMinutes(slot: IncomePlanningSlot): number {
   return Math.max(0, Math.round(slot.durationMinutes));
 }
 
+export function incomePlanningSleepSlotDurationMinutes(slot: IncomePlanningSleepSlot): number {
+  if (slot.flexible) return Math.max(0, Math.round(slot.durationMinutes));
+  return incomePlanningSlotCalendarSegments(slot).reduce((sum, segment) => sum + segment.durationMinutes, 0);
+}
+
+export function incomePlanningSleepMinutes(assumptions: IncomePlanningAssumptions): number {
+  if (assumptions.sleepSlots.length) {
+    return assumptions.sleepSlots.reduce((sum, slot) => sum + incomePlanningSleepSlotDurationMinutes(slot), 0);
+  }
+  return Math.round(positiveNumber(assumptions.sleepHoursPerDay) * 7 * 60);
+}
+
+export function incomePlanningAverageSleepHours(assumptions: IncomePlanningAssumptions): number {
+  return minutesToHours(incomePlanningSleepMinutes(assumptions) / 7);
+}
+
+export function incomePlanningSlotCalendarSegments(
+  slot: Pick<IncomePlanningSleepSlot, "day" | "startTime" | "endTime" | "flexible" | "durationMinutes">
+): IncomePlanningSlotCalendarSegment[] {
+  const start = parseTimeMinutes(slot.startTime);
+  const end = parseTimeMinutes(slot.endTime);
+  if (start === null || end === null) {
+    return [{ day: slot.day, startMinute: 0, endMinute: 24 * 60, durationMinutes: Math.max(0, Math.round(slot.durationMinutes)) }];
+  }
+  if (slot.flexible && start === end) {
+    return [{ day: slot.day, startMinute: 0, endMinute: 24 * 60, durationMinutes: Math.max(0, Math.round(slot.durationMinutes)) }];
+  }
+  if (end > start) {
+    return [{ day: slot.day, startMinute: start, endMinute: end, durationMinutes: end - start }];
+  }
+  return [
+    { day: slot.day, startMinute: start, endMinute: 24 * 60, durationMinutes: 24 * 60 - start },
+    { day: nextIncomePlanningWeekday(slot.day), startMinute: 0, endMinute: end, durationMinutes: end }
+  ].filter((segment) => segment.durationMinutes > 0);
+}
+
 function habitFallbackSlots(habit: IncomePlanningHabit): IncomePlanningSlot[] {
   if (habit.durationUnit === "day") {
     return INCOME_PLANNING_WEEK_DAYS.map((day, index) => ({
@@ -442,7 +515,7 @@ function detectConflicts(entries: CalendarEntryDraft[]): { entryIds: Set<string>
 }
 
 function incomePlanningWarnings(input: {
-  sleepHoursPerDay: number;
+  sleepMinutes: number;
   status: IncomePlanningModel["status"];
   remainingMinutes: number;
   totalWorkMinutes: number;
@@ -451,7 +524,7 @@ function incomePlanningWarnings(input: {
   invalidSlotCount: number;
 }): string[] {
   const warnings: string[] = [];
-  if (positiveNumber(input.sleepHoursPerDay) < 7) {
+  if (input.sleepMinutes / 7 / 60 < 7) {
     warnings.push("Die Schlafannahme liegt unter 7 Stunden pro Tag.");
   }
   if (input.invalidSlotCount > 0) {
@@ -485,10 +558,6 @@ function plannerTypeForManualBlock(type: IncomePlanningManualBlockType): IncomeP
   return "other_event";
 }
 
-function isCareerCategory(category: IncomePlanningCategory): boolean {
-  return category === "salary" || category === "training_allowance";
-}
-
 function compareCalendarEntries(first: IncomePlanningCalendarEntry, second: IncomePlanningCalendarEntry): number {
   const dayDiff = INCOME_PLANNING_DAY_INDEX[first.day] - INCOME_PLANNING_DAY_INDEX[second.day];
   if (dayDiff !== 0) return dayDiff;
@@ -516,6 +585,25 @@ function dailyHabitSlots(ownerId: string, durationMinutes: number, startTime: st
     flexible: false,
     durationMinutes
   }));
+}
+
+function sleepSlot(
+  id: string,
+  day: IncomePlanningWeekday,
+  startTime: string,
+  endTime: string,
+  flexible: boolean
+): IncomePlanningSleepSlot {
+  const segments = incomePlanningSlotCalendarSegments({ day, startTime, endTime, flexible: false, durationMinutes: 0 });
+  const durationMinutes = segments.reduce((sum, segment) => sum + segment.durationMinutes, 0);
+  return {
+    id,
+    day,
+    startTime,
+    endTime,
+    flexible,
+    durationMinutes
+  };
 }
 
 function manualBlockDefaults(type: IncomePlanningManualBlockType): { name: string; slots: IncomePlanningSlot[] } {
@@ -578,6 +666,10 @@ function positiveNumber(value: number | null | undefined): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
+function nextIncomePlanningWeekday(day: IncomePlanningWeekday): IncomePlanningWeekday {
+  return INCOME_PLANNING_WEEK_DAYS[(INCOME_PLANNING_DAY_INDEX[day] + 1) % INCOME_PLANNING_WEEK_DAYS.length];
+}
+
 export function isIncomePlanningWeekday(value: unknown): value is IncomePlanningWeekday {
   return INCOME_PLANNING_WEEK_DAYS.includes(value as IncomePlanningWeekday);
 }
@@ -607,8 +699,10 @@ export function isIncomePlanningManualBlockType(value: unknown): value is Income
 }
 
 export function defaultIncomePlanningAssumptions(overrides: Partial<IncomePlanningAssumptions> = {}): IncomePlanningAssumptions {
+  const sleepSlots = overrides.sleepSlots ?? buildDefaultIncomePlanningSleepSlots();
   return {
-    sleepHoursPerDay: 7,
+    sleepHoursPerDay: minutesToHours(sleepSlots.reduce((sum, slot) => sum + incomePlanningSleepSlotDurationMinutes(slot), 0) / 7),
+    sleepSlots,
     ...overrides
   };
 }

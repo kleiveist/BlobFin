@@ -408,6 +408,15 @@ export interface IncomePlanningSlot {
   durationMinutes: number;
 }
 
+export interface IncomePlanningSleepSlot {
+  id: string;
+  day: IncomePlanningWeekday;
+  startTime: string;
+  endTime: string;
+  flexible: boolean;
+  durationMinutes: number;
+}
+
 export interface IncomePlanningWorkBlock {
   id: string;
   active: boolean;
@@ -444,6 +453,7 @@ export interface IncomePlanningManualBlock {
 
 export interface IncomePlanningAssumptions {
   sleepHoursPerDay: number;
+  sleepSlots: IncomePlanningSleepSlot[];
 }
 
 export interface IncomePlanningState {

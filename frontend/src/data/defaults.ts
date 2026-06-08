@@ -14,9 +14,11 @@ import type {
   StatutoryPensionSettings
 } from "../types";
 import {
+  buildDefaultIncomePlanningSleepSlots,
   buildIncomePlanningHabit,
   buildIncomePlanningManualBlock,
-  buildIncomePlanningWorkBlock
+  buildIncomePlanningWorkBlock,
+  incomePlanningAverageSleepHours
 } from "../domain/incomePlanning";
 
 export const MONTHS = [
@@ -389,11 +391,16 @@ export function defaultIncomeTrackerState(): IncomeTrackerState {
 }
 
 export function defaultIncomePlanningState(): IncomePlanningState {
+  const sleepSlots = buildDefaultIncomePlanningSleepSlots();
   return {
     workBlocks: [
       buildIncomePlanningWorkBlock("salary", "income-plan-main-job"),
       buildIncomePlanningWorkBlock("online_sales", "income-plan-online-sales"),
-      buildIncomePlanningWorkBlock("self_employed", "income-plan-self-employment")
+      buildIncomePlanningWorkBlock("self_employed", "income-plan-self-employment", {
+        active: false,
+        name: "Nebenberufliche Selbststaendigkeit",
+        slots: []
+      })
     ],
     habits: [
       buildIncomePlanningHabit("income-plan-book-reading"),
@@ -415,7 +422,8 @@ export function defaultIncomePlanningState(): IncomePlanningState {
       buildIncomePlanningManualBlock("buffer", "income-plan-weekly-buffer")
     ],
     assumptions: {
-      sleepHoursPerDay: 7
+      sleepHoursPerDay: incomePlanningAverageSleepHours({ sleepHoursPerDay: 0, sleepSlots }),
+      sleepSlots
     }
   };
 }
