@@ -32,6 +32,7 @@ import {
   incomePlanningDefaultWorkCategory,
   incomePlanningCategoryConfig,
   incomePlanningDefaultManualColor,
+  incomePlanningDefaultManualIcon,
   incomePlanningDefaultWorkColor,
   incomePlanningAverageSleepHours,
   incomePlanningSlotGrossDurationMinutes,
@@ -169,6 +170,7 @@ import type {
   IncomeTaxDeductionField,
   IncomeTaxDeductionItems,
   IncomePlanningAssumptions,
+  IncomePlanningCalendarStamp,
   IncomePlanningCategory,
   IncomePlanningHabit,
   IncomePlanningManualBlock,
@@ -473,6 +475,7 @@ type IncomePlanningDialogState = {
   description: string;
   color: string;
   habitIcon: string;
+  manualIcon: string;
   timing: string;
   habitDurationMinutes: number;
   replacementHabit: string;
@@ -564,6 +567,17 @@ let incomePlanningDragState: IncomePlanningDragState = null;
 let incomePlanningSleepDragState: IncomePlanningSleepDragState = null;
 let incomePlanningSuppressNextCalendarClick = false;
 let incomePlanningHabitIconPicker: { top: number; left: number } | null = null;
+let incomePlanningStampPicker: {
+  stampId: string | null;
+  day: IncomePlanningWeekday;
+  startTime: string;
+  icon: string;
+  label: string;
+  top: number;
+  left: number;
+} | null = null;
+let incomePlanningStampMenu: { stampId: string; top: number; left: number } | null = null;
+let incomePlanningCurrentTimeTimerId: number | null = null;
 let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 let positionFilterDrafts = createPositionFilterDrafts();
@@ -591,6 +605,7 @@ applyTheme();
 
 renderShell();
 bindEvents();
+startIncomePlanningCurrentTimeTicker();
 syncAllInputsFromState();
 syncThemeControls();
 renderAll();
@@ -1074,6 +1089,11 @@ function bindEvents(): void {
       return;
     }
 
+    if (target.dataset.incomePlanningStampField) {
+      updateIncomePlanningStampPickerDraft(target.dataset.incomePlanningStampField, target.value);
+      return;
+    }
+
     if (target.dataset.positionCostPositionId && target.dataset.positionCostItemId && target.dataset.positionCostField) {
       updatePositionCostBreakdownItem(
         target.dataset.positionCostPositionId,
@@ -1144,6 +1164,11 @@ function bindEvents(): void {
     }
 
     if (handleIncomePlanningControl(target, "full")) {
+      return;
+    }
+
+    if (target.dataset.incomePlanningStampField) {
+      updateIncomePlanningStampPickerDraft(target.dataset.incomePlanningStampField, target.value);
       return;
     }
 
@@ -1264,11 +1289,26 @@ function bindEvents(): void {
       return;
     }
     const calendarDay = target?.closest<HTMLElement>("[data-income-planning-calendar-day]");
+    if (
+      calendarDay &&
+      event.ctrlKey &&
+      !target?.closest("[data-income-planning-calendar-block]") &&
+      !target?.closest("[data-income-planning-calendar-background]") &&
+      !target?.closest("[data-income-planning-calendar-stamp]")
+    ) {
+      event.preventDefault();
+      openIncomePlanningStampPickerFromCalendar(calendarDay, event.clientX, event.clientY);
+      return;
+    }
     if (calendarDay && target?.closest("[data-income-planning-calendar-background]")) {
       event.preventDefault();
       return;
     }
-    if (calendarDay && !target?.closest("[data-income-planning-calendar-block]")) {
+    if (
+      calendarDay &&
+      !target?.closest("[data-income-planning-calendar-block]") &&
+      !target?.closest("[data-income-planning-calendar-stamp]")
+    ) {
       event.preventDefault();
       openIncomePlanningDialogFromCalendar(calendarDay, event.clientY);
       return;
@@ -1280,6 +1320,12 @@ function bindEvents(): void {
       }
       if (incomePlanningHabitIconPicker && !target?.closest("#incomePlanningHabitIconPicker")) {
         hideIncomePlanningHabitIconPicker();
+      }
+      if (incomePlanningStampPicker && !target?.closest("#incomePlanningStampPicker")) {
+        hideIncomePlanningStampPicker();
+      }
+      if (incomePlanningStampMenu && !target?.closest("#incomePlanningStampMenu")) {
+        hideIncomePlanningStampMenu();
       }
       if (incomeYearLabelPicker && !target?.closest("#incomeYearLabelPicker")) {
         hideIncomeYearLabelPicker();
@@ -1321,11 +1367,25 @@ function bindEvents(): void {
       hidePositionIconPicker();
     }
     if (
-      action !== "open-income-planning-habit-icon-picker" &&
-      action !== "select-income-planning-habit-icon" &&
-      action !== "close-income-planning-habit-icon-picker"
+      action !== "open-income-planning-icon-picker" &&
+      action !== "select-income-planning-icon" &&
+      action !== "close-income-planning-icon-picker"
     ) {
       hideIncomePlanningHabitIconPicker();
+    }
+    if (
+      action !== "income-planning-open-stamp-menu" &&
+      action !== "income-planning-edit-stamp" &&
+      action !== "income-planning-save-stamp" &&
+      action !== "income-planning-delete-stamp" &&
+      action !== "income-planning-close-stamp-picker" &&
+      action !== "income-planning-close-stamp-menu" &&
+      action !== "select-income-planning-stamp-icon" &&
+      !button.closest("#incomePlanningStampPicker") &&
+      !button.closest("#incomePlanningStampMenu")
+    ) {
+      hideIncomePlanningStampPicker();
+      hideIncomePlanningStampMenu();
     }
     if (action !== "open-income-year-label-picker" && action !== "select-income-year-label") {
       hideIncomeYearLabelPicker();
@@ -1470,11 +1530,24 @@ function bindEvents(): void {
       updateIncomePlanningDialogDraft("color", button.dataset.incomePlanningColor || "");
       renderIncomePlanningDialog();
     }
-    if (action === "open-income-planning-habit-icon-picker") showIncomePlanningHabitIconPicker(button);
-    if (action === "close-income-planning-habit-icon-picker") hideIncomePlanningHabitIconPicker();
-    if (action === "select-income-planning-habit-icon") {
-      selectIncomePlanningHabitIcon(button.dataset.incomePlanningHabitIcon || "");
+    if (action === "open-income-planning-icon-picker") showIncomePlanningHabitIconPicker(button);
+    if (action === "close-income-planning-icon-picker") hideIncomePlanningHabitIconPicker();
+    if (action === "select-income-planning-icon") {
+      selectIncomePlanningHabitIcon(button.dataset.incomePlanningIcon || "");
     }
+    if (action === "income-planning-open-stamp-menu") {
+      openIncomePlanningStampMenu(button.dataset.incomePlanningStampId || "", event.clientX, event.clientY);
+    }
+    if (action === "income-planning-edit-stamp") {
+      openIncomePlanningStampPickerForEdit(button.dataset.incomePlanningStampId || "", event.clientX, event.clientY);
+    }
+    if (action === "income-planning-close-stamp-picker") hideIncomePlanningStampPicker();
+    if (action === "income-planning-close-stamp-menu") hideIncomePlanningStampMenu();
+    if (action === "select-income-planning-stamp-icon") {
+      selectIncomePlanningStampIcon(button.dataset.incomePlanningStampIcon || "");
+    }
+    if (action === "income-planning-save-stamp") saveIncomePlanningStampPicker();
+    if (action === "income-planning-delete-stamp") deleteIncomePlanningStamp(button.dataset.incomePlanningStampId || "");
     if (action === "add-planning-account") addPlanningAccount();
     if (action === "rename-planning-account") renamePlanningAccount();
     if (action === "cancel-planning-account-dialog") closePlanningAccountDialog();
@@ -1670,6 +1743,8 @@ function bindEvents(): void {
       hideReserveChartPopup();
       hideInvestmentIncludePopup();
       hidePositionFilterPopup();
+      hideIncomePlanningStampPicker();
+      hideIncomePlanningStampMenu();
       closePlanningAccountDialog();
       closeIncomeTaxDialog();
       closeIncomeAnalysisDialog();
@@ -1692,6 +1767,14 @@ function requestRenderAll(): void {
     renderAllTimer = null;
     renderAll();
   }, FORM_RENDER_DEBOUNCE_MS);
+}
+
+function startIncomePlanningCurrentTimeTicker(): void {
+  if (incomePlanningCurrentTimeTimerId !== null) return;
+  incomePlanningCurrentTimeTimerId = window.setInterval(() => {
+    if (state.ui.activeSection !== "income_planning") return;
+    renderIncomePlanningSummary();
+  }, 60 * 1000);
 }
 
 function renderAll(): void {
@@ -1953,9 +2036,12 @@ function renderIncomePlanning(): void {
   renderIncomePlanningAssumptions();
   renderIncomePlanningManualBlocks();
   renderIncomePlanningHabits();
+  renderIncomePlanningCalendarStamps();
   renderIncomePlanningSummary();
   renderIncomePlanningDialog();
   renderIncomePlanningHabitIconPicker();
+  renderIncomePlanningStampPicker();
+  renderIncomePlanningStampMenu();
 }
 
 function renderIncomePlanningSummary(): void {
@@ -2137,9 +2223,6 @@ function incomePlanningWorkBlockRow(workBlock: IncomePlanningWorkBlock): string 
           <button class="button secondary" type="button" data-action="income-planning-open-block" data-income-planning-owner-type="work" data-income-planning-owner-id="${escapeHtml(
             workBlock.id
           )}" data-income-planning-slot-id="${escapeHtml(workBlock.slots[0]?.id ?? "")}">Bearbeiten</button>
-          <button class="button secondary" type="button" data-action="income-planning-add-slot" data-income-planning-owner-type="work" data-income-planning-owner-id="${escapeHtml(
-            workBlock.id
-          )}">Slot</button>
           <button class="icon-button danger" type="button" data-action="income-planning-remove-work-block" data-income-planning-work-id="${escapeHtml(
             workBlock.id
           )}" aria-label="Arbeitsblock entfernen">x</button>
@@ -2160,16 +2243,25 @@ function incomePlanningTypeLabel(label: string, icon: string): string {
 }
 
 function incomePlanningSlotSummary(ownerType: string, ownerId: string, slots: IncomePlanningSlot[]): string {
+  const addChip = incomePlanningSlotAddChip(ownerType, ownerId);
   return `
     <div class="income-planning-slot-summary">
       ${slots.length
-        ? slots.map((slot) => incomePlanningSlotChip(ownerType, ownerId, slot)).join("")
+        ? `${slots.map((slot) => incomePlanningSlotChip(ownerType, ownerId, slot)).join("")}${addChip}`
         : '<div class="chart-empty">Noch keine Wochen-Slots geplant.</div>'}
+      ${slots.length ? "" : addChip}
     </div>
   `;
 }
 
 function incomePlanningSlotChip(ownerType: string, ownerId: string, slot: IncomePlanningSlot): string {
+  const duration = incomePlanningSlotGrossDurationMinutes(slot);
+  const visualRange = incomePlanningVisualRangeFromTimes(slot.startTime, slot.endTime, duration);
+  const timeLabel = slot.flexible
+    ? `flexibel · ${formatIncomePlanningTime(visualRange.startMinute)}-${formatIncomePlanningTime(visualRange.endMinute)} · ${minutesLabel(
+        duration
+      )}`
+    : `${slot.startTime}-${slot.endTime}`;
   const pauseLabel =
     ownerType !== "habit" && slot.pauseEnabled && slot.pauseStartTime && slot.pauseEndTime
       ? `<small>Pause ${escapeHtml(slot.pauseStartTime)}-${escapeHtml(slot.pauseEndTime)}</small>`
@@ -2179,8 +2271,19 @@ function incomePlanningSlotChip(ownerType: string, ownerId: string, slot: Income
       ownerType
     )}" data-income-planning-owner-id="${escapeHtml(ownerId)}" data-income-planning-slot-id="${escapeHtml(slot.id)}">
       <strong>${escapeHtml(incomePlanningWeekdayLabel(slot.day))}</strong>
-      <span>${escapeHtml(slot.flexible ? `flexibel · ${minutesLabel(slot.durationMinutes)}` : `${slot.startTime}-${slot.endTime}`)}</span>
+      <span>${escapeHtml(timeLabel)}</span>
       ${pauseLabel}
+    </button>
+  `;
+}
+
+function incomePlanningSlotAddChip(ownerType: string, ownerId: string): string {
+  return `
+    <button class="income-planning-slot-chip add" type="button" data-action="income-planning-add-slot" data-income-planning-owner-type="${escapeHtml(
+      ownerType
+    )}" data-income-planning-owner-id="${escapeHtml(ownerId)}">
+      <strong>+</strong>
+      <span>Wochen-Slot</span>
     </button>
   `;
 }
@@ -2216,11 +2319,12 @@ function renderIncomePlanningManualBlocks(): void {
 
 function incomePlanningManualBlockRow(block: IncomePlanningManualBlock): string {
   const pauseHours = slotsPauseHours(block.slots);
+  const icon = normalizePositionIcon(block.icon, incomePlanningDefaultManualIcon(block.type));
   return `
     <article class="income-planning-block-card compact ${block.active ? "active" : ""}" style="${incomePlanningColorStyle(block.color ?? incomePlanningDefaultManualColor(block.type))}">
       <div class="income-planning-compact-head">
         <div>
-          <span>${escapeHtml(incomePlanningManualBlockTypeLabel(block.type))}</span>
+          <span>${positionIconSvg(icon, "position-icon-svg income-planning-type-icon")} ${escapeHtml(incomePlanningManualBlockTypeLabel(block.type))}</span>
           <strong>${escapeHtml(block.name)}</strong>
           <small>${escapeHtml(block.description || `${hoursLabel(slotsHours(block.slots))} / Woche${pauseHours > 0 ? ` · ${hoursLabel(pauseHours)} Pause` : ""}`)}</small>
         </div>
@@ -2228,9 +2332,6 @@ function incomePlanningManualBlockRow(block: IncomePlanningManualBlock): string 
           <button class="button secondary" type="button" data-action="income-planning-open-block" data-income-planning-owner-type="manual" data-income-planning-owner-id="${escapeHtml(
             block.id
           )}" data-income-planning-slot-id="${escapeHtml(block.slots[0]?.id ?? "")}">Bearbeiten</button>
-          <button class="button secondary" type="button" data-action="income-planning-add-slot" data-income-planning-owner-type="manual" data-income-planning-owner-id="${escapeHtml(
-            block.id
-          )}">Slot</button>
           <button class="icon-button danger" type="button" data-action="income-planning-remove-manual-block" data-income-planning-manual-id="${escapeHtml(
             block.id
           )}" aria-label="Zeitblock entfernen">x</button>
@@ -2263,9 +2364,6 @@ function incomePlanningHabitRow(habit: IncomePlanningHabit): string {
           <button class="button secondary" type="button" data-action="income-planning-open-block" data-income-planning-owner-type="habit" data-income-planning-owner-id="${escapeHtml(
             habit.id
           )}" data-income-planning-slot-id="${escapeHtml(habit.slots[0]?.id ?? "")}">Bearbeiten</button>
-          <button class="button secondary" type="button" data-action="income-planning-add-slot" data-income-planning-owner-type="habit" data-income-planning-owner-id="${escapeHtml(
-            habit.id
-          )}">Slot</button>
           <button class="icon-button danger" type="button" data-action="income-planning-remove-habit" data-income-planning-habit-id="${escapeHtml(
             habit.id
           )}" aria-label="Habit entfernen">x</button>
@@ -2274,6 +2372,40 @@ function incomePlanningHabitRow(habit: IncomePlanningHabit): string {
       ${incomePlanningSlotSummary("habit", habit.id, habit.slots)}
     </article>
   `;
+}
+
+function renderIncomePlanningCalendarStamps(): void {
+  const host = document.querySelector<HTMLDivElement>("#incomePlanningCalendarStamps");
+  if (!host) return;
+  const stamps = [...state.incomePlanning.calendarStamps].sort(compareIncomePlanningCalendarStamps);
+  host.innerHTML = `
+    <div class="income-planning-stamp-list-head">
+      <strong>Stempel</strong>
+      <span>${intNumber(stamps.length)} im Kalender</span>
+    </div>
+    ${
+      stamps.length
+        ? stamps.map(incomePlanningCalendarStampListRow).join("")
+        : '<div class="chart-empty">Strg+Klick im Kalender setzt Icon-Stempel.</div>'
+    }
+  `;
+}
+
+function incomePlanningCalendarStampListRow(stamp: IncomePlanningCalendarStamp): string {
+  const icon = normalizePositionIcon(stamp.icon, "calendar");
+  return `
+    <button class="income-planning-stamp-list-row" type="button" data-action="income-planning-edit-stamp" data-income-planning-stamp-id="${escapeHtml(stamp.id)}">
+      ${positionIconSvg(icon, "position-icon-svg income-planning-type-icon")}
+      <span>${escapeHtml(stamp.label)}</span>
+      <small>${escapeHtml(`${incomePlanningWeekdayLabel(stamp.day)} · ${stamp.startTime}`)}</small>
+    </button>
+  `;
+}
+
+function compareIncomePlanningCalendarStamps(first: IncomePlanningCalendarStamp, second: IncomePlanningCalendarStamp): number {
+  const dayDiff = incomePlanningWeekdayIndex(first.day) - incomePlanningWeekdayIndex(second.day);
+  if (dayDiff !== 0) return dayDiff;
+  return first.startTime.localeCompare(second.startTime, "de");
 }
 
 function renderIncomePlanningCareerLife(model: IncomePlanningModel): void {
@@ -2308,9 +2440,10 @@ function renderIncomePlanningCareerLife(model: IncomePlanningModel): void {
 function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
   const host = document.querySelector<HTMLDivElement>("#incomePlanningWeeklyPlanner");
   if (!host) return;
-  const graphicEntries = model.calendarEntries.filter((entry) => !entry.flexible && !entry.invalid);
-  const backgroundEntries = incomePlanningCalendarBackgroundEntries(model);
-  const flexibleCount = model.calendarEntries.filter((entry) => entry.flexible).length;
+  const graphicEntries = model.calendarEntries.filter((entry) => !entry.invalid);
+  const backgroundEntries = incomePlanningCalendarBackgroundEntries();
+  const flexibleCount = graphicEntries.filter((entry) => entry.flexible).length;
+  const currentTime = incomePlanningCurrentTimeMarker();
   host.innerHTML = `
     <div class="income-planning-calendar" data-income-planning-calendar>
       <div class="income-planning-calendar-head">
@@ -2322,13 +2455,14 @@ function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
           ${Array.from({ length: 25 }, (_, hour) => `<span style="--hour:${hour}">${String(hour).padStart(2, "0")}:00</span>`).join("")}
         </div>
         <div id="incomePlanningCalendarDays" class="income-planning-calendar-days">
-          ${INCOME_PLANNING_WEEK_DAYS.map((day) => incomePlanningCalendarDayColumn(day, graphicEntries, backgroundEntries)).join("")}
+          ${INCOME_PLANNING_WEEK_DAYS.map((day) => incomePlanningCalendarDayColumn(day, graphicEntries, backgroundEntries, currentTime)).join("")}
         </div>
       </div>
       <div class="income-planning-calendar-note">
         <span>${intNumber(graphicEntries.length)} Zeitbloecke in der Grafik</span>
-        <span>${intNumber(flexibleCount)} flexible Horizonte im Hintergrund</span>
+        <span>${intNumber(flexibleCount)} flexible Zeitbloecke</span>
         <span>${intNumber(state.incomePlanning.assumptions.sleepSlots.length)} Schlafhorizonte im Hintergrund</span>
+        <span>Ist-Zeit ${escapeHtml(currentTime.label)}</span>
       </div>
     </div>
   `;
@@ -2337,10 +2471,12 @@ function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
 function incomePlanningCalendarDayColumn(
   day: IncomePlanningWeekday,
   entries: IncomePlanningCalendarEntry[],
-  backgroundEntries: IncomePlanningCalendarBackgroundEntry[]
+  backgroundEntries: IncomePlanningCalendarBackgroundEntry[],
+  currentTime: { day: IncomePlanningWeekday; minute: number; label: string }
 ): string {
   const dayEntries = entries.filter((entry) => entry.day === day);
   const dayBackgrounds = backgroundEntries.filter((entry) => entry.day === day);
+  const dayStamps = state.incomePlanning.calendarStamps.filter((stamp) => stamp.day === day).sort(compareIncomePlanningCalendarStamps);
   return `
     <div class="income-planning-calendar-day-column" data-income-planning-calendar-day="${escapeHtml(day)}" aria-label="${escapeHtml(
       incomePlanningWeekdayLabel(day)
@@ -2350,35 +2486,17 @@ function incomePlanningCalendarDayColumn(
       </div>
       ${dayBackgrounds.map(incomePlanningCalendarBackgroundBlock).join("")}
       ${dayEntries.map(incomePlanningCalendarEntryBlock).join("")}
+      ${dayStamps.map(incomePlanningCalendarStampMarker).join("")}
+      ${currentTime.day === day ? incomePlanningCurrentTimeLine(currentTime.minute, currentTime.label) : ""}
     </div>
   `;
 }
 
-function incomePlanningCalendarBackgroundEntries(model: IncomePlanningModel): IncomePlanningCalendarBackgroundEntry[] {
-  const flexibleEntries = model.calendarEntries.filter((entry) => entry.flexible && !entry.invalid).flatMap(incomePlanningFlexibleBackgroundEntries);
+function incomePlanningCalendarBackgroundEntries(): IncomePlanningCalendarBackgroundEntry[] {
   const sleepEntries = incomePlanningSleepSlotGroupsFromSlots(state.incomePlanning.assumptions.sleepSlots).flatMap(
     incomePlanningSleepBackgroundEntries
   );
-  return [...sleepEntries, ...flexibleEntries];
-}
-
-function incomePlanningFlexibleBackgroundEntries(entry: IncomePlanningCalendarEntry): IncomePlanningCalendarBackgroundEntry[] {
-  const meta = incomePlanningCalendarEntryMeta(entry);
-  const color = incomePlanningCalendarEntryColor(entry);
-  const segments = incomePlanningSlotCalendarSegments(entry);
-  return segments.map((segment, index) => ({
-    id: `${entry.id}:background:${index}`,
-    day: segment.day,
-    startMinute: segment.startMinute,
-    endMinute: segment.endMinute,
-    title: entry.title,
-    label: meta.label,
-    detail: `flexibel · ${minutesLabel(entry.durationMinutes)}`,
-    icon: meta.icon,
-    type: entry.type,
-    flexible: true,
-    color
-  }));
+  return sleepEntries;
 }
 
 function incomePlanningSleepBackgroundEntries(group: IncomePlanningSleepSlotGroup): IncomePlanningCalendarBackgroundEntry[] {
@@ -2444,13 +2562,16 @@ function incomePlanningCalendarEntryBlock(entry: IncomePlanningCalendarEntry): s
   const ownerType = incomePlanningOwnerTypeForEntry(entry);
   const meta = incomePlanningCalendarEntryMeta(entry);
   const color = incomePlanningCalendarEntryColor(entry);
-  const start = clamp(entry.startMinute, 0, 24 * 60);
-  const end = clamp(entry.endMinute, start + 15, 24 * 60);
+  const range = incomePlanningCalendarEntryVisualRange(entry);
+  const start = range.startMinute;
+  const end = range.endMinute;
   const top = (start / (24 * 60)) * 100;
   const height = ((end - start) / (24 * 60)) * 100;
+  const isHabitEntry = entry.type === "good_habit" || entry.type === "bad_habit" || entry.type === "replacement_habit";
   const classes = [
     "income-planning-calendar-block",
     `type-${entry.type}`,
+    entry.flexible ? "flexible" : "",
     entry.conflict ? "conflict" : "",
     entry.durationMinutes <= 30 ? "short" : ""
   ]
@@ -2467,19 +2588,77 @@ function incomePlanningCalendarEntryBlock(entry: IncomePlanningCalendarEntry): s
       data-income-planning-slot-id="${escapeHtml(entry.slotId)}"
       data-income-planning-slot-part="${escapeHtml(entry.slotPart)}"
       style="--top:${top.toFixed(3)}%; --height:${height.toFixed(3)}%; --start-minute:${start}; --duration-minutes:${end - start}; ${incomePlanningColorStyle(color)}"
-      title="${escapeHtml(`${incomePlanningEntryTime(entry)} · ${entry.title} · ${meta.label} · ${incomePlanningPlannerTypeLabel(entry.type)}`)}"
+      title="${escapeHtml(`${incomePlanningEntryTime(entry)} · ${entry.title}${isHabitEntry ? "" : ` · ${meta.label}`} · ${incomePlanningPlannerTypeLabel(entry.type)}`)}"
     >
       <span class="income-planning-calendar-resize top" data-income-planning-resize="start" aria-hidden="true"></span>
       <span class="income-planning-calendar-label">
         ${positionIconSvg(meta.icon, "position-icon-svg income-planning-calendar-icon")}
-        <span>${escapeHtml(meta.label)}</span>
+        <span>${escapeHtml(isHabitEntry ? entry.title : meta.label)}</span>
       </span>
-      <strong>${escapeHtml(entry.title)}</strong>
+      ${isHabitEntry ? "" : `<strong>${escapeHtml(entry.title)}</strong>`}
       <small>${escapeHtml(incomePlanningEntryTime(entry))}</small>
-      <em>${escapeHtml(incomePlanningPlannerTypeLabel(entry.type))}</em>
+      ${isHabitEntry ? "" : `<em>${escapeHtml(incomePlanningPlannerTypeLabel(entry.type))}</em>`}
       <span class="income-planning-calendar-resize bottom" data-income-planning-resize="end" aria-hidden="true"></span>
     </button>
   `;
+}
+
+function incomePlanningCalendarEntryVisualRange(entry: IncomePlanningCalendarEntry): { startMinute: number; endMinute: number } {
+  return incomePlanningVisualRangeFromTimes(entry.startTime, entry.endTime, entry.durationMinutes);
+}
+
+function incomePlanningVisualRangeFromTimes(
+  startTime: string,
+  endTime: string,
+  durationMinutes: number
+): { startMinute: number; endMinute: number } {
+  const parsedStart = parseTimeMinutes(startTime);
+  const parsedEnd = parseTimeMinutes(endTime);
+  const startMinute = clamp(parsedStart ?? 0, 0, 23 * 60 + 45);
+  if (parsedEnd !== null && parsedEnd > startMinute) {
+    return { startMinute, endMinute: clamp(parsedEnd, startMinute + 15, 24 * 60) };
+  }
+  const duration = clamp(Math.round(durationMinutes || 60), 15, 24 * 60 - startMinute);
+  return { startMinute, endMinute: startMinute + duration };
+}
+
+function incomePlanningCalendarStampMarker(stamp: IncomePlanningCalendarStamp): string {
+  const start = clamp(parseTimeMinutes(stamp.startTime) ?? 0, 0, 24 * 60);
+  const top = (start / (24 * 60)) * 100;
+  const icon = normalizePositionIcon(stamp.icon, "calendar");
+  return `
+    <button
+      class="income-planning-calendar-stamp"
+      type="button"
+      data-action="income-planning-open-stamp-menu"
+      data-income-planning-stamp-id="${escapeHtml(stamp.id)}"
+      style="--top:${top.toFixed(3)}%;"
+      title="${escapeHtml(`${stamp.label} · ${stamp.startTime}`)}"
+    >
+      ${positionIconSvg(icon, "position-icon-svg income-planning-calendar-icon")}
+      <span>${escapeHtml(stamp.label)}</span>
+    </button>
+  `;
+}
+
+function incomePlanningCurrentTimeLine(minute: number, label: string): string {
+  const top = (clamp(minute, 0, 24 * 60) / (24 * 60)) * 100;
+  return `
+    <div class="income-planning-current-time-line" style="--top:${top.toFixed(3)}%;" aria-label="Ist-Zeit ${escapeHtml(label)}">
+      <span>Ist-Zeit ${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
+function incomePlanningCurrentTimeMarker(): { day: IncomePlanningWeekday; minute: number; label: string } {
+  const now = new Date();
+  const dayIndex = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const minute = now.getHours() * 60 + now.getMinutes();
+  return {
+    day: INCOME_PLANNING_WEEK_DAYS[dayIndex] ?? "monday",
+    minute,
+    label: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+  };
 }
 
 function incomePlanningCalendarEntryMeta(entry: IncomePlanningCalendarEntry): { label: string; icon: string } {
@@ -2490,12 +2669,16 @@ function incomePlanningCalendarEntryMeta(entry: IncomePlanningCalendarEntry): { 
     return { label: config.label, icon: config.icon };
   }
   const habit = state.incomePlanning.habits.find((item) => item.id === entry.ownerId);
-  if (entry.type === "good_habit") return { label: "Gute Habit", icon: normalizePositionIcon(habit?.icon, "book") };
-  if (entry.type === "bad_habit") return { label: "Schlechte Habit", icon: normalizePositionIcon(habit?.icon, "snack") };
-  if (entry.type === "replacement_habit") return { label: "Ersatz-Habit", icon: "gift" };
-  if (entry.type === "private_commitment") return { label: "Privat", icon: "calendar" };
-  if (entry.type === "free_time") return { label: "Freizeit", icon: "health" };
-  if (entry.type === "buffer") return { label: "Puffer", icon: "calendar" };
+  if (entry.type === "good_habit") return { label: entry.title, icon: normalizePositionIcon(habit?.icon, "book") };
+  if (entry.type === "bad_habit") return { label: entry.title, icon: normalizePositionIcon(habit?.icon, "snack") };
+  if (entry.type === "replacement_habit") return { label: entry.title, icon: "gift" };
+  const manualBlock = state.incomePlanning.manualBlocks.find((block) => block.id === entry.ownerId);
+  if (manualBlock) {
+    return {
+      label: incomePlanningManualBlockTypeLabel(manualBlock.type),
+      icon: normalizePositionIcon(manualBlock.icon, incomePlanningDefaultManualIcon(manualBlock.type))
+    };
+  }
   return { label: incomePlanningPlannerTypeLabel(entry.type), icon: "calendar" };
 }
 
@@ -2514,7 +2697,12 @@ function incomePlanningCalendarEntryColor(entry: IncomePlanningCalendarEntry): s
 }
 
 function incomePlanningEntryTime(entry: IncomePlanningCalendarEntry): string {
-  if (entry.flexible) return "flexibel";
+  if (entry.flexible) {
+    const range = incomePlanningCalendarEntryVisualRange(entry);
+    return `flexibel · ${formatIncomePlanningTime(range.startMinute)}-${formatIncomePlanningTime(range.endMinute)} · ${minutesLabel(
+      entry.durationMinutes
+    )}`;
+  }
   return `${entry.startTime}-${entry.endTime}`;
 }
 
@@ -2846,7 +3034,8 @@ function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialo
           <span>Beschreibung</span>
           <input type="text" value="${escapeHtml(dialog.description)}" data-income-planning-dialog-field="description" />
         </label>
-        ${isHabit ? incomePlanningHabitIconDialogField(dialog) : incomePlanningColorDialogField(dialog)}
+        ${isHabit ? incomePlanningIconDialogField(dialog) : incomePlanningColorDialogField(dialog)}
+        ${dialog.ownerType === "manual" ? incomePlanningIconDialogField(dialog) : ""}
       </div>
     </section>
     <section class="income-planning-dialog-section">
@@ -2898,7 +3087,7 @@ function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialo
         </label>
         <label class="field compact">
           <span>Minuten</span>
-          <input type="number" min="15" max="10080" step="15" value="${dialog.slotDurationMinutes}" data-income-planning-dialog-field="slotDurationMinutes" />
+          <input type="number" min="15" max="10080" step="15" value="${dialog.slotDurationMinutes}" disabled aria-label="Automatisch berechnete Slot-Minuten" />
         </label>
         ${isHabit ? "" : incomePlanningPauseDialogFields(dialog)}
       </div>
@@ -2933,13 +3122,14 @@ function incomePlanningColorDialogField(dialog: NonNullable<IncomePlanningDialog
   `;
 }
 
-function incomePlanningHabitIconDialogField(dialog: NonNullable<IncomePlanningDialogState>): string {
-  const icon = normalizePositionIcon(dialog.habitIcon, dialog.habitType === "bad" ? "snack" : "book");
+function incomePlanningIconDialogField(dialog: NonNullable<IncomePlanningDialogState>): string {
+  const fallback = dialog.ownerType === "manual" ? incomePlanningDefaultManualIcon(dialog.manualType) : dialog.habitType === "bad" ? "snack" : "book";
+  const icon = normalizePositionIcon(dialog.ownerType === "manual" ? dialog.manualIcon : dialog.habitIcon, fallback);
   const label = POSITION_ICONS.find((item) => item.id === icon)?.label ?? "Icon";
   return `
     <div class="field income-planning-icon-field">
       <span>Icon</span>
-      <button class="income-planning-icon-button" type="button" data-action="open-income-planning-habit-icon-picker" title="Habit-Icon auswaehlen">
+      <button class="income-planning-icon-button" type="button" data-action="open-income-planning-icon-picker" title="Icon auswaehlen">
         ${positionIconSvg(icon, "position-icon-svg income-planning-type-icon")}
         <span>${escapeHtml(label)}</span>
       </button>
@@ -3019,6 +3209,61 @@ function openIncomePlanningDialogFromCalendar(dayColumn: HTMLElement, clientY: n
   });
 }
 
+function openIncomePlanningStampPickerFromCalendar(dayColumn: HTMLElement, clientX: number, clientY: number): void {
+  const day = incomePlanningWeekdayFromValue(dayColumn.dataset.incomePlanningCalendarDay) ?? "monday";
+  const rect = dayColumn.getBoundingClientRect();
+  const minute = snapIncomePlanningMinute(((clientY - rect.top) / Math.max(1, rect.height)) * 24 * 60);
+  const position = incomePlanningPopupPosition(clientX, clientY, 340, 430);
+  incomePlanningStampMenu = null;
+  incomePlanningStampPicker = {
+    stampId: null,
+    day,
+    startTime: formatIncomePlanningTime(clamp(minute, 0, 23 * 60 + 45)),
+    icon: "calendar",
+    label: "Stempel",
+    ...position
+  };
+  renderIncomePlanningStampPicker();
+  renderIncomePlanningStampMenu();
+}
+
+function openIncomePlanningStampPickerForEdit(stampId: string, clientX: number, clientY: number): void {
+  const stamp = state.incomePlanning.calendarStamps.find((item) => item.id === stampId);
+  if (!stamp) return;
+  const position = incomePlanningPopupPosition(clientX, clientY, 340, 430);
+  incomePlanningStampMenu = null;
+  incomePlanningStampPicker = {
+    stampId: stamp.id,
+    day: stamp.day,
+    startTime: stamp.startTime,
+    icon: normalizePositionIcon(stamp.icon, "calendar"),
+    label: stamp.label,
+    ...position
+  };
+  renderIncomePlanningStampPicker();
+  renderIncomePlanningStampMenu();
+}
+
+function openIncomePlanningStampMenu(stampId: string, clientX: number, clientY: number): void {
+  if (!state.incomePlanning.calendarStamps.some((stamp) => stamp.id === stampId)) return;
+  incomePlanningStampPicker = null;
+  incomePlanningStampMenu = { stampId, ...incomePlanningPopupPosition(clientX, clientY, 220, 160) };
+  renderIncomePlanningStampPicker();
+  renderIncomePlanningStampMenu();
+}
+
+function incomePlanningPopupPosition(
+  clientX: number,
+  clientY: number,
+  panelWidth: number,
+  panelHeight: number
+): { top: number; left: number } {
+  return {
+    left: Math.max(12, Math.min(clientX + 12, window.innerWidth - panelWidth - 12)),
+    top: Math.max(12, Math.min(clientY + 12, window.innerHeight - panelHeight - 12))
+  };
+}
+
 function incomePlanningDialogDraft(
   ownerType: IncomePlanningOwnerType,
   mode: IncomePlanningDialogMode,
@@ -3050,6 +3295,7 @@ function incomePlanningDialogDraft(
           ...slotSeed
         };
   const slotRange = mode === "create_slot" ? { fromDay: slot.day, toDay: slot.day } : incomePlanningSlotRangeForSlots(sourceSlots, slot);
+  const slotVisualRange = incomePlanningVisualRangeFromTimes(slot.startTime, slot.endTime, slot.durationMinutes);
   return {
     mode,
     ownerType,
@@ -3073,6 +3319,7 @@ function incomePlanningDialogDraft(
       habit?.icon,
       (habit?.type ?? fallbackHabit.type) === "bad" ? "snack" : (fallbackHabit.icon ?? "book")
     ),
+    manualIcon: normalizePositionIcon(manualBlock?.icon, incomePlanningDefaultManualIcon(manualBlock?.type ?? "other_event")),
     timing: habit?.timing ?? fallbackHabit.timing,
     habitDurationMinutes: habit?.durationMinutes ?? fallbackHabit.durationMinutes,
     replacementHabit: habit?.replacementHabit ?? "",
@@ -3083,7 +3330,7 @@ function incomePlanningDialogDraft(
     startTime: slot.startTime,
     endTime: slot.endTime,
     flexible: slot.flexible,
-    slotDurationMinutes: slot.durationMinutes,
+    slotDurationMinutes: slotVisualRange.endMinute - slotVisualRange.startMinute,
     pauseEnabled:
       ownerType !== "habit" &&
       Boolean(slot.pauseEnabled ?? (slot.pauseDurationMinutes && slot.pauseStartTime && slot.pauseEndTime)),
@@ -3122,7 +3369,7 @@ function updateIncomePlanningDialogDraft(field: string, value: string): void {
   if (!incomePlanningDialog) return;
   const numericFields = new Set(["habitDurationMinutes", "slotDurationMinutes", "sleepHoursPerDay", "pauseDurationMinutes"]);
   const booleanFields = new Set(["active", "flexible", "pauseEnabled"]);
-  incomePlanningDialog = {
+  const nextDraft = {
     ...incomePlanningDialog,
     [field]: booleanFields.has(field)
       ? value === "true"
@@ -3133,6 +3380,18 @@ function updateIncomePlanningDialogDraft(field: string, value: string): void {
           : value,
     error: ""
   } as NonNullable<IncomePlanningDialogState>;
+  incomePlanningDialog = incomePlanningDialogWithAutoSlotDuration(nextDraft);
+}
+
+function incomePlanningDialogWithAutoSlotDuration(
+  draft: NonNullable<IncomePlanningDialogState>
+): NonNullable<IncomePlanningDialogState> {
+  const start = parseTimeMinutes(draft.startTime);
+  const end = parseTimeMinutes(draft.endTime);
+  if (start !== null && end !== null && end > start) {
+    return { ...draft, slotDurationMinutes: end - start };
+  }
+  return draft;
 }
 
 function addIncomePlanningDialogSleepSlot(): void {
@@ -3330,8 +3589,8 @@ function saveIncomePlanningDialog(): void {
 function incomePlanningSlotsFromDialog(draft: NonNullable<IncomePlanningDialogState>): IncomePlanningSlot[] {
   const start = parseTimeMinutes(draft.startTime);
   const end = parseTimeMinutes(draft.endTime);
-  if (!draft.flexible && (start === null || end === null || end - start < 15)) return [];
-  const durationMinutes = draft.flexible ? clamp(Math.round(draft.slotDurationMinutes), 15, 10080) : (end ?? 0) - (start ?? 0);
+  if (start === null || end === null || end - start < 15) return [];
+  const durationMinutes = end - start;
   const pause = incomePlanningPauseFromDialog(draft);
   const slots = incomePlanningDayRange(draft.day, draft.toDay).map((day, index) => ({
     id: draft.day === draft.toDay && index === 0 ? draft.slotId || createId() : createId(),
@@ -3413,6 +3672,7 @@ function createIncomePlanningOwnerFromDialog(draft: NonNullable<IncomePlanningDi
           name: draft.name || incomePlanningManualBlockTypeLabel(draft.manualType),
           description: draft.description,
           color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultManualColor(draft.manualType)),
+          icon: normalizePositionIcon(draft.manualIcon, incomePlanningDefaultManualIcon(draft.manualType)),
           slots
         })
       ]
@@ -3474,7 +3734,8 @@ function applyIncomePlanningDialogOwnerFields(draft: NonNullable<IncomePlanningD
             type: draft.manualType,
             name: draft.name,
             description: draft.description,
-            color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultManualColor(draft.manualType))
+            color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultManualColor(draft.manualType)),
+            icon: normalizePositionIcon(draft.manualIcon, incomePlanningDefaultManualIcon(draft.manualType))
           }
         : block
       )
@@ -3532,7 +3793,9 @@ function handleIncomePlanningControl(
     const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
     const field = target.dataset.incomePlanningDialogField;
     updateIncomePlanningDialogDraft(field, value);
-    if (field === "pauseEnabled") renderIncomePlanningDialog();
+    if (["pauseEnabled", "startTime", "endTime", "flexible", "pauseStartTime", "pauseEndTime"].includes(field)) {
+      renderIncomePlanningDialog();
+    }
     return true;
   }
 
@@ -3719,6 +3982,7 @@ function updateIncomePlanningManualBlock(
       if (field === "name") return { ...block, name: value };
       if (field === "description") return { ...block, description: value };
       if (field === "color") return { ...block, color: normalizeIncomePlanningColor(value, block.color ?? incomePlanningDefaultManualColor(block.type)) };
+      if (field === "icon") return { ...block, icon: normalizePositionIcon(value, incomePlanningDefaultManualIcon(block.type)) };
       return block;
     })
   };
@@ -3754,7 +4018,6 @@ function updateIncomePlanningSlotField(slot: IncomePlanningSlot, field: keyof In
 
 function normalizeIncomePlanningSlotAfterEdit(slot: IncomePlanningSlot): IncomePlanningSlot {
   const normalizedPause = normalizeIncomePlanningSlotPause(slot);
-  if (normalizedPause.flexible) return normalizedPause;
   const start = parseTimeMinutes(normalizedPause.startTime);
   const end = parseTimeMinutes(normalizedPause.endTime);
   if (start !== null && end !== null && end > start) {
@@ -3834,9 +4097,11 @@ function startIncomePlanningCalendarDrag(event: PointerEvent): void {
   const column = block.closest<HTMLElement>("[data-income-planning-calendar-day]");
   const days = document.querySelector<HTMLElement>("#incomePlanningCalendarDays");
   if (!ownerId || !slotId || !slot || !column || !days) return;
-  const startMinute = parseTimeMinutes(slotPart === "pause" ? slot.pauseStartTime ?? "" : slot.startTime);
-  const endMinute = parseTimeMinutes(slotPart === "pause" ? slot.pauseEndTime ?? "" : slot.endTime);
-  if ((slotPart === "main" && slot.flexible) || startMinute === null || endMinute === null || endMinute <= startMinute) return;
+  const range =
+    slotPart === "pause"
+      ? incomePlanningVisualRangeFromTimes(slot.pauseStartTime ?? "", slot.pauseEndTime ?? "", slot.pauseDurationMinutes ?? 30)
+      : incomePlanningVisualRangeFromTimes(slot.startTime, slot.endTime, slot.durationMinutes);
+  if (range.endMinute <= range.startMinute) return;
   const resizeHandle = target?.closest<HTMLElement>("[data-income-planning-resize]");
   incomePlanningDragState = {
     ownerType,
@@ -3848,8 +4113,8 @@ function startIncomePlanningCalendarDrag(event: PointerEvent): void {
     startClientX: event.clientX,
     startClientY: event.clientY,
     originalDay: slot.day,
-    originalStartMinute: startMinute,
-    originalEndMinute: endMinute,
+    originalStartMinute: range.startMinute,
+    originalEndMinute: range.endMinute,
     dayWidth: Math.max(1, days.getBoundingClientRect().width / 7),
     columnHeight: Math.max(1, column.getBoundingClientRect().height),
     element: block,
@@ -8289,7 +8554,7 @@ function renderIncomeMilestoneTypePicker(): void {
 }
 
 function showIncomePlanningHabitIconPicker(button: HTMLButtonElement): void {
-  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "habit") return;
+  if (!incomePlanningDialog || (incomePlanningDialog.ownerType !== "habit" && incomePlanningDialog.ownerType !== "manual")) return;
   const rect = button.getBoundingClientRect();
   const panelWidth = 320;
   const panelHeight = 360;
@@ -8308,10 +8573,18 @@ function hideIncomePlanningHabitIconPicker(): void {
 }
 
 function selectIncomePlanningHabitIcon(icon: string): void {
-  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "habit") return;
+  if (!incomePlanningDialog || (incomePlanningDialog.ownerType !== "habit" && incomePlanningDialog.ownerType !== "manual")) return;
+  const fallback =
+    incomePlanningDialog.ownerType === "manual"
+      ? incomePlanningDefaultManualIcon(incomePlanningDialog.manualType)
+      : incomePlanningDialog.habitType === "bad"
+        ? "snack"
+        : "book";
+  const normalizedIcon = normalizePositionIcon(icon, fallback);
   incomePlanningDialog = {
     ...incomePlanningDialog,
-    habitIcon: normalizePositionIcon(icon, incomePlanningDialog.habitType === "bad" ? "snack" : "book"),
+    habitIcon: incomePlanningDialog.ownerType === "habit" ? normalizedIcon : incomePlanningDialog.habitIcon,
+    manualIcon: incomePlanningDialog.ownerType === "manual" ? normalizedIcon : incomePlanningDialog.manualIcon,
     error: ""
   };
   incomePlanningHabitIconPicker = null;
@@ -8322,18 +8595,32 @@ function selectIncomePlanningHabitIcon(icon: string): void {
 function renderIncomePlanningHabitIconPicker(): void {
   const picker = document.querySelector<HTMLDivElement>("#incomePlanningHabitIconPicker");
   if (!picker) return;
-  if (!incomePlanningHabitIconPicker || !incomePlanningDialog || incomePlanningDialog.ownerType !== "habit") {
+  if (
+    !incomePlanningHabitIconPicker ||
+    !incomePlanningDialog ||
+    (incomePlanningDialog.ownerType !== "habit" && incomePlanningDialog.ownerType !== "manual")
+  ) {
     picker.hidden = true;
     return;
   }
 
-  const currentIcon = normalizePositionIcon(incomePlanningDialog.habitIcon, incomePlanningDialog.habitType === "bad" ? "snack" : "book");
+  const fallback =
+    incomePlanningDialog.ownerType === "manual"
+      ? incomePlanningDefaultManualIcon(incomePlanningDialog.manualType)
+      : incomePlanningDialog.habitType === "bad"
+        ? "snack"
+        : "book";
+  const currentIcon = normalizePositionIcon(
+    incomePlanningDialog.ownerType === "manual" ? incomePlanningDialog.manualIcon : incomePlanningDialog.habitIcon,
+    fallback
+  );
+  const title = incomePlanningDialog.ownerType === "manual" ? "Zeitblock-Icon" : "Habit-Icon";
   picker.style.top = `${incomePlanningHabitIconPicker.top}px`;
   picker.style.left = `${incomePlanningHabitIconPicker.left}px`;
   picker.innerHTML = `
     <div class="position-icon-picker-head">
-      <span>Habit-Icon</span>
-      <button class="icon-button" type="button" data-action="close-income-planning-habit-icon-picker" aria-label="Iconauswahl schliessen">x</button>
+      <span>${escapeHtml(title)}</span>
+      <button class="icon-button" type="button" data-action="close-income-planning-icon-picker" aria-label="Iconauswahl schliessen">x</button>
     </div>
     <div class="position-icon-picker-grid">
       ${POSITION_ICONS.map((icon) => {
@@ -8342,8 +8629,8 @@ function renderIncomePlanningHabitIconPicker(): void {
           <button
             class="position-icon-option ${active ? "active" : ""}"
             type="button"
-            data-action="select-income-planning-habit-icon"
-            data-income-planning-habit-icon="${icon.id}"
+            data-action="select-income-planning-icon"
+            data-income-planning-icon="${icon.id}"
             aria-pressed="${active}"
             title="${escapeHtml(icon.label)}"
           >
@@ -8355,6 +8642,170 @@ function renderIncomePlanningHabitIconPicker(): void {
     </div>
   `;
   picker.hidden = false;
+}
+
+function hideIncomePlanningStampPicker(): void {
+  incomePlanningStampPicker = null;
+  renderIncomePlanningStampPicker();
+}
+
+function hideIncomePlanningStampMenu(): void {
+  incomePlanningStampMenu = null;
+  renderIncomePlanningStampMenu();
+}
+
+function updateIncomePlanningStampPickerDraft(field: string, value: string): void {
+  if (!incomePlanningStampPicker) return;
+  if (field === "label") {
+    incomePlanningStampPicker = { ...incomePlanningStampPicker, label: value };
+    return;
+  }
+  if (field === "startTime") {
+    incomePlanningStampPicker = { ...incomePlanningStampPicker, startTime: value };
+    return;
+  }
+  if (field === "day" && isIncomePlanningWeekday(value)) {
+    incomePlanningStampPicker = { ...incomePlanningStampPicker, day: value };
+  }
+}
+
+function selectIncomePlanningStampIcon(icon: string): void {
+  if (!incomePlanningStampPicker) return;
+  incomePlanningStampPicker = { ...incomePlanningStampPicker, icon: normalizePositionIcon(icon, "calendar") };
+  renderIncomePlanningStampPicker();
+}
+
+function saveIncomePlanningStampPicker(): void {
+  if (!incomePlanningStampPicker) return;
+  const label = incomePlanningStampPicker.label.trim() || "Stempel";
+  const startTime = formatIncomePlanningTime(parseTimeMinutes(incomePlanningStampPicker.startTime) ?? 9 * 60);
+  const stamp: IncomePlanningCalendarStamp = {
+    id: incomePlanningStampPicker.stampId ?? createId(),
+    day: incomePlanningStampPicker.day,
+    startTime,
+    icon: normalizePositionIcon(incomePlanningStampPicker.icon, "calendar"),
+    label
+  };
+  const exists = state.incomePlanning.calendarStamps.some((item) => item.id === stamp.id);
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    calendarStamps: exists
+      ? state.incomePlanning.calendarStamps.map((item) => (item.id === stamp.id ? stamp : item))
+      : [...state.incomePlanning.calendarStamps, stamp]
+  };
+  incomePlanningStampPicker = null;
+  renderIncomePlanning();
+  saveState(state);
+}
+
+function deleteIncomePlanningStamp(stampId: string): void {
+  if (!stampId) return;
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    calendarStamps: state.incomePlanning.calendarStamps.filter((stamp) => stamp.id !== stampId)
+  };
+  incomePlanningStampPicker = null;
+  incomePlanningStampMenu = null;
+  renderIncomePlanning();
+  saveState(state);
+}
+
+function renderIncomePlanningStampPicker(): void {
+  const picker = document.querySelector<HTMLDivElement>("#incomePlanningStampPicker");
+  if (!picker) return;
+  if (!incomePlanningStampPicker) {
+    picker.hidden = true;
+    return;
+  }
+  const draft = incomePlanningStampPicker;
+  const currentIcon = normalizePositionIcon(draft.icon, "calendar");
+  picker.style.top = `${draft.top}px`;
+  picker.style.left = `${draft.left}px`;
+  picker.innerHTML = `
+    <div class="position-icon-picker-head">
+      <span>${draft.stampId ? "Stempel bearbeiten" : "Stempel setzen"}</span>
+      <button class="icon-button" type="button" data-action="income-planning-close-stamp-picker" aria-label="Stempel-Picker schliessen">x</button>
+    </div>
+    <div class="income-planning-stamp-form">
+      <label class="field">
+        <span>Label</span>
+        <input type="text" value="${escapeHtml(draft.label)}" data-income-planning-stamp-field="label" />
+      </label>
+      <div class="income-planning-stamp-time-grid">
+        ${incomePlanningStampSelectField("day", "Tag", incomePlanningWeekdayOptionItems(), draft.day)}
+        <label class="field compact">
+          <span>Zeit</span>
+          <input type="time" value="${escapeHtml(draft.startTime)}" data-income-planning-stamp-field="startTime" />
+        </label>
+      </div>
+    </div>
+    <div class="position-icon-picker-grid compact">
+      ${POSITION_ICONS.map((icon) => {
+        const active = icon.id === currentIcon;
+        return `
+          <button
+            class="position-icon-option ${active ? "active" : ""}"
+            type="button"
+            data-action="select-income-planning-stamp-icon"
+            data-income-planning-stamp-icon="${icon.id}"
+            aria-pressed="${active}"
+            title="${escapeHtml(icon.label)}"
+          >
+            ${positionIconSvg(icon.id)}
+            <span>${escapeHtml(icon.label)}</span>
+          </button>
+        `;
+      }).join("")}
+    </div>
+    <div class="button-row income-planning-stamp-actions">
+      <button class="button secondary" type="button" data-action="income-planning-close-stamp-picker">Abbrechen</button>
+      <button class="button" type="button" data-action="income-planning-save-stamp">Speichern</button>
+    </div>
+  `;
+  picker.hidden = false;
+}
+
+function incomePlanningStampSelectField(
+  field: string,
+  label: string,
+  options: Array<{ value: string; label: string }>,
+  selected: string
+): string {
+  return `
+    <label class="field compact">
+      <span>${escapeHtml(label)}</span>
+      <select data-income-planning-stamp-field="${escapeHtml(field)}">
+        ${options.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === selected ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function renderIncomePlanningStampMenu(): void {
+  const menu = document.querySelector<HTMLDivElement>("#incomePlanningStampMenu");
+  if (!menu) return;
+  if (!incomePlanningStampMenu) {
+    menu.hidden = true;
+    return;
+  }
+  const stamp = state.incomePlanning.calendarStamps.find((item) => item.id === incomePlanningStampMenu?.stampId);
+  if (!stamp) {
+    menu.hidden = true;
+    return;
+  }
+  menu.style.top = `${incomePlanningStampMenu.top}px`;
+  menu.style.left = `${incomePlanningStampMenu.left}px`;
+  menu.innerHTML = `
+    <div class="position-icon-picker-head">
+      <span>${escapeHtml(stamp.label)}</span>
+      <button class="icon-button" type="button" data-action="income-planning-close-stamp-menu" aria-label="Stempel-Menue schliessen">x</button>
+    </div>
+    <div class="income-planning-stamp-menu-actions">
+      <button class="button secondary" type="button" data-action="income-planning-edit-stamp" data-income-planning-stamp-id="${escapeHtml(stamp.id)}">Bearbeiten</button>
+      <button class="button danger" type="button" data-action="income-planning-delete-stamp" data-income-planning-stamp-id="${escapeHtml(stamp.id)}">Loeschen</button>
+    </div>
+  `;
+  menu.hidden = false;
 }
 
 function showPositionIconPicker(button: HTMLButtonElement): void {

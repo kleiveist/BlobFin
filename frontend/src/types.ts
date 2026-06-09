@@ -455,7 +455,16 @@ export interface IncomePlanningManualBlock {
   name: string;
   description: string;
   color?: string;
+  icon?: string;
   slots: IncomePlanningSlot[];
+}
+
+export interface IncomePlanningCalendarStamp {
+  id: string;
+  day: IncomePlanningWeekday;
+  startTime: string;
+  icon: string;
+  label: string;
 }
 
 export interface IncomePlanningAssumptions {
@@ -467,6 +476,7 @@ export interface IncomePlanningState {
   workBlocks: IncomePlanningWorkBlock[];
   habits: IncomePlanningHabit[];
   manualBlocks: IncomePlanningManualBlock[];
+  calendarStamps: IncomePlanningCalendarStamp[];
   assumptions: IncomePlanningAssumptions;
 }
 

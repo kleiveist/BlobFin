@@ -23,6 +23,7 @@ import {
   INCOME_PLANNING_CATEGORY_IDS,
   incomePlanningCategoryConfig,
   incomePlanningDefaultManualColor,
+  incomePlanningDefaultManualIcon,
   incomePlanningDefaultWorkColor,
   incomePlanningSleepSlotDurationMinutes,
   incomePlanningStripSlotPause,
@@ -54,6 +55,7 @@ import type {
   CombinedWealthDepotKey,
   CombinedWealthToggles,
   IncomePlanningAssumptions,
+  IncomePlanningCalendarStamp,
   IncomePlanningCategory,
   IncomePlanningHabit,
   IncomePlanningManualBlock,
@@ -879,6 +881,11 @@ function normalizeIncomePlanningState(value: unknown): IncomePlanningState {
       ? value.habits.map(normalizeIncomePlanningHabit).filter((habit): habit is IncomePlanningHabit => habit !== null)
       : fallback.habits,
     manualBlocks,
+    calendarStamps: Array.isArray(value.calendarStamps)
+      ? value.calendarStamps
+          .map(normalizeIncomePlanningCalendarStamp)
+          .filter((stamp): stamp is IncomePlanningCalendarStamp => stamp !== null)
+      : fallback.calendarStamps,
     assumptions: normalizeIncomePlanningAssumptions(value.assumptions)
   };
 }
@@ -964,9 +971,22 @@ function normalizeIncomePlanningManualBlock(value: unknown): IncomePlanningManua
     name: String(value.name || fallback.name),
     description: String(value.description || ""),
     color: normalizeIncomePlanningColor(value.color, fallback.color ?? incomePlanningDefaultManualColor(type)),
+    icon: normalizePositionIcon(value.icon, incomePlanningDefaultManualIcon(type)),
     slots: Array.isArray(value.slots)
       ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", 60)).filter(isSlot)
       : fallback.slots
+  };
+}
+
+function normalizeIncomePlanningCalendarStamp(value: unknown): IncomePlanningCalendarStamp | null {
+  if (!isRecord(value)) return null;
+  const label = String(value.label || "").trim();
+  return {
+    id: String(value.id || createId()),
+    day: isIncomePlanningWeekday(value.day) ? value.day : "monday",
+    startTime: normalizeIncomePlanningTime(value.startTime, "09:00"),
+    icon: normalizePositionIcon(value.icon, "calendar"),
+    label: label || "Stempel"
   };
 }
 
@@ -978,15 +998,19 @@ function normalizeIncomePlanningSlot(
   if (!isRecord(value)) return null;
   const startTime = normalizeIncomePlanningTime(value.startTime, "09:00");
   const endTime = normalizeIncomePlanningTime(value.endTime, "10:00");
+  const startMinutes = timeMinutes(String(value.startTime || ""));
+  const endMinutes = timeMinutes(String(value.endTime || ""));
+  const clockDuration = startMinutes !== null && endMinutes !== null && endMinutes > startMinutes ? endMinutes - startMinutes : null;
+  const storedDuration = Math.round(
+    clampNumber(numberOrDefault(value.durationMinutes, fallbackDuration(startTime, endTime, fallbackDurationMinutes)), 0, 168 * 60)
+  );
   const normalizedSlot: IncomePlanningSlot = {
     id: String(value.id || createId()),
     day: isIncomePlanningWeekday(value.day) ? value.day : fallbackDay,
     startTime,
     endTime,
     flexible: booleanOrDefault(value.flexible, false),
-    durationMinutes: Math.round(
-      clampNumber(numberOrDefault(value.durationMinutes, fallbackDuration(startTime, endTime, fallbackDurationMinutes)), 0, 168 * 60)
-    )
+    durationMinutes: clockDuration ?? storedDuration
   };
   const pauseStartTime = "pauseStartTime" in value ? normalizeIncomePlanningTime(value.pauseStartTime, "12:00") : undefined;
   const pauseEndTime = "pauseEndTime" in value ? normalizeIncomePlanningTime(value.pauseEndTime, "12:30") : undefined;

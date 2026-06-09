@@ -344,8 +344,18 @@ describe("income planning", () => {
       manualBlocks: [
         buildIncomePlanningManualBlock("free_time", "free", {
           name: "Freizeit",
+          icon: "health",
           slots: [flexiblePlanningSlot("free-slot", 5)]
         })
+      ],
+      calendarStamps: [
+        {
+          id: "stamp-walk",
+          day: "wednesday",
+          startTime: "18:15",
+          icon: "calendar",
+          label: "Spaziergang"
+        }
       ],
       assumptions: {
         sleepHoursPerDay: 7.5,
@@ -391,7 +401,15 @@ describe("income planning", () => {
       priority: "high",
       icon: "snack"
     });
+    expect(imported?.manualBlocks[0]).toMatchObject({ id: "free", icon: "health" });
     expect(imported?.manualBlocks[0]?.slots[0]).toMatchObject({ id: "free-slot", flexible: true, durationMinutes: 300 });
+    expect(imported?.calendarStamps[0]).toMatchObject({
+      id: "stamp-walk",
+      day: "wednesday",
+      startTime: "18:15",
+      icon: "calendar",
+      label: "Spaziergang"
+    });
     expect(imported?.assumptions.sleepHoursPerDay).toBe(7.5);
     expect(imported?.assumptions.sleepSlots[0]).toMatchObject({
       id: "sleep-slot",

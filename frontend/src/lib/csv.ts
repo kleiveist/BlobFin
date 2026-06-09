@@ -5,6 +5,7 @@ import {
   buildIncomePlanningWorkBlock,
   incomePlanningAverageSleepHours,
   incomePlanningDefaultManualColor,
+  incomePlanningDefaultManualIcon,
   incomePlanningDefaultWorkColor,
   incomePlanningStripSlotPause,
   INCOME_PLANNING_CATEGORY_CONFIGS,
@@ -32,6 +33,7 @@ import { flowForType, isIncomeType, typeForFlow } from "./positionKinds";
 import { positionPlanningYear } from "./planningYears";
 import type {
   IncomePlanningCategory,
+  IncomePlanningCalendarStamp,
   IncomePlanningHabit,
   IncomePlanningHabitDurationUnit,
   IncomePlanningManualBlock,
@@ -283,7 +285,7 @@ const INCOME_PLANNING_CSV_HEADER = [
   "Habit-Ersatz",
   "Habit-Status",
   "Habit-Prioritaet",
-  "Habit-Icon",
+  "Icon",
   "Schlaf-Stunden-Pro-Tag"
 ];
 
@@ -295,6 +297,7 @@ type IncomePlanningCsvRowKind =
   | "habit_slot"
   | "manual"
   | "manual_slot"
+  | "stamp"
   | "sleep"
   | "unknown";
 
@@ -349,12 +352,25 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         4: block.type,
         5: block.name,
         6: block.description,
-        7: block.color ?? incomePlanningDefaultManualColor(block.type)
+        7: block.color ?? incomePlanningDefaultManualColor(block.type),
+        25: block.icon ?? incomePlanningDefaultManualIcon(block.type)
       })
     );
     for (const slot of block.slots) {
       rows.push(incomePlanningCsvRow("Zeitblock-Slot", { 1: block.id, ...incomePlanningSlotCsvCells(slot) }));
     }
+  }
+
+  for (const stamp of planning.calendarStamps) {
+    rows.push(
+      incomePlanningCsvRow("Stempel", {
+        1: stamp.id,
+        5: stamp.label,
+        8: stamp.day,
+        9: stamp.startTime,
+        25: stamp.icon
+      })
+    );
   }
 
   for (const slot of planning.assumptions.sleepSlots) {
@@ -388,6 +404,7 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
   const habits = new Map<string, IncomePlanningHabit>();
   const manualBlocks = new Map<string, IncomePlanningManualBlock>();
   const slotsByOwnerId = new Map<string, IncomePlanningSlot[]>();
+  const calendarStamps: IncomePlanningCalendarStamp[] = [];
   const sleepSlots: IncomePlanningSleepSlot[] = [];
   let sleepHoursPerDay: number | null = null;
   let recognizedRows = 0;
@@ -433,6 +450,12 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
       continue;
     }
 
+    if (kind === "stamp") {
+      calendarStamps.push(parseIncomePlanningCalendarStamp(row, get));
+      recognizedRows += 1;
+      continue;
+    }
+
     if (kind === "sleep") {
       const slot = parseIncomePlanningCsvSleepSlot(row, get);
       if (slot) {
@@ -458,6 +481,7 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
       ...block,
       slots: slotsByOwnerId.get(block.id) ?? []
     })),
+    calendarStamps,
     assumptions: {
       sleepHoursPerDay:
         sleepHoursPerDay ?? incomePlanningAverageSleepHours({ sleepHoursPerDay: 0, sleepSlots: importedSleepSlots }),
@@ -522,6 +546,7 @@ function parseIncomePlanningCsvRowKind(value: unknown): IncomePlanningCsvRowKind
   if (["habitslot", "gewohnheitslot"].includes(normalized)) return "habit_slot";
   if (["zeitblock", "manual", "manualblock", "privatezeit", "ereignis"].includes(normalized)) return "manual";
   if (["zeitblockslot", "manualslot", "ereignisslot"].includes(normalized)) return "manual_slot";
+  if (["stempel", "stamp", "calendarstamp", "kalenderstempel"].includes(normalized)) return "stamp";
   if (["schlaf", "sleep", "sleepslot"].includes(normalized)) return "sleep";
   return "unknown";
 }
@@ -579,6 +604,7 @@ function parseIncomePlanningManualBlock(row: string[], get: CsvRowGetter): Incom
   const id = cleanText(get(row, ["blockid", "id", "ownerid"], 1)) || createId();
   const fallback = buildIncomePlanningManualBlock(type, id, { slots: [] });
   const color = normalizeIncomePlanningCsvColor(get(row, ["farbe", "color"], 7), incomePlanningDefaultManualColor(type));
+  const icon = normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), incomePlanningDefaultManualIcon(type));
   return {
     ...fallback,
     id,
@@ -587,7 +613,22 @@ function parseIncomePlanningManualBlock(row: string[], get: CsvRowGetter): Incom
     name: cleanText(get(row, ["name", "titel", "title"], 5)) || fallback.name,
     description: cleanText(get(row, ["beschreibung", "description"], 6)),
     color,
+    icon,
     slots: []
+  };
+}
+
+function parseIncomePlanningCalendarStamp(row: string[], get: CsvRowGetter): IncomePlanningCalendarStamp {
+  const id = cleanText(get(row, ["blockid", "id", "ownerid"], 1)) || createId();
+  const day = parseIncomePlanningWeekday(get(row, ["tag", "day", "wochentag"], 8), "monday");
+  const startTime = parseIncomePlanningTime(get(row, ["startzeit", "start", "starttime"], 9), "09:00");
+  const label = cleanText(get(row, ["name", "label", "titel", "title"], 5)) || "Stempel";
+  return {
+    id,
+    day,
+    startTime,
+    icon: normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), "calendar"),
+    label
   };
 }
 
@@ -597,10 +638,12 @@ function parseIncomePlanningCsvSlot(row: string[], get: CsvRowGetter): IncomePla
   const startTime = parseIncomePlanningTime(get(row, ["startzeit", "start", "starttime"], 9), "09:00");
   const endTime = parseIncomePlanningTime(get(row, ["endzeit", "ende", "end", "endtime"], 10), "10:00");
   const flexible = parseBooleanValue(get(row, ["flexibel", "flexible"], 11), false);
-  const durationMinutes = parseIncomePlanningMinutes(
+  const clockDuration = fallbackTimeDuration(startTime, endTime, 0);
+  const parsedDurationMinutes = parseIncomePlanningMinutes(
     get(row, ["dauerminuten", "dauer", "durationminutes"], 12),
     flexible ? 60 : fallbackTimeDuration(startTime, endTime, 60)
   );
+  const durationMinutes = clockDuration > 0 ? clockDuration : parsedDurationMinutes;
   const slot: IncomePlanningSlot = { id, day, startTime, endTime, flexible, durationMinutes };
   const pauseEnabledRaw = get(row, ["pauseaktiv", "pauseenabled"], 13);
   const pauseStartRaw = get(row, ["pausestartzeit", "pausestart", "pausestarttime"], 14);

@@ -421,6 +421,7 @@ export function defaultIncomePlanningState(): IncomePlanningState {
       buildIncomePlanningManualBlock("free_time", "income-plan-free-time"),
       buildIncomePlanningManualBlock("buffer", "income-plan-weekly-buffer")
     ],
+    calendarStamps: [],
     assumptions: {
       sleepHoursPerDay: incomePlanningAverageSleepHours({ sleepHoursPerDay: 0, sleepSlots }),
       sleepSlots

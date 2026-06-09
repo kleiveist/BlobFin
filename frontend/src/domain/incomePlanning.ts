@@ -325,6 +325,7 @@ export function buildIncomePlanningManualBlock(
     name: config.name,
     description: "",
     color: incomePlanningDefaultManualColor(type),
+    icon: incomePlanningDefaultManualIcon(type),
     slots,
     ...overrides
   };
@@ -493,7 +494,6 @@ function pauseCalendarEntryFromSlot(ownerId: string, slot: IncomePlanningSlot, i
 }
 
 export function incomePlanningSlotGrossDurationMinutes(slot: IncomePlanningSlot): number {
-  if (slot.flexible) return Math.max(0, Math.round(slot.durationMinutes));
   const start = parseTimeMinutes(slot.startTime);
   const end = parseTimeMinutes(slot.endTime);
   if (start !== null && end !== null && end > start) return end - start;
@@ -727,6 +727,13 @@ export function incomePlanningDefaultManualColor(type: IncomePlanningManualBlock
   if (type === "free_time") return "#7d6bb3";
   if (type === "buffer") return "#c76f4c";
   return "#6f7785";
+}
+
+export function incomePlanningDefaultManualIcon(type: IncomePlanningManualBlockType): string {
+  if (type === "private_commitment") return "calendar";
+  if (type === "free_time") return "health";
+  if (type === "buffer") return "shield";
+  return "calendar";
 }
 
 function timedSlot(day: IncomePlanningWeekday, startTime: string, endTime: string): IncomePlanningSlotTemplate {

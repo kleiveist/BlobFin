@@ -198,7 +198,7 @@ export function renderAppShell(): string {
           <div id="incomePlanningTimeCharts" class="income-planning-time-charts"></div>
         </section>
         <section class="income-card income-planning-weekly-card">
-          <div class="income-section-head">
+          <div class="income-section-head income-planning-weekly-head">
             <h3>Wochenplaner / Kalender</h3>
             <p>Kompakte 7-Tage-Grafik mit 24h-Achse, Dragging und Popup-Datenerfassung.</p>
           </div>
@@ -246,7 +246,10 @@ export function renderAppShell(): string {
             </div>
             <button class="button" type="button" data-action="income-planning-add-habit">Habit hinzufuegen</button>
           </div>
-          <div id="incomePlanningHabits" class="income-planning-block-list"></div>
+          <div class="income-planning-habit-stamp-layout">
+            <div id="incomePlanningHabits" class="income-planning-block-list"></div>
+            <aside id="incomePlanningCalendarStamps" class="income-planning-calendar-stamp-list" aria-label="Kalender-Stempel"></aside>
+          </div>
         </section>
         <div id="incomePlanningDialogRoot"></div>
       </section>
@@ -522,7 +525,9 @@ export function renderAppShell(): string {
         <div id="incomeAnalysisDialogRoot"></div>
         <div id="incomeYearLabelPicker" class="position-icon-picker income-year-label-picker" role="dialog" aria-label="Einkommenslabel auswaehlen" hidden></div>
         <div id="incomeMilestoneTypePicker" class="position-icon-picker income-milestone-type-picker" role="dialog" aria-label="Meilenstein-Typ auswaehlen" hidden></div>
-        <div id="incomePlanningHabitIconPicker" class="position-icon-picker income-planning-habit-icon-picker" role="dialog" aria-label="Habit-Icon auswaehlen" hidden></div>
+        <div id="incomePlanningHabitIconPicker" class="position-icon-picker income-planning-habit-icon-picker" role="dialog" aria-label="Icon auswaehlen" hidden></div>
+        <div id="incomePlanningStampPicker" class="position-icon-picker income-planning-stamp-picker" role="dialog" aria-label="Kalender-Stempel bearbeiten" hidden></div>
+        <div id="incomePlanningStampMenu" class="position-icon-picker income-planning-stamp-menu" role="dialog" aria-label="Kalender-Stempel-Menue" hidden></div>
       </div>
 
       <section class="panel investment-panel" data-module-section="planning_scenarios">

@@ -1595,7 +1595,7 @@ tfoot th {
 
 .position-icon-picker {
   position: fixed;
-  z-index: 30;
+  z-index: 120;
   width: min(320px, calc(100vw - 24px));
   max-height: min(360px, calc(100vh - 24px));
   overflow: auto;
@@ -1629,6 +1629,36 @@ tfoot th {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.position-icon-picker-grid.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.income-planning-stamp-picker {
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(430px, calc(100vh - 24px));
+}
+
+.income-planning-stamp-menu {
+  width: min(220px, calc(100vw - 24px));
+}
+
+.income-planning-stamp-form,
+.income-planning-stamp-menu-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.income-planning-stamp-time-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.7fr);
+  gap: 8px;
+}
+
+.income-planning-stamp-actions {
+  margin-top: 10px;
+  justify-content: flex-end;
 }
 
 .income-year-label-picker {
@@ -5179,6 +5209,19 @@ tfoot th {
   align-items: flex-start;
 }
 
+.income-planning-weekly-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+  gap: 16px;
+  align-items: end;
+}
+
+.income-planning-weekly-head p {
+  justify-self: end;
+  max-width: 420px;
+  text-align: right;
+}
+
 .income-planning-time-controls,
 .income-planning-block-list,
 .income-planning-slot-summary,
@@ -5191,6 +5234,68 @@ tfoot th {
 #incomePlanningWorkBlocks.income-planning-block-list {
   grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
   align-items: stretch;
+}
+
+#incomePlanningManualBlocks.income-planning-block-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.income-planning-habit-stamp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(180px, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.income-planning-calendar-stamp-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.income-planning-stamp-list-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.income-planning-stamp-list-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 5px 7px;
+  align-items: center;
+  border: 1px solid var(--row-border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 7px;
+  text-align: left;
+}
+
+.income-planning-stamp-list-row span,
+.income-planning-stamp-list-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-planning-stamp-list-row small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
 }
 
 .income-planning-block-card {
@@ -5432,6 +5537,22 @@ tfoot th {
   border-style: dashed;
 }
 
+.income-planning-slot-chip.add {
+  border-style: dashed;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.income-planning-slot-chip.add strong {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
 .income-planning-career-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -5537,7 +5658,7 @@ tfoot th {
 .income-planning-calendar {
   --calendar-axis-width: 58px;
   --calendar-day-width: minmax(118px, 1fr);
-  --calendar-height: 720px;
+  --calendar-height: clamp(540px, 66vh, 640px);
   display: grid;
   gap: 8px;
   min-width: 0;
@@ -5559,6 +5680,7 @@ tfoot th {
   grid-template-columns: var(--calendar-axis-width) minmax(calc(7 * 118px), 1fr);
   min-width: 0;
   overflow-x: auto;
+  overflow-y: visible;
 }
 
 .income-planning-calendar-axis {
@@ -5728,6 +5850,13 @@ tfoot th {
   cursor: grabbing;
 }
 
+.income-planning-calendar-block.flexible {
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, var(--entry-bg, rgba(47, 111, 176, 0.13)), rgba(255, 255, 255, 0.02)),
+    var(--surface-soft);
+}
+
 .income-planning-calendar-block strong,
 .income-planning-calendar-block small,
 .income-planning-calendar-block em {
@@ -5845,6 +5974,62 @@ tfoot th {
 
 .income-planning-calendar-block.conflict {
   box-shadow: inset 0 0 0 1px rgba(185, 70, 70, 0.65);
+}
+
+.income-planning-calendar-stamp {
+  position: absolute;
+  right: 4px;
+  top: var(--top);
+  transform: translateY(-50%);
+  display: inline-grid;
+  grid-template-columns: 14px minmax(0, auto);
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 10px);
+  border: 1px solid var(--row-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 3px 7px;
+  text-align: left;
+  box-shadow: 0 6px 14px rgba(31, 37, 40, 0.12);
+  z-index: 5;
+}
+
+.income-planning-calendar-stamp span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent-strong);
+  font-size: 0.62rem;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.income-planning-current-time-line {
+  position: absolute;
+  right: 0;
+  left: 0;
+  top: var(--top);
+  border-top: 2px solid #d14b4b;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.income-planning-current-time-line span {
+  position: absolute;
+  right: 4px;
+  top: -10px;
+  border-radius: 999px;
+  background: #d14b4b;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 950;
+  padding: 2px 6px;
+  white-space: nowrap;
 }
 
 .income-planning-calendar-note {
@@ -7895,6 +8080,9 @@ tfoot th {
   .income-planning-layout,
   .income-planning-scenario-grid,
   #incomePlanningWorkBlocks.income-planning-block-list,
+  #incomePlanningManualBlocks.income-planning-block-list,
+  .income-planning-habit-stamp-layout,
+  .income-planning-weekly-head,
   .income-planning-block-grid.work,
   .income-planning-block-grid.manual,
   .income-planning-block-grid.habit,
@@ -7924,6 +8112,11 @@ tfoot th {
     align-items: flex-start;
     flex-direction: column;
     grid-template-columns: 1fr;
+  }
+
+  .income-planning-weekly-head p {
+    justify-self: start;
+    text-align: left;
   }
 
   .income-planning-sleep-slot-row {
