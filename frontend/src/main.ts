@@ -1297,6 +1297,12 @@ function bindEvents(): void {
       return;
     }
     const calendarDay = target?.closest<HTMLElement>("[data-income-planning-calendar-day]");
+    const calendarStampButton = target?.closest<HTMLButtonElement>("[data-income-planning-calendar-stamp]");
+    if (calendarDay && event.ctrlKey && calendarStampButton) {
+      event.preventDefault();
+      openIncomePlanningStampPickerForEdit(calendarStampButton.dataset.incomePlanningStampId || "", event.clientX, event.clientY);
+      return;
+    }
     if (
       calendarDay &&
       event.ctrlKey &&
@@ -2644,6 +2650,7 @@ function incomePlanningCalendarStampMarker(stamp: IncomePlanningCalendarStamp): 
       class="income-planning-calendar-stamp"
       type="button"
       data-action="income-planning-open-stamp-menu"
+      data-income-planning-calendar-stamp="true"
       data-income-planning-stamp-id="${escapeHtml(stamp.id)}"
       style="--top:${top.toFixed(3)}%;"
       title="${escapeHtml(`${stamp.label} · ${stamp.startTime}`)}"
