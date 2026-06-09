@@ -1535,6 +1535,7 @@ function bindEvents(): void {
     }
     if (action === "income-planning-close-dialog") closeIncomePlanningDialog();
     if (action === "income-planning-save-dialog") saveIncomePlanningDialog();
+    if (action === "income-planning-delete-dialog-slot") deleteIncomePlanningDialogSlot();
     if (action === "income-planning-set-dialog-color") {
       updateIncomePlanningDialogDraft("color", button.dataset.incomePlanningColor || "");
       renderIncomePlanningDialog();
@@ -2921,7 +2922,7 @@ function renderIncomePlanningDialog(): void {
             <strong>${escapeHtml(incomePlanningDialogTitle(incomePlanningDialog))}</strong>
             <span>${escapeHtml(incomePlanningDialogSubtitle(incomePlanningDialog))}</span>
           </div>
-          <button class="chart-popup-close" type="button" data-action="income-planning-close-dialog" aria-label="Zeitbudget-Dialog schliessen">x</button>
+          ${incomePlanningDialogHeaderActions(incomePlanningDialog)}
         </div>
         ${incomePlanningDialog.error ? `<div class="income-planning-warning unrealistic"><strong>Fehler</strong><span>${escapeHtml(incomePlanningDialog.error)}</span></div>` : ""}
         ${
@@ -2936,6 +2937,37 @@ function renderIncomePlanningDialog(): void {
       </div>
     </div>
   `;
+}
+
+function incomePlanningDialogHeaderActions(dialog: NonNullable<IncomePlanningDialogState>): string {
+  const deleteButton = incomePlanningDialogCanDeleteSlot(dialog)
+    ? `
+      <button
+        class="income-planning-header-icon-button danger"
+        type="button"
+        data-action="income-planning-delete-dialog-slot"
+        aria-label="Aktuellen Wochen-Slot loeschen"
+        title="Aktuellen Wochen-Slot loeschen"
+      >
+        ${incomePlanningHeaderIcon("trash")}
+      </button>
+    `
+    : "";
+  return `
+    <div class="income-planning-header-actions">
+      <button class="income-planning-header-icon-button" type="button" data-action="income-planning-close-dialog" aria-label="Zeitbudget-Dialog schliessen" title="Schliessen">x</button>
+      <button class="income-planning-header-icon-button" type="button" data-action="income-planning-save-dialog" aria-label="Zeitbudget speichern" title="Speichern">
+        ${incomePlanningHeaderIcon("save")}
+      </button>
+      ${deleteButton}
+    </div>
+  `;
+}
+
+function incomePlanningDialogCanDeleteSlot(dialog: NonNullable<IncomePlanningDialogState>): boolean {
+  if (dialog.ownerType === "assumption" || !dialog.ownerId || !dialog.slotId) return false;
+  if (dialog.mode !== "edit" && dialog.mode !== "create_slot") return false;
+  return Boolean(incomePlanningSlotById(dialog.ownerType, dialog.ownerId, dialog.slotId));
 }
 
 function incomePlanningDialogTitle(dialog: NonNullable<IncomePlanningDialogState>): string {
@@ -3556,6 +3588,17 @@ function closeIncomePlanningDialog(): void {
   incomePlanningDialog = null;
   incomePlanningHabitIconPicker = null;
   renderIncomePlanningDialog();
+  renderIncomePlanningHabitIconPicker();
+}
+
+function deleteIncomePlanningDialogSlot(): void {
+  if (!incomePlanningDialog || !incomePlanningDialogCanDeleteSlot(incomePlanningDialog)) return;
+  const ownerType = incomePlanningDialog.ownerType;
+  const ownerId = incomePlanningDialog.ownerId ?? "";
+  const slotId = incomePlanningDialog.slotId ?? "";
+  incomePlanningDialog = null;
+  incomePlanningHabitIconPicker = null;
+  removeIncomePlanningSlot(ownerType, ownerId, slotId);
   renderIncomePlanningHabitIconPicker();
 }
 
@@ -8750,7 +8793,7 @@ function renderIncomePlanningStampPicker(): void {
   picker.innerHTML = `
     <div class="position-icon-picker-head">
       <span>${draft.stampId ? "Stempel bearbeiten" : "Stempel setzen"}</span>
-      <button class="icon-button" type="button" data-action="income-planning-close-stamp-picker" aria-label="Stempel-Picker schliessen">x</button>
+      ${incomePlanningStampPickerHeaderActions(draft)}
     </div>
     <div class="income-planning-stamp-form">
       <label class="field">
@@ -8807,6 +8850,44 @@ function renderIncomePlanningStampPicker(): void {
     </div>
   `;
   picker.hidden = false;
+}
+
+function incomePlanningStampPickerHeaderActions(draft: NonNullable<typeof incomePlanningStampPicker>): string {
+  const deleteButton = draft.stampId
+    ? `
+      <button
+        class="income-planning-header-icon-button danger"
+        type="button"
+        data-action="income-planning-delete-stamp"
+        data-income-planning-stamp-id="${escapeHtml(draft.stampId)}"
+        aria-label="Stempel loeschen"
+        title="Loeschen"
+      >
+        ${incomePlanningHeaderIcon("trash")}
+      </button>
+    `
+    : "";
+  return `
+    <div class="income-planning-header-actions">
+      <button class="income-planning-header-icon-button" type="button" data-action="income-planning-close-stamp-picker" aria-label="Stempel-Picker schliessen" title="Schliessen">x</button>
+      <button class="income-planning-header-icon-button" type="button" data-action="income-planning-save-stamp" aria-label="Stempel speichern" title="Speichern">
+        ${incomePlanningHeaderIcon("save")}
+      </button>
+      ${deleteButton}
+    </div>
+  `;
+}
+
+function incomePlanningHeaderIcon(icon: "save" | "trash"): string {
+  const paths: Record<"save" | "trash", string> = {
+    save: '<path d="M5 4h12l2 2v14H5V4Z"/><path d="M8 4v6h8V4"/><path d="M8 17h8"/>',
+    trash: '<path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>'
+  };
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      ${paths[icon]}
+    </svg>
+  `;
 }
 
 function incomePlanningStampSelectField(

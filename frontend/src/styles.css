@@ -1625,6 +1625,54 @@ tfoot th {
   text-transform: uppercase;
 }
 
+.income-planning-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.income-planning-header-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--row-border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 0;
+}
+
+.income-planning-header-icon-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.income-planning-header-icon-button.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.income-planning-header-icon-button.danger:hover {
+  border-color: var(--danger);
+}
+
+.income-planning-header-icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
 .position-icon-picker-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

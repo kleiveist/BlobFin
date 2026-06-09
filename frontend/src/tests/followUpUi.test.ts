@@ -1,5 +1,8 @@
+/// <reference types="vite/client" />
+
 import { describe, expect, it } from "vitest";
 
+import mainSource from "../main.ts?raw";
 import { renderAppShell } from "../views/templates";
 import {
   paidLoanCostForYear,
@@ -162,6 +165,14 @@ describe("follow-up ui rendering", () => {
     expect(html.indexOf('id="incomePlanningWorkBlocks"')).toBeLessThan(html.indexOf('id="incomePlanningCareerLife"'));
     expect(html.indexOf('id="incomePlanningCareerLife"')).toBeLessThan(html.indexOf('id="incomePlanningAssumptions"'));
     expect(html.indexOf('id="incomePlanningAssumptions"')).toBeLessThan(html.indexOf('id="incomePlanningHabits"'));
+  });
+
+  it("keeps income planning header icon actions wired", () => {
+    expect(mainSource).toContain('data-action="income-planning-save-dialog" aria-label="Zeitbudget speichern"');
+    expect(mainSource).toContain('data-action="income-planning-delete-dialog-slot"');
+    expect(mainSource).toContain('data-action="income-planning-save-stamp" aria-label="Stempel speichern"');
+    expect(mainSource).toContain('data-action="income-planning-delete-stamp"');
+    expect(mainSource).toContain("function incomePlanningDialogCanDeleteSlot");
   });
 
   it("structures income as one combined page with insights before status", () => {
