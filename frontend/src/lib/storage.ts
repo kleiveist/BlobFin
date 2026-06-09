@@ -59,6 +59,7 @@ import type {
   IncomePlanningCategory,
   IncomePlanningHabit,
   IncomePlanningManualBlock,
+  IncomePlanningPlannedStamp,
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningState,
@@ -523,6 +524,7 @@ function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSecti
   if (
     value === "home" ||
     value === "income_planning" ||
+    value === "income_stamp_planner" ||
     value === "real_estate_financing" ||
     value === "statutory_pension" ||
     value === "combined_wealth"
@@ -886,6 +888,11 @@ function normalizeIncomePlanningState(value: unknown): IncomePlanningState {
           .map(normalizeIncomePlanningCalendarStamp)
           .filter((stamp): stamp is IncomePlanningCalendarStamp => stamp !== null)
       : fallback.calendarStamps,
+    plannedStamps: Array.isArray(value.plannedStamps)
+      ? value.plannedStamps
+          .map(normalizeIncomePlanningPlannedStamp)
+          .filter((stamp): stamp is IncomePlanningPlannedStamp => stamp !== null)
+      : fallback.plannedStamps,
     assumptions: normalizeIncomePlanningAssumptions(value.assumptions)
   };
 }
@@ -987,6 +994,19 @@ function normalizeIncomePlanningCalendarStamp(value: unknown): IncomePlanningCal
     startTime: normalizeIncomePlanningTime(value.startTime, "09:00"),
     icon: normalizePositionIcon(value.icon, "calendar"),
     label: label || "Stempel"
+  };
+}
+
+function normalizeIncomePlanningPlannedStamp(value: unknown): IncomePlanningPlannedStamp | null {
+  if (!isRecord(value)) return null;
+  const label = String(value.label || "").trim();
+  return {
+    id: String(value.id || createId()),
+    date: normalizeIncomePlanningDate(value.date, todayLocalDateString()),
+    startTime: normalizeIncomePlanningTime(value.startTime, "09:00"),
+    icon: normalizePositionIcon(value.icon, "calendar"),
+    label: label || "Stempel",
+    description: String(value.description || "")
   };
 }
 
@@ -1103,6 +1123,22 @@ function isSlot(value: IncomePlanningSlot | null): value is IncomePlanningSlot {
 function normalizeIncomePlanningTime(value: unknown, fallback: string): string {
   const time = String(value || "");
   return /^([0-1]\d|2[0-3]):([0-5]\d)$/.test(time) ? time : fallback;
+}
+
+function normalizeIncomePlanningDate(value: unknown, fallback: string): string {
+  const date = String(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fallback;
+  const [yearRaw, monthRaw, dayRaw] = date.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const parsed = new Date(year, month - 1, day);
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day ? date : fallback;
+}
+
+function todayLocalDateString(): string {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function fallbackDuration(startTime: string, endTime: string, fallback: number): number {

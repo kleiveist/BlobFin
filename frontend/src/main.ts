@@ -175,6 +175,7 @@ import type {
   IncomePlanningHabit,
   IncomePlanningManualBlock,
   IncomePlanningManualBlockType,
+  IncomePlanningPlannedStamp,
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningWeekday,
@@ -239,6 +240,7 @@ const APP_SECTION_IDS: AppSectionId[] = [
   "home",
   "income",
   "income_planning",
+  "income_stamp_planner",
   "planning_scenarios",
   "real_estate_financing",
   "statutory_pension",
@@ -456,6 +458,7 @@ type AccountDialogState = {
 } | null;
 type IncomePlanningOwnerType = "work" | "habit" | "manual" | "assumption";
 type IncomePlanningDialogMode = "create" | "edit" | "create_slot";
+type IncomeStampPlannerDateRange = { start: Date; end: Date; year: number; month: number };
 interface IncomePlanningSleepSlotGroup {
   id: string;
   fromDay: IncomePlanningWeekday;
@@ -598,6 +601,16 @@ let incomePlanningStampPicker: {
   left: number;
 } | null = null;
 let incomePlanningStampMenu: { stampId: string; top: number; left: number } | null = null;
+let incomeStampPlannerMonthCursor = incomeStampPlannerMonthStart(new Date());
+let incomeStampPlannerDialog: {
+  stampId: string | null;
+  date: string;
+  startTime: string;
+  icon: string;
+  label: string;
+  description: string;
+  error: string;
+} | null = null;
 let incomePlanningCurrentTimeTimerId: number | null = null;
 let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
@@ -1115,6 +1128,11 @@ function bindEvents(): void {
       return;
     }
 
+    if (target.dataset.incomeStampPlannerField) {
+      updateIncomeStampPlannerDialogDraft(target.dataset.incomeStampPlannerField, target.value);
+      return;
+    }
+
     if (target.dataset.positionCostPositionId && target.dataset.positionCostItemId && target.dataset.positionCostField) {
       updatePositionCostBreakdownItem(
         target.dataset.positionCostPositionId,
@@ -1190,6 +1208,11 @@ function bindEvents(): void {
 
     if (target.dataset.incomePlanningStampField) {
       updateIncomePlanningStampPickerDraft(target.dataset.incomePlanningStampField, target.value);
+      return;
+    }
+
+    if (target.dataset.incomeStampPlannerField) {
+      updateIncomeStampPlannerDialogDraft(target.dataset.incomeStampPlannerField, target.value);
       return;
     }
 
@@ -1311,6 +1334,14 @@ function bindEvents(): void {
     }
     const calendarDay = target?.closest<HTMLElement>("[data-income-planning-calendar-day]");
     const calendarStampButton = target?.closest<HTMLButtonElement>("[data-income-planning-calendar-stamp]");
+    const plannedStampButton = target?.closest<HTMLButtonElement>("[data-income-stamp-planner-calendar-stamp]");
+    if (calendarDay && plannedStampButton) {
+      event.preventDefault();
+      openIncomeStampPlannerDialogForEdit(plannedStampButton.dataset.incomeStampPlannerStampId || "", {
+        switchToPlanner: true
+      });
+      return;
+    }
     if (calendarDay && event.ctrlKey && calendarStampButton) {
       event.preventDefault();
       openIncomePlanningStampPickerForEdit(calendarStampButton.dataset.incomePlanningStampId || "", event.clientX, event.clientY);
@@ -1321,7 +1352,8 @@ function bindEvents(): void {
       event.ctrlKey &&
       !target?.closest("[data-income-planning-calendar-block]") &&
       !target?.closest("[data-income-planning-calendar-background]") &&
-      !target?.closest("[data-income-planning-calendar-stamp]")
+      !target?.closest("[data-income-planning-calendar-stamp]") &&
+      !target?.closest("[data-income-stamp-planner-calendar-stamp]")
     ) {
       event.preventDefault();
       openIncomePlanningStampPickerFromCalendar(calendarDay, event.clientX, event.clientY);
@@ -1334,7 +1366,8 @@ function bindEvents(): void {
     if (
       calendarDay &&
       !target?.closest("[data-income-planning-calendar-block]") &&
-      !target?.closest("[data-income-planning-calendar-stamp]")
+      !target?.closest("[data-income-planning-calendar-stamp]") &&
+      !target?.closest("[data-income-stamp-planner-calendar-stamp]")
     ) {
       event.preventDefault();
       openIncomePlanningDialogFromCalendar(calendarDay, event.clientY);
@@ -1580,6 +1613,25 @@ function bindEvents(): void {
     }
     if (action === "income-planning-save-stamp") saveIncomePlanningStampPicker();
     if (action === "income-planning-delete-stamp") deleteIncomePlanningStamp(button.dataset.incomePlanningStampId || "");
+    if (action === "income-stamp-planner-add") openIncomeStampPlannerDialogForDate();
+    if (action === "income-stamp-planner-add-date") {
+      openIncomeStampPlannerDialogForDate(button.dataset.incomeStampPlannerDate || "");
+    }
+    if (action === "income-stamp-planner-edit") {
+      openIncomeStampPlannerDialogForEdit(button.dataset.incomeStampPlannerStampId || "");
+    }
+    if (action === "income-stamp-planner-close-dialog") closeIncomeStampPlannerDialog();
+    if (action === "income-stamp-planner-save") saveIncomeStampPlannerDialog();
+    if (action === "income-stamp-planner-delete") deleteIncomeStampPlannerStamp();
+    if (action === "select-income-stamp-planner-icon") {
+      selectIncomeStampPlannerIcon(button.dataset.incomeStampPlannerIcon || "");
+    }
+    if (action === "select-income-stamp-planner-preset") {
+      selectIncomeStampPlannerPreset(button.dataset.incomeStampPlannerLabel || "", button.dataset.incomeStampPlannerIcon || "");
+    }
+    if (action === "income-stamp-planner-prev-month") showPreviousIncomeStampPlannerMonth();
+    if (action === "income-stamp-planner-next-month") showNextIncomeStampPlannerMonth();
+    if (action === "income-stamp-planner-current-month") showCurrentIncomeStampPlannerMonth();
     if (action === "add-planning-account") addPlanningAccount();
     if (action === "rename-planning-account") renamePlanningAccount();
     if (action === "cancel-planning-account-dialog") closePlanningAccountDialog();
@@ -1851,6 +1903,7 @@ function renderAll(): void {
     syncSettingsAccordionState();
     renderIncomeTracker();
     renderIncomePlanning();
+    renderIncomeStampPlanner();
     saveState(state);
   } finally {
     renderAllRunning = false;
@@ -2074,6 +2127,485 @@ function renderIncomePlanning(): void {
   renderIncomePlanningHabitIconPicker();
   renderIncomePlanningStampPicker();
   renderIncomePlanningStampMenu();
+}
+
+function renderIncomeStampPlanner(): void {
+  const panel = document.querySelector<HTMLElement>('[data-module-section="income_stamp_planner"]');
+  if (!panel) return;
+  renderIncomeStampPlannerControls();
+  renderIncomeStampPlannerGrid();
+  renderIncomeStampPlannerDialog();
+}
+
+function renderIncomeStampPlannerControls(): void {
+  const host = document.querySelector<HTMLDivElement>("#incomeStampPlannerControls");
+  if (!host) return;
+  const range = incomeStampPlannerDateRange();
+  const stamps = incomeStampPlannerVisibleStamps(range);
+  const isCurrentMonth = incomeStampPlannerSameMonth(incomeStampPlannerMonthCursor, new Date());
+  host.innerHTML = `
+    <div class="income-stamp-planner-control-stack">
+      <div class="income-stamp-planner-month-nav" role="group" aria-label="Stempel-Planer Monat">
+        <button class="income-stamp-planner-month-button" type="button" data-action="income-stamp-planner-prev-month" aria-label="Vorherigen Monat anzeigen" title="Zurueck">
+          ${incomePlanningHeaderIcon("chevron-left")}
+        </button>
+        <strong id="incomeStampPlannerMonthLabel" class="income-stamp-planner-month-label">${escapeHtml(
+          incomeStampPlannerMonthTitle(range)
+        )}</strong>
+        <button class="income-stamp-planner-month-button" type="button" data-action="income-stamp-planner-next-month" aria-label="Naechsten Monat anzeigen" title="Weiter">
+          ${incomePlanningHeaderIcon("chevron-right")}
+        </button>
+        ${
+          isCurrentMonth
+            ? ""
+            : '<button class="income-stamp-planner-today-button" type="button" data-action="income-stamp-planner-current-month">Heute</button>'
+        }
+      </div>
+      <div class="income-stamp-planner-range">
+        <strong>${intNumber(stamps.length)} geplant</strong>
+        <span>${escapeHtml(incomeStampPlannerRangeLabel(range))}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderIncomeStampPlannerGrid(): void {
+  const host = document.querySelector<HTMLDivElement>("#incomeStampPlannerGrid");
+  if (!host) return;
+  const range = incomeStampPlannerDateRange();
+  const weeks = incomeStampPlannerWeeks(range);
+  host.innerHTML = `
+    <div class="income-stamp-planner-calendar" data-income-stamp-planner-calendar>
+      <div class="income-stamp-planner-weekday-row">
+        <span></span>
+        ${INCOME_PLANNING_WEEK_DAYS.map((day) => `<strong>${escapeHtml(incomePlanningWeekdayLabel(day))}</strong>`).join("")}
+      </div>
+      <div class="income-stamp-planner-week-list">
+        ${weeks.map((week) => incomeStampPlannerWeekRow(week, range)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function incomeStampPlannerWeekRow(weekStart: Date, range: IncomeStampPlannerDateRange): string {
+  const days = Array.from({ length: 7 }, (_, index) => incomeStampPlannerAddDays(weekStart, index));
+  const weekEnd = days[6];
+  return `
+    <div class="income-stamp-planner-week">
+      <div class="income-stamp-planner-week-label">
+        <strong>Woche</strong>
+        <span>${escapeHtml(`${incomeStampPlannerShortDate(weekStart)}-${incomeStampPlannerShortDate(weekEnd)}`)}</span>
+      </div>
+      ${days.map((day) => incomeStampPlannerDayCell(day, range)).join("")}
+    </div>
+  `;
+}
+
+function incomeStampPlannerDayCell(day: Date, range: IncomeStampPlannerDateRange): string {
+  const date = incomeStampPlannerDateString(day);
+  const today = date === incomeStampPlannerTodayDateString();
+  const outsideMonth = day.getFullYear() !== range.year || day.getMonth() !== range.month;
+  const stamps = outsideMonth ? [] : incomeStampPlannerStampsForDate(date);
+  const classes = ["income-stamp-planner-day", today ? "today" : "", outsideMonth ? "outside-month" : "", stamps.length ? "has-stamps" : ""]
+    .filter(Boolean)
+    .join(" ");
+  return `
+    <div class="${escapeHtml(classes)}" data-income-stamp-planner-date="${escapeHtml(date)}">
+      <div class="income-stamp-planner-day-head">
+        <time datetime="${escapeHtml(date)}">
+          <strong>${intNumber(day.getDate())}</strong>
+          <span>${escapeHtml(incomeStampPlannerMonthLabel(day))}</span>
+        </time>
+        <button
+          class="income-stamp-planner-day-add"
+          type="button"
+          data-action="income-stamp-planner-add-date"
+          data-income-stamp-planner-date="${escapeHtml(date)}"
+          aria-label="Stempel fuer ${escapeHtml(incomeStampPlannerFullDateLabel(date))} planen"
+          title="Stempel planen"
+          ${outsideMonth ? "disabled" : ""}
+        >+</button>
+      </div>
+      <div class="income-stamp-planner-day-stamps">
+        ${stamps.map(incomeStampPlannerStampButton).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function incomeStampPlannerStampButton(stamp: IncomePlanningPlannedStamp): string {
+  const icon = normalizePositionIcon(stamp.icon, "calendar");
+  return `
+    <button
+      class="income-stamp-planner-stamp"
+      type="button"
+      data-action="income-stamp-planner-edit"
+      data-income-stamp-planner-stamp-id="${escapeHtml(stamp.id)}"
+      title="${escapeHtml(`${stamp.label} · ${incomeStampPlannerFullDateLabel(stamp.date)} · ${stamp.startTime}`)}"
+    >
+      ${positionIconSvg(icon, "position-icon-svg income-planning-type-icon")}
+      <span>${escapeHtml(stamp.label)}</span>
+      <small>${escapeHtml(stamp.startTime)}</small>
+    </button>
+  `;
+}
+
+function renderIncomeStampPlannerDialog(): void {
+  const root = document.querySelector<HTMLDivElement>("#incomeStampPlannerDialogRoot");
+  if (!root) return;
+  if (!incomeStampPlannerDialog) {
+    root.innerHTML = "";
+    return;
+  }
+  const draft = incomeStampPlannerDialog;
+  const currentIcon = normalizePositionIcon(draft.icon, "calendar");
+  root.innerHTML = `
+    <div class="income-planning-dialog-backdrop" role="presentation">
+      <div class="income-planning-dialog income-stamp-planner-dialog" role="dialog" aria-modal="true" aria-label="Geplanten Stempel bearbeiten">
+        <div class="income-tax-dialog-head">
+          <div>
+            <strong>${draft.stampId ? "Stempel bearbeiten" : "Stempel planen"}</strong>
+            <span>${escapeHtml(incomeStampPlannerFullDateLabel(draft.date))}</span>
+          </div>
+          <button class="chart-popup-close" type="button" data-action="income-stamp-planner-close-dialog" aria-label="Stempel-Planer Dialog schliessen">x</button>
+        </div>
+        <div class="income-planning-dialog-grid basis">
+          <label class="field">
+            <span>Label</span>
+            <input type="text" value="${escapeHtml(draft.label)}" data-income-stamp-planner-field="label" />
+          </label>
+          <label class="field">
+            <span>Projekt / Notiz</span>
+            <input type="text" value="${escapeHtml(draft.description)}" data-income-stamp-planner-field="description" />
+          </label>
+          <label class="field compact">
+            <span>Datum</span>
+            <input type="date" value="${escapeHtml(draft.date)}" data-income-stamp-planner-field="date" />
+          </label>
+          <label class="field compact">
+            <span>Zeit</span>
+            <input type="time" value="${escapeHtml(draft.startTime)}" data-income-stamp-planner-field="startTime" />
+          </label>
+        </div>
+        <div class="income-planning-stamp-presets" aria-label="Stempel-Labels">
+          ${INCOME_PLANNING_STAMP_PRESETS.map((preset) => {
+            const presetIcon = normalizePositionIcon(preset.icon, "calendar");
+            const active = draft.label === preset.label && currentIcon === presetIcon;
+            return `
+              <button
+                class="income-planning-stamp-preset ${active ? "active" : ""}"
+                type="button"
+                data-action="select-income-stamp-planner-preset"
+                data-income-stamp-planner-label="${escapeHtml(preset.label)}"
+                data-income-stamp-planner-icon="${escapeHtml(preset.icon)}"
+                aria-pressed="${active}"
+              >
+                ${positionIconSvg(preset.icon, "position-icon-svg income-planning-type-icon")}
+                <span>${escapeHtml(preset.label)}</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+        <div class="position-icon-picker-grid compact income-stamp-planner-icon-grid">
+          ${POSITION_ICONS.map((icon) => {
+            const active = icon.id === currentIcon;
+            return `
+              <button
+                class="position-icon-option ${active ? "active" : ""}"
+                type="button"
+                data-action="select-income-stamp-planner-icon"
+                data-income-stamp-planner-icon="${icon.id}"
+                aria-pressed="${active}"
+                title="${escapeHtml(icon.label)}"
+              >
+                ${positionIconSvg(icon.id)}
+                <span>${escapeHtml(icon.label)}</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+        ${draft.error ? `<div class="income-planning-warning high">${escapeHtml(draft.error)}</div>` : ""}
+        <div class="income-planning-dialog-actions">
+          ${draft.stampId ? `<button class="button danger" type="button" data-action="income-stamp-planner-delete">Loeschen</button>` : ""}
+          <button class="button secondary" type="button" data-action="income-stamp-planner-close-dialog">Abbrechen</button>
+          <button class="button" type="button" data-action="income-stamp-planner-save" aria-label="Geplanten Stempel speichern">Speichern</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function incomeStampPlannerDateRange(): IncomeStampPlannerDateRange {
+  const monthStart = incomeStampPlannerMonthStart(incomeStampPlannerMonthCursor);
+  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  return {
+    start: incomeStampPlannerWeekStart(monthStart),
+    end: incomeStampPlannerAddDays(incomeStampPlannerWeekStart(monthEnd), 6),
+    year: monthStart.getFullYear(),
+    month: monthStart.getMonth()
+  };
+}
+
+function incomeStampPlannerVisibleStamps(range: IncomeStampPlannerDateRange): IncomePlanningPlannedStamp[] {
+  return [...(state.incomePlanning.plannedStamps ?? [])]
+    .filter((stamp) => {
+      const date = incomeStampPlannerDateFromString(stamp.date);
+      if (!date) return false;
+      return date.getFullYear() === range.year && date.getMonth() === range.month;
+    })
+    .sort(compareIncomePlanningPlannedStamps);
+}
+
+function incomeStampPlannerWeeks(range: IncomeStampPlannerDateRange): Date[] {
+  const weeks: Date[] = [];
+  for (let cursor = range.start; cursor.getTime() <= range.end.getTime(); cursor = incomeStampPlannerAddDays(cursor, 7)) {
+    weeks.push(cursor);
+  }
+  return weeks;
+}
+
+function incomeStampPlannerStampsForDate(date: string): IncomePlanningPlannedStamp[] {
+  return [...(state.incomePlanning.plannedStamps ?? [])]
+    .filter((stamp) => stamp.date === date)
+    .sort(compareIncomePlanningPlannedStamps);
+}
+
+function incomePlanningPlannedStampsForCurrentWeek(day: IncomePlanningWeekday): IncomePlanningPlannedStamp[] {
+  const range = incomeStampPlannerCurrentWeekRange();
+  return [...(state.incomePlanning.plannedStamps ?? [])]
+    .filter((stamp) => {
+      const date = incomeStampPlannerDateFromString(stamp.date);
+      if (!date) return false;
+      return (
+        date.getTime() >= range.start.getTime() &&
+        date.getTime() <= range.end.getTime() &&
+        incomePlanningWeekdayForDate(date) === day
+      );
+    })
+    .sort(compareIncomePlanningPlannedStamps);
+}
+
+function compareIncomePlanningPlannedStamps(first: IncomePlanningPlannedStamp, second: IncomePlanningPlannedStamp): number {
+  return (
+    first.date.localeCompare(second.date, "de") ||
+    first.startTime.localeCompare(second.startTime, "de") ||
+    first.label.localeCompare(second.label, "de") ||
+    first.id.localeCompare(second.id, "de")
+  );
+}
+
+function incomeStampPlannerCurrentWeekRange(): { start: Date; end: Date } {
+  const start = incomeStampPlannerWeekStart(new Date());
+  return { start, end: incomeStampPlannerAddDays(start, 6) };
+}
+
+function incomePlanningWeekdayForDate(date: Date): IncomePlanningWeekday {
+  const index = (date.getDay() + 6) % 7;
+  return INCOME_PLANNING_WEEK_DAYS[index] ?? "monday";
+}
+
+function incomeStampPlannerRangeLabel(range: IncomeStampPlannerDateRange): string {
+  return `${monthName(range.month + 1)} ${range.year}`;
+}
+
+function incomeStampPlannerMonthTitle(range: IncomeStampPlannerDateRange): string {
+  return `${monthName(range.month + 1)} ${range.year}`;
+}
+
+function incomeStampPlannerFullDateLabel(value: string): string {
+  const date = incomeStampPlannerDateFromString(value);
+  if (!date) return "ungueltiges Datum";
+  return `${incomePlanningWeekdayLabel(incomePlanningWeekdayForDate(date))}, ${incomeStampPlannerShortDate(date)}${date.getFullYear()}`;
+}
+
+function incomeStampPlannerMonthLabel(date: Date): string {
+  return `${String(date.getMonth() + 1).padStart(2, "0")}.${date.getFullYear()}`;
+}
+
+function incomeStampPlannerShortDate(date: Date): string {
+  return `${String(date.getDate()).padStart(2, "0")}.${String(date.getMonth() + 1).padStart(2, "0")}.`;
+}
+
+function incomeStampPlannerTodayDateString(): string {
+  return incomeStampPlannerDateString(new Date());
+}
+
+function incomeStampPlannerDateString(date: Date): string {
+  const local = incomeStampPlannerStartOfDay(date);
+  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
+}
+
+function incomeStampPlannerDateFromString(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [yearRaw, monthRaw, dayRaw] = value.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return incomeStampPlannerStartOfDay(date);
+}
+
+function incomeStampPlannerStartOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function incomeStampPlannerMonthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function incomeStampPlannerWeekStart(date: Date): Date {
+  const start = incomeStampPlannerStartOfDay(date);
+  const offset = (start.getDay() + 6) % 7;
+  return incomeStampPlannerAddDays(start, -offset);
+}
+
+function incomeStampPlannerAddDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+function incomeStampPlannerSameMonth(first: Date, second: Date): boolean {
+  return first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth();
+}
+
+function showPreviousIncomeStampPlannerMonth(): void {
+  incomeStampPlannerMonthCursor = new Date(
+    incomeStampPlannerMonthCursor.getFullYear(),
+    incomeStampPlannerMonthCursor.getMonth() - 1,
+    1
+  );
+  renderIncomeStampPlanner();
+}
+
+function showNextIncomeStampPlannerMonth(): void {
+  incomeStampPlannerMonthCursor = new Date(
+    incomeStampPlannerMonthCursor.getFullYear(),
+    incomeStampPlannerMonthCursor.getMonth() + 1,
+    1
+  );
+  renderIncomeStampPlanner();
+}
+
+function showCurrentIncomeStampPlannerMonth(): void {
+  incomeStampPlannerMonthCursor = incomeStampPlannerMonthStart(new Date());
+  renderIncomeStampPlanner();
+}
+
+function openIncomeStampPlannerDialogForDate(date: string = incomeStampPlannerTodayDateString()): void {
+  const normalizedDate = incomeStampPlannerDateFromString(date) ? date : incomeStampPlannerTodayDateString();
+  incomeStampPlannerDialog = {
+    stampId: null,
+    date: normalizedDate,
+    startTime: "09:00",
+    icon: "calendar",
+    label: "Stempel",
+    description: "",
+    error: ""
+  };
+  renderIncomeStampPlannerDialog();
+}
+
+function openIncomeStampPlannerDialogForEdit(stampId: string, options: { switchToPlanner?: boolean } = {}): void {
+  const stamp = (state.incomePlanning.plannedStamps ?? []).find((item) => item.id === stampId);
+  if (!stamp) return;
+  incomeStampPlannerDialog = {
+    stampId: stamp.id,
+    date: stamp.date,
+    startTime: stamp.startTime,
+    icon: normalizePositionIcon(stamp.icon, "calendar"),
+    label: stamp.label,
+    description: stamp.description,
+    error: ""
+  };
+  if (options.switchToPlanner) {
+    setActiveSection("income_stamp_planner");
+    renderAll();
+    return;
+  }
+  renderIncomeStampPlannerDialog();
+}
+
+function closeIncomeStampPlannerDialog(): void {
+  incomeStampPlannerDialog = null;
+  renderIncomeStampPlannerDialog();
+}
+
+function updateIncomeStampPlannerDialogDraft(field: string, value: string): void {
+  if (!incomeStampPlannerDialog) return;
+  if (field === "label") {
+    incomeStampPlannerDialog = { ...incomeStampPlannerDialog, label: value, error: "" };
+  } else if (field === "description") {
+    incomeStampPlannerDialog = { ...incomeStampPlannerDialog, description: value, error: "" };
+  } else if (field === "date") {
+    incomeStampPlannerDialog = { ...incomeStampPlannerDialog, date: value, error: "" };
+  } else if (field === "startTime") {
+    incomeStampPlannerDialog = { ...incomeStampPlannerDialog, startTime: value, error: "" };
+  }
+}
+
+function selectIncomeStampPlannerIcon(icon: string): void {
+  if (!incomeStampPlannerDialog) return;
+  incomeStampPlannerDialog = { ...incomeStampPlannerDialog, icon: normalizePositionIcon(icon, "calendar"), error: "" };
+  renderIncomeStampPlannerDialog();
+}
+
+function selectIncomeStampPlannerPreset(label: string, icon: string): void {
+  if (!incomeStampPlannerDialog) return;
+  const preset = INCOME_PLANNING_STAMP_PRESETS.find((item) => item.label === label) ?? {
+    label: label.trim() || "Stempel",
+    icon
+  };
+  incomeStampPlannerDialog = {
+    ...incomeStampPlannerDialog,
+    label: preset.label,
+    icon: normalizePositionIcon(preset.icon, "calendar"),
+    error: ""
+  };
+  renderIncomeStampPlannerDialog();
+}
+
+function saveIncomeStampPlannerDialog(): void {
+  if (!incomeStampPlannerDialog) return;
+  const draft = incomeStampPlannerDialog;
+  if (!incomeStampPlannerDateFromString(draft.date)) {
+    incomeStampPlannerDialog = { ...draft, error: "Bitte ein gueltiges Datum auswaehlen." };
+    renderIncomeStampPlannerDialog();
+    return;
+  }
+  const startTime = formatIncomePlanningTime(parseTimeMinutes(draft.startTime) ?? 9 * 60);
+  const stamp: IncomePlanningPlannedStamp = {
+    id: draft.stampId ?? createId(),
+    date: draft.date,
+    startTime,
+    icon: normalizePositionIcon(draft.icon, "calendar"),
+    label: draft.label.trim() || "Stempel",
+    description: draft.description.trim()
+  };
+  const plannedStamps = state.incomePlanning.plannedStamps ?? [];
+  const exists = plannedStamps.some((item) => item.id === stamp.id);
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    plannedStamps: exists
+      ? plannedStamps.map((item) => (item.id === stamp.id ? stamp : item))
+      : [...plannedStamps, stamp]
+  };
+  const savedDate = incomeStampPlannerDateFromString(stamp.date);
+  if (savedDate) {
+    incomeStampPlannerMonthCursor = incomeStampPlannerMonthStart(savedDate);
+  }
+  incomeStampPlannerDialog = null;
+  renderAll();
+}
+
+function deleteIncomeStampPlannerStamp(stampId: string | null = incomeStampPlannerDialog?.stampId ?? null): void {
+  if (!stampId) return;
+  const plannedStamps = state.incomePlanning.plannedStamps ?? [];
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    plannedStamps: plannedStamps.filter((stamp) => stamp.id !== stampId)
+  };
+  incomeStampPlannerDialog = null;
+  renderAll();
 }
 
 function renderIncomePlanningSummary(): void {
@@ -2509,6 +3041,7 @@ function incomePlanningCalendarDayColumn(
   const dayEntries = entries.filter((entry) => entry.day === day);
   const dayBackgrounds = backgroundEntries.filter((entry) => entry.day === day);
   const dayStamps = state.incomePlanning.calendarStamps.filter((stamp) => stamp.day === day).sort(compareIncomePlanningCalendarStamps);
+  const plannedStamps = incomePlanningPlannedStampsForCurrentWeek(day);
   return `
     <div class="income-planning-calendar-day-column" data-income-planning-calendar-day="${escapeHtml(day)}" aria-label="${escapeHtml(
       incomePlanningWeekdayLabel(day)
@@ -2519,6 +3052,7 @@ function incomePlanningCalendarDayColumn(
       ${dayBackgrounds.map(incomePlanningCalendarBackgroundBlock).join("")}
       ${dayEntries.map(incomePlanningCalendarEntryBlock).join("")}
       ${dayStamps.map(incomePlanningCalendarStampMarker).join("")}
+      ${plannedStamps.map(incomePlanningPlannedStampMarker).join("")}
       ${currentTime.day === day ? incomePlanningCurrentTimeLine(currentTime.minute, currentTime.label) : ""}
     </div>
   `;
@@ -2667,6 +3201,26 @@ function incomePlanningCalendarStampMarker(stamp: IncomePlanningCalendarStamp): 
       data-income-planning-stamp-id="${escapeHtml(stamp.id)}"
       style="--top:${top.toFixed(3)}%;"
       title="${escapeHtml(`${stamp.label} · ${stamp.startTime}`)}"
+    >
+      ${positionIconSvg(icon, "position-icon-svg income-planning-calendar-icon")}
+      <span>${escapeHtml(stamp.label)}</span>
+    </button>
+  `;
+}
+
+function incomePlanningPlannedStampMarker(stamp: IncomePlanningPlannedStamp): string {
+  const start = clamp(parseTimeMinutes(stamp.startTime) ?? 0, 0, 24 * 60);
+  const top = (start / (24 * 60)) * 100;
+  const icon = normalizePositionIcon(stamp.icon, "calendar");
+  return `
+    <button
+      class="income-planning-calendar-stamp planned"
+      type="button"
+      data-action="income-stamp-planner-edit"
+      data-income-stamp-planner-calendar-stamp="true"
+      data-income-stamp-planner-stamp-id="${escapeHtml(stamp.id)}"
+      style="--top:${top.toFixed(3)}%;"
+      title="${escapeHtml(`${stamp.label} · ${incomeStampPlannerFullDateLabel(stamp.date)} · ${stamp.startTime}`)}"
     >
       ${positionIconSvg(icon, "position-icon-svg income-planning-calendar-icon")}
       <span>${escapeHtml(stamp.label)}</span>
@@ -6925,9 +7479,12 @@ async function importIncomePlanningCsvFromFile(file: File | undefined): Promise<
     imported.workBlocks.length +
     imported.habits.length +
     imported.manualBlocks.length +
+    imported.calendarStamps.length +
+    imported.plannedStamps.length +
     imported.assumptions.sleepSlots.length;
   state.incomePlanning = imported;
   closeIncomePlanningDialog();
+  closeIncomeStampPlannerDialog();
   renderAll();
   showIncomePlanningExportStatus(`${importedCount} Zeitbudget-Eintraege aus CSV importiert.`);
 }
@@ -8981,10 +9538,12 @@ function incomePlanningStampPickerHeaderActions(draft: NonNullable<typeof income
   `;
 }
 
-function incomePlanningHeaderIcon(icon: "save" | "trash"): string {
-  const paths: Record<"save" | "trash", string> = {
+function incomePlanningHeaderIcon(icon: "save" | "trash" | "chevron-left" | "chevron-right"): string {
+  const paths: Record<"save" | "trash" | "chevron-left" | "chevron-right", string> = {
     save: '<path d="M5 4h12l2 2v14H5V4Z"/><path d="M8 4v6h8V4"/><path d="M8 17h8"/>',
-    trash: '<path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>'
+    trash: '<path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+    "chevron-left": '<path d="m15 18-6-6 6-6"/>',
+    "chevron-right": '<path d="m9 18 6-6-6-6"/>'
   };
   return `
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">

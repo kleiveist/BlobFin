@@ -38,6 +38,7 @@ import type {
   IncomePlanningHabitDurationUnit,
   IncomePlanningManualBlock,
   IncomePlanningManualBlockType,
+  IncomePlanningPlannedStamp,
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningState,
@@ -286,7 +287,8 @@ const INCOME_PLANNING_CSV_HEADER = [
   "Habit-Status",
   "Habit-Prioritaet",
   "Icon",
-  "Schlaf-Stunden-Pro-Tag"
+  "Schlaf-Stunden-Pro-Tag",
+  "Datum"
 ];
 
 type IncomePlanningCsvRowKind =
@@ -298,6 +300,7 @@ type IncomePlanningCsvRowKind =
   | "manual"
   | "manual_slot"
   | "stamp"
+  | "planned_stamp"
   | "sleep"
   | "unknown";
 
@@ -373,6 +376,19 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
     );
   }
 
+  for (const stamp of planning.plannedStamps ?? []) {
+    rows.push(
+      incomePlanningCsvRow("Geplanter-Stempel", {
+        1: stamp.id,
+        5: stamp.label,
+        6: stamp.description,
+        9: stamp.startTime,
+        25: stamp.icon,
+        27: stamp.date
+      })
+    );
+  }
+
   for (const slot of planning.assumptions.sleepSlots) {
     rows.push(incomePlanningCsvRow("Schlaf", incomePlanningSleepSlotCsvCells(slot)));
   }
@@ -405,6 +421,7 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
   const manualBlocks = new Map<string, IncomePlanningManualBlock>();
   const slotsByOwnerId = new Map<string, IncomePlanningSlot[]>();
   const calendarStamps: IncomePlanningCalendarStamp[] = [];
+  const plannedStamps: IncomePlanningPlannedStamp[] = [];
   const sleepSlots: IncomePlanningSleepSlot[] = [];
   let sleepHoursPerDay: number | null = null;
   let recognizedRows = 0;
@@ -456,6 +473,12 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
       continue;
     }
 
+    if (kind === "planned_stamp") {
+      plannedStamps.push(parseIncomePlanningPlannedStamp(row, get));
+      recognizedRows += 1;
+      continue;
+    }
+
     if (kind === "sleep") {
       const slot = parseIncomePlanningCsvSleepSlot(row, get);
       if (slot) {
@@ -482,6 +505,7 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
       slots: slotsByOwnerId.get(block.id) ?? []
     })),
     calendarStamps,
+    plannedStamps,
     assumptions: {
       sleepHoursPerDay:
         sleepHoursPerDay ?? incomePlanningAverageSleepHours({ sleepHoursPerDay: 0, sleepSlots: importedSleepSlots }),
@@ -547,6 +571,9 @@ function parseIncomePlanningCsvRowKind(value: unknown): IncomePlanningCsvRowKind
   if (["zeitblock", "manual", "manualblock", "privatezeit", "ereignis"].includes(normalized)) return "manual";
   if (["zeitblockslot", "manualslot", "ereignisslot"].includes(normalized)) return "manual_slot";
   if (["stempel", "stamp", "calendarstamp", "kalenderstempel"].includes(normalized)) return "stamp";
+  if (["geplanterstempel", "geplanter-stempel", "plannedstamp", "plannedcalendarstamp"].includes(normalized)) {
+    return "planned_stamp";
+  }
   if (["schlaf", "sleep", "sleepslot"].includes(normalized)) return "sleep";
   return "unknown";
 }
@@ -629,6 +656,21 @@ function parseIncomePlanningCalendarStamp(row: string[], get: CsvRowGetter): Inc
     startTime,
     icon: normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), "calendar"),
     label
+  };
+}
+
+function parseIncomePlanningPlannedStamp(row: string[], get: CsvRowGetter): IncomePlanningPlannedStamp {
+  const id = cleanText(get(row, ["blockid", "id", "ownerid"], 1)) || createId();
+  const date = parseIncomePlanningDate(get(row, ["datum", "date"], 27), todayLocalDateString());
+  const startTime = parseIncomePlanningTime(get(row, ["startzeit", "start", "starttime"], 9), "09:00");
+  const label = cleanText(get(row, ["name", "label", "titel", "title"], 5)) || "Stempel";
+  return {
+    id,
+    date,
+    startTime,
+    icon: normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), "calendar"),
+    label,
+    description: cleanText(get(row, ["beschreibung", "description"], 6))
   };
 }
 
@@ -716,6 +758,22 @@ function parseIncomePlanningWeekday(value: unknown, fallback: IncomePlanningSlot
 function parseIncomePlanningTime(value: unknown, fallback: string): string {
   const cleaned = cleanText(value);
   return /^([0-1]\d|2[0-3]):([0-5]\d)$/.test(cleaned) ? cleaned : fallback;
+}
+
+function parseIncomePlanningDate(value: unknown, fallback: string): string {
+  const cleaned = cleanText(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return fallback;
+  const [yearRaw, monthRaw, dayRaw] = cleaned.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const parsed = new Date(year, month - 1, day);
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day ? cleaned : fallback;
+}
+
+function todayLocalDateString(): string {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function parseIncomePlanningMinutes(value: unknown, fallback: number): number {

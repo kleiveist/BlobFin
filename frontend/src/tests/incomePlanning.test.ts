@@ -357,6 +357,16 @@ describe("income planning", () => {
           label: "Spaziergang"
         }
       ],
+      plannedStamps: [
+        {
+          id: "planned-workshop",
+          date: "2026-07-15",
+          startTime: "10:30",
+          icon: "education",
+          label: "Workshop",
+          description: "Projekttermin"
+        }
+      ],
       assumptions: {
         sleepHoursPerDay: 7.5,
         sleepSlots: [
@@ -377,6 +387,7 @@ describe("income planning", () => {
 
     expect(csv).toContain("Arbeit-Slot");
     expect(csv).toContain("Pause-Startzeit");
+    expect(csv).toContain("Geplanter-Stempel");
     expect(imported?.workBlocks[0]).toMatchObject({
       id: "main",
       active: true,
@@ -409,6 +420,14 @@ describe("income planning", () => {
       startTime: "18:15",
       icon: "calendar",
       label: "Spaziergang"
+    });
+    expect(imported?.plannedStamps[0]).toMatchObject({
+      id: "planned-workshop",
+      date: "2026-07-15",
+      startTime: "10:30",
+      icon: "education",
+      label: "Workshop",
+      description: "Projekttermin"
     });
     expect(imported?.assumptions.sleepHoursPerDay).toBe(7.5);
     expect(imported?.assumptions.sleepSlots[0]).toMatchObject({

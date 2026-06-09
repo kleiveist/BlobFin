@@ -177,7 +177,9 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel income-planning-panel" data-module-section="income_planning">
-        ${moduleTopBar("Zeitbudget & Habits", "Wochenplaner, Arbeit, Nebentaetigkeiten und Gewohnheiten")}
+        ${moduleTopBar("Zeitbudget & Habits", "Wochenplaner, Arbeit, Nebentaetigkeiten und Gewohnheiten", [
+          { label: "Stempel Planer", action: "open-section-income_stamp_planner", className: "secondary" }
+        ])}
         <div class="section-heading income-planning-heading">
           <div>
             <h2>Zeitbudget & Habits</h2>
@@ -252,6 +254,34 @@ export function renderAppShell(): string {
           </div>
         </section>
         <div id="incomePlanningDialogRoot"></div>
+      </section>
+
+      <section class="panel income-planning-panel income-stamp-planner-panel" data-module-section="income_stamp_planner">
+        ${moduleTopBar("Stempel Planer", "Einmalige Stempel fuer kommende Wochen", [
+          { label: "Zeitbudget", action: "open-section-income_planning", className: "secondary" }
+        ])}
+        <div class="section-heading income-planning-heading">
+          <div>
+            <h2>Stempel Planer</h2>
+            <p class="planning-account-summary">
+              Plane einmalige Projekt-Stempel fuer konkrete Kalenderwochen, ohne den festen Wochenblock zu veraendern.
+            </p>
+          </div>
+          <div class="button-row">
+            <button class="button" type="button" data-action="income-stamp-planner-add">Stempel planen</button>
+          </div>
+        </div>
+        <section class="income-card income-stamp-planner-card">
+          <div class="income-section-head income-planning-card-head">
+            <div>
+              <h3>Planungsraster</h3>
+              <p>Monatsuebersicht fuer einmalige Kalender-Stempel.</p>
+            </div>
+            <div id="incomeStampPlannerControls" class="income-stamp-planner-controls"></div>
+          </div>
+          <div id="incomeStampPlannerGrid" class="income-stamp-planner-grid"></div>
+        </section>
+        <div id="incomeStampPlannerDialogRoot"></div>
       </section>
 
       <section class="panel account-panel" data-module-section="planning_scenarios">

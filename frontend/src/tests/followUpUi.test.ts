@@ -85,6 +85,7 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-module-section="investment_overview"');
     expect(html).toContain('data-action="open-section-income"');
     expect(html).toContain('data-action="open-section-income_planning"');
+    expect(html).toContain('data-action="open-section-income_stamp_planner"');
     expect(html).toContain('data-action="open-section-planning_scenarios"');
     expect(html).toContain('data-action="open-section-real_estate_financing"');
     expect(html).toContain('data-action="open-section-combined_wealth"');
@@ -133,6 +134,7 @@ describe("follow-up ui rendering", () => {
     const html = renderAppShell();
 
     expect(html).toContain('data-module-section="income_planning"');
+    expect(html).toContain('data-action="open-section-income_stamp_planner"');
     expect(html).toContain("Zeitbudget & Habits");
     expect(html).toContain('id="incomePlanningMetricGrid"');
     expect(html).toContain('id="incomePlanningWorkBlocks"');
@@ -167,6 +169,25 @@ describe("follow-up ui rendering", () => {
     expect(html.indexOf('id="incomePlanningWorkBlocks"')).toBeLessThan(html.indexOf('id="incomePlanningCareerLife"'));
     expect(html.indexOf('id="incomePlanningCareerLife"')).toBeLessThan(html.indexOf('id="incomePlanningAssumptions"'));
     expect(html.indexOf('id="incomePlanningAssumptions"')).toBeLessThan(html.indexOf('id="incomePlanningHabits"'));
+    const incomePlanningIndex = html.indexOf('data-module-section="income_planning"');
+    const stampPlannerButtonIndex = html.indexOf('data-action="open-section-income_stamp_planner"', incomePlanningIndex);
+    const homeButtonIndex = html.indexOf('data-action="open-section-home"', incomePlanningIndex);
+    expect(stampPlannerButtonIndex).toBeGreaterThan(incomePlanningIndex);
+    expect(stampPlannerButtonIndex).toBeLessThan(homeButtonIndex);
+  });
+
+  it("renders the stamp planner as an independent page", () => {
+    const html = renderAppShell();
+
+    expect(html).toContain('data-module-section="income_stamp_planner"');
+    expect(html).toContain("Stempel Planer");
+    expect(html).toContain('id="incomeStampPlannerControls"');
+    expect(html).toContain('id="incomeStampPlannerGrid"');
+    expect(html).toContain('id="incomeStampPlannerDialogRoot"');
+    expect(html).toContain('data-action="income-stamp-planner-add"');
+    expect(html).toContain('data-action="open-section-income_planning"');
+    expect(html).toContain("Einmalige Stempel fuer kommende Wochen");
+    expect(html).toContain("Monatsuebersicht fuer einmalige Kalender-Stempel");
   });
 
   it("keeps income planning header icon actions wired", () => {
@@ -175,8 +196,19 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain('data-action="income-planning-save-stamp" aria-label="Stempel speichern"');
     expect(mainSource).toContain('data-action="income-planning-delete-stamp"');
     expect(mainSource).toContain('data-income-planning-calendar-stamp="true"');
+    expect(mainSource).toContain('data-action="income-stamp-planner-save" aria-label="Geplanten Stempel speichern"');
+    expect(mainSource).toContain('data-action="income-stamp-planner-delete"');
+    expect(mainSource).toContain('data-income-stamp-planner-calendar-stamp="true"');
+    expect(mainSource).toContain('id="incomeStampPlannerMonthLabel"');
+    expect(mainSource).toContain('data-action="income-stamp-planner-prev-month"');
+    expect(mainSource).toContain('data-action="income-stamp-planner-next-month"');
+    expect(mainSource).not.toContain('data-action="income-stamp-planner-mode-');
+    expect(mainSource).toContain("function showPreviousIncomeStampPlannerMonth");
+    expect(mainSource).toContain("function showNextIncomeStampPlannerMonth");
+    expect(mainSource).toContain("function incomeStampPlannerVisibleStamps");
     expect(mainSource).toContain("function startIncomePlanningStampCalendarDrag");
     expect(mainSource).toContain("function updateIncomePlanningStampAfterCalendarDrag");
+    expect(mainSource).toContain("function incomePlanningPlannedStampsForCurrentWeek");
     expect(mainSource).toContain('class="income-planning-dialog-grid basis"');
     expect(mainSource).toContain("function incomePlanningDialogCanDeleteSlot");
   });

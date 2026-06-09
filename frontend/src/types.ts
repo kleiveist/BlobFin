@@ -12,6 +12,7 @@ export type AppSectionId =
   | "home"
   | "income"
   | "income_planning"
+  | "income_stamp_planner"
   | "planning_scenarios"
   | "real_estate_financing"
   | "statutory_pension"
@@ -467,6 +468,15 @@ export interface IncomePlanningCalendarStamp {
   label: string;
 }
 
+export interface IncomePlanningPlannedStamp {
+  id: string;
+  date: string;
+  startTime: string;
+  icon: string;
+  label: string;
+  description: string;
+}
+
 export interface IncomePlanningAssumptions {
   sleepHoursPerDay: number;
   sleepSlots: IncomePlanningSleepSlot[];
@@ -477,6 +487,7 @@ export interface IncomePlanningState {
   habits: IncomePlanningHabit[];
   manualBlocks: IncomePlanningManualBlock[];
   calendarStamps: IncomePlanningCalendarStamp[];
+  plannedStamps: IncomePlanningPlannedStamp[];
   assumptions: IncomePlanningAssumptions;
 }
 

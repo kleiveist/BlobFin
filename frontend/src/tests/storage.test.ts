@@ -94,6 +94,7 @@ describe("storage", () => {
     for (const section of [
       "income",
       "income_planning",
+      "income_stamp_planner",
       "planning_scenarios",
       "real_estate_financing",
       "combined_wealth",
@@ -129,6 +130,7 @@ describe("storage", () => {
       "free_time",
       "buffer"
     ]);
+    expect(loaded.incomePlanning.plannedStamps).toEqual([]);
     expect(loaded.incomePlanning.habits.map((habit) => habit.name)).toContain("Buch lesen");
   });
 
@@ -200,6 +202,16 @@ describe("storage", () => {
           slots: []
         }
       ],
+      plannedStamps: [
+        {
+          id: "planned",
+          date: "2026-02-03",
+          startTime: "bad",
+          icon: "education",
+          label: "",
+          description: "Projekt"
+        }
+      ],
       manualBlocks: [],
       assumptions: { sleepHoursPerDay: 30 }
     };
@@ -223,6 +235,14 @@ describe("storage", () => {
     });
     expect(loaded.incomePlanning.assumptions.sleepHoursPerDay).toBe(24);
     expect(loaded.incomePlanning.assumptions.sleepSlots).toHaveLength(7);
+    expect(loaded.incomePlanning.plannedStamps[0]).toMatchObject({
+      id: "planned",
+      date: "2026-02-03",
+      startTime: "09:00",
+      icon: "education",
+      label: "Stempel",
+      description: "Projekt"
+    });
   });
 
   it("migrates legacy slot pauses while stripping pauses from habits", () => {
