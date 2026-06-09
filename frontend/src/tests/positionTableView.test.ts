@@ -243,8 +243,12 @@ describe("position table view", () => {
 
     expect(normalizePositionIcon("Online-Verkaeufe")).toBe("online_sales");
     expect(normalizePositionIcon("Versicherungsauszahlungen")).toBe("insurance_payouts");
+    expect(normalizePositionIcon("Wandern")).toBe("hiking");
+    expect(normalizePositionIcon("Laufen")).toBe("running");
+    expect(normalizePositionIcon("Hantel / Workout")).toBe("dumbbell");
     expect(positionIconLabel("online_sales")).toBe("Online-Verkaeufe");
     expect(positionIconLabel("insurance_payouts")).toBe("Versicherungsauszahlungen");
+    expect(positionIconLabel("dumbbell")).toBe("Hantel / Workout");
     expect(defaultPositionIconForPosition({ flow: "income", type: "incomeTemporary", name: "Online Verkauf" })).toBe(
       "online_sales"
     );
@@ -255,6 +259,7 @@ describe("position table view", () => {
         name: "Versicherung Auszahlung"
       })
     ).toBe("insurance_payouts");
+    expect(defaultPositionIconForPosition({ flow: "expense", type: "fixed", name: "Workout" })).toBe("dumbbell");
     expect(onlineRows.map((position) => position.id)).toEqual(["online"]);
     expect(insuranceRows.map((position) => position.id)).toEqual(["insurance"]);
   });

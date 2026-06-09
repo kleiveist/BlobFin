@@ -328,6 +328,14 @@ const INCOME_PLANNING_COLOR_OPTIONS = [
   "#6f7785",
   "#4e9f6d"
 ];
+const INCOME_PLANNING_STAMP_PRESETS: Array<{ label: string; icon: string }> = [
+  { label: "Wandern", icon: "hiking" },
+  { label: "Laufen", icon: "running" },
+  { label: "Workout", icon: "dumbbell" },
+  { label: "Spaziergang", icon: "health" },
+  { label: "Fernstudium", icon: "education" },
+  { label: "Arbeitsweg", icon: "car" }
+];
 const INCOME_PROJECTION_MODES: IncomeProjectionMode[] = ["off", "historical_average", "manual"];
 type NumericPlanningSetting = Exclude<keyof PlanningSettings, "endDate">;
 type NumericInvestmentSetting =
@@ -1380,6 +1388,7 @@ function bindEvents(): void {
       action !== "income-planning-delete-stamp" &&
       action !== "income-planning-close-stamp-picker" &&
       action !== "income-planning-close-stamp-menu" &&
+      action !== "select-income-planning-stamp-preset" &&
       action !== "select-income-planning-stamp-icon" &&
       !button.closest("#incomePlanningStampPicker") &&
       !button.closest("#incomePlanningStampMenu")
@@ -1545,6 +1554,9 @@ function bindEvents(): void {
     if (action === "income-planning-close-stamp-menu") hideIncomePlanningStampMenu();
     if (action === "select-income-planning-stamp-icon") {
       selectIncomePlanningStampIcon(button.dataset.incomePlanningStampIcon || "");
+    }
+    if (action === "select-income-planning-stamp-preset") {
+      selectIncomePlanningStampPreset(button.dataset.incomePlanningStampLabel || "", button.dataset.incomePlanningStampIcon || "");
     }
     if (action === "income-planning-save-stamp") saveIncomePlanningStampPicker();
     if (action === "income-planning-delete-stamp") deleteIncomePlanningStamp(button.dataset.incomePlanningStampId || "");
@@ -3213,7 +3225,7 @@ function openIncomePlanningStampPickerFromCalendar(dayColumn: HTMLElement, clien
   const day = incomePlanningWeekdayFromValue(dayColumn.dataset.incomePlanningCalendarDay) ?? "monday";
   const rect = dayColumn.getBoundingClientRect();
   const minute = snapIncomePlanningMinute(((clientY - rect.top) / Math.max(1, rect.height)) * 24 * 60);
-  const position = incomePlanningPopupPosition(clientX, clientY, 340, 430);
+  const position = incomePlanningPopupPosition(clientX, clientY, 480, 620);
   incomePlanningStampMenu = null;
   incomePlanningStampPicker = {
     stampId: null,
@@ -3230,7 +3242,7 @@ function openIncomePlanningStampPickerFromCalendar(dayColumn: HTMLElement, clien
 function openIncomePlanningStampPickerForEdit(stampId: string, clientX: number, clientY: number): void {
   const stamp = state.incomePlanning.calendarStamps.find((item) => item.id === stampId);
   if (!stamp) return;
-  const position = incomePlanningPopupPosition(clientX, clientY, 340, 430);
+  const position = incomePlanningPopupPosition(clientX, clientY, 480, 620);
   incomePlanningStampMenu = null;
   incomePlanningStampPicker = {
     stampId: stamp.id,
@@ -8675,6 +8687,20 @@ function selectIncomePlanningStampIcon(icon: string): void {
   renderIncomePlanningStampPicker();
 }
 
+function selectIncomePlanningStampPreset(label: string, icon: string): void {
+  if (!incomePlanningStampPicker) return;
+  const preset = INCOME_PLANNING_STAMP_PRESETS.find((item) => item.label === label) ?? {
+    label: label.trim() || "Stempel",
+    icon
+  };
+  incomePlanningStampPicker = {
+    ...incomePlanningStampPicker,
+    label: preset.label,
+    icon: normalizePositionIcon(preset.icon, "calendar")
+  };
+  renderIncomePlanningStampPicker();
+}
+
 function saveIncomePlanningStampPicker(): void {
   if (!incomePlanningStampPicker) return;
   const label = incomePlanningStampPicker.label.trim() || "Stempel";
@@ -8738,6 +8764,24 @@ function renderIncomePlanningStampPicker(): void {
           <input type="time" value="${escapeHtml(draft.startTime)}" data-income-planning-stamp-field="startTime" />
         </label>
       </div>
+    </div>
+    <div class="income-planning-stamp-presets" aria-label="Stempel-Labels">
+      ${INCOME_PLANNING_STAMP_PRESETS.map((preset) => {
+        const active = draft.label === preset.label && currentIcon === normalizePositionIcon(preset.icon, "calendar");
+        return `
+          <button
+            class="income-planning-stamp-preset ${active ? "active" : ""}"
+            type="button"
+            data-action="select-income-planning-stamp-preset"
+            data-income-planning-stamp-label="${escapeHtml(preset.label)}"
+            data-income-planning-stamp-icon="${escapeHtml(preset.icon)}"
+            aria-pressed="${active}"
+          >
+            ${positionIconSvg(preset.icon, "position-icon-svg income-planning-type-icon")}
+            <span>${escapeHtml(preset.label)}</span>
+          </button>
+        `;
+      }).join("")}
     </div>
     <div class="position-icon-picker-grid compact">
       ${POSITION_ICONS.map((icon) => {

@@ -1636,8 +1636,8 @@ tfoot th {
 }
 
 .income-planning-stamp-picker {
-  width: min(340px, calc(100vw - 24px));
-  max-height: min(430px, calc(100vh - 24px));
+  width: min(480px, calc(100vw - 24px));
+  max-height: min(620px, calc(100vh - 24px));
 }
 
 .income-planning-stamp-menu {
@@ -1648,6 +1648,48 @@ tfoot th {
 .income-planning-stamp-menu-actions {
   display: grid;
   gap: 8px;
+}
+
+.income-planning-stamp-picker .position-icon-picker-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+}
+
+.income-planning-stamp-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.income-planning-stamp-preset {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 9px;
+  text-align: left;
+}
+
+.income-planning-stamp-preset:hover,
+.income-planning-stamp-preset.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.income-planning-stamp-preset span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .income-planning-stamp-time-grid {

@@ -92,6 +92,21 @@ export const POSITION_ICONS: PositionIconDefinition[] = [
     svg: '<path d="M12 20s-7-4.2-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.8-7 10-7 10Z"/><path d="M9 12h6"/><path d="M12 9v6"/>'
   },
   {
+    id: "hiking",
+    label: "Wandern",
+    svg: '<circle cx="12" cy="4.5" r="2"/><path d="m10.5 8 3 2 2.5 4"/><path d="m11.5 10-2 4-3 3"/><path d="m13.5 14-1 3 2.5 3"/><path d="M17 8v13"/><path d="m15.5 11 1.5-3 1.5 3"/>'
+  },
+  {
+    id: "running",
+    label: "Laufen",
+    svg: '<circle cx="14" cy="4.5" r="2"/><path d="m12 8 3 2-2 3h-3"/><path d="m15 10 3 2"/><path d="m10 13-2 4-3 2"/><path d="m13 13 2 3 3 3"/>'
+  },
+  {
+    id: "dumbbell",
+    label: "Hantel / Workout",
+    svg: '<path d="M6 8v8"/><path d="M9 7v10"/><path d="M15 7v10"/><path d="M18 8v8"/><path d="M9 12h6"/><path d="M3 10v4"/><path d="M21 10v4"/>'
+  },
+  {
     id: "pet",
     label: "Tier",
     svg: '<circle cx="6.5" cy="9" r="1.6"/><circle cx="10" cy="6.5" r="1.6"/><circle cx="14" cy="6.5" r="1.6"/><circle cx="17.5" cy="9" r="1.6"/><path d="M8.5 15.5c0-2 1.6-4 3.5-4s3.5 2 3.5 4c0 1.5-1.1 2.5-2.4 2.1-.7-.2-1.5-.2-2.2 0-1.3.4-2.4-.6-2.4-2.1Z"/>'
@@ -262,6 +277,9 @@ export function defaultPositionIconForPosition(
   if (/(telefon|internet|handy|mobilfunk)/.test(name)) return "phone";
   if (/(essen|lebensmittel|supermarkt|food)/.test(name)) return "food";
   if (/(arzt|gesund|medizin|apotheke)/.test(name)) return "health";
+  if (/(wandern|wanderung|hiking)/.test(name)) return "hiking";
+  if (/(laufen|joggen|run|running)/.test(name)) return "running";
+  if (/(hantel|workout|fitness|training|kraftsport)/.test(name)) return "dumbbell";
   if (/(steuer|finanzamt)/.test(name)) return "tax";
   if (/(reise|urlaub|flug|bahn)/.test(name)) return "travel";
   if (/(kind|kita|schule)/.test(name)) return "child";
