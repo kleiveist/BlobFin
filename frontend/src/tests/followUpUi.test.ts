@@ -173,6 +173,8 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain('data-action="income-planning-save-stamp" aria-label="Stempel speichern"');
     expect(mainSource).toContain('data-action="income-planning-delete-stamp"');
     expect(mainSource).toContain('data-income-planning-calendar-stamp="true"');
+    expect(mainSource).toContain("function startIncomePlanningStampCalendarDrag");
+    expect(mainSource).toContain("function updateIncomePlanningStampAfterCalendarDrag");
     expect(mainSource).toContain('class="income-planning-dialog-grid basis"');
     expect(mainSource).toContain("function incomePlanningDialogCanDeleteSlot");
   });

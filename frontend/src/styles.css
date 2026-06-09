@@ -6080,12 +6080,20 @@ tfoot th {
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   color: var(--text);
-  cursor: pointer;
+  cursor: grab;
   font: inherit;
   padding: 3px 7px;
   text-align: left;
+  touch-action: none;
   box-shadow: 0 6px 14px rgba(31, 37, 40, 0.12);
   z-index: 5;
+}
+
+.income-planning-calendar-stamp.dragging {
+  border-color: var(--accent);
+  box-shadow: 0 8px 18px rgba(31, 37, 40, 0.18);
+  cursor: grabbing;
+  z-index: 6;
 }
 
 .income-planning-calendar-stamp span {
