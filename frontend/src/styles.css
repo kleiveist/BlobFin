@@ -6113,7 +6113,7 @@ tfoot th {
   border-color: color-mix(in srgb, var(--accent) 48%, var(--row-border));
   border-style: dashed;
   background: var(--accent-soft);
-  cursor: pointer;
+  cursor: grab;
 }
 
 .income-stamp-planner-card {
@@ -6342,15 +6342,26 @@ tfoot th {
   border-radius: 7px;
   background: var(--surface-soft);
   color: var(--text);
-  cursor: pointer;
+  cursor: grab;
   font: inherit;
   padding: 6px 7px;
   text-align: left;
+  touch-action: none;
 }
 
 .income-stamp-planner-stamp:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.income-stamp-planner-stamp.dragging {
+  border-color: var(--accent);
+  box-shadow: 0 8px 18px rgba(31, 37, 40, 0.18);
+  cursor: grabbing;
+  opacity: 0.96;
+  pointer-events: none;
+  position: relative;
+  z-index: 10;
 }
 
 .income-stamp-planner-stamp span,

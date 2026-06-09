@@ -199,6 +199,7 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain('data-action="income-stamp-planner-save" aria-label="Geplanten Stempel speichern"');
     expect(mainSource).toContain('data-action="income-stamp-planner-delete"');
     expect(mainSource).toContain('data-income-stamp-planner-calendar-stamp="true"');
+    expect(mainSource).toContain('data-income-stamp-planner-stamp="true"');
     expect(mainSource).toContain('id="incomeStampPlannerMonthLabel"');
     expect(mainSource).toContain('data-action="income-stamp-planner-prev-month"');
     expect(mainSource).toContain('data-action="income-stamp-planner-next-month"');
@@ -208,6 +209,10 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain("function incomeStampPlannerVisibleStamps");
     expect(mainSource).toContain("function startIncomePlanningStampCalendarDrag");
     expect(mainSource).toContain("function updateIncomePlanningStampAfterCalendarDrag");
+    expect(mainSource).toContain("function startIncomePlanningPlannedStampCalendarDrag");
+    expect(mainSource).toContain("function updateIncomePlanningPlannedStampAfterCalendarDrag");
+    expect(mainSource).toContain("function startIncomeStampPlannerStampDrag");
+    expect(mainSource).toContain("function updateIncomeStampPlannerStampAfterPlannerDrag");
     expect(mainSource).toContain("function incomePlanningPlannedStampsForCurrentWeek");
     expect(mainSource).toContain('class="income-planning-dialog-grid basis"');
     expect(mainSource).toContain("function incomePlanningDialogCanDeleteSlot");

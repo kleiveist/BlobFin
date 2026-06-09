@@ -560,6 +560,26 @@ type IncomePlanningStampDragState = {
   element: HTMLElement;
   moved: boolean;
 } | null;
+type IncomePlanningPlannedStampDragState = {
+  stampId: string;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  originalDate: string;
+  originalStartMinute: number;
+  dayWidth: number;
+  columnHeight: number;
+  element: HTMLElement;
+  moved: boolean;
+} | null;
+type IncomeStampPlannerStampDragState = {
+  stampId: string;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  element: HTMLElement;
+  moved: boolean;
+} | null;
 
 let investmentAccountContextId: string | null = null;
 let state = loadInitialState();
@@ -589,6 +609,7 @@ let incomePlanningDialog: IncomePlanningDialogState = null;
 let incomePlanningDragState: IncomePlanningDragState = null;
 let incomePlanningSleepDragState: IncomePlanningSleepDragState = null;
 let incomePlanningStampDragState: IncomePlanningStampDragState = null;
+let incomePlanningPlannedStampDragState: IncomePlanningPlannedStampDragState = null;
 let incomePlanningSuppressNextCalendarClick = false;
 let incomePlanningHabitIconPicker: { top: number; left: number } | null = null;
 let incomePlanningStampPicker: {
@@ -602,6 +623,8 @@ let incomePlanningStampPicker: {
 } | null = null;
 let incomePlanningStampMenu: { stampId: string; top: number; left: number } | null = null;
 let incomeStampPlannerMonthCursor = incomeStampPlannerMonthStart(new Date());
+let incomeStampPlannerStampDragState: IncomeStampPlannerStampDragState = null;
+let incomeStampPlannerSuppressNextClick = false;
 let incomeStampPlannerDialog: {
   stampId: string | null;
   date: string;
@@ -1356,6 +1379,10 @@ function bindEvents(): void {
     }
     if (incomePlanningSuppressNextCalendarClick) {
       incomePlanningSuppressNextCalendarClick = false;
+      return;
+    }
+    if (incomeStampPlannerSuppressNextClick) {
+      incomeStampPlannerSuppressNextClick = false;
       return;
     }
     const calendarDay = target?.closest<HTMLElement>("[data-income-planning-calendar-day]");
@@ -2266,6 +2293,7 @@ function incomeStampPlannerStampButton(stamp: IncomePlanningPlannedStamp): strin
       class="income-stamp-planner-stamp"
       type="button"
       data-action="income-stamp-planner-edit"
+      data-income-stamp-planner-stamp="true"
       data-income-stamp-planner-stamp-id="${escapeHtml(stamp.id)}"
       title="${escapeHtml(`${stamp.label} · ${incomeStampPlannerFullDateLabel(stamp.date)} · ${stamp.startTime}`)}"
     >
@@ -4737,6 +4765,16 @@ function defaultIncomePlanningSlot(ownerType: string): IncomePlanningSlot {
 
 function startIncomePlanningCalendarDrag(event: PointerEvent): void {
   const target = event.target as HTMLElement | null;
+  const plannerStamp = target?.closest<HTMLElement>("[data-income-stamp-planner-stamp]");
+  if (plannerStamp && plannerStamp.closest("[data-income-stamp-planner-calendar]")) {
+    startIncomeStampPlannerStampDrag(event, plannerStamp);
+    return;
+  }
+  const plannedStamp = target?.closest<HTMLElement>("[data-income-stamp-planner-calendar-stamp]");
+  if (plannedStamp) {
+    startIncomePlanningPlannedStampCalendarDrag(event, plannedStamp);
+    return;
+  }
   const stamp = target?.closest<HTMLElement>("[data-income-planning-calendar-stamp]");
   if (stamp) {
     startIncomePlanningStampCalendarDrag(event, stamp);
@@ -4808,7 +4846,71 @@ function startIncomePlanningStampCalendarDrag(event: PointerEvent, stampElement:
   event.preventDefault();
 }
 
+function startIncomePlanningPlannedStampCalendarDrag(event: PointerEvent, stampElement: HTMLElement): void {
+  const stampId = stampElement.dataset.incomeStampPlannerStampId || "";
+  const stamp = (state.incomePlanning.plannedStamps ?? []).find((item) => item.id === stampId);
+  const column = stampElement.closest<HTMLElement>("[data-income-planning-calendar-day]");
+  const days = document.querySelector<HTMLElement>("#incomePlanningCalendarDays");
+  if (!stampId || !stamp || !incomeStampPlannerDateFromString(stamp.date) || !column || !days) return;
+  incomePlanningPlannedStampDragState = {
+    stampId,
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    originalDate: stamp.date,
+    originalStartMinute: parseTimeMinutes(stamp.startTime) ?? 0,
+    dayWidth: Math.max(1, days.getBoundingClientRect().width / 7),
+    columnHeight: Math.max(1, column.getBoundingClientRect().height),
+    element: stampElement,
+    moved: false
+  };
+  stampElement.classList.add("dragging");
+  stampElement.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+}
+
+function startIncomeStampPlannerStampDrag(event: PointerEvent, stampElement: HTMLElement): void {
+  const stampId = stampElement.dataset.incomeStampPlannerStampId || "";
+  const stamp = (state.incomePlanning.plannedStamps ?? []).find((item) => item.id === stampId);
+  if (!stampId || !stamp || !incomeStampPlannerDateFromString(stamp.date)) return;
+  incomeStampPlannerStampDragState = {
+    stampId,
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    element: stampElement,
+    moved: false
+  };
+  stampElement.classList.add("dragging");
+  stampElement.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+}
+
 function moveIncomePlanningCalendarDrag(event: PointerEvent): void {
+  if (incomePlanningPlannedStampDragState && event.pointerId === incomePlanningPlannedStampDragState.pointerId) {
+    const next = incomePlanningPlannedStampDragPreview(event);
+    incomePlanningPlannedStampDragState.moved =
+      incomePlanningPlannedStampDragState.moved ||
+      Math.abs(event.clientX - incomePlanningPlannedStampDragState.startClientX) > 3 ||
+      Math.abs(event.clientY - incomePlanningPlannedStampDragState.startClientY) > 3;
+    const top = (next.startMinute / (24 * 60)) * 100;
+    incomePlanningPlannedStampDragState.element.style.setProperty("--top", `${top.toFixed(3)}%`);
+    event.preventDefault();
+    return;
+  }
+  if (incomeStampPlannerStampDragState && event.pointerId === incomeStampPlannerStampDragState.pointerId) {
+    incomeStampPlannerStampDragState.moved =
+      incomeStampPlannerStampDragState.moved ||
+      Math.abs(event.clientX - incomeStampPlannerStampDragState.startClientX) > 3 ||
+      Math.abs(event.clientY - incomeStampPlannerStampDragState.startClientY) > 3;
+    if (incomeStampPlannerStampDragState.moved) {
+      const deltaX = event.clientX - incomeStampPlannerStampDragState.startClientX;
+      const deltaY = event.clientY - incomeStampPlannerStampDragState.startClientY;
+      incomeStampPlannerStampDragState.element.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+    }
+    event.preventDefault();
+    return;
+  }
   if (incomePlanningStampDragState && event.pointerId === incomePlanningStampDragState.pointerId) {
     const next = incomePlanningStampDragPreview(event);
     incomePlanningStampDragState.moved =
@@ -4845,6 +4947,45 @@ function moveIncomePlanningCalendarDrag(event: PointerEvent): void {
 }
 
 function finishIncomePlanningCalendarDrag(event: PointerEvent): void {
+  if (incomePlanningPlannedStampDragState && event.pointerId === incomePlanningPlannedStampDragState.pointerId) {
+    const dragState = incomePlanningPlannedStampDragState;
+    const next = incomePlanningPlannedStampDragPreview(event);
+    dragState.element.classList.remove("dragging");
+    dragState.element.releasePointerCapture?.(event.pointerId);
+    incomePlanningPlannedStampDragState = null;
+    if (dragState.moved) {
+      updateIncomePlanningPlannedStampAfterCalendarDrag(dragState.stampId, next);
+      const savedDate = incomeStampPlannerDateFromString(next.date);
+      if (savedDate) {
+        incomeStampPlannerMonthCursor = incomeStampPlannerMonthStart(savedDate);
+      }
+      renderAll();
+      saveState(state);
+      incomePlanningSuppressNextCalendarClick = true;
+    }
+    return;
+  }
+  if (incomeStampPlannerStampDragState && event.pointerId === incomeStampPlannerStampDragState.pointerId) {
+    const dragState = incomeStampPlannerStampDragState;
+    const nextDate = incomeStampPlannerDateFromPointer(event.clientX, event.clientY);
+    dragState.element.classList.remove("dragging");
+    dragState.element.style.transform = "";
+    dragState.element.releasePointerCapture?.(event.pointerId);
+    incomeStampPlannerStampDragState = null;
+    if (dragState.moved) {
+      if (nextDate) {
+        updateIncomeStampPlannerStampAfterPlannerDrag(dragState.stampId, nextDate);
+        const savedDate = incomeStampPlannerDateFromString(nextDate);
+        if (savedDate) {
+          incomeStampPlannerMonthCursor = incomeStampPlannerMonthStart(savedDate);
+        }
+        renderAll();
+        saveState(state);
+      }
+      incomeStampPlannerSuppressNextClick = true;
+    }
+    return;
+  }
   if (incomePlanningStampDragState && event.pointerId === incomePlanningStampDragState.pointerId) {
     const dragState = incomePlanningStampDragState;
     const next = incomePlanningStampDragPreview(event);
@@ -4911,6 +5052,37 @@ function incomePlanningStampDragPreview(event: PointerEvent): { day: IncomePlann
   };
 }
 
+function incomePlanningPlannedStampDragPreview(event: PointerEvent): { date: string; startMinute: number } {
+  if (!incomePlanningPlannedStampDragState) return { date: incomeStampPlannerTodayDateString(), startMinute: 0 };
+  const originalDate =
+    incomeStampPlannerDateFromString(incomePlanningPlannedStampDragState.originalDate) ??
+    incomeStampPlannerStartOfDay(new Date());
+  const verticalDelta = snapIncomePlanningMinute(
+    ((event.clientY - incomePlanningPlannedStampDragState.startClientY) /
+      incomePlanningPlannedStampDragState.columnHeight) *
+      24 *
+      60
+  );
+  const dayDelta = Math.round(
+    (event.clientX - incomePlanningPlannedStampDragState.startClientX) /
+      incomePlanningPlannedStampDragState.dayWidth
+  );
+  const weekRange = incomeStampPlannerCurrentWeekRange();
+  const nextDate = incomeStampPlannerClampDate(
+    incomeStampPlannerAddDays(originalDate, dayDelta),
+    weekRange.start,
+    weekRange.end
+  );
+  return {
+    date: incomeStampPlannerDateString(nextDate),
+    startMinute: clamp(
+      snapIncomePlanningMinute(incomePlanningPlannedStampDragState.originalStartMinute + verticalDelta),
+      0,
+      23 * 60 + 45
+    )
+  };
+}
+
 function updateIncomePlanningStampAfterCalendarDrag(
   stampId: string,
   next: { day: IncomePlanningWeekday; startMinute: number }
@@ -4921,6 +5093,40 @@ function updateIncomePlanningStampAfterCalendarDrag(
       stamp.id === stampId ? { ...stamp, day: next.day, startTime: formatIncomePlanningTime(next.startMinute) } : stamp
     )
   };
+}
+
+function updateIncomePlanningPlannedStampAfterCalendarDrag(
+  stampId: string,
+  next: { date: string; startMinute: number }
+): void {
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    plannedStamps: (state.incomePlanning.plannedStamps ?? []).map((stamp) =>
+      stamp.id === stampId ? { ...stamp, date: next.date, startTime: formatIncomePlanningTime(next.startMinute) } : stamp
+    )
+  };
+}
+
+function updateIncomeStampPlannerStampAfterPlannerDrag(stampId: string, date: string): void {
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    plannedStamps: (state.incomePlanning.plannedStamps ?? []).map((stamp) =>
+      stamp.id === stampId ? { ...stamp, date } : stamp
+    )
+  };
+}
+
+function incomeStampPlannerDateFromPointer(clientX: number, clientY: number): string | null {
+  const target = document.elementFromPoint(clientX, clientY);
+  const day = target?.closest<HTMLElement>("[data-income-stamp-planner-date]");
+  const date = day?.dataset.incomeStampPlannerDate || "";
+  return incomeStampPlannerDateFromString(date) ? date : null;
+}
+
+function incomeStampPlannerClampDate(date: Date, min: Date, max: Date): Date {
+  if (date.getTime() < min.getTime()) return incomeStampPlannerStartOfDay(min);
+  if (date.getTime() > max.getTime()) return incomeStampPlannerStartOfDay(max);
+  return incomeStampPlannerStartOfDay(date);
 }
 
 function updateIncomePlanningPauseAfterCalendarDrag(
