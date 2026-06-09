@@ -172,6 +172,7 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain('data-action="income-planning-delete-dialog-slot"');
     expect(mainSource).toContain('data-action="income-planning-save-stamp" aria-label="Stempel speichern"');
     expect(mainSource).toContain('data-action="income-planning-delete-stamp"');
+    expect(mainSource).toContain('class="income-planning-dialog-grid basis"');
     expect(mainSource).toContain("function incomePlanningDialogCanDeleteSlot");
   });
 

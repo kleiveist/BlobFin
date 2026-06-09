@@ -6161,6 +6161,10 @@ tfoot th {
   align-items: end;
 }
 
+.income-planning-dialog-grid.basis {
+  grid-template-columns: 50px 150px 150px 100px 150px;
+}
+
 .income-planning-dialog-grid.single {
   grid-template-columns: minmax(160px, 260px);
 }
@@ -8233,6 +8237,7 @@ tfoot th {
   }
 
   .income-planning-dialog-grid,
+  .income-planning-dialog-grid.basis,
   .income-planning-dialog-grid.single {
     grid-template-columns: 1fr;
   }

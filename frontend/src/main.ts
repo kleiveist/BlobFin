@@ -3065,7 +3065,7 @@ function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialo
   return `
     <section class="income-planning-dialog-section">
       <strong>Basis</strong>
-      <div class="income-planning-dialog-grid">
+      <div class="income-planning-dialog-grid basis">
         <label class="income-planning-source-active">
           <input type="checkbox" ${dialog.active ? "checked" : ""} data-income-planning-dialog-field="active" />
           <span>Aktiv</span>
