@@ -6162,7 +6162,7 @@ tfoot th {
 }
 
 .income-planning-dialog-grid.basis {
-  grid-template-columns: 50px 150px 150px 100px 150px;
+  grid-template-columns: minmax(50px, 0.35fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(100px, 0.7fr) minmax(150px, 1fr);
 }
 
 .income-planning-dialog-grid.single {
