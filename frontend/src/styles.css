@@ -6248,8 +6248,8 @@ tfoot th {
 }
 
 .income-planning-color-swatches {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 24px);
   gap: 5px;
 }
 
