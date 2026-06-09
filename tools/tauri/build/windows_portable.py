@@ -3,11 +3,14 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 
 from tools import logger
 from tools.tauri import common, paths
+
+WINDOWS_TARGET = "x86_64-pc-windows-msvc"
 
 
 def main(args: argparse.Namespace) -> int:
@@ -43,7 +46,8 @@ def _ensure_cargo_xwin(*, dry_run: bool) -> tuple[int, str, dict[str, str]]:
     cargo_xwin = _find_cargo_xwin(env)
     if cargo_xwin is not None:
         logger.ok("cargo-xwin found")
-        return 0, cargo_xwin, env
+        code = _ensure_windows_resource_compiler(env, dry_run=dry_run)
+        return code, cargo_xwin, env
 
     cargo = shutil.which("cargo", path=env.get("PATH")) or ("cargo" if dry_run else None)
     if cargo is None:
@@ -57,13 +61,88 @@ def _ensure_cargo_xwin(*, dry_run: bool) -> tuple[int, str, dict[str, str]]:
         return code, "cargo-xwin", env
 
     if dry_run:
-        return 0, str(_cargo_xwin_path()), env
+        code = _ensure_windows_resource_compiler(env, dry_run=dry_run)
+        return code, str(_cargo_xwin_path()), env
 
     cargo_xwin = _find_cargo_xwin(env)
     if cargo_xwin is None:
         logger.fail(f"cargo-xwin install completed, but cargo-xwin was not found at {_cargo_xwin_path()}.")
         return 1, "cargo-xwin", env
-    return 0, cargo_xwin, env
+    code = _ensure_windows_resource_compiler(env, dry_run=dry_run)
+    return code, cargo_xwin, env
+
+
+def _ensure_windows_resource_compiler(env: dict[str, str], *, dry_run: bool) -> int:
+    configured_rc = _configured_resource_compiler(env)
+    if configured_rc is not None:
+        logger.ok(f"Windows resource compiler configured via {configured_rc}")
+        return 0
+
+    if _find_llvm_rc(env) is not None:
+        logger.ok("llvm-rc found")
+        return 0
+
+    rustup = shutil.which("rustup", path=env.get("PATH")) or ("rustup" if dry_run else None)
+    if rustup is None:
+        logger.fail(
+            "llvm-rc not found. Action: install the Rust llvm-tools-preview component "
+            "or put llvm-rc on PATH before building Windows portable on Linux."
+        )
+        return 1
+
+    logger.info("llvm-rc not found; installing Rust llvm-tools-preview for Windows resource compilation.")
+    result = common.run_command([rustup, "component", "add", "llvm-tools-preview"], dry_run=dry_run, env=env)
+    code = common.print_result(result, "llvm-tools-preview ready", "llvm-tools-preview install failed")
+    if code != 0 or dry_run:
+        return code
+
+    if _find_llvm_rc(env) is None:
+        logger.fail(
+            "llvm-rc not found after installing llvm-tools-preview. "
+            "Action: install an LLVM/Clang package that provides llvm-rc, or set RC to a compatible resource compiler."
+        )
+        return 1
+    logger.ok("llvm-rc ready")
+    return 0
+
+
+def _configured_resource_compiler(env: dict[str, str]) -> str | None:
+    for name in (f"RC_{WINDOWS_TARGET}", f"RC_{WINDOWS_TARGET.replace('-', '_')}", "RC"):
+        if env.get(name):
+            return name
+    return None
+
+
+def _find_llvm_rc(env: dict[str, str]) -> str | None:
+    _prepend_rust_llvm_tools_dir(env)
+    return shutil.which("llvm-rc", path=env.get("PATH"))
+
+
+def _prepend_rust_llvm_tools_dir(env: dict[str, str]) -> None:
+    rustc = shutil.which("rustc", path=env.get("PATH"))
+    if rustc is None:
+        return
+    try:
+        completed = subprocess.run([rustc, "--print", "sysroot"], capture_output=True, text=True, check=False, env=env)
+    except OSError:
+        return
+    if completed.returncode != 0:
+        return
+    sysroot = Path((completed.stdout or "").strip())
+    if not sysroot.exists():
+        return
+    for tools_dir in sorted((sysroot / "lib" / "rustlib").glob("*/bin")):
+        if (tools_dir / "llvm-rc").exists():
+            _prepend_path(env, tools_dir)
+            return
+
+
+def _prepend_path(env: dict[str, str], directory: Path) -> None:
+    path = env.get("PATH", "")
+    directory_string = str(directory)
+    parts = path.split(os.pathsep) if path else []
+    if directory_string not in parts:
+        env["PATH"] = os.pathsep.join([directory_string, *parts])
 
 
 def _env_with_cargo_bin() -> dict[str, str]:
@@ -94,14 +173,14 @@ def _build_command(host: str, *, runner: str | None = None) -> list[str]:
             "--runner",
             runner or "cargo-xwin",
             "--target",
-            "x86_64-pc-windows-msvc",
+            WINDOWS_TARGET,
             "--no-bundle",
         )
-    return common.tauri_cli_command("build", "--target", "x86_64-pc-windows-msvc", "--no-bundle")
+    return common.tauri_cli_command("build", "--target", WINDOWS_TARGET, "--no-bundle")
 
 
 def _zip_portable_binary(*, dry_run: bool) -> int:
-    release_dir = paths.TAURI_DIR / "target" / "x86_64-pc-windows-msvc" / "release"
+    release_dir = paths.TAURI_DIR / "target" / WINDOWS_TARGET / "release"
     zip_path = paths.DIST_DIR / f"{paths.APP_NAME}-windows-portable.zip"
 
     if dry_run:

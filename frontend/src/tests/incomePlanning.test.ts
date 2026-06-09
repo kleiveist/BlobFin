@@ -4,6 +4,7 @@ import { defaultIncomePlanningState } from "../data/defaults";
 import { INCOME_YEAR_LABEL_OPTIONS } from "../domain/incomeLabels";
 import {
   buildIncomePlanningHabit,
+  buildIncomePlanningManualBlock,
   buildIncomePlanningModel,
   buildIncomePlanningWorkBlock,
   enforceSingleActiveIncomePlanningMainJob,
@@ -11,6 +12,7 @@ import {
   incomePlanningSlotCalendarSegments,
   INCOME_PLANNING_CATEGORY_CONFIGS
 } from "../domain/incomePlanning";
+import { exportIncomePlanningCsv, incomePlanningFromCsvRows, parseCsv } from "../lib/csv";
 import type { IncomePlanningSlot, IncomePlanningState } from "../types";
 
 describe("income planning", () => {
@@ -290,6 +292,114 @@ describe("income planning", () => {
     expect(model.habitHours).toBe(0.5);
     expect(model.pauseHours).toBe(0);
     expect(model.calendarEntries.map((entry) => entry.type)).toEqual(["good_habit"]);
+  });
+
+  it("round-trips the full time budget through csv", () => {
+    const state: IncomePlanningState = {
+      workBlocks: [
+        buildIncomePlanningWorkBlock("salary", "main", {
+          name: "Fruehschicht",
+          description: "Hauptjob",
+          color: "#123456",
+          slots: [
+            {
+              id: "main-slot",
+              day: "monday",
+              startTime: "06:30",
+              endTime: "15:45",
+              flexible: false,
+              durationMinutes: 555,
+              pauseEnabled: true,
+              pauseStartTime: "12:00",
+              pauseEndTime: "12:30",
+              pauseDurationMinutes: 30
+            }
+          ]
+        })
+      ],
+      habits: [
+        buildIncomePlanningHabit("habit", {
+          type: "bad",
+          name: "Handy im Bett",
+          timing: "abends",
+          durationMinutes: 20,
+          durationUnit: "day",
+          goalChange: "replace",
+          replacementHabit: "Buch lesen",
+          status: "difficult",
+          priority: "high",
+          icon: "snack",
+          slots: [
+            {
+              id: "habit-slot",
+              day: "tuesday",
+              startTime: "21:30",
+              endTime: "21:50",
+              flexible: false,
+              durationMinutes: 20
+            }
+          ]
+        })
+      ],
+      manualBlocks: [
+        buildIncomePlanningManualBlock("free_time", "free", {
+          name: "Freizeit",
+          slots: [flexiblePlanningSlot("free-slot", 5)]
+        })
+      ],
+      assumptions: {
+        sleepHoursPerDay: 7.5,
+        sleepSlots: [
+          {
+            id: "sleep-slot",
+            day: "sunday",
+            startTime: "22:00",
+            endTime: "06:00",
+            flexible: false,
+            durationMinutes: 480
+          }
+        ]
+      }
+    };
+
+    const csv = exportIncomePlanningCsv(state);
+    const imported = incomePlanningFromCsvRows(parseCsv(csv));
+
+    expect(csv).toContain("Arbeit-Slot");
+    expect(csv).toContain("Pause-Startzeit");
+    expect(imported?.workBlocks[0]).toMatchObject({
+      id: "main",
+      active: true,
+      category: "salary",
+      name: "Fruehschicht",
+      description: "Hauptjob",
+      color: "#123456"
+    });
+    expect(imported?.workBlocks[0]?.slots[0]).toMatchObject({
+      id: "main-slot",
+      pauseEnabled: true,
+      pauseStartTime: "12:00",
+      pauseEndTime: "12:30",
+      pauseDurationMinutes: 30
+    });
+    expect(imported?.habits[0]).toMatchObject({
+      id: "habit",
+      type: "bad",
+      goalChange: "replace",
+      replacementHabit: "Buch lesen",
+      status: "difficult",
+      priority: "high",
+      icon: "snack"
+    });
+    expect(imported?.manualBlocks[0]?.slots[0]).toMatchObject({ id: "free-slot", flexible: true, durationMinutes: 300 });
+    expect(imported?.assumptions.sleepHoursPerDay).toBe(7.5);
+    expect(imported?.assumptions.sleepSlots[0]).toMatchObject({
+      id: "sleep-slot",
+      day: "sunday",
+      startTime: "22:00",
+      endTime: "06:00",
+      durationMinutes: 480
+    });
   });
 
   it("uses the yearly income labels as work planning categories", () => {

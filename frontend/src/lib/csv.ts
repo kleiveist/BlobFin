@@ -1,4 +1,21 @@
-import { createId, defaultPlanningSettings, MONTHS } from "../data/defaults";
+import { createId, defaultIncomePlanningState, defaultPlanningSettings, MONTHS } from "../data/defaults";
+import {
+  buildIncomePlanningHabit,
+  buildIncomePlanningManualBlock,
+  buildIncomePlanningWorkBlock,
+  incomePlanningAverageSleepHours,
+  incomePlanningDefaultManualColor,
+  incomePlanningDefaultWorkColor,
+  incomePlanningStripSlotPause,
+  INCOME_PLANNING_CATEGORY_CONFIGS,
+  isIncomePlanningHabitChange,
+  isIncomePlanningHabitDurationUnit,
+  isIncomePlanningHabitStatus,
+  isIncomePlanningHabitType,
+  isIncomePlanningManualBlockType,
+  isIncomePlanningPriority,
+  isIncomePlanningWeekday
+} from "../domain/incomePlanning";
 import { calculateMonthlyRows } from "../domain/reserveCalculator";
 import {
   cleanText,
@@ -14,6 +31,15 @@ import { defaultPositionIconForPosition, normalizePositionIcon, positionIconLabe
 import { flowForType, isIncomeType, typeForFlow } from "./positionKinds";
 import { positionPlanningYear } from "./planningYears";
 import type {
+  IncomePlanningCategory,
+  IncomePlanningHabit,
+  IncomePlanningHabitDurationUnit,
+  IncomePlanningManualBlock,
+  IncomePlanningManualBlockType,
+  IncomePlanningSleepSlot,
+  IncomePlanningSlot,
+  IncomePlanningState,
+  IncomePlanningWorkBlock,
   PlanningSettings,
   PayoutType,
   PositionCostBreakdownItem,
@@ -231,6 +257,215 @@ export function exportYearTableCsv(
   return csvRows.map((row) => row.map(csvCell).join(";")).join("\n");
 }
 
+const INCOME_PLANNING_CSV_HEADER = [
+  "Datensatz",
+  "Block-ID",
+  "Slot-ID",
+  "Aktiv",
+  "Kategorie",
+  "Name",
+  "Beschreibung",
+  "Farbe",
+  "Tag",
+  "Startzeit",
+  "Endzeit",
+  "Flexibel",
+  "Dauer-Minuten",
+  "Pause-Aktiv",
+  "Pause-Startzeit",
+  "Pause-Endzeit",
+  "Pause-Minuten",
+  "Habit-Typ",
+  "Habit-Timing",
+  "Habit-Dauer-Minuten",
+  "Habit-Dauer-Einheit",
+  "Habit-Ziel",
+  "Habit-Ersatz",
+  "Habit-Status",
+  "Habit-Prioritaet",
+  "Habit-Icon",
+  "Schlaf-Stunden-Pro-Tag"
+];
+
+type IncomePlanningCsvRowKind =
+  | "assumptions"
+  | "work"
+  | "work_slot"
+  | "habit"
+  | "habit_slot"
+  | "manual"
+  | "manual_slot"
+  | "sleep"
+  | "unknown";
+
+export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
+  const rows = [INCOME_PLANNING_CSV_HEADER];
+  rows.push(incomePlanningCsvRow("Annahmen", { 26: formatCsvNumber(planning.assumptions.sleepHoursPerDay) }));
+
+  for (const block of planning.workBlocks) {
+    rows.push(
+      incomePlanningCsvRow("Arbeit", {
+        1: block.id,
+        3: booleanCsv(block.active),
+        4: block.category,
+        5: block.name,
+        6: block.description,
+        7: block.color ?? incomePlanningDefaultWorkColor(block.category)
+      })
+    );
+    for (const slot of block.slots) {
+      rows.push(incomePlanningCsvRow("Arbeit-Slot", { 1: block.id, ...incomePlanningSlotCsvCells(slot) }));
+    }
+  }
+
+  for (const habit of planning.habits) {
+    rows.push(
+      incomePlanningCsvRow("Habit", {
+        1: habit.id,
+        3: booleanCsv(habit.active),
+        5: habit.name,
+        6: habit.description,
+        17: habit.type,
+        18: habit.timing,
+        19: String(Math.round(habit.durationMinutes)),
+        20: habit.durationUnit,
+        21: habit.goalChange,
+        22: habit.replacementHabit,
+        23: habit.status,
+        24: habit.priority,
+        25: habit.icon ?? (habit.type === "bad" ? "snack" : "book")
+      })
+    );
+    for (const slot of habit.slots) {
+      rows.push(incomePlanningCsvRow("Habit-Slot", { 1: habit.id, ...incomePlanningSlotCsvCells(slot) }));
+    }
+  }
+
+  for (const block of planning.manualBlocks) {
+    rows.push(
+      incomePlanningCsvRow("Zeitblock", {
+        1: block.id,
+        3: booleanCsv(block.active),
+        4: block.type,
+        5: block.name,
+        6: block.description,
+        7: block.color ?? incomePlanningDefaultManualColor(block.type)
+      })
+    );
+    for (const slot of block.slots) {
+      rows.push(incomePlanningCsvRow("Zeitblock-Slot", { 1: block.id, ...incomePlanningSlotCsvCells(slot) }));
+    }
+  }
+
+  for (const slot of planning.assumptions.sleepSlots) {
+    rows.push(incomePlanningCsvRow("Schlaf", incomePlanningSleepSlotCsvCells(slot)));
+  }
+
+  return rows.map((row) => row.map(csvCell).join(";")).join("\n");
+}
+
+export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState | null {
+  if (!rows.length) return null;
+  const header = rows[0].map(normalizeHeader);
+  const hasHeader =
+    header.includes("datensatz") ||
+    header.includes("blockid") ||
+    header.includes("slotid") ||
+    header.includes("startzeit");
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const get: CsvRowGetter = (row, keys, fallbackIndex) => {
+    if (hasHeader) {
+      for (const key of keys) {
+        const index = header.indexOf(key);
+        if (index >= 0) return row[index] ?? "";
+      }
+    }
+    return fallbackIndex >= 0 ? row[fallbackIndex] ?? "" : "";
+  };
+
+  const fallback = defaultIncomePlanningState();
+  const workBlocks = new Map<string, IncomePlanningWorkBlock>();
+  const habits = new Map<string, IncomePlanningHabit>();
+  const manualBlocks = new Map<string, IncomePlanningManualBlock>();
+  const slotsByOwnerId = new Map<string, IncomePlanningSlot[]>();
+  const sleepSlots: IncomePlanningSleepSlot[] = [];
+  let sleepHoursPerDay: number | null = null;
+  let recognizedRows = 0;
+
+  for (const row of dataRows) {
+    const kind = parseIncomePlanningCsvRowKind(get(row, ["datensatz", "zeilentyp", "typ", "type"], 0));
+
+    if (kind === "assumptions") {
+      const parsedHours = parseIncomePlanningHours(get(row, ["schlafstundenprotag", "schlafstunden", "sleephoursperday"], 26));
+      if (parsedHours !== null) sleepHoursPerDay = parsedHours;
+      recognizedRows += 1;
+      continue;
+    }
+
+    if (kind === "work") {
+      const block = parseIncomePlanningWorkBlock(row, get);
+      workBlocks.set(block.id, block);
+      recognizedRows += 1;
+      continue;
+    }
+
+    if (kind === "habit") {
+      const habit = parseIncomePlanningHabit(row, get);
+      habits.set(habit.id, habit);
+      recognizedRows += 1;
+      continue;
+    }
+
+    if (kind === "manual") {
+      const block = parseIncomePlanningManualBlock(row, get);
+      manualBlocks.set(block.id, block);
+      recognizedRows += 1;
+      continue;
+    }
+
+    if (kind === "work_slot" || kind === "habit_slot" || kind === "manual_slot") {
+      const ownerId = cleanText(get(row, ["blockid", "ownerid", "besitzerid"], 1));
+      const slot = parseIncomePlanningCsvSlot(row, get);
+      if (ownerId && slot) {
+        slotsByOwnerId.set(ownerId, [...(slotsByOwnerId.get(ownerId) ?? []), slot]);
+        recognizedRows += 1;
+      }
+      continue;
+    }
+
+    if (kind === "sleep") {
+      const slot = parseIncomePlanningCsvSleepSlot(row, get);
+      if (slot) {
+        sleepSlots.push(slot);
+        recognizedRows += 1;
+      }
+    }
+  }
+
+  if (!recognizedRows) return null;
+
+  const importedSleepSlots = sleepSlots.length ? sleepSlots : fallback.assumptions.sleepSlots;
+  return {
+    workBlocks: Array.from(workBlocks.values()).map((block) => ({
+      ...block,
+      slots: slotsByOwnerId.get(block.id) ?? []
+    })),
+    habits: Array.from(habits.values()).map((habit) => ({
+      ...habit,
+      slots: (slotsByOwnerId.get(habit.id) ?? []).map(incomePlanningStripSlotPause)
+    })),
+    manualBlocks: Array.from(manualBlocks.values()).map((block) => ({
+      ...block,
+      slots: slotsByOwnerId.get(block.id) ?? []
+    })),
+    assumptions: {
+      sleepHoursPerDay:
+        sleepHoursPerDay ?? incomePlanningAverageSleepHours({ sleepHoursPerDay: 0, sleepSlots: importedSleepSlots }),
+      sleepSlots: importedSleepSlots
+    }
+  };
+}
+
 export function csvCell(value: unknown): string {
   return `"${String(value).replaceAll('"', '""')}"`;
 }
@@ -241,6 +476,279 @@ export function parseMoneyValue(value: unknown): number {
   cleaned = cleaned.replaceAll(".", "").replaceAll(",", ".");
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function incomePlanningCsvRow(kind: string, values: Partial<Record<number, string>> = {}): string[] {
+  const row = Array.from({ length: INCOME_PLANNING_CSV_HEADER.length }, () => "");
+  row[0] = kind;
+  for (const [index, value] of Object.entries(values)) {
+    if (value !== undefined) row[Number(index)] = value;
+  }
+  return row;
+}
+
+function incomePlanningSlotCsvCells(slot: IncomePlanningSlot): Partial<Record<number, string>> {
+  return {
+    2: slot.id,
+    8: slot.day,
+    9: slot.startTime,
+    10: slot.endTime,
+    11: booleanCsv(slot.flexible),
+    12: String(Math.round(slot.durationMinutes)),
+    13: slot.pauseEnabled === undefined ? "" : booleanCsv(slot.pauseEnabled),
+    14: slot.pauseStartTime ?? "",
+    15: slot.pauseEndTime ?? "",
+    16: slot.pauseDurationMinutes === undefined ? "" : String(Math.round(slot.pauseDurationMinutes))
+  };
+}
+
+function incomePlanningSleepSlotCsvCells(slot: IncomePlanningSleepSlot): Partial<Record<number, string>> {
+  return {
+    2: slot.id,
+    8: slot.day,
+    9: slot.startTime,
+    10: slot.endTime,
+    11: booleanCsv(slot.flexible),
+    12: String(Math.round(slot.durationMinutes))
+  };
+}
+
+function parseIncomePlanningCsvRowKind(value: unknown): IncomePlanningCsvRowKind {
+  const normalized = normalizeHeader(value);
+  if (["annahmen", "assumptions", "settings", "einstellungen"].includes(normalized)) return "assumptions";
+  if (["arbeit", "taetigkeit", "tatigkeit", "work", "workblock"].includes(normalized)) return "work";
+  if (["arbeitslot", "taetigkeitslot", "tatigkeitslot", "workslot"].includes(normalized)) return "work_slot";
+  if (["habit", "gewohnheit"].includes(normalized)) return "habit";
+  if (["habitslot", "gewohnheitslot"].includes(normalized)) return "habit_slot";
+  if (["zeitblock", "manual", "manualblock", "privatezeit", "ereignis"].includes(normalized)) return "manual";
+  if (["zeitblockslot", "manualslot", "ereignisslot"].includes(normalized)) return "manual_slot";
+  if (["schlaf", "sleep", "sleepslot"].includes(normalized)) return "sleep";
+  return "unknown";
+}
+
+function parseIncomePlanningWorkBlock(row: string[], get: CsvRowGetter): IncomePlanningWorkBlock {
+  const category = parseIncomePlanningCategory(get(row, ["kategorie", "category"], 4));
+  const id = cleanText(get(row, ["blockid", "id", "ownerid"], 1)) || createId();
+  const fallback = buildIncomePlanningWorkBlock(category, id, { slots: [] });
+  const color = normalizeIncomePlanningCsvColor(get(row, ["farbe", "color"], 7), incomePlanningDefaultWorkColor(category));
+  return {
+    ...fallback,
+    id,
+    active: parseBooleanValue(get(row, ["aktiv", "active"], 3), fallback.active),
+    category,
+    name: cleanText(get(row, ["name", "titel", "title"], 5)) || fallback.name,
+    description: cleanText(get(row, ["beschreibung", "description"], 6)),
+    color,
+    slots: []
+  };
+}
+
+function parseIncomePlanningHabit(row: string[], get: CsvRowGetter): IncomePlanningHabit {
+  const id = cleanText(get(row, ["blockid", "id", "ownerid"], 1)) || createId();
+  const type = parseIncomePlanningHabitType(get(row, ["habittyp", "type", "habitart"], 17));
+  const fallback = buildIncomePlanningHabit(id, { type, slots: [] });
+  const durationUnit = parseIncomePlanningHabitDurationUnit(
+    get(row, ["habitdauereinheit", "dauereinheit", "durationunit"], 20),
+    fallback.durationUnit
+  );
+  const durationMinutes = parseIncomePlanningMinutes(
+    get(row, ["habitdauerminuten", "habitdauer", "durationminutes"], 19),
+    fallback.durationMinutes
+  );
+  return {
+    ...fallback,
+    id,
+    active: parseBooleanValue(get(row, ["aktiv", "active"], 3), fallback.active),
+    type,
+    name: cleanText(get(row, ["name", "titel", "title"], 5)) || fallback.name,
+    description: cleanText(get(row, ["beschreibung", "description"], 6)),
+    timing: cleanText(get(row, ["habittiming", "timing", "zeitpunkt"], 18)),
+    durationMinutes,
+    durationUnit,
+    goalChange: parseIncomePlanningHabitChange(get(row, ["habitziel", "goalchange", "ziel"], 21), fallback.goalChange),
+    replacementHabit: cleanText(get(row, ["habitersatz", "replacementhabit", "ersatz"], 22)),
+    status: parseIncomePlanningHabitStatus(get(row, ["habitstatus", "status"], 23), fallback.status),
+    priority: parseIncomePlanningPriority(get(row, ["habitprioritaet", "priority", "prioritaet"], 24), fallback.priority),
+    icon: normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), type === "bad" ? "snack" : "book"),
+    slots: []
+  };
+}
+
+function parseIncomePlanningManualBlock(row: string[], get: CsvRowGetter): IncomePlanningManualBlock {
+  const type = parseIncomePlanningManualBlockType(get(row, ["kategorie", "type", "typ"], 4));
+  const id = cleanText(get(row, ["blockid", "id", "ownerid"], 1)) || createId();
+  const fallback = buildIncomePlanningManualBlock(type, id, { slots: [] });
+  const color = normalizeIncomePlanningCsvColor(get(row, ["farbe", "color"], 7), incomePlanningDefaultManualColor(type));
+  return {
+    ...fallback,
+    id,
+    active: parseBooleanValue(get(row, ["aktiv", "active"], 3), fallback.active),
+    type,
+    name: cleanText(get(row, ["name", "titel", "title"], 5)) || fallback.name,
+    description: cleanText(get(row, ["beschreibung", "description"], 6)),
+    color,
+    slots: []
+  };
+}
+
+function parseIncomePlanningCsvSlot(row: string[], get: CsvRowGetter): IncomePlanningSlot | null {
+  const id = cleanText(get(row, ["slotid", "id"], 2)) || createId();
+  const day = parseIncomePlanningWeekday(get(row, ["tag", "day", "wochentag"], 8), "sunday");
+  const startTime = parseIncomePlanningTime(get(row, ["startzeit", "start", "starttime"], 9), "09:00");
+  const endTime = parseIncomePlanningTime(get(row, ["endzeit", "ende", "end", "endtime"], 10), "10:00");
+  const flexible = parseBooleanValue(get(row, ["flexibel", "flexible"], 11), false);
+  const durationMinutes = parseIncomePlanningMinutes(
+    get(row, ["dauerminuten", "dauer", "durationminutes"], 12),
+    flexible ? 60 : fallbackTimeDuration(startTime, endTime, 60)
+  );
+  const slot: IncomePlanningSlot = { id, day, startTime, endTime, flexible, durationMinutes };
+  const pauseEnabledRaw = get(row, ["pauseaktiv", "pauseenabled"], 13);
+  const pauseStartRaw = get(row, ["pausestartzeit", "pausestart", "pausestarttime"], 14);
+  const pauseEndRaw = get(row, ["pauseendzeit", "pauseende", "pauseend", "pauseendtime"], 15);
+  const pauseDurationRaw = get(row, ["pauseminuten", "pausedauer", "pausedurationminutes"], 16);
+  const hasPause =
+    parseBooleanValue(pauseEnabledRaw, false) ||
+    cleanText(pauseStartRaw) !== "" ||
+    cleanText(pauseEndRaw) !== "" ||
+    cleanText(pauseDurationRaw) !== "";
+  if (!hasPause) return slot;
+  const pauseStartTime = parseIncomePlanningTime(pauseStartRaw, "12:00");
+  const pauseEndTime = parseIncomePlanningTime(pauseEndRaw, "12:30");
+  const pauseDurationMinutes = parseIncomePlanningMinutes(
+    pauseDurationRaw,
+    fallbackTimeDuration(pauseStartTime, pauseEndTime, 0)
+  );
+  return {
+    ...slot,
+    pauseEnabled: parseBooleanValue(pauseEnabledRaw, pauseDurationMinutes > 0),
+    pauseStartTime,
+    pauseEndTime,
+    pauseDurationMinutes
+  };
+}
+
+function parseIncomePlanningCsvSleepSlot(row: string[], get: CsvRowGetter): IncomePlanningSleepSlot | null {
+  const id = cleanText(get(row, ["slotid", "id"], 2)) || createId();
+  const day = parseIncomePlanningWeekday(get(row, ["tag", "day", "wochentag"], 8), "sunday");
+  const startTime = parseIncomePlanningTime(get(row, ["startzeit", "start", "starttime"], 9), "21:00");
+  const endTime = parseIncomePlanningTime(get(row, ["endzeit", "ende", "end", "endtime"], 10), "05:30");
+  const flexible = parseBooleanValue(get(row, ["flexibel", "flexible"], 11), false);
+  const durationMinutes = parseIncomePlanningMinutes(
+    get(row, ["dauerminuten", "dauer", "durationminutes"], 12),
+    fallbackTimeDuration(startTime, endTime, 8 * 60)
+  );
+  return { id, day, startTime, endTime, flexible, durationMinutes };
+}
+
+function parseIncomePlanningCategory(value: unknown): IncomePlanningCategory {
+  const cleaned = cleanText(value);
+  return INCOME_PLANNING_CATEGORY_CONFIGS.some((config) => config.id === cleaned)
+    ? (cleaned as IncomePlanningCategory)
+    : "other";
+}
+
+function parseIncomePlanningWeekday(value: unknown, fallback: IncomePlanningSlot["day"]): IncomePlanningSlot["day"] {
+  const cleaned = cleanText(value);
+  if (isIncomePlanningWeekday(cleaned)) return cleaned;
+  const normalized = normalizeHeader(value);
+  const aliases: Record<string, IncomePlanningSlot["day"]> = {
+    montag: "monday",
+    monday: "monday",
+    dienstag: "tuesday",
+    tuesday: "tuesday",
+    mittwoch: "wednesday",
+    wednesday: "wednesday",
+    donnerstag: "thursday",
+    thursday: "thursday",
+    freitag: "friday",
+    friday: "friday",
+    samstag: "saturday",
+    saturday: "saturday",
+    sonntag: "sunday",
+    sunday: "sunday"
+  };
+  return aliases[normalized] ?? fallback;
+}
+
+function parseIncomePlanningTime(value: unknown, fallback: string): string {
+  const cleaned = cleanText(value);
+  return /^([0-1]\d|2[0-3]):([0-5]\d)$/.test(cleaned) ? cleaned : fallback;
+}
+
+function parseIncomePlanningMinutes(value: unknown, fallback: number): number {
+  if (cleanText(value) === "") return Math.max(0, Math.round(fallback));
+  return Math.round(clamp(parseMoneyValue(value), 0, 168 * 60));
+}
+
+function parseIncomePlanningHours(value: unknown): number | null {
+  if (cleanText(value) === "") return null;
+  return clamp(parseMoneyValue(value), 0, 24);
+}
+
+function parseIncomePlanningHabitType(value: unknown): IncomePlanningHabit["type"] {
+  const cleaned = cleanText(value);
+  return isIncomePlanningHabitType(cleaned) ? cleaned : "good";
+}
+
+function parseIncomePlanningHabitDurationUnit(
+  value: unknown,
+  fallback: IncomePlanningHabitDurationUnit
+): IncomePlanningHabitDurationUnit {
+  const cleaned = cleanText(value);
+  return isIncomePlanningHabitDurationUnit(cleaned) ? cleaned : fallback;
+}
+
+function parseIncomePlanningHabitChange(
+  value: unknown,
+  fallback: IncomePlanningHabit["goalChange"]
+): IncomePlanningHabit["goalChange"] {
+  const cleaned = cleanText(value);
+  return isIncomePlanningHabitChange(cleaned) ? cleaned : fallback;
+}
+
+function parseIncomePlanningHabitStatus(
+  value: unknown,
+  fallback: IncomePlanningHabit["status"]
+): IncomePlanningHabit["status"] {
+  const cleaned = cleanText(value);
+  return isIncomePlanningHabitStatus(cleaned) ? cleaned : fallback;
+}
+
+function parseIncomePlanningPriority(
+  value: unknown,
+  fallback: IncomePlanningHabit["priority"]
+): IncomePlanningHabit["priority"] {
+  const cleaned = cleanText(value);
+  return isIncomePlanningPriority(cleaned) ? cleaned : fallback;
+}
+
+function parseIncomePlanningManualBlockType(value: unknown): IncomePlanningManualBlockType {
+  const cleaned = cleanText(value);
+  return isIncomePlanningManualBlockType(cleaned) ? cleaned : "other_event";
+}
+
+function normalizeIncomePlanningCsvColor(value: unknown, fallback: string): string {
+  const cleaned = cleanText(value);
+  return /^#[0-9a-fA-F]{6}$/.test(cleaned) ? cleaned.toLowerCase() : fallback;
+}
+
+function fallbackTimeDuration(startTime: string, endTime: string, fallback: number): number {
+  const start = timeMinutes(startTime);
+  const end = timeMinutes(endTime);
+  if (start === null || end === null) return fallback;
+  if (end > start) return end - start;
+  if (end < start) return 24 * 60 - start + end;
+  return fallback;
+}
+
+function timeMinutes(value: string): number | null {
+  const match = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function booleanCsv(value: boolean): string {
+  return value ? "Ja" : "Nein";
 }
 
 type CsvRowGetter = (row: string[], keys: string[], fallbackIndex: number) => string;

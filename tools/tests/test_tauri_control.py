@@ -187,14 +187,15 @@ def test_tauri_windows_portable_dry_run_uses_cargo_xwin_on_linux(monkeypatch) ->
     code = control.main(["tauri", "build", "--target", "windows-portable", "--dry-run"])
 
     assert code == 0
-    assert len(calls) == 2
+    assert len(calls) == 3
     assert calls[0][1] is True
     assert calls[0][0][-3:] == ["cargo", "install", "cargo-xwin"]
-    assert calls[1][1] is True
-    assert "--runner" in calls[1][0]
-    runner = calls[1][0][calls[1][0].index("--runner") + 1]
+    assert calls[1] == (["rustup", "component", "add", "llvm-tools-preview"], True)
+    assert calls[2][1] is True
+    assert "--runner" in calls[2][0]
+    runner = calls[2][0][calls[2][0].index("--runner") + 1]
     assert Path(runner).name == "cargo-xwin"
-    assert calls[1][0][-1:] == ["--no-bundle"]
+    assert calls[2][0][-1:] == ["--no-bundle"]
 
 
 def test_tauri_raw_windows_portable_flags_map_to_portable_target(monkeypatch) -> None:
@@ -223,30 +224,38 @@ def test_tauri_raw_windows_portable_flags_map_to_portable_target(monkeypatch) ->
     )
 
     assert code == 0
-    assert len(calls) == 2
-    assert calls[1][1] is True
-    assert "--runner" in calls[1][0]
-    runner = calls[1][0][calls[1][0].index("--runner") + 1]
+    assert len(calls) == 3
+    assert calls[1] == (["rustup", "component", "add", "llvm-tools-preview"], True)
+    assert calls[2][1] is True
+    assert "--runner" in calls[2][0]
+    runner = calls[2][0][calls[2][0].index("--runner") + 1]
     assert Path(runner).name == "cargo-xwin"
-    assert calls[1][0][-1:] == ["--no-bundle"]
+    assert calls[2][0][-1:] == ["--no-bundle"]
 
 
 def test_tauri_windows_portable_installs_cargo_xwin_for_real_linux_build(monkeypatch) -> None:
     calls: list[tuple[list[str], bool]] = []
     installed = False
+    llvm_installed = False
 
     def fake_which(name: str, path: str | None = None) -> str | None:
         if name == "cargo":
             return "/usr/bin/cargo"
+        if name == "rustup":
+            return "/usr/bin/rustup"
         if name == "cargo-xwin" and installed:
             return "/home/test/.cargo/bin/cargo-xwin"
+        if name == "llvm-rc" and llvm_installed:
+            return "/home/test/.rustup/toolchains/stable/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-rc"
         return None
 
     def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
-        nonlocal installed
+        nonlocal installed, llvm_installed
         calls.append((command, bool(kwargs.get("dry_run"))))
         if command == ["/usr/bin/cargo", "install", "cargo-xwin"]:
             installed = True
+        if command == ["/usr/bin/rustup", "component", "add", "llvm-tools-preview"]:
+            llvm_installed = True
         return common.CommandResult(command, paths.ROOT, 0, dry_run=bool(kwargs.get("dry_run")))
 
     monkeypatch.setattr(common, "host_os", lambda: "linux")
@@ -258,9 +267,10 @@ def test_tauri_windows_portable_installs_cargo_xwin_for_real_linux_build(monkeyp
 
     assert code == 0
     assert calls[0] == (["/usr/bin/cargo", "install", "cargo-xwin"], False)
-    assert "--runner" in calls[1][0]
-    assert calls[1][0][calls[1][0].index("--runner") + 1] == "/home/test/.cargo/bin/cargo-xwin"
-    assert calls[1][0][-1:] == ["--no-bundle"]
+    assert calls[1] == (["/usr/bin/rustup", "component", "add", "llvm-tools-preview"], False)
+    assert "--runner" in calls[2][0]
+    assert calls[2][0][calls[2][0].index("--runner") + 1] == "/home/test/.cargo/bin/cargo-xwin"
+    assert calls[2][0][-1:] == ["--no-bundle"]
 
 
 def test_tauri_windows_portable_fails_without_cargo_on_linux(monkeypatch) -> None:
@@ -622,7 +632,8 @@ def test_tauri_cli_fallback_uses_tauri_apps_cli_package(monkeypatch) -> None:
 
     command = common.tauri_cli_command("dev")
 
-    assert command[:5] == ["npm", "exec", "--yes", "--package", "@tauri-apps/cli@2.10.1"]
+    assert Path(command[0]).name == "npm"
+    assert command[1:5] == ["exec", "--yes", "--package", "@tauri-apps/cli@2.10.1"]
     assert command[-2:] == ["tauri", "dev"]
 
 

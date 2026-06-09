@@ -978,12 +978,7 @@ function normalizeIncomePlanningSlot(
   if (!isRecord(value)) return null;
   const startTime = normalizeIncomePlanningTime(value.startTime, "09:00");
   const endTime = normalizeIncomePlanningTime(value.endTime, "10:00");
-  const pauseStartTime = "pauseStartTime" in value ? normalizeIncomePlanningTime(value.pauseStartTime, "12:00") : null;
-  const pauseEndTime = "pauseEndTime" in value ? normalizeIncomePlanningTime(value.pauseEndTime, "12:30") : null;
-  const pauseDurationMinutes = Math.round(clampNumber(numberOrDefault(value.pauseDurationMinutes, fallbackDuration(pauseStartTime ?? "12:00", pauseEndTime ?? "12:30", 0)), 0, 168 * 60));
-  const hasPauseFields = Boolean(pauseStartTime && pauseEndTime);
-  const pauseEnabled = booleanOrDefault(value.pauseEnabled, hasPauseFields && pauseDurationMinutes > 0);
-  return {
+  const normalizedSlot: IncomePlanningSlot = {
     id: String(value.id || createId()),
     day: isIncomePlanningWeekday(value.day) ? value.day : fallbackDay,
     startTime,
@@ -991,10 +986,20 @@ function normalizeIncomePlanningSlot(
     flexible: booleanOrDefault(value.flexible, false),
     durationMinutes: Math.round(
       clampNumber(numberOrDefault(value.durationMinutes, fallbackDuration(startTime, endTime, fallbackDurationMinutes)), 0, 168 * 60)
-    ),
-    ...(hasPauseFields
-      ? { pauseEnabled, pauseStartTime, pauseEndTime, pauseDurationMinutes }
-      : {})
+    )
+  };
+  const pauseStartTime = "pauseStartTime" in value ? normalizeIncomePlanningTime(value.pauseStartTime, "12:00") : undefined;
+  const pauseEndTime = "pauseEndTime" in value ? normalizeIncomePlanningTime(value.pauseEndTime, "12:30") : undefined;
+  if (pauseStartTime === undefined || pauseEndTime === undefined) return normalizedSlot;
+  const pauseDurationMinutes = Math.round(
+    clampNumber(numberOrDefault(value.pauseDurationMinutes, fallbackDuration(pauseStartTime, pauseEndTime, 0)), 0, 168 * 60)
+  );
+  return {
+    ...normalizedSlot,
+    pauseEnabled: booleanOrDefault(value.pauseEnabled, pauseDurationMinutes > 0),
+    pauseStartTime,
+    pauseEndTime,
+    pauseDurationMinutes
   };
 }
 

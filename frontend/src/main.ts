@@ -89,7 +89,14 @@ import {
   calculatePlannedOutflowForSingleMonth,
   calculateReserveSummary
 } from "./domain/reserveCalculator";
-import { exportPositionsCsv, exportYearTableCsv, parseCsv, positionsFromCsvRows } from "./lib/csv";
+import {
+  exportIncomePlanningCsv,
+  exportPositionsCsv,
+  exportYearTableCsv,
+  incomePlanningFromCsvRows,
+  parseCsv,
+  positionsFromCsvRows
+} from "./lib/csv";
 import {
   clamp,
   escapeHtml,
@@ -1221,6 +1228,11 @@ function bindEvents(): void {
       void importIncomeCsvFromFile(target.files?.[0]);
       target.value = "";
     }
+
+    if (target.id === "incomePlanningCsvImport" && target instanceof HTMLInputElement) {
+      void importIncomePlanningCsvFromFile(target.files?.[0]);
+      target.value = "";
+    }
   });
 
   root.addEventListener("click", (event) => {
@@ -1415,6 +1427,8 @@ function bindEvents(): void {
     if (action?.startsWith("income-remove-")) removeIncomeEntry(action);
     if (action === "income-export-csv") void exportIncomeCsv();
     if (action === "income-export-pdf") exportIncomePdf();
+    if (action === "income-planning-import-csv") document.querySelector<HTMLInputElement>("#incomePlanningCsvImport")?.click();
+    if (action === "income-planning-export-csv") void exportIncomePlanningCsvFile();
     if (action === "income-planning-add-work-block") openIncomePlanningDialog("work", "create");
     if (action === "income-planning-remove-work-block") {
       removeIncomePlanningWorkBlock(button.dataset.incomePlanningWorkId || "");
@@ -6475,6 +6489,35 @@ async function exportIncomeCsv(): Promise<void> {
   showIncomeExportStatus("CSV-Export wurde erstellt.");
 }
 
+async function importIncomePlanningCsvFromFile(file: File | undefined): Promise<void> {
+  if (!file) return;
+  const text = await file.text();
+  const imported = incomePlanningFromCsvRows(parseCsv(text));
+  if (!imported) {
+    window.alert("Keine gueltigen Zeitbudget-CSV-Daten gefunden.");
+    return;
+  }
+
+  const importedCount =
+    imported.workBlocks.length +
+    imported.habits.length +
+    imported.manualBlocks.length +
+    imported.assumptions.sleepSlots.length;
+  state.incomePlanning = imported;
+  closeIncomePlanningDialog();
+  renderAll();
+  showIncomePlanningExportStatus(`${importedCount} Zeitbudget-Eintraege aus CSV importiert.`);
+}
+
+async function exportIncomePlanningCsvFile(): Promise<void> {
+  await exportCsvFile(
+    "zeitbudget-und-habits.csv",
+    exportIncomePlanningCsv(state.incomePlanning),
+    "Zeitbudget-CSV",
+    showIncomePlanningExportStatus
+  );
+}
+
 function exportIncomePdf(): void {
   const model = incomeTrackerModel();
   const reportWindow = window.open("", "_blank");
@@ -6920,6 +6963,16 @@ function cssEscape(value: string): string {
 
 function showIncomeExportStatus(message: string): void {
   const status = document.querySelector<HTMLParagraphElement>("#incomeExportStatus");
+  if (status) status.textContent = message;
+  if (exportStatusTimeoutId) window.clearTimeout(exportStatusTimeoutId);
+  exportStatusTimeoutId = window.setTimeout(() => {
+    if (status) status.textContent = "";
+    exportStatusTimeoutId = undefined;
+  }, 3500);
+}
+
+function showIncomePlanningExportStatus(message: string): void {
+  const status = document.querySelector<HTMLSpanElement>("#incomePlanningExportStatus");
   if (status) status.textContent = message;
   if (exportStatusTimeoutId) window.clearTimeout(exportStatusTimeoutId);
   exportStatusTimeoutId = window.setTimeout(() => {
@@ -11425,30 +11478,39 @@ async function importPositionsFromFile(file: File | undefined): Promise<void> {
   renderAll();
 }
 
-async function exportCsvFile(filename: string, text: string, label: string): Promise<void> {
+async function exportCsvFile(
+  filename: string,
+  text: string,
+  label: string,
+  showStatus: (message: string) => void = showExportStatus
+): Promise<void> {
   const contents = csvFileContents(text);
-  const nativeResult = await saveCsvWithNativeDialog(filename, contents);
+  const nativeResult = await saveCsvWithNativeDialog(filename, contents, showStatus);
 
   if (nativeResult === "saved") {
-    showExportStatus(`${label} wurde gespeichert.`);
+    showStatus(`${label} wurde gespeichert.`);
     return;
   }
 
   if (nativeResult === "cancelled") {
-    showExportStatus(`${label} wurde abgebrochen.`);
+    showStatus(`${label} wurde abgebrochen.`);
     return;
   }
 
   downloadText(filename, contents);
-  showExportStatus(
+  showStatus(
     nativeResult === "failed" ? `${label} wurde als Download gestartet.` : `${label} wurde gestartet.`
   );
 }
 
-async function saveCsvWithNativeDialog(filename: string, contents: string): Promise<"saved" | "cancelled" | "unavailable" | "failed"> {
+async function saveCsvWithNativeDialog(
+  filename: string,
+  contents: string,
+  showStatus: (message: string) => void
+): Promise<"saved" | "cancelled" | "unavailable" | "failed"> {
   if (!isTauriRuntime()) return "unavailable";
 
-  showExportStatus("Speichern-Dialog wird geoeffnet...");
+  showStatus("Speichern-Dialog wird geoeffnet...");
   try {
     const [{ save }, { invoke }] = await Promise.all([import("@tauri-apps/plugin-dialog"), import("@tauri-apps/api/core")]);
     const selectedPath = await save({

@@ -185,6 +185,12 @@ export function renderAppShell(): string {
               Plane Arbeitszeit, Nebentaetigkeiten, Habits und private Zeitbloecke als Wochenbudget.
             </p>
           </div>
+          <div class="button-row">
+            <button class="button secondary" type="button" data-action="income-planning-import-csv">CSV importieren</button>
+            <button class="button secondary" type="button" data-action="income-planning-export-csv">CSV exportieren</button>
+            <input class="visually-hidden" id="incomePlanningCsvImport" type="file" accept=".csv,text/csv" />
+            <span id="incomePlanningExportStatus" class="export-status" aria-live="polite"></span>
+          </div>
         </div>
         <section class="income-card income-planning-summary-card">
           <div id="incomePlanningMetricGrid" class="income-planning-metric-grid"></div>
