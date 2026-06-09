@@ -186,8 +186,8 @@ export function renderAppShell(): string {
             </p>
           </div>
           <div class="button-row">
-            <button class="button secondary" type="button" data-action="income-planning-import-csv">CSV importieren</button>
-            <button class="button secondary" type="button" data-action="income-planning-export-csv">CSV exportieren</button>
+            ${toolbarIconButton("income-planning-import-csv", "CSV importieren", "upload")}
+            ${toolbarIconButton("income-planning-export-csv", "CSV exportieren", "download")}
             <input class="visually-hidden" id="incomePlanningCsvImport" type="file" accept=".csv,text/csv" />
             <span id="incomePlanningExportStatus" class="export-status" aria-live="polite"></span>
           </div>

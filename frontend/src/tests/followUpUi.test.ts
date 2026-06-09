@@ -91,6 +91,8 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('data-action="open-section-statutory_pension"');
     expect(html).toContain('data-action="income-planning-import-csv"');
     expect(html).toContain('data-action="income-planning-export-csv"');
+    expect(html).toContain('data-action="income-planning-import-csv"\n      aria-label="CSV importieren"');
+    expect(html).toContain('data-action="income-planning-export-csv"\n      aria-label="CSV exportieren"');
     expect(html).toContain('id="incomePlanningCsvImport"');
     expect(html).not.toContain('data-action="open-section-income_tracking"');
     expect(html).not.toContain('data-action="open-section-income_status"');
