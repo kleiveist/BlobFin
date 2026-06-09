@@ -1065,12 +1065,14 @@ function bindEvents(): void {
     }
 
     if (target.dataset.setting) {
+      if (isDeferredModelInput(target)) return;
       updatePlanningSetting(target.dataset.setting as keyof PlanningSettings, target.value);
       requestRenderAll();
       return;
     }
 
     if (target.dataset.investment) {
+      if (isDeferredModelInput(target)) return;
       updateInvestmentSetting(target.dataset.investment as keyof InvestmentSettings, target.value);
       requestRenderAll();
       return;
@@ -1158,6 +1160,7 @@ function bindEvents(): void {
     }
 
     if (target.dataset.retirementAge) {
+      if (isDeferredModelInput(target)) return;
       updateRetirementAge(target.value);
       requestRenderAll();
     }
@@ -1174,6 +1177,29 @@ function bindEvents(): void {
 
     if (target.dataset.accountDialogField) {
       updateAccountDialogDraft(target.dataset.accountDialogField, target.value);
+      return;
+    }
+
+    if (target.dataset.setting) {
+      const field = target.dataset.setting as keyof PlanningSettings;
+      updatePlanningSetting(field, target.value);
+      syncCommittedPlanningSettingInput(target, field);
+      requestRenderAll();
+      return;
+    }
+
+    if (target.dataset.investment) {
+      const field = target.dataset.investment as keyof InvestmentSettings;
+      updateInvestmentSetting(field, target.value);
+      syncCommittedInvestmentSettingInput(target, field);
+      requestRenderAll();
+      return;
+    }
+
+    if (target.dataset.retirementAge) {
+      updateRetirementAge(target.value);
+      syncCommittedRetirementAgeInput(target);
+      requestRenderAll();
       return;
     }
 
@@ -1236,7 +1262,7 @@ function bindEvents(): void {
 
     if (target.dataset.includePosition && target instanceof HTMLInputElement) {
       toggleInvestmentPosition(target.dataset.includePosition, target.checked);
-      requestRenderAll();
+      renderInvestmentSelectionChange();
       return;
     }
 
@@ -10985,10 +11011,7 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
     return;
   }
 
-  const blockedPositionIds = new Set(otherDepots.flatMap((item) => depotInvestmentSettings(item).includedIds));
-  const visibleSavingsPositions = savingsPositions.filter(
-    (position) => !blockedPositionIds.has(position.id) || settings.includedIds.includes(position.id)
-  );
+  const visibleSavingsPositions = visibleInvestmentSavingsPositions(savingsPositions, settings, otherDepots);
   if (!visibleSavingsPositions.length) {
     list.innerHTML = `<div class="include-empty">Alle Sparraten sind in anderen Depots eingeplant.</div>`;
     hideInvestmentIncludePopup();
@@ -10998,6 +11021,74 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
   const selection = investmentSavingsSelectionSummary(visibleSavingsPositions, settings.includedIds, state.settings.year);
   list.innerHTML = investmentIncludeSummaryButton(visibleSavingsPositions.length, selection);
   renderInvestmentIncludePopup(visibleSavingsPositions, settings);
+}
+
+function visibleInvestmentSavingsPositions(
+  savingsPositions: ReservePosition[],
+  settings: InvestmentSettings,
+  otherDepots: InvestmentDepotKey[]
+): ReservePosition[] {
+  const blockedPositionIds = new Set(otherDepots.flatMap((item) => depotInvestmentSettings(item).includedIds));
+  return savingsPositions.filter(
+    (position) => !blockedPositionIds.has(position.id) || settings.includedIds.includes(position.id)
+  );
+}
+
+function renderInvestmentSelectionChange(): void {
+  const investmentAccount = selectedInvestmentPlanningAccount();
+  state.investmentByAccountId = {
+    ...state.investmentByAccountId,
+    [investmentAccount.id]: state.investment
+  };
+  investmentAccountContextId = investmentAccount.id;
+
+  const investmentReserve = calculateReserveSummary(state.settings, investmentAccount.yearlyRows);
+  const activeReserve = calculateReserveSummary(activePlanningSettings(), activePlanningPositions());
+
+  syncInvestmentIncludeSelectionState();
+  renderCalculations(investmentReserve, activeReserve);
+  saveState(state);
+}
+
+function syncInvestmentIncludeSelectionState(): void {
+  const depot = activeInvestmentDepot();
+  const settings = depotInvestmentSettings(depot);
+  const positions = visibleInvestmentSavingsPositions(
+    selectableInvestmentSavingsPositions(selectedInvestmentPlanningAccount().yearlyRows),
+    settings,
+    otherInvestmentDepots(depot)
+  );
+  if (!positions.length) return;
+
+  const selection = investmentSavingsSelectionSummary(positions, settings.includedIds, state.settings.year);
+  const summaryText = `${intNumber(selection.selectedCount)} aktiv · ${money(selection.yearlyAmount)} jaehrlich`;
+  const countText = `${intNumber(positions.length)} verfuegbar`;
+  const summaryButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-investment-include-popup']");
+  if (summaryButton) {
+    summaryButton.classList.toggle("active", selection.selectedCount > 0);
+    summaryButton.setAttribute("aria-expanded", String(investmentIncludePopupOpen));
+    const summaryValue = summaryButton.querySelector("strong");
+    const summaryCount = summaryButton.querySelector("small");
+    if (summaryValue) summaryValue.textContent = summaryText;
+    if (summaryCount) summaryCount.textContent = countText;
+  }
+
+  const popup = document.querySelector<HTMLDivElement>("#investmentIncludePopup");
+  if (!popup || popup.hidden) return;
+  const popupValue = popup.querySelector(".chart-popup-head strong");
+  const popupCount = popup.querySelector(".investment-include-actions span");
+  if (popupValue) popupValue.textContent = summaryText;
+  if (popupCount) popupCount.textContent = countText;
+
+  const blockedRealEstateIds = realEstateSelectedSourceIds();
+  const blockedCashIds = combinedCashSelectedPositionIds();
+  for (const input of popup.querySelectorAll<HTMLInputElement>("[data-include-position]")) {
+    const id = input.dataset.includePosition ?? "";
+    const blocked = blockedRealEstateIds.has(id) || blockedCashIds.has(id);
+    input.checked = settings.includedIds.includes(id);
+    input.disabled = blocked;
+    input.closest(".include-item")?.classList.toggle("blocked", blocked);
+  }
 }
 
 function investmentIncludeSummaryButton(
@@ -12811,6 +12902,33 @@ function formControl(target: EventTarget | null): HTMLInputElement | HTMLSelectE
   return null;
 }
 
+function isDeferredModelInput(target: HTMLInputElement | HTMLSelectElement): boolean {
+  return target instanceof HTMLInputElement && (target.type === "number" || target.type === "date");
+}
+
+function syncCommittedPlanningSettingInput(
+  target: HTMLInputElement | HTMLSelectElement,
+  field: keyof PlanningSettings
+): void {
+  if (!isDeferredModelInput(target)) return;
+  target.value = String(state.settings[field]);
+}
+
+function syncCommittedInvestmentSettingInput(
+  target: HTMLInputElement | HTMLSelectElement,
+  field: keyof InvestmentSettings
+): void {
+  if (!isDeferredModelInput(target) || !isNumericInvestmentSetting(field)) return;
+  const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettings(activeInvestmentDepot()));
+  target.value = String(settings[field]);
+}
+
+function syncCommittedRetirementAgeInput(target: HTMLInputElement | HTMLSelectElement): void {
+  if (!isDeferredModelInput(target)) return;
+  const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettings(activeInvestmentDepot()));
+  target.value = String(calculatePayoutStartAge(settings));
+}
+
 function setText(id: string, value: string): void {
   const element = document.getElementById(id);
   if (element) element.textContent = value;
@@ -12822,6 +12940,7 @@ function setRangeLabel(key: keyof InvestmentSettings, value: string): void {
 
 function setInputValue(selector: string, value: number | string | string[]): void {
   for (const input of document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(selector)) {
+    if (input === document.activeElement && isDeferredModelInput(input)) continue;
     input.value = String(value);
   }
 }
