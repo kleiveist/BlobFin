@@ -20,7 +20,6 @@ describe("income planning", () => {
     const model = buildIncomePlanningModel(defaultIncomePlanningState());
 
     expect(model.scenarioId).toBe("normal");
-    expect(model.scenarioSuggestionHours).toBe(0);
     expect(model.grossWorkHours).toBe(51.3);
     expect(model.totalWorkHours).toBe(51.3);
     expect(model.pauseHours).toBe(0);
@@ -36,32 +35,70 @@ describe("income planning", () => {
     expect("totalMonthlyIncome" in model).toBe(false);
   });
 
-  it("applies week scenarios as non-destructive overlays", () => {
+  it("filters saved entries by week scenario without creating suggestion blocks", () => {
     const state: IncomePlanningState = {
       ...defaultIncomePlanningState(),
-      workBlocks: [],
-      manualBlocks: [],
+      weekScenarios: [{ id: "focus", label: "Fokuswoche" }],
+      workBlocks: [
+        buildIncomePlanningWorkBlock("salary", "all-work", { slots: [flexiblePlanningSlot("all-work-slot", 2)] }),
+        buildIncomePlanningWorkBlock("self_employed", "self-work", {
+          scenarioIds: ["self_employed"],
+          slots: [flexiblePlanningSlot("self-work-slot", 3)]
+        }),
+        buildIncomePlanningWorkBlock("freelance", "focus-work", {
+          scenarioIds: ["focus"],
+          slots: [flexiblePlanningSlot("focus-work-slot", 4)]
+        })
+      ],
+      manualBlocks: [
+        buildIncomePlanningManualBlock("free_time", "normal-manual", {
+          scenarioIds: ["normal"],
+          slots: [flexiblePlanningSlot("normal-manual-slot", 1)]
+        }),
+        buildIncomePlanningManualBlock("buffer", "focus-manual", {
+          scenarioIds: ["focus"],
+          slots: [flexiblePlanningSlot("focus-manual-slot", 2)]
+        })
+      ],
       habits: [
-        buildIncomePlanningHabit("low", { priority: "low", slots: [flexiblePlanningSlot("low-slot", 1)] }),
-        buildIncomePlanningHabit("medium", { priority: "medium", slots: [flexiblePlanningSlot("medium-slot", 1)] }),
-        buildIncomePlanningHabit("high", { priority: "high", slots: [flexiblePlanningSlot("high-slot", 1)] })
-      ]
+        buildIncomePlanningHabit("all-habit", { slots: [flexiblePlanningSlot("all-habit-slot", 1)] }),
+        buildIncomePlanningHabit("self-habit", {
+          scenarioIds: ["self_employed"],
+          slots: [flexiblePlanningSlot("self-habit-slot", 1)]
+        }),
+        buildIncomePlanningHabit("focus-habit", {
+          scenarioIds: ["focus"],
+          slots: [flexiblePlanningSlot("focus-habit-slot", 1)]
+        })
+      ],
+      assumptions: {
+        sleepHoursPerDay: 0,
+        sleepSlots: [
+          { ...flexiblePlanningSlot("all-sleep", 1), day: "monday" },
+          { ...flexiblePlanningSlot("focus-sleep", 2), day: "tuesday", scenarioIds: ["focus"] }
+        ]
+      }
     };
     const snapshot = JSON.stringify(state);
 
     const normal = buildIncomePlanningModel(state, { scenarioId: "normal" });
-    const uni = buildIncomePlanningModel(state, { scenarioId: "uni" });
     const selfEmployed = buildIncomePlanningModel(state, { scenarioId: "self_employed" });
-    const project = buildIncomePlanningModel(state, { scenarioId: "project" });
+    const focus = buildIncomePlanningModel(state, { scenarioId: "focus" });
 
-    expect(normal.activeHabits.map((habit) => habit.id)).toEqual(["low", "medium", "high"]);
-    expect(uni.activeHabits.map((habit) => habit.id)).toEqual(["medium", "high"]);
-    expect(selfEmployed.activeHabits.map((habit) => habit.id)).toEqual(["medium", "high"]);
-    expect(project.activeHabits.map((habit) => habit.id)).toEqual(["high"]);
-    expect(uni.calendarEntries.filter((entry) => entry.type === "scenario_suggestion")).toHaveLength(3);
-    expect(project.calendarEntries.filter((entry) => entry.type === "scenario_suggestion").every((entry) => entry.readOnly)).toBe(true);
-    expect(uni.scenarioSuggestionHours).toBeGreaterThan(0);
-    expect(uni.usedHours).toBeGreaterThan(normal.usedHours - normal.habitHours);
+    expect(normal.activeWorkBlocks.map((block) => block.id)).toEqual(["all-work"]);
+    expect(selfEmployed.activeWorkBlocks.map((block) => block.id)).toEqual(["all-work", "self-work"]);
+    expect(focus.activeWorkBlocks.map((block) => block.id)).toEqual(["all-work", "focus-work"]);
+    expect(normal.activeManualBlocks.map((block) => block.id)).toEqual(["normal-manual"]);
+    expect(focus.activeManualBlocks.map((block) => block.id)).toEqual(["focus-manual"]);
+    expect(normal.activeHabits.map((habit) => habit.id)).toEqual(["all-habit"]);
+    expect(selfEmployed.activeHabits.map((habit) => habit.id)).toEqual(["all-habit", "self-habit"]);
+    expect(focus.activeHabits.map((habit) => habit.id)).toEqual(["all-habit", "focus-habit"]);
+    expect(normal.sleepHoursPerWeek).toBe(1);
+    expect(focus.sleepHoursPerWeek).toBe(3);
+    expect(focus.scenarioLabel).toBe("Fokuswoche");
+    expect([normal, selfEmployed, focus].flatMap((model) => model.calendarEntries.map((entry) => entry.type))).not.toContain(
+      "scenario_suggestion"
+    );
     expect(JSON.stringify(state)).toBe(snapshot);
   });
 
@@ -332,6 +369,7 @@ describe("income planning", () => {
           name: "Fruehschicht",
           description: "Hauptjob",
           color: "#123456",
+          scenarioIds: ["self_employed", "focus"],
           slots: [
             {
               id: "main-slot",
@@ -360,6 +398,7 @@ describe("income planning", () => {
           status: "difficult",
           priority: "high",
           icon: "snack",
+          scenarioIds: ["focus"],
           slots: [
             {
               id: "habit-slot",
@@ -376,6 +415,7 @@ describe("income planning", () => {
         buildIncomePlanningManualBlock("free_time", "free", {
           name: "Freizeit",
           icon: "health",
+          scenarioIds: ["normal"],
           slots: [flexiblePlanningSlot("free-slot", 5)]
         })
       ],
@@ -385,7 +425,8 @@ describe("income planning", () => {
           day: "wednesday",
           startTime: "18:15",
           icon: "calendar",
-          label: "Spaziergang"
+          label: "Spaziergang",
+          scenarioIds: ["focus"]
         }
       ],
       plannedStamps: [
@@ -395,13 +436,15 @@ describe("income planning", () => {
           startTime: "10:30",
           icon: "education",
           label: "Workshop",
-          description: "Projekttermin"
+          description: "Projekttermin",
+          scenarioIds: ["self_employed"]
         }
       ],
+      weekScenarios: [{ id: "focus", label: "Fokuswoche" }],
       weekScenarioAssignments: [
         {
           weekStartDate: "2026-07-13",
-          scenarioId: "project"
+          scenarioId: "focus"
         }
       ],
       assumptions: {
@@ -413,7 +456,8 @@ describe("income planning", () => {
             startTime: "22:00",
             endTime: "06:00",
             flexible: false,
-            durationMinutes: 480
+            durationMinutes: 480,
+            scenarioIds: ["focus"]
           }
         ]
       }
@@ -426,13 +470,16 @@ describe("income planning", () => {
     expect(csv).toContain("Pause-Startzeit");
     expect(csv).toContain("Geplanter-Stempel");
     expect(csv).toContain("Wochenszenario");
+    expect(csv).toContain("Wochenszenario-Label");
+    expect(csv).toContain("Szenario-IDs");
     expect(imported?.workBlocks[0]).toMatchObject({
       id: "main",
       active: true,
       category: "salary",
       name: "Fruehschicht",
       description: "Hauptjob",
-      color: "#123456"
+      color: "#123456",
+      scenarioIds: ["self_employed", "focus"]
     });
     expect(imported?.workBlocks[0]?.slots[0]).toMatchObject({
       id: "main-slot",
@@ -448,16 +495,18 @@ describe("income planning", () => {
       replacementHabit: "Buch lesen",
       status: "difficult",
       priority: "high",
-      icon: "snack"
+      icon: "snack",
+      scenarioIds: ["focus"]
     });
-    expect(imported?.manualBlocks[0]).toMatchObject({ id: "free", icon: "health" });
+    expect(imported?.manualBlocks[0]).toMatchObject({ id: "free", icon: "health", scenarioIds: ["normal"] });
     expect(imported?.manualBlocks[0]?.slots[0]).toMatchObject({ id: "free-slot", flexible: true, durationMinutes: 300 });
     expect(imported?.calendarStamps[0]).toMatchObject({
       id: "stamp-walk",
       day: "wednesday",
       startTime: "18:15",
       icon: "calendar",
-      label: "Spaziergang"
+      label: "Spaziergang",
+      scenarioIds: ["focus"]
     });
     expect(imported?.plannedStamps[0]).toMatchObject({
       id: "planned-workshop",
@@ -465,16 +514,19 @@ describe("income planning", () => {
       startTime: "10:30",
       icon: "education",
       label: "Workshop",
-      description: "Projekttermin"
+      description: "Projekttermin",
+      scenarioIds: ["self_employed"]
     });
-    expect(imported?.weekScenarioAssignments).toEqual([{ weekStartDate: "2026-07-13", scenarioId: "project" }]);
+    expect(imported?.weekScenarios).toEqual([{ id: "focus", label: "Fokuswoche" }]);
+    expect(imported?.weekScenarioAssignments).toEqual([{ weekStartDate: "2026-07-13", scenarioId: "focus" }]);
     expect(imported?.assumptions.sleepHoursPerDay).toBe(7.5);
     expect(imported?.assumptions.sleepSlots[0]).toMatchObject({
       id: "sleep-slot",
       day: "sunday",
       startTime: "22:00",
       endTime: "06:00",
-      durationMinutes: 480
+      durationMinutes: 480,
+      scenarioIds: ["focus"]
     });
   });
 

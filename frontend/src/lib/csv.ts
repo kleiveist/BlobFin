@@ -8,6 +8,7 @@ import {
   incomePlanningDefaultManualIcon,
   incomePlanningDefaultWorkColor,
   incomePlanningStripSlotPause,
+  INCOME_PLANNING_WEEK_SCENARIO_IDS,
   INCOME_PLANNING_CATEGORY_CONFIGS,
   isIncomePlanningHabitChange,
   isIncomePlanningHabitDurationUnit,
@@ -43,7 +44,9 @@ import type {
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningState,
+  IncomePlanningWeekScenario,
   IncomePlanningWeekScenarioAssignment,
+  IncomePlanningWeekScenarioId,
   IncomePlanningWorkBlock,
   PlanningSettings,
   PayoutType,
@@ -292,7 +295,9 @@ const INCOME_PLANNING_CSV_HEADER = [
   "Schlaf-Stunden-Pro-Tag",
   "Datum",
   "Wochenstart",
-  "Szenario-ID"
+  "Szenario-ID",
+  "Szenario-IDs",
+  "Szenario-Label"
 ];
 
 type IncomePlanningCsvRowKind =
@@ -306,6 +311,7 @@ type IncomePlanningCsvRowKind =
   | "stamp"
   | "planned_stamp"
   | "week_scenario"
+  | "week_scenario_label"
   | "sleep"
   | "unknown";
 
@@ -321,7 +327,8 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         4: block.category,
         5: block.name,
         6: block.description,
-        7: block.color ?? incomePlanningDefaultWorkColor(block.category)
+        7: block.color ?? incomePlanningDefaultWorkColor(block.category),
+        30: formatIncomePlanningScenarioIds(block.scenarioIds)
       })
     );
     for (const slot of block.slots) {
@@ -344,7 +351,8 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         22: habit.replacementHabit,
         23: habit.status,
         24: habit.priority,
-        25: habit.icon ?? (habit.type === "bad" ? "snack" : "book")
+        25: habit.icon ?? (habit.type === "bad" ? "snack" : "book"),
+        30: formatIncomePlanningScenarioIds(habit.scenarioIds)
       })
     );
     for (const slot of habit.slots) {
@@ -361,7 +369,8 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         5: block.name,
         6: block.description,
         7: block.color ?? incomePlanningDefaultManualColor(block.type),
-        25: block.icon ?? incomePlanningDefaultManualIcon(block.type)
+        25: block.icon ?? incomePlanningDefaultManualIcon(block.type),
+        30: formatIncomePlanningScenarioIds(block.scenarioIds)
       })
     );
     for (const slot of block.slots) {
@@ -376,7 +385,8 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         5: stamp.label,
         8: stamp.day,
         9: stamp.startTime,
-        25: stamp.icon
+        25: stamp.icon,
+        30: formatIncomePlanningScenarioIds(stamp.scenarioIds)
       })
     );
   }
@@ -389,7 +399,17 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         6: stamp.description,
         9: stamp.startTime,
         25: stamp.icon,
-        27: stamp.date
+        27: stamp.date,
+        30: formatIncomePlanningScenarioIds(stamp.scenarioIds)
+      })
+    );
+  }
+
+  for (const scenario of planning.weekScenarios ?? []) {
+    rows.push(
+      incomePlanningCsvRow("Wochenszenario-Label", {
+        29: scenario.id,
+        31: scenario.label
       })
     );
   }
@@ -436,6 +456,7 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
   const slotsByOwnerId = new Map<string, IncomePlanningSlot[]>();
   const calendarStamps: IncomePlanningCalendarStamp[] = [];
   const plannedStamps: IncomePlanningPlannedStamp[] = [];
+  const weekScenarios: IncomePlanningWeekScenario[] = [];
   const weekScenarioAssignments: IncomePlanningWeekScenarioAssignment[] = [];
   const sleepSlots: IncomePlanningSleepSlot[] = [];
   let sleepHoursPerDay: number | null = null;
@@ -503,6 +524,15 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
       continue;
     }
 
+    if (kind === "week_scenario_label") {
+      const scenario = parseIncomePlanningWeekScenario(row, get);
+      if (scenario) {
+        weekScenarios.push(scenario);
+        recognizedRows += 1;
+      }
+      continue;
+    }
+
     if (kind === "sleep") {
       const slot = parseIncomePlanningCsvSleepSlot(row, get);
       if (slot) {
@@ -514,23 +544,28 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
 
   if (!recognizedRows) return null;
 
-  const importedSleepSlots = sleepSlots.length ? sleepSlots : fallback.assumptions.sleepSlots;
+  const normalizedWeekScenarios = normalizeIncomePlanningCsvWeekScenarios(weekScenarios);
+  const allowedScenarioIds = incomePlanningCsvAllowedScenarioIds(normalizedWeekScenarios);
+  const importedSleepSlots = (sleepSlots.length ? sleepSlots : fallback.assumptions.sleepSlots).map((slot) =>
+    normalizeIncomePlanningCsvEntryScenarioIds(slot, allowedScenarioIds)
+  );
   return {
     workBlocks: Array.from(workBlocks.values()).map((block) => ({
-      ...block,
+      ...normalizeIncomePlanningCsvEntryScenarioIds(block, allowedScenarioIds),
       slots: slotsByOwnerId.get(block.id) ?? []
     })),
     habits: Array.from(habits.values()).map((habit) => ({
-      ...habit,
+      ...normalizeIncomePlanningCsvEntryScenarioIds(habit, allowedScenarioIds),
       slots: (slotsByOwnerId.get(habit.id) ?? []).map(incomePlanningStripSlotPause)
     })),
     manualBlocks: Array.from(manualBlocks.values()).map((block) => ({
-      ...block,
+      ...normalizeIncomePlanningCsvEntryScenarioIds(block, allowedScenarioIds),
       slots: slotsByOwnerId.get(block.id) ?? []
     })),
-    calendarStamps,
-    plannedStamps,
-    weekScenarioAssignments: normalizeIncomePlanningCsvWeekScenarioAssignments(weekScenarioAssignments),
+    calendarStamps: calendarStamps.map((stamp) => normalizeIncomePlanningCsvEntryScenarioIds(stamp, allowedScenarioIds)),
+    plannedStamps: plannedStamps.map((stamp) => normalizeIncomePlanningCsvEntryScenarioIds(stamp, allowedScenarioIds)),
+    weekScenarios: normalizedWeekScenarios,
+    weekScenarioAssignments: normalizeIncomePlanningCsvWeekScenarioAssignments(weekScenarioAssignments, allowedScenarioIds),
     assumptions: {
       sleepHoursPerDay:
         sleepHoursPerDay ?? incomePlanningAverageSleepHours({ sleepHoursPerDay: 0, sleepSlots: importedSleepSlots }),
@@ -582,8 +617,13 @@ function incomePlanningSleepSlotCsvCells(slot: IncomePlanningSleepSlot): Partial
     9: slot.startTime,
     10: slot.endTime,
     11: booleanCsv(slot.flexible),
-    12: String(Math.round(slot.durationMinutes))
+    12: String(Math.round(slot.durationMinutes)),
+    30: formatIncomePlanningScenarioIds(slot.scenarioIds)
   };
+}
+
+function formatIncomePlanningScenarioIds(scenarioIds: IncomePlanningWeekScenarioId[] | undefined): string {
+  return scenarioIds?.length ? scenarioIds.join(",") : "";
 }
 
 function parseIncomePlanningCsvRowKind(value: unknown): IncomePlanningCsvRowKind {
@@ -598,6 +638,11 @@ function parseIncomePlanningCsvRowKind(value: unknown): IncomePlanningCsvRowKind
   if (["stempel", "stamp", "calendarstamp", "kalenderstempel"].includes(normalized)) return "stamp";
   if (["geplanterstempel", "geplanter-stempel", "plannedstamp", "plannedcalendarstamp"].includes(normalized)) {
     return "planned_stamp";
+  }
+  if (
+    ["wochenszenariolabel", "wochenszenario-label", "weekscenariolabel", "weekscenario-label"].includes(normalized)
+  ) {
+    return "week_scenario_label";
   }
   if (["wochenszenario", "weekscenario", "weekscenarioassignment", "wochenmodus"].includes(normalized)) {
     return "week_scenario";
@@ -619,7 +664,8 @@ function parseIncomePlanningWorkBlock(row: string[], get: CsvRowGetter): IncomeP
     name: cleanText(get(row, ["name", "titel", "title"], 5)) || fallback.name,
     description: cleanText(get(row, ["beschreibung", "description"], 6)),
     color,
-    slots: []
+    slots: [],
+    scenarioIds: parseIncomePlanningScenarioIds(row, get)
   };
 }
 
@@ -650,7 +696,8 @@ function parseIncomePlanningHabit(row: string[], get: CsvRowGetter): IncomePlann
     status: parseIncomePlanningHabitStatus(get(row, ["habitstatus", "status"], 23), fallback.status),
     priority: parseIncomePlanningPriority(get(row, ["habitprioritaet", "priority", "prioritaet"], 24), fallback.priority),
     icon: normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), type === "bad" ? "snack" : "book"),
-    slots: []
+    slots: [],
+    scenarioIds: parseIncomePlanningScenarioIds(row, get)
   };
 }
 
@@ -669,7 +716,8 @@ function parseIncomePlanningManualBlock(row: string[], get: CsvRowGetter): Incom
     description: cleanText(get(row, ["beschreibung", "description"], 6)),
     color,
     icon,
-    slots: []
+    slots: [],
+    scenarioIds: parseIncomePlanningScenarioIds(row, get)
   };
 }
 
@@ -683,7 +731,8 @@ function parseIncomePlanningCalendarStamp(row: string[], get: CsvRowGetter): Inc
     day,
     startTime,
     icon: normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), "calendar"),
-    label
+    label,
+    scenarioIds: parseIncomePlanningScenarioIds(row, get)
   };
 }
 
@@ -698,8 +747,16 @@ function parseIncomePlanningPlannedStamp(row: string[], get: CsvRowGetter): Inco
     startTime,
     icon: normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), "calendar"),
     label,
-    description: cleanText(get(row, ["beschreibung", "description"], 6))
+    description: cleanText(get(row, ["beschreibung", "description"], 6)),
+    scenarioIds: parseIncomePlanningScenarioIds(row, get)
   };
+}
+
+function parseIncomePlanningWeekScenario(row: string[], get: CsvRowGetter): IncomePlanningWeekScenario | null {
+  const id = cleanText(get(row, ["szenarioid", "scenarioid", "id"], 29));
+  const label = cleanText(get(row, ["szenariolabel", "label", "name", "titel", "title"], 31));
+  if (!isIncomePlanningWeekScenarioId(id) || INCOME_PLANNING_WEEK_SCENARIO_IDS.includes(id) || !label) return null;
+  return { id, label };
 }
 
 function parseIncomePlanningWeekScenarioAssignment(
@@ -712,6 +769,23 @@ function parseIncomePlanningWeekScenarioAssignment(
   const scenarioId = cleanText(get(row, ["szenarioid", "szenario", "scenarioid", "scenario", "kategorie", "category"], 29));
   if (!weekStartDate || !isIncomePlanningWeekScenarioId(scenarioId) || scenarioId === "normal") return null;
   return { weekStartDate, scenarioId };
+}
+
+function parseIncomePlanningScenarioIds(
+  row: string[],
+  get: CsvRowGetter
+): IncomePlanningWeekScenarioId[] | undefined {
+  const raw = cleanText(get(row, ["szenarioids", "szenarien", "scenarioids", "scenarios"], 30));
+  if (!raw) return undefined;
+  const scenarioIds = Array.from(
+    new Set(
+      raw
+        .split(/[|,]/)
+        .map((value) => value.trim())
+        .filter((value): value is IncomePlanningWeekScenarioId => isIncomePlanningWeekScenarioId(value))
+    )
+  );
+  return scenarioIds.length ? scenarioIds : undefined;
 }
 
 function parseIncomePlanningCsvSlot(row: string[], get: CsvRowGetter): IncomePlanningSlot | null {
@@ -762,7 +836,7 @@ function parseIncomePlanningCsvSleepSlot(row: string[], get: CsvRowGetter): Inco
     get(row, ["dauerminuten", "dauer", "durationminutes"], 12),
     fallbackTimeDuration(startTime, endTime, 8 * 60)
   );
-  return { id, day, startTime, endTime, flexible, durationMinutes };
+  return { id, day, startTime, endTime, flexible, durationMinutes, scenarioIds: parseIncomePlanningScenarioIds(row, get) };
 }
 
 function parseIncomePlanningCategory(value: unknown): IncomePlanningCategory {
@@ -824,13 +898,60 @@ function parseIncomePlanningWeekStartDate(value: unknown): string | null {
 }
 
 function normalizeIncomePlanningCsvWeekScenarioAssignments(
-  assignments: IncomePlanningWeekScenarioAssignment[]
+  assignments: IncomePlanningWeekScenarioAssignment[],
+  allowedScenarioIds: Set<IncomePlanningWeekScenarioId>
 ): IncomePlanningWeekScenarioAssignment[] {
   const byWeek = new Map<string, IncomePlanningWeekScenarioAssignment>();
   for (const assignment of assignments) {
+    if (!allowedScenarioIds.has(assignment.scenarioId)) continue;
     byWeek.set(assignment.weekStartDate, assignment);
   }
   return Array.from(byWeek.values()).sort((first, second) => first.weekStartDate.localeCompare(second.weekStartDate));
+}
+
+function normalizeIncomePlanningCsvWeekScenarios(
+  scenarios: IncomePlanningWeekScenario[]
+): IncomePlanningWeekScenario[] {
+  const byId = new Map<IncomePlanningWeekScenarioId, IncomePlanningWeekScenario>();
+  for (const scenario of scenarios) {
+    const id = scenario.id.trim();
+    const label = scenario.label.trim();
+    if (!isIncomePlanningWeekScenarioId(id) || INCOME_PLANNING_WEEK_SCENARIO_IDS.includes(id) || !label) continue;
+    byId.set(id, { id, label });
+  }
+  return Array.from(byId.values());
+}
+
+function incomePlanningCsvAllowedScenarioIds(
+  scenarios: IncomePlanningWeekScenario[]
+): Set<IncomePlanningWeekScenarioId> {
+  return new Set([...INCOME_PLANNING_WEEK_SCENARIO_IDS, ...scenarios.map((scenario) => scenario.id)]);
+}
+
+function normalizeIncomePlanningCsvEntryScenarioIds<T extends { scenarioIds?: IncomePlanningWeekScenarioId[] }>(
+  entry: T,
+  allowedScenarioIds: Set<IncomePlanningWeekScenarioId>
+): T {
+  const scenarioIds = normalizeIncomePlanningCsvScenarioIds(entry.scenarioIds, allowedScenarioIds);
+  if (scenarioIds) return { ...entry, scenarioIds };
+  const { scenarioIds: _scenarioIds, ...rest } = entry;
+  return rest as T;
+}
+
+function normalizeIncomePlanningCsvScenarioIds(
+  scenarioIds: IncomePlanningWeekScenarioId[] | undefined,
+  allowedScenarioIds: Set<IncomePlanningWeekScenarioId>
+): IncomePlanningWeekScenarioId[] | undefined {
+  if (!scenarioIds?.length) return undefined;
+  const normalized = Array.from(
+    new Set(
+      scenarioIds.filter(
+        (scenarioId): scenarioId is IncomePlanningWeekScenarioId =>
+          isIncomePlanningWeekScenarioId(scenarioId) && allowedScenarioIds.has(scenarioId)
+      )
+    )
+  );
+  return normalized.length > 0 && normalized.length < allowedScenarioIds.size ? normalized : undefined;
 }
 
 function todayLocalDateString(): string {

@@ -423,6 +423,7 @@ export function defaultIncomePlanningState(): IncomePlanningState {
     ],
     calendarStamps: [],
     plannedStamps: [],
+    weekScenarios: [],
     weekScenarioAssignments: [],
     assumptions: {
       sleepHoursPerDay: incomePlanningAverageSleepHours({ sleepHoursPerDay: 0, sleepSlots }),

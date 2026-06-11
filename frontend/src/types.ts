@@ -66,7 +66,7 @@ export type IncomePlanningHabitStatus = "planned" | "active" | "difficult" | "st
 export type IncomePlanningPriority = "low" | "medium" | "high";
 export type IncomePlanningHabitDurationUnit = "day" | "week";
 export type IncomePlanningManualBlockType = "private_commitment" | "free_time" | "buffer" | "other_event";
-export type IncomePlanningWeekScenarioId = "normal" | "uni" | "self_employed" | "project";
+export type IncomePlanningWeekScenarioId = string;
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -421,6 +421,7 @@ export interface IncomePlanningSleepSlot {
   endTime: string;
   flexible: boolean;
   durationMinutes: number;
+  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningWorkBlock {
@@ -431,6 +432,7 @@ export interface IncomePlanningWorkBlock {
   description: string;
   color?: string;
   slots: IncomePlanningSlot[];
+  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningHabit {
@@ -448,6 +450,7 @@ export interface IncomePlanningHabit {
   priority: IncomePlanningPriority;
   icon?: string;
   slots: IncomePlanningSlot[];
+  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningManualBlock {
@@ -459,6 +462,7 @@ export interface IncomePlanningManualBlock {
   color?: string;
   icon?: string;
   slots: IncomePlanningSlot[];
+  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningCalendarStamp {
@@ -467,6 +471,7 @@ export interface IncomePlanningCalendarStamp {
   startTime: string;
   icon: string;
   label: string;
+  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningPlannedStamp {
@@ -476,6 +481,12 @@ export interface IncomePlanningPlannedStamp {
   icon: string;
   label: string;
   description: string;
+  scenarioIds?: IncomePlanningWeekScenarioId[];
+}
+
+export interface IncomePlanningWeekScenario {
+  id: IncomePlanningWeekScenarioId;
+  label: string;
 }
 
 export interface IncomePlanningWeekScenarioAssignment {
@@ -494,6 +505,7 @@ export interface IncomePlanningState {
   manualBlocks: IncomePlanningManualBlock[];
   calendarStamps: IncomePlanningCalendarStamp[];
   plannedStamps: IncomePlanningPlannedStamp[];
+  weekScenarios: IncomePlanningWeekScenario[];
   weekScenarioAssignments: IncomePlanningWeekScenarioAssignment[];
   assumptions: IncomePlanningAssumptions;
 }

@@ -5871,13 +5871,6 @@ tfoot th {
   background: var(--entry-bg, rgba(111, 119, 133, 0.12));
 }
 
-.income-planning-calendar-block.type-scenario_suggestion {
-  border-left-color: var(--entry-color, #6f7785);
-  background:
-    linear-gradient(135deg, var(--entry-bg, rgba(111, 119, 133, 0.12)), rgba(255, 255, 255, 0.02)),
-    var(--surface-soft);
-}
-
 .income-planning-calendar-block.type-pause {
   border-left-color: #6f7785;
   background: rgba(111, 119, 133, 0.12);

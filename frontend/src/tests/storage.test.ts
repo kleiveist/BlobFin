@@ -130,6 +130,7 @@ describe("storage", () => {
       "free_time",
       "buffer"
     ]);
+    expect(loaded.incomePlanning.weekScenarios).toEqual([]);
     expect(loaded.incomePlanning.plannedStamps).toEqual([]);
     expect(loaded.incomePlanning.weekScenarioAssignments).toEqual([]);
     expect(loaded.incomePlanning.habits.map((habit) => habit.name)).toContain("Buch lesen");
@@ -253,6 +254,114 @@ describe("storage", () => {
     });
     expect(loaded.incomePlanning.weekScenarioAssignments).toEqual([
       { weekStartDate: "2026-07-13", scenarioId: "self_employed" }
+    ]);
+  });
+
+  it("normalizes custom income planning scenarios and entry scenario filters", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState() as any;
+    state.incomePlanning = {
+      weekScenarios: [
+        { id: "focus", label: "Fokuswoche" },
+        { id: "project", label: "Altes Projekt" },
+        { id: "empty-label", label: "" },
+        { id: "focus", label: "Fokuswoche neu" }
+      ],
+      workBlocks: [
+        {
+          id: "work",
+          active: true,
+          category: "salary",
+          name: "Job",
+          description: "",
+          scenarioIds: ["focus", "missing", "uni"],
+          slots: []
+        }
+      ],
+      habits: [
+        {
+          id: "habit",
+          active: true,
+          type: "good",
+          name: "Habit",
+          description: "",
+          timing: "",
+          durationMinutes: 30,
+          durationUnit: "day",
+          goalChange: "build",
+          replacementHabit: "",
+          status: "planned",
+          priority: "medium",
+          scenarioIds: ["self_employed", "project"],
+          slots: []
+        }
+      ],
+      manualBlocks: [
+        {
+          id: "manual",
+          active: true,
+          type: "free_time",
+          name: "Freizeit",
+          description: "",
+          scenarioIds: ["normal", "self_employed", "focus"],
+          slots: []
+        }
+      ],
+      calendarStamps: [
+        {
+          id: "stamp",
+          day: "monday",
+          startTime: "09:00",
+          icon: "calendar",
+          label: "Stempel",
+          scenarioIds: ["focus"]
+        }
+      ],
+      plannedStamps: [
+        {
+          id: "planned",
+          date: "2026-07-15",
+          startTime: "10:00",
+          icon: "calendar",
+          label: "Termin",
+          description: "",
+          scenarioIds: ["focus", "bad"]
+        }
+      ],
+      weekScenarioAssignments: [
+        { weekStartDate: "2026-07-13", scenarioId: "focus" },
+        { weekStartDate: "2026-07-20", scenarioId: "project" },
+        { weekStartDate: "2026-07-27", scenarioId: "self_employed" }
+      ],
+      assumptions: {
+        sleepHoursPerDay: 8,
+        sleepSlots: [
+          {
+            id: "sleep",
+            day: "monday",
+            startTime: "22:00",
+            endTime: "06:00",
+            flexible: false,
+            durationMinutes: 480,
+            scenarioIds: ["focus", "missing"]
+          }
+        ]
+      }
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.incomePlanning.weekScenarios).toEqual([{ id: "focus", label: "Fokuswoche neu" }]);
+    expect(loaded.incomePlanning.workBlocks[0].scenarioIds).toEqual(["focus"]);
+    expect(loaded.incomePlanning.habits[0].scenarioIds).toEqual(["self_employed"]);
+    expect(loaded.incomePlanning.manualBlocks[0].scenarioIds).toBeUndefined();
+    expect(loaded.incomePlanning.calendarStamps[0].scenarioIds).toEqual(["focus"]);
+    expect(loaded.incomePlanning.plannedStamps[0].scenarioIds).toEqual(["focus"]);
+    expect(loaded.incomePlanning.assumptions.sleepSlots[0].scenarioIds).toEqual(["focus"]);
+    expect(loaded.incomePlanning.weekScenarioAssignments).toEqual([
+      { weekStartDate: "2026-07-13", scenarioId: "focus" },
+      { weekStartDate: "2026-07-27", scenarioId: "self_employed" }
     ]);
   });
 

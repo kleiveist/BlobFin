@@ -13,6 +13,7 @@ import type {
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningState,
+  IncomePlanningWeekScenario,
   IncomePlanningWeekScenarioId,
   IncomePlanningWeekday,
   IncomePlanningWorkBlock
@@ -32,12 +33,9 @@ export const INCOME_PLANNING_WEEK_DAYS: IncomePlanningWeekday[] = [
 export const INCOME_PLANNING_CATEGORY_IDS: IncomePlanningCategory[] = INCOME_YEAR_LABEL_OPTIONS.map(
   (option) => option.id as IncomePlanningCategory
 );
-export const INCOME_PLANNING_WEEK_SCENARIO_IDS: IncomePlanningWeekScenarioId[] = [
-  "normal",
-  "uni",
-  "self_employed",
-  "project"
-];
+export const INCOME_PLANNING_WEEK_SCENARIO_IDS: IncomePlanningWeekScenarioId[] = ["normal", "self_employed"];
+export const INCOME_PLANNING_LEGACY_WEEK_SCENARIO_IDS = ["uni", "project"];
+const INCOME_PLANNING_CUSTOM_SCENARIO_COLORS = ["#4f6f9f", "#8f5aa8", "#b8860b", "#2e7d58"];
 
 export interface IncomePlanningSlotTemplate {
   day: IncomePlanningWeekday;
@@ -66,7 +64,6 @@ export type IncomePlanningPlannerEntryType =
   | "bad_habit"
   | "replacement_habit"
   | "other_event"
-  | "scenario_suggestion"
   | "pause";
 
 export interface IncomePlanningCalendarEntry {
@@ -108,7 +105,6 @@ export interface IncomePlanningModel {
   calendarEntries: IncomePlanningCalendarEntry[];
   scenarioId: IncomePlanningWeekScenarioId;
   scenarioLabel: string;
-  scenarioSuggestionHours: number;
   grossWorkHours: number;
   totalWorkHours: number;
   pauseHours: number;
@@ -130,15 +126,6 @@ export interface IncomePlanningWeekScenarioConfig {
   icon: string;
   description: string;
   color: string;
-  suggestions: IncomePlanningScenarioSuggestion[];
-}
-
-export interface IncomePlanningScenarioSuggestion {
-  id: string;
-  title: string;
-  detail: string;
-  priority: IncomePlanningPriority;
-  slot: IncomePlanningSlotTemplate;
 }
 
 export interface IncomePlanningModelOptions {
@@ -268,99 +255,15 @@ export const INCOME_PLANNING_WEEK_SCENARIOS: IncomePlanningWeekScenarioConfig[] 
     id: "normal",
     label: "Normale Woche",
     icon: "calendar",
-    description: "Standard-Zeitbudget und regulaere Habits.",
-    color: "#6f7785",
-    suggestions: []
-  },
-  {
-    id: "uni",
-    label: "Uni-Woche",
-    icon: "education",
-    description: "Fokus auf Studium, Vorlesungen, Lernen und Pruefungen.",
-    color: "#4f6f9f",
-    suggestions: [
-      {
-        id: "lecture",
-        title: "Vorlesung / Seminar",
-        detail: "Studienblock",
-        priority: "high",
-        slot: timedSlot("monday", "10:00", "12:00")
-      },
-      {
-        id: "learning",
-        title: "Lernen",
-        detail: "Nachbereitung und Uebungen",
-        priority: "medium",
-        slot: timedSlot("wednesday", "18:00", "20:00")
-      },
-      {
-        id: "exam-prep",
-        title: "Pruefungsvorbereitung",
-        detail: "Flexibler Fokusblock",
-        priority: "high",
-        slot: flexibleSlot("sunday", 3 * 60)
-      }
-    ]
+    description: "Standard-Zeitbudget ohne Zusatzvorschlaege.",
+    color: "#6f7785"
   },
   {
     id: "self_employed",
     label: "Selbstaendigkeits-Woche",
     icon: "briefcase",
-    description: "Fokus auf Kundenarbeit, Projektarbeit und Buchhaltung.",
-    color: "#5f7f4f",
-    suggestions: [
-      {
-        id: "client-work",
-        title: "Kundenarbeit",
-        detail: "Lieferarbeit",
-        priority: "high",
-        slot: timedSlot("tuesday", "18:00", "21:00")
-      },
-      {
-        id: "project-work",
-        title: "Projektarbeit",
-        detail: "Aufbau und Umsetzung",
-        priority: "high",
-        slot: timedSlot("thursday", "18:00", "21:00")
-      },
-      {
-        id: "bookkeeping",
-        title: "Buchhaltung",
-        detail: "Orga, Rechnungen, Nachhalten",
-        priority: "medium",
-        slot: flexibleSlot("sunday", 90)
-      }
-    ]
-  },
-  {
-    id: "project",
-    label: "Projekt-Woche",
-    icon: "investment",
-    description: "Fokus auf ein bestimmtes Vorhaben und intensive Arbeitsbloecke.",
-    color: "#8f5aa8",
-    suggestions: [
-      {
-        id: "deep-work-1",
-        title: "Deep Work",
-        detail: "Intensiver Projektblock",
-        priority: "high",
-        slot: timedSlot("monday", "18:00", "20:30")
-      },
-      {
-        id: "deep-work-2",
-        title: "Deep Work",
-        detail: "Intensiver Projektblock",
-        priority: "high",
-        slot: timedSlot("wednesday", "18:00", "20:30")
-      },
-      {
-        id: "review",
-        title: "Projekt-Review",
-        detail: "Planen, auswerten, naechste Schritte",
-        priority: "medium",
-        slot: flexibleSlot("sunday", 60)
-      }
-    ]
+    description: "Zeitbudget fuer Kundenarbeit, Projektarbeit und Buchhaltung.",
+    color: "#5f7f4f"
   }
 ];
 
@@ -368,12 +271,34 @@ export function incomePlanningCategoryConfig(category: IncomePlanningCategory): 
   return INCOME_PLANNING_CATEGORY_CONFIGS.find((config) => config.id === category) ?? INCOME_PLANNING_CATEGORY_CONFIGS[0];
 }
 
-export function incomePlanningWeekScenarioConfig(id: IncomePlanningWeekScenarioId): IncomePlanningWeekScenarioConfig {
-  return INCOME_PLANNING_WEEK_SCENARIOS.find((config) => config.id === id) ?? INCOME_PLANNING_WEEK_SCENARIOS[0];
+export function incomePlanningWeekScenarioConfigs(
+  customScenarios: IncomePlanningWeekScenario[] = []
+): IncomePlanningWeekScenarioConfig[] {
+  const custom = customScenarios
+    .filter((scenario) => isIncomePlanningWeekScenarioId(scenario.id) && scenario.id !== "normal")
+    .map((scenario, index) => ({
+      id: scenario.id,
+      label: scenario.label,
+      icon: "calendar",
+      description: "Eigenes Wochenszenario.",
+      color: INCOME_PLANNING_CUSTOM_SCENARIO_COLORS[index % INCOME_PLANNING_CUSTOM_SCENARIO_COLORS.length]
+    }));
+  return [...INCOME_PLANNING_WEEK_SCENARIOS, ...custom];
+}
+
+export function incomePlanningWeekScenarioConfig(
+  id: IncomePlanningWeekScenarioId,
+  customScenarios: IncomePlanningWeekScenario[] = []
+): IncomePlanningWeekScenarioConfig {
+  return incomePlanningWeekScenarioConfigs(customScenarios).find((config) => config.id === id) ?? INCOME_PLANNING_WEEK_SCENARIOS[0];
 }
 
 export function isIncomePlanningWeekScenarioId(value: unknown): value is IncomePlanningWeekScenarioId {
-  return INCOME_PLANNING_WEEK_SCENARIO_IDS.includes(value as IncomePlanningWeekScenarioId);
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 80) return false;
+  if (INCOME_PLANNING_LEGACY_WEEK_SCENARIO_IDS.includes(trimmed)) return false;
+  return /^[a-zA-Z0-9:_-]+$/.test(trimmed);
 }
 
 export function isIncomePlanningMainJobCategory(category: IncomePlanningCategory): boolean {
@@ -480,20 +405,21 @@ export function buildIncomePlanningManualBlock(
 
 export function buildIncomePlanningModel(state: IncomePlanningState, options: IncomePlanningModelOptions = {}): IncomePlanningModel {
   const scenarioId = options.scenarioId ?? "normal";
-  const scenario = incomePlanningWeekScenarioConfig(scenarioId);
-  const activeWorkBlocks = state.workBlocks.filter((block) => block.active);
+  const scenario = incomePlanningWeekScenarioConfig(scenarioId, state.weekScenarios);
+  const activeWorkBlocks = state.workBlocks.filter((block) => block.active && incomePlanningEntryActiveInScenario(block, scenarioId));
   const careerWorkBlocks = activeWorkBlocks.filter((block) => isIncomePlanningMainJobCategory(block.category));
-  const activeHabits = incomePlanningHabitsForScenario(
-    state.habits.filter((habit) => habit.active),
-    scenarioId
+  const activeHabits = state.habits.filter((habit) => habit.active && incomePlanningEntryActiveInScenario(habit, scenarioId));
+  const activeManualBlocks = state.manualBlocks.filter(
+    (block) => block.active && incomePlanningEntryActiveInScenario(block, scenarioId)
   );
-  const activeManualBlocks = state.manualBlocks.filter((block) => block.active);
-  const scenarioEntries = scenario.suggestions.map((suggestion) => scenarioSuggestionCalendarEntry(scenario, suggestion));
+  const scenarioSleepSlots = state.assumptions.sleepSlots.filter((slot) =>
+    incomePlanningEntryActiveInScenario(slot, scenarioId)
+  );
+  const scenarioAssumptions = { ...state.assumptions, sleepSlots: scenarioSleepSlots };
   const drafts = [
     ...activeWorkBlocks.flatMap(workBlockCalendarEntries),
     ...activeHabits.flatMap(habitCalendarEntries),
-    ...activeManualBlocks.flatMap(manualBlockCalendarEntries),
-    ...scenarioEntries
+    ...activeManualBlocks.flatMap(manualBlockCalendarEntries)
   ];
   const conflictResult = detectConflicts(drafts);
   const calendarEntries = drafts
@@ -507,10 +433,9 @@ export function buildIncomePlanningModel(state: IncomePlanningState, options: In
   const grossManualMinutes = sumSlotsDuration(activeManualBlocks.flatMap((block) => block.slots), "gross");
   const manualPauseMinutes = sumSlotsDuration(activeManualBlocks.flatMap((block) => block.slots), "pause");
   const manualMinutes = sumSlotsDuration(activeManualBlocks.flatMap((block) => block.slots), "net");
-  const scenarioSuggestionMinutes = sumEntryMinutes(calendarEntries, ["scenario_suggestion"]);
   const pauseMinutes = workPauseMinutes + manualPauseMinutes;
-  const sleepMinutes = incomePlanningSleepMinutes(state.assumptions);
-  const usedMinutes = sleepMinutes + totalWorkMinutes + pauseMinutes + habitMinutes + manualMinutes + scenarioSuggestionMinutes;
+  const sleepMinutes = incomePlanningSleepMinutes(scenarioAssumptions);
+  const usedMinutes = sleepMinutes + totalWorkMinutes + pauseMinutes + habitMinutes + manualMinutes;
   const remainingMinutes = INCOME_PLANNING_WEEK_MINUTES - usedMinutes;
   const nonSleepMinutes = usedMinutes - sleepMinutes;
   const totalWorkHours = minutesToHours(totalWorkMinutes);
@@ -532,7 +457,6 @@ export function buildIncomePlanningModel(state: IncomePlanningState, options: In
     calendarEntries,
     scenarioId,
     scenarioLabel: scenario.label,
-    scenarioSuggestionHours: minutesToHours(scenarioSuggestionMinutes),
     grossWorkHours: minutesToHours(grossWorkMinutes),
     totalWorkHours,
     pauseHours: minutesToHours(pauseMinutes),
@@ -555,6 +479,13 @@ export function buildIncomePlanningModel(state: IncomePlanningState, options: In
       invalidSlotCount
     })
   };
+}
+
+export function incomePlanningEntryActiveInScenario(
+  entry: { scenarioIds?: IncomePlanningWeekScenarioId[] },
+  scenarioId: IncomePlanningWeekScenarioId
+): boolean {
+  return !entry.scenarioIds?.length || entry.scenarioIds.includes(scenarioId);
 }
 
 function workBlockCalendarEntries(block: IncomePlanningWorkBlock): CalendarEntryDraft[] {
@@ -584,37 +515,6 @@ function habitCalendarEntries(habit: IncomePlanningHabit): CalendarEntryDraft[] 
 
 function manualBlockCalendarEntries(block: IncomePlanningManualBlock): CalendarEntryDraft[] {
   return block.slots.flatMap((slot) => calendarEntriesFromSlot(block.id, slot, block.name, plannerTypeForManualBlock(block.type)));
-}
-
-function incomePlanningHabitsForScenario(
-  habits: IncomePlanningHabit[],
-  scenarioId: IncomePlanningWeekScenarioId
-): IncomePlanningHabit[] {
-  if (scenarioId === "normal") return habits;
-  if (scenarioId === "project") return habits.filter((habit) => habit.priority === "high");
-  return habits.filter((habit) => habit.priority === "medium" || habit.priority === "high");
-}
-
-function scenarioSuggestionCalendarEntry(
-  scenario: IncomePlanningWeekScenarioConfig,
-  suggestion: IncomePlanningScenarioSuggestion
-): CalendarEntryDraft {
-  const suggestionSlot = slot(`scenario-${scenario.id}-${suggestion.id}`, suggestion.slot);
-  return {
-    ...calendarEntryFromSlot(
-      `scenario:${scenario.id}`,
-      suggestionSlot,
-      suggestion.title,
-      "scenario_suggestion",
-      `scenario:${scenario.id}`
-    ),
-    detail: suggestion.detail,
-    icon: scenario.icon,
-    color: scenario.color,
-    priority: suggestion.priority,
-    scenarioId: scenario.id,
-    readOnly: true
-  };
 }
 
 function calendarEntriesFromSlot(

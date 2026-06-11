@@ -184,8 +184,17 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain("select-income-planning-week-scenario-");
     expect(mainSource).toContain("function setIncomePlanningWeekScenario");
     expect(mainSource).toContain("weekScenarioAssignments");
+    expect(mainSource).toContain("weekScenarios");
     expect(mainSource).toContain("return incomePlanningActiveWeekRange();");
-    expect(mainSource).toContain("data-income-planning-scenario-suggestion");
+    expect(mainSource).toContain('data-action="income-planning-open-week-scenario-dialog"');
+    expect(mainSource).toContain('data-action="income-planning-save-week-scenario"');
+    expect(mainSource).toContain("data-income-planning-dialog-scenario-id");
+    expect(mainSource).toContain("data-income-planning-stamp-scenario-id");
+    expect(mainSource).toContain("data-income-stamp-planner-scenario-id");
+    expect(mainSource).not.toContain("Uni-Woche");
+    expect(mainSource).not.toContain("Projekt-Woche");
+    expect(mainSource).not.toContain("scenario_suggestion");
+    expect(mainSource).not.toContain("data-income-planning-scenario-suggestion");
   });
 
   it("renders the stamp planner as an independent page", () => {

@@ -29,12 +29,13 @@ import {
   enforceSingleActiveIncomePlanningMainJob,
   INCOME_PLANNING_CATEGORY_CONFIGS,
   INCOME_PLANNING_WEEK_DAYS,
-  INCOME_PLANNING_WEEK_SCENARIOS,
   incomePlanningDefaultWorkCategory,
   incomePlanningCategoryConfig,
   incomePlanningDefaultManualColor,
   incomePlanningDefaultManualIcon,
   incomePlanningDefaultWorkColor,
+  incomePlanningEntryActiveInScenario,
+  incomePlanningWeekScenarioConfigs,
   incomePlanningWeekScenarioConfig,
   incomePlanningAverageSleepHours,
   incomePlanningSlotGrossDurationMinutes,
@@ -43,7 +44,6 @@ import {
   incomePlanningSleepSlotDurationMinutes,
   incomePlanningSlotCalendarSegments,
   incomePlanningStripSlotPause,
-  isIncomePlanningWeekScenarioId,
   parseTimeMinutes,
   type IncomePlanningCalendarEntry,
   type IncomePlanningModel,
@@ -183,6 +183,7 @@ import type {
   IncomePlanningPlannedStamp,
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
+  IncomePlanningWeekScenario,
   IncomePlanningWeekScenarioId,
   IncomePlanningWeekday,
   IncomePlanningWorkBlock,
@@ -451,6 +452,7 @@ interface IncomePlanningSleepSlotGroup {
   endTime: string;
   flexible: boolean;
   durationMinutes: number;
+  scenarioIds: IncomePlanningWeekScenarioId[];
   slotIds: Partial<Record<IncomePlanningWeekday, string>>;
 }
 type IncomePlanningDialogState = {
@@ -486,6 +488,7 @@ type IncomePlanningDialogState = {
   pauseStartTime: string;
   pauseEndTime: string;
   pauseDurationMinutes: number;
+  scenarioIds: IncomePlanningWeekScenarioId[];
   error: string;
 } | null;
 interface IncomePlanningCalendarBackgroundEntry {
@@ -596,6 +599,7 @@ let incomePlanningStampPicker: {
   startTime: string;
   icon: string;
   label: string;
+  scenarioIds: IncomePlanningWeekScenarioId[];
   top: number;
   left: number;
 } | null = null;
@@ -611,8 +615,10 @@ let incomeStampPlannerDialog: {
   icon: string;
   label: string;
   description: string;
+  scenarioIds: IncomePlanningWeekScenarioId[];
   error: string;
 } | null = null;
+let incomePlanningWeekScenarioDialog: { label: string; error: string } | null = null;
 let incomePlanningCurrentTimeTimerId: number | null = null;
 let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
@@ -1651,6 +1657,9 @@ function bindEvents(): void {
     if (action?.startsWith("select-income-planning-week-scenario-")) {
       setIncomePlanningWeekScenario(action.replace("select-income-planning-week-scenario-", ""));
     }
+    if (action === "income-planning-open-week-scenario-dialog") openIncomePlanningWeekScenarioDialog();
+    if (action === "income-planning-close-week-scenario-dialog") closeIncomePlanningWeekScenarioDialog();
+    if (action === "income-planning-save-week-scenario") saveIncomePlanningWeekScenarioDialog();
     if (action === "income-stamp-planner-add") openIncomeStampPlannerDialogForDate();
     if (action === "income-stamp-planner-add-date") {
       openIncomeStampPlannerDialogForDate(button.dataset.incomeStampPlannerDate || "");
@@ -2143,6 +2152,7 @@ function renderIncomePlanning(): void {
   renderIncomePlanningCalendarStamps();
   renderIncomePlanningSummary(activeWeekModel);
   renderIncomePlanningDialog();
+  renderIncomePlanningWeekScenarioDialog();
   renderIncomePlanningHabitIconPicker();
   renderIncomePlanningStampPicker();
   renderIncomePlanningStampMenu();
@@ -2344,6 +2354,13 @@ function renderIncomeStampPlannerDialog(): void {
             `;
           }).join("")}
         </div>
+        <section class="income-planning-dialog-section">
+          <strong>Wochenszenarien</strong>
+          ${incomePlanningScenarioCheckboxGroup({
+            selectedIds: draft.scenarioIds,
+            dataAttribute: "data-income-stamp-planner-scenario-id"
+          })}
+        </section>
         ${draft.error ? `<div class="income-planning-warning high">${escapeHtml(draft.error)}</div>` : ""}
         <div class="income-planning-dialog-actions">
           ${draft.stampId ? `<button class="button danger" type="button" data-action="income-stamp-planner-delete">Loeschen</button>` : ""}
@@ -2399,7 +2416,8 @@ function incomePlanningPlannedStampsForCurrentWeek(day: IncomePlanningWeekday): 
       return (
         date.getTime() >= range.start.getTime() &&
         date.getTime() <= range.end.getTime() &&
-        incomePlanningWeekdayForDate(date) === day
+        incomePlanningWeekdayForDate(date) === day &&
+        incomePlanningEntryIsActiveInCurrentScenario(stamp)
       );
     })
     .sort(compareIncomePlanningPlannedStamps);
@@ -2418,12 +2436,20 @@ function incomePlanningModelForActiveWeek(): IncomePlanningModel {
   return buildIncomePlanningModel(state.incomePlanning, { scenarioId: incomePlanningActiveWeekScenarioId() });
 }
 
+function incomePlanningWeekScenarioOptions(): ReturnType<typeof incomePlanningWeekScenarioConfigs> {
+  return incomePlanningWeekScenarioConfigs(state.incomePlanning.weekScenarios ?? []);
+}
+
+function incomePlanningKnownScenarioIds(): IncomePlanningWeekScenarioId[] {
+  return incomePlanningWeekScenarioOptions().map((scenario) => scenario.id);
+}
+
 function incomePlanningActiveWeekScenarioId(): IncomePlanningWeekScenarioId {
   const weekStartDate = incomePlanningActiveWeekStartDate();
-  return (
-    (state.incomePlanning.weekScenarioAssignments ?? []).find((assignment) => assignment.weekStartDate === weekStartDate)?.scenarioId ??
-    "normal"
-  );
+  const assignedScenarioId = (state.incomePlanning.weekScenarioAssignments ?? []).find(
+    (assignment) => assignment.weekStartDate === weekStartDate
+  )?.scenarioId;
+  return incomePlanningKnownScenarioIds().includes(assignedScenarioId ?? "") ? assignedScenarioId ?? "normal" : "normal";
 }
 
 function incomePlanningActiveWeekStartDate(): string {
@@ -2459,7 +2485,7 @@ function showCurrentIncomePlanningWeek(): void {
 }
 
 function setIncomePlanningWeekScenario(value: string): void {
-  if (!isIncomePlanningWeekScenarioId(value)) return;
+  if (!incomePlanningKnownScenarioIds().includes(value)) return;
   const weekStartDate = incomePlanningActiveWeekStartDate();
   const assignments = (state.incomePlanning.weekScenarioAssignments ?? []).filter(
     (assignment) => assignment.weekStartDate !== weekStartDate
@@ -2475,6 +2501,114 @@ function setIncomePlanningWeekScenario(value: string): void {
   };
   renderIncomePlanning();
   saveState(state);
+}
+
+function openIncomePlanningWeekScenarioDialog(): void {
+  incomePlanningWeekScenarioDialog = { label: "", error: "" };
+  renderIncomePlanningWeekScenarioDialog();
+}
+
+function closeIncomePlanningWeekScenarioDialog(): void {
+  incomePlanningWeekScenarioDialog = null;
+  renderIncomePlanningWeekScenarioDialog();
+}
+
+function updateIncomePlanningWeekScenarioDialogDraft(field: string, value: string): void {
+  if (!incomePlanningWeekScenarioDialog || field !== "label") return;
+  incomePlanningWeekScenarioDialog = { ...incomePlanningWeekScenarioDialog, label: value, error: "" };
+}
+
+function saveIncomePlanningWeekScenarioDialog(): void {
+  if (!incomePlanningWeekScenarioDialog) return;
+  const label = incomePlanningWeekScenarioDialog.label.trim().replace(/\s+/g, " ");
+  if (!label) {
+    incomePlanningWeekScenarioDialog = { ...incomePlanningWeekScenarioDialog, error: "Bitte ein Szenario-Label eingeben." };
+    renderIncomePlanningWeekScenarioDialog();
+    return;
+  }
+  const duplicate = incomePlanningWeekScenarioOptions().some(
+    (scenario) => scenario.label.trim().toLowerCase() === label.toLowerCase()
+  );
+  if (duplicate) {
+    incomePlanningWeekScenarioDialog = { ...incomePlanningWeekScenarioDialog, error: "Dieses Wochenszenario existiert bereits." };
+    renderIncomePlanningWeekScenarioDialog();
+    return;
+  }
+
+  const scenario: IncomePlanningWeekScenario = {
+    id: `week-scenario-${createId()}`,
+    label
+  };
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    weekScenarios: [...(state.incomePlanning.weekScenarios ?? []), scenario]
+  };
+  incomePlanningWeekScenarioDialog = null;
+  setIncomePlanningWeekScenario(scenario.id);
+}
+
+function renderIncomePlanningWeekScenarioDialog(): void {
+  const root = document.querySelector<HTMLDivElement>("#incomePlanningDialogRoot");
+  if (!root || incomePlanningDialog) return;
+  if (!incomePlanningWeekScenarioDialog) {
+    root.innerHTML = "";
+    return;
+  }
+  root.innerHTML = `
+    <div class="income-planning-dialog-backdrop" role="presentation">
+      <div class="income-planning-dialog" role="dialog" aria-modal="true" aria-label="Wochenszenario hinzufuegen">
+        <div class="income-tax-dialog-head">
+          <div>
+            <strong>Wochenszenario hinzufuegen</strong>
+            <span>Eigenes Label fuer Wochenmodus</span>
+          </div>
+          <div class="income-planning-header-actions">
+            <button class="income-planning-header-icon-button" type="button" data-action="income-planning-close-week-scenario-dialog" aria-label="Dialog schliessen" title="Schliessen">x</button>
+            <button class="income-planning-header-icon-button" type="button" data-action="income-planning-save-week-scenario" aria-label="Wochenszenario speichern" title="Speichern">
+              ${incomePlanningHeaderIcon("save")}
+            </button>
+          </div>
+        </div>
+        ${incomePlanningWeekScenarioDialog.error ? `<div class="income-planning-warning unrealistic"><strong>Fehler</strong><span>${escapeHtml(incomePlanningWeekScenarioDialog.error)}</span></div>` : ""}
+        <section class="income-planning-dialog-section">
+          <strong>Label</strong>
+          <label class="field">
+            <span>Name</span>
+            <input type="text" value="${escapeHtml(incomePlanningWeekScenarioDialog.label)}" data-income-planning-week-scenario-dialog-field="label" />
+          </label>
+        </section>
+        <div class="button-row income-planning-dialog-actions">
+          <button class="button secondary" type="button" data-action="income-planning-close-week-scenario-dialog">Abbrechen</button>
+          <button class="button" type="button" data-action="income-planning-save-week-scenario">Speichern</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function incomePlanningScenarioIdsForDialog(scenarioIds: IncomePlanningWeekScenarioId[] | undefined): IncomePlanningWeekScenarioId[] {
+  const knownIds = incomePlanningKnownScenarioIds();
+  if (!scenarioIds?.length) return knownIds;
+  const selected = scenarioIds.filter((scenarioId) => knownIds.includes(scenarioId));
+  return selected.length ? Array.from(new Set(selected)) : knownIds;
+}
+
+function incomePlanningDefaultScenarioIdsForNewEntry(): IncomePlanningWeekScenarioId[] {
+  const activeScenarioId = incomePlanningActiveWeekScenarioId();
+  return incomePlanningKnownScenarioIds().includes(activeScenarioId) ? [activeScenarioId] : ["normal"];
+}
+
+function incomePlanningStoredScenarioIds(
+  scenarioIds: IncomePlanningWeekScenarioId[]
+): IncomePlanningWeekScenarioId[] | undefined {
+  const knownIds = incomePlanningKnownScenarioIds();
+  const selected = Array.from(new Set(scenarioIds.filter((scenarioId) => knownIds.includes(scenarioId))));
+  if (!selected.length || selected.length === knownIds.length) return undefined;
+  return selected;
+}
+
+function incomePlanningEntryIsActiveInCurrentScenario(entry: { scenarioIds?: IncomePlanningWeekScenarioId[] }): boolean {
+  return incomePlanningEntryActiveInScenario(entry, incomePlanningActiveWeekScenarioId());
 }
 
 function incomePlanningWeekdayForDate(date: Date): IncomePlanningWeekday {
@@ -2578,6 +2712,7 @@ function openIncomeStampPlannerDialogForDate(date: string = incomeStampPlannerTo
     icon: "calendar",
     label: "Stempel",
     description: "",
+    scenarioIds: incomePlanningDefaultScenarioIdsForNewEntry(),
     error: ""
   };
   renderIncomeStampPlannerDialog();
@@ -2593,6 +2728,7 @@ function openIncomeStampPlannerDialogForEdit(stampId: string, options: { switchT
     icon: normalizePositionIcon(stamp.icon, "calendar"),
     label: stamp.label,
     description: stamp.description,
+    scenarioIds: incomePlanningScenarioIdsForDialog(stamp.scenarioIds),
     error: ""
   };
   if (options.switchToPlanner) {
@@ -2642,11 +2778,25 @@ function selectIncomeStampPlannerPreset(label: string, icon: string): void {
   renderIncomeStampPlannerDialog();
 }
 
+function updateIncomeStampPlannerScenarioSelection(scenarioId: string, checked: boolean): void {
+  if (!incomeStampPlannerDialog || !incomePlanningKnownScenarioIds().includes(scenarioId)) return;
+  const selected = new Set(incomeStampPlannerDialog.scenarioIds);
+  if (checked) selected.add(scenarioId);
+  else selected.delete(scenarioId);
+  incomeStampPlannerDialog = { ...incomeStampPlannerDialog, scenarioIds: Array.from(selected), error: "" };
+  renderIncomeStampPlannerDialog();
+}
+
 function saveIncomeStampPlannerDialog(): void {
   if (!incomeStampPlannerDialog) return;
   const draft = incomeStampPlannerDialog;
   if (!incomeStampPlannerDateFromString(draft.date)) {
     incomeStampPlannerDialog = { ...draft, error: "Bitte ein gueltiges Datum auswaehlen." };
+    renderIncomeStampPlannerDialog();
+    return;
+  }
+  if (!draft.scenarioIds.length) {
+    incomeStampPlannerDialog = { ...draft, error: "Bitte mindestens ein Wochenszenario auswaehlen." };
     renderIncomeStampPlannerDialog();
     return;
   }
@@ -2657,7 +2807,8 @@ function saveIncomeStampPlannerDialog(): void {
     startTime,
     icon: normalizePositionIcon(draft.icon, "calendar"),
     label: draft.label.trim() || "Stempel",
-    description: draft.description.trim()
+    description: draft.description.trim(),
+    scenarioIds: incomePlanningStoredScenarioIds(draft.scenarioIds)
   };
   const plannedStamps = state.incomePlanning.plannedStamps ?? [];
   const exists = plannedStamps.some((item) => item.id === stamp.id);
@@ -3086,7 +3237,7 @@ function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
   const flexibleCount = graphicEntries.filter((entry) => entry.flexible).length;
   const currentTime = incomePlanningIsCurrentWeek() ? incomePlanningCurrentTimeMarker() : null;
   const weekRange = incomePlanningActiveWeekRange();
-  const scenario = incomePlanningWeekScenarioConfig(model.scenarioId);
+  const scenario = incomePlanningWeekScenarioConfig(model.scenarioId, state.incomePlanning.weekScenarios ?? []);
   host.innerHTML = `
     <div class="income-planning-calendar" data-income-planning-calendar>
       <div class="income-planning-week-toolbar">
@@ -3116,14 +3267,19 @@ function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
         <div>
           <span>Wochenszenario</span>
           <strong>${escapeHtml(model.scenarioLabel)}</strong>
-          <small>${escapeHtml(
-            model.scenarioSuggestionHours > 0
-              ? `${hoursLabel(model.scenarioSuggestionHours)} Vorschlagszeit`
-              : "Standard-Zeitbudget ohne Zusatzvorschlaege"
-          )}</small>
+          <small>${escapeHtml(scenario.description)}</small>
         </div>
         <div class="income-planning-week-scenario-options" role="group" aria-label="Wochenszenario auswaehlen">
-          ${INCOME_PLANNING_WEEK_SCENARIOS.map((option) => incomePlanningWeekScenarioButton(option.id, model.scenarioId)).join("")}
+          ${incomePlanningWeekScenarioOptions().map((option) => incomePlanningWeekScenarioButton(option.id, model.scenarioId)).join("")}
+          <button
+            class="income-planning-week-scenario-button add"
+            type="button"
+            data-action="income-planning-open-week-scenario-dialog"
+            aria-label="Wochenszenario hinzufuegen"
+            title="Wochenszenario hinzufuegen"
+          >
+            <span>+</span>
+          </button>
         </div>
       </div>
       <div class="income-planning-calendar-head">
@@ -3141,8 +3297,7 @@ function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
       <div class="income-planning-calendar-note">
         <span>${intNumber(graphicEntries.length)} Zeitbloecke in der Grafik</span>
         <span>${intNumber(flexibleCount)} flexible Zeitbloecke</span>
-        <span>${hoursLabel(model.scenarioSuggestionHours)} Szenario-Vorschlaege</span>
-        <span>${intNumber(state.incomePlanning.assumptions.sleepSlots.length)} Schlafhorizonte im Hintergrund</span>
+        <span>${intNumber(incomePlanningSleepSlotsForActiveScenario().length)} Schlafhorizonte im Hintergrund</span>
         ${currentTime ? `<span>Ist-Zeit ${escapeHtml(currentTime.label)}</span>` : ""}
       </div>
     </div>
@@ -3153,7 +3308,7 @@ function incomePlanningWeekScenarioButton(
   scenarioId: IncomePlanningWeekScenarioId,
   activeScenarioId: IncomePlanningWeekScenarioId
 ): string {
-  const scenario = incomePlanningWeekScenarioConfig(scenarioId);
+  const scenario = incomePlanningWeekScenarioConfig(scenarioId, state.incomePlanning.weekScenarios ?? []);
   const active = scenarioId === activeScenarioId;
   return `
     <button
@@ -3177,7 +3332,9 @@ function incomePlanningCalendarDayColumn(
 ): string {
   const dayEntries = entries.filter((entry) => entry.day === day);
   const dayBackgrounds = backgroundEntries.filter((entry) => entry.day === day);
-  const dayStamps = state.incomePlanning.calendarStamps.filter((stamp) => stamp.day === day).sort(compareIncomePlanningCalendarStamps);
+  const dayStamps = state.incomePlanning.calendarStamps
+    .filter((stamp) => stamp.day === day && incomePlanningEntryIsActiveInCurrentScenario(stamp))
+    .sort(compareIncomePlanningCalendarStamps);
   const plannedStamps = incomePlanningPlannedStampsForCurrentWeek(day);
   return `
     <div class="income-planning-calendar-day-column" data-income-planning-calendar-day="${escapeHtml(day)}" aria-label="${escapeHtml(
@@ -3196,10 +3353,14 @@ function incomePlanningCalendarDayColumn(
 }
 
 function incomePlanningCalendarBackgroundEntries(): IncomePlanningCalendarBackgroundEntry[] {
-  const sleepEntries = incomePlanningSleepSlotGroupsFromSlots(state.incomePlanning.assumptions.sleepSlots).flatMap(
+  const sleepEntries = incomePlanningSleepSlotGroupsFromSlots(incomePlanningSleepSlotsForActiveScenario()).flatMap(
     incomePlanningSleepBackgroundEntries
   );
   return sleepEntries;
+}
+
+function incomePlanningSleepSlotsForActiveScenario(): IncomePlanningSleepSlot[] {
+  return state.incomePlanning.assumptions.sleepSlots.filter(incomePlanningEntryIsActiveInCurrentScenario);
 }
 
 function incomePlanningSleepBackgroundEntries(group: IncomePlanningSleepSlotGroup): IncomePlanningCalendarBackgroundEntry[] {
@@ -3279,24 +3440,6 @@ function incomePlanningCalendarEntryBlock(entry: IncomePlanningCalendarEntry): s
   ]
     .filter(Boolean)
     .join(" ");
-  if (entry.type === "scenario_suggestion") {
-    return `
-      <div
-        class="${escapeHtml(classes)} read-only"
-        style="--top:${top.toFixed(3)}%; --height:${height.toFixed(3)}%; --start-minute:${start}; --duration-minutes:${end - start}; ${incomePlanningColorStyle(color)}"
-        title="${escapeHtml(`${incomePlanningEntryTime(entry)} · ${entry.title} · Szenario-Vorschlag`)}"
-        data-income-planning-scenario-suggestion="true"
-      >
-        <span class="income-planning-calendar-label">
-          ${positionIconSvg(meta.icon, "position-icon-svg income-planning-calendar-icon")}
-          <span>${escapeHtml(meta.label)}</span>
-        </span>
-        <strong>${escapeHtml(entry.title)}</strong>
-        <small>${escapeHtml(incomePlanningEntryTime(entry))}</small>
-        <em>${escapeHtml(entry.detail || "Szenario-Vorschlag")}</em>
-      </div>
-    `;
-  }
   const ownerType = incomePlanningOwnerTypeForEntry(entry);
   return `
     <button
@@ -3405,7 +3548,6 @@ function incomePlanningCurrentTimeMarker(): { day: IncomePlanningWeekday; minute
 
 function incomePlanningCalendarEntryMeta(entry: IncomePlanningCalendarEntry): { label: string; icon: string } {
   if (entry.type === "pause") return { label: "Pause", icon: "calendar" };
-  if (entry.type === "scenario_suggestion") return { label: "Vorschlag", icon: normalizePositionIcon(entry.icon, "calendar") };
   const workBlock = state.incomePlanning.workBlocks.find((block) => block.id === entry.ownerId);
   if (workBlock && (entry.type === "career" || entry.type === "side_work")) {
     const config = incomePlanningCategoryConfig(workBlock.category);
@@ -3427,7 +3569,6 @@ function incomePlanningCalendarEntryMeta(entry: IncomePlanningCalendarEntry): { 
 
 function incomePlanningCalendarEntryColor(entry: IncomePlanningCalendarEntry): string {
   if (entry.type === "pause") return "#6f7785";
-  if (entry.type === "scenario_suggestion") return normalizeIncomePlanningColor(entry.color, "#6f7785");
   const workBlock = state.incomePlanning.workBlocks.find((block) => block.id === entry.ownerId);
   if (workBlock && (entry.type === "career" || entry.type === "side_work")) {
     return normalizeIncomePlanningColor(workBlock.color, incomePlanningDefaultWorkColor(workBlock.category));
@@ -3539,7 +3680,6 @@ function incomePlanningPlannerTypeLabel(type: IncomePlanningPlannerEntryType): s
   if (type === "good_habit") return "Gute Habit";
   if (type === "bad_habit") return "Schlechte Habit";
   if (type === "replacement_habit") return "Ersatz-Habit";
-  if (type === "scenario_suggestion") return "Szenario-Vorschlag";
   return "Sonstiges";
 }
 
@@ -3555,7 +3695,6 @@ function incomePlanningOwnerTypeForEntry(entry: IncomePlanningCalendarEntry): Ex
   if (entry.type === "career" || entry.type === "side_work") return "work";
   if (entry.type === "good_habit" || entry.type === "bad_habit" || entry.type === "replacement_habit") return "habit";
   if (entry.type === "pause") return incomePlanningOwnerTypeForId(entry.ownerId);
-  if (entry.type === "scenario_suggestion") return "manual";
   return "manual";
 }
 
@@ -3772,6 +3911,11 @@ function incomePlanningSleepSlotGroupDialogRow(group: IncomePlanningSleepSlotGro
       <button class="icon-button danger" type="button" data-action="income-planning-remove-sleep-slot" data-income-planning-sleep-slot-group-id="${escapeHtml(
         group.id
       )}" aria-label="Schlafzeit entfernen">x</button>
+      ${incomePlanningScenarioCheckboxGroup({
+        selectedIds: group.scenarioIds,
+        dataAttribute: "data-income-planning-sleep-scenario-id",
+        groupId: group.id
+      })}
     </div>
   `;
 }
@@ -3845,6 +3989,7 @@ function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialo
         }
       </div>
     </section>
+    ${incomePlanningDialogScenarioFields(dialog)}
     <section class="income-planning-dialog-section income-planning-dialog-slot">
       <strong>Wochen-Slot</strong>
       <div class="income-planning-dialog-grid slot">
@@ -3868,6 +4013,19 @@ function incomePlanningBlockDialogFields(dialog: NonNullable<IncomePlanningDialo
         </label>
         ${isHabit ? "" : incomePlanningPauseDialogFields(dialog)}
       </div>
+    </section>
+  `;
+}
+
+function incomePlanningDialogScenarioFields(dialog: NonNullable<IncomePlanningDialogState>): string {
+  if (dialog.ownerType === "assumption") return "";
+  return `
+    <section class="income-planning-dialog-section">
+      <strong>Wochenszenarien</strong>
+      ${incomePlanningScenarioCheckboxGroup({
+        selectedIds: dialog.scenarioIds,
+        dataAttribute: "data-income-planning-dialog-scenario-id"
+      })}
     </section>
   `;
 }
@@ -3941,6 +4099,33 @@ function incomePlanningPauseDialogFields(dialog: NonNullable<IncomePlanningDialo
   `;
 }
 
+function incomePlanningScenarioCheckboxGroup(input: {
+  selectedIds: IncomePlanningWeekScenarioId[];
+  dataAttribute: string;
+  groupId?: string;
+}): string {
+  const options = incomePlanningWeekScenarioOptions();
+  const selected = new Set(input.selectedIds);
+  return `
+    <div class="income-planning-week-scenario-options compact" role="group" aria-label="Szenario-Aktivierung">
+      ${options.map((scenario) => {
+        const checked = selected.has(scenario.id);
+        return `
+          <label class="income-planning-source-active income-planning-scenario-checkbox">
+            <input
+              type="checkbox"
+              ${checked ? "checked" : ""}
+              ${input.groupId ? `data-income-planning-sleep-slot-group-id="${escapeHtml(input.groupId)}"` : ""}
+              ${input.dataAttribute}="${escapeHtml(scenario.id)}"
+            />
+            <span>${escapeHtml(scenario.label)}</span>
+          </label>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function incomePlanningDialogSelectField(
   field: string,
   label: string,
@@ -3998,6 +4183,7 @@ function openIncomePlanningStampPickerFromCalendar(dayColumn: HTMLElement, clien
     startTime: formatIncomePlanningTime(clamp(minute, 0, 23 * 60 + 45)),
     icon: "calendar",
     label: "Stempel",
+    scenarioIds: incomePlanningDefaultScenarioIdsForNewEntry(),
     ...position
   };
   renderIncomePlanningStampPicker();
@@ -4015,6 +4201,7 @@ function openIncomePlanningStampPickerForEdit(stampId: string, clientX: number, 
     startTime: stamp.startTime,
     icon: normalizePositionIcon(stamp.icon, "calendar"),
     label: stamp.label,
+    scenarioIds: incomePlanningScenarioIdsForDialog(stamp.scenarioIds),
     ...position
   };
   renderIncomePlanningStampPicker();
@@ -4114,6 +4301,12 @@ function incomePlanningDialogDraft(
     pauseStartTime: slot.pauseStartTime ?? "12:00",
     pauseEndTime: slot.pauseEndTime ?? "12:30",
     pauseDurationMinutes: slot.pauseDurationMinutes ?? 0,
+    scenarioIds:
+      ownerType === "assumption"
+        ? []
+        : mode === "create" || mode === "create_slot"
+          ? incomePlanningDefaultScenarioIdsForNewEntry()
+          : incomePlanningScenarioIdsForDialog(workBlock?.scenarioIds ?? manualBlock?.scenarioIds ?? habit?.scenarioIds),
     error: ""
   };
 }
@@ -4160,6 +4353,15 @@ function updateIncomePlanningDialogDraft(field: string, value: string): void {
   incomePlanningDialog = incomePlanningDialogWithAutoSlotDuration(nextDraft);
 }
 
+function updateIncomePlanningDialogScenarioSelection(scenarioId: string, checked: boolean): void {
+  if (!incomePlanningDialog || !incomePlanningKnownScenarioIds().includes(scenarioId)) return;
+  const selected = new Set(incomePlanningDialog.scenarioIds);
+  if (checked) selected.add(scenarioId);
+  else selected.delete(scenarioId);
+  incomePlanningDialog = { ...incomePlanningDialog, scenarioIds: Array.from(selected), error: "" };
+  renderIncomePlanningDialog();
+}
+
 function incomePlanningDialogWithAutoSlotDuration(
   draft: NonNullable<IncomePlanningDialogState>
 ): NonNullable<IncomePlanningDialogState> {
@@ -4181,6 +4383,7 @@ function addIncomePlanningDialogSleepSlot(): void {
     endTime: "05:30",
     flexible: false,
     durationMinutes: 8.5 * 60,
+    scenarioIds: incomePlanningDefaultScenarioIdsForNewEntry(),
     slotIds: {}
   });
   incomePlanningDialog = {
@@ -4227,6 +4430,22 @@ function updateIncomePlanningSleepSlotGroupField(
   return group;
 }
 
+function updateIncomePlanningDialogSleepSlotGroupScenario(groupId: string, scenarioId: string, checked: boolean): void {
+  if (!incomePlanningDialog || incomePlanningDialog.ownerType !== "assumption" || !incomePlanningKnownScenarioIds().includes(scenarioId)) return;
+  incomePlanningDialog = {
+    ...incomePlanningDialog,
+    sleepSlotGroups: incomePlanningDialog.sleepSlotGroups.map((group) => {
+      if (group.id !== groupId) return group;
+      const selected = new Set(group.scenarioIds);
+      if (checked) selected.add(scenarioId);
+      else selected.delete(scenarioId);
+      return { ...group, scenarioIds: Array.from(selected) };
+    }),
+    error: ""
+  };
+  renderIncomePlanningDialog();
+}
+
 function normalizeIncomePlanningDialogSleepSlot(slot: IncomePlanningSleepSlot): IncomePlanningSleepSlot {
   const durationMinutes = slot.flexible
     ? Math.round(clamp(slot.durationMinutes, 15, 10080))
@@ -4271,6 +4490,7 @@ function incomePlanningSleepSlotGroupsFromSlots(slots: IncomePlanningSleepSlot[]
         endTime: slot.endTime,
         flexible: slot.flexible,
         durationMinutes: slot.durationMinutes,
+        scenarioIds: incomePlanningScenarioIdsForDialog(slot.scenarioIds),
         slotIds: { [slot.day]: slot.id }
       });
     }
@@ -4283,7 +4503,8 @@ function incomePlanningSleepSlotGroupMatchesSlot(group: IncomePlanningSleepSlotG
     group.startTime === slot.startTime &&
     group.endTime === slot.endTime &&
     group.flexible === slot.flexible &&
-    group.durationMinutes === slot.durationMinutes
+    group.durationMinutes === slot.durationMinutes &&
+    scenarioIdsEqual(group.scenarioIds, incomePlanningScenarioIdsForDialog(slot.scenarioIds))
   );
 }
 
@@ -4296,10 +4517,17 @@ function incomePlanningSleepSlotsFromDialogGroups(groups: IncomePlanningSleepSlo
         startTime: group.startTime,
         endTime: group.endTime,
         flexible: group.flexible,
-        durationMinutes: group.durationMinutes
+        durationMinutes: group.durationMinutes,
+        scenarioIds: incomePlanningStoredScenarioIds(group.scenarioIds)
       })
     )
   );
+}
+
+function scenarioIdsEqual(first: IncomePlanningWeekScenarioId[], second: IncomePlanningWeekScenarioId[]): boolean {
+  if (first.length !== second.length) return false;
+  const firstSet = new Set(first);
+  return second.every((scenarioId) => firstSet.has(scenarioId));
 }
 
 function incomePlanningSleepSlotGroupDays(group: IncomePlanningSleepSlotGroup): IncomePlanningWeekday[] {
@@ -4339,6 +4567,11 @@ function saveIncomePlanningDialog(): void {
   if (!incomePlanningDialog) return;
   const draft = incomePlanningDialog;
   if (draft.ownerType === "assumption") {
+    if (draft.sleepSlotGroups.some((group) => !group.scenarioIds.length)) {
+      incomePlanningDialog = { ...draft, error: "Bitte pro Schlafzeit mindestens ein Wochenszenario auswaehlen." };
+      renderIncomePlanningDialog();
+      return;
+    }
     const sleepSlots = incomePlanningSleepSlotsFromDialogGroups(draft.sleepSlotGroups);
     state.incomePlanning = {
       ...state.incomePlanning,
@@ -4357,6 +4590,11 @@ function saveIncomePlanningDialog(): void {
   const dialogSlots = incomePlanningSlotsFromDialog(draft);
   if (!dialogSlots.length) {
     incomePlanningDialog = { ...draft, error: "Start und Ende muessen innerhalb desselben Tages liegen und mindestens 15 Minuten Abstand haben." };
+    renderIncomePlanningDialog();
+    return;
+  }
+  if (!draft.scenarioIds.length) {
+    incomePlanningDialog = { ...draft, error: "Bitte mindestens ein Wochenszenario auswaehlen." };
     renderIncomePlanningDialog();
     return;
   }
@@ -4444,7 +4682,8 @@ function createIncomePlanningOwnerFromDialog(draft: NonNullable<IncomePlanningDi
           name: draft.name || incomePlanningCategoryConfig(draft.category).defaultName,
           description: draft.description,
           color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultWorkColor(draft.category)),
-          slots
+          slots,
+          scenarioIds: incomePlanningStoredScenarioIds(draft.scenarioIds)
         })
       ]
     };
@@ -4461,7 +4700,8 @@ function createIncomePlanningOwnerFromDialog(draft: NonNullable<IncomePlanningDi
           description: draft.description,
           color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultManualColor(draft.manualType)),
           icon: normalizePositionIcon(draft.manualIcon, incomePlanningDefaultManualIcon(draft.manualType)),
-          slots
+          slots,
+          scenarioIds: incomePlanningStoredScenarioIds(draft.scenarioIds)
         })
       ]
     };
@@ -4484,7 +4724,8 @@ function createIncomePlanningOwnerFromDialog(draft: NonNullable<IncomePlanningDi
           replacementHabit: draft.replacementHabit,
           status: draft.habitStatus,
           priority: draft.priority,
-          slots
+          slots,
+          scenarioIds: incomePlanningStoredScenarioIds(draft.scenarioIds)
         })
       ]
     };
@@ -4504,7 +4745,8 @@ function applyIncomePlanningDialogOwnerFields(draft: NonNullable<IncomePlanningD
             category: draft.category,
             name: draft.name,
             description: draft.description,
-            color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultWorkColor(draft.category))
+            color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultWorkColor(draft.category)),
+            scenarioIds: incomePlanningStoredScenarioIds(draft.scenarioIds)
           }
         : block
       )
@@ -4523,7 +4765,8 @@ function applyIncomePlanningDialogOwnerFields(draft: NonNullable<IncomePlanningD
             name: draft.name,
             description: draft.description,
             color: normalizeIncomePlanningColor(draft.color, incomePlanningDefaultManualColor(draft.manualType)),
-            icon: normalizePositionIcon(draft.manualIcon, incomePlanningDefaultManualIcon(draft.manualType))
+            icon: normalizePositionIcon(draft.manualIcon, incomePlanningDefaultManualIcon(draft.manualType)),
+            scenarioIds: incomePlanningStoredScenarioIds(draft.scenarioIds)
           }
         : block
       )
@@ -4547,7 +4790,8 @@ function applyIncomePlanningDialogOwnerFields(draft: NonNullable<IncomePlanningD
               goalChange: draft.habitGoalChange,
               replacementHabit: draft.replacementHabit,
               status: draft.habitStatus,
-              priority: draft.priority
+              priority: draft.priority,
+              scenarioIds: incomePlanningStoredScenarioIds(draft.scenarioIds)
             }
           : habit
       )
@@ -4567,6 +4811,39 @@ function handleIncomePlanningControl(
   target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
   renderMode: "live" | "full" = "full"
 ): boolean {
+  if (target.dataset.incomePlanningWeekScenarioDialogField) {
+    updateIncomePlanningWeekScenarioDialogDraft(target.dataset.incomePlanningWeekScenarioDialogField, target.value);
+    return true;
+  }
+
+  if (target.dataset.incomePlanningDialogScenarioId) {
+    if (!(target instanceof HTMLInputElement)) return false;
+    updateIncomePlanningDialogScenarioSelection(target.dataset.incomePlanningDialogScenarioId, target.checked);
+    return true;
+  }
+
+  if (target.dataset.incomePlanningStampScenarioId) {
+    if (!(target instanceof HTMLInputElement)) return false;
+    updateIncomePlanningStampScenarioSelection(target.dataset.incomePlanningStampScenarioId, target.checked);
+    return true;
+  }
+
+  if (target.dataset.incomeStampPlannerScenarioId) {
+    if (!(target instanceof HTMLInputElement)) return false;
+    updateIncomeStampPlannerScenarioSelection(target.dataset.incomeStampPlannerScenarioId, target.checked);
+    return true;
+  }
+
+  if (target.dataset.incomePlanningSleepSlotGroupId && target.dataset.incomePlanningSleepScenarioId) {
+    if (!(target instanceof HTMLInputElement)) return false;
+    updateIncomePlanningDialogSleepSlotGroupScenario(
+      target.dataset.incomePlanningSleepSlotGroupId,
+      target.dataset.incomePlanningSleepScenarioId,
+      target.checked
+    );
+    return true;
+  }
+
   if (target.dataset.incomePlanningSleepSlotGroupId && target.dataset.incomePlanningSleepSlotGroupField) {
     const value = target instanceof HTMLInputElement && target.type === "checkbox" ? String(target.checked) : target.value;
     updateIncomePlanningDialogSleepSlotGroup(
@@ -9739,8 +10016,18 @@ function selectIncomePlanningStampPreset(label: string, icon: string): void {
   renderIncomePlanningStampPicker();
 }
 
+function updateIncomePlanningStampScenarioSelection(scenarioId: string, checked: boolean): void {
+  if (!incomePlanningStampPicker || !incomePlanningKnownScenarioIds().includes(scenarioId)) return;
+  const selected = new Set(incomePlanningStampPicker.scenarioIds);
+  if (checked) selected.add(scenarioId);
+  else selected.delete(scenarioId);
+  incomePlanningStampPicker = { ...incomePlanningStampPicker, scenarioIds: Array.from(selected) };
+  renderIncomePlanningStampPicker();
+}
+
 function saveIncomePlanningStampPicker(): void {
   if (!incomePlanningStampPicker) return;
+  if (!incomePlanningStampPicker.scenarioIds.length) return;
   const label = incomePlanningStampPicker.label.trim() || "Stempel";
   const startTime = formatIncomePlanningTime(parseTimeMinutes(incomePlanningStampPicker.startTime) ?? 9 * 60);
   const stamp: IncomePlanningCalendarStamp = {
@@ -9748,7 +10035,8 @@ function saveIncomePlanningStampPicker(): void {
     day: incomePlanningStampPicker.day,
     startTime,
     icon: normalizePositionIcon(incomePlanningStampPicker.icon, "calendar"),
-    label
+    label,
+    scenarioIds: incomePlanningStoredScenarioIds(incomePlanningStampPicker.scenarioIds)
   };
   const exists = state.incomePlanning.calendarStamps.some((item) => item.id === stamp.id);
   state.incomePlanning = {
@@ -9839,6 +10127,10 @@ function renderIncomePlanningStampPicker(): void {
         `;
       }).join("")}
     </div>
+    ${incomePlanningScenarioCheckboxGroup({
+      selectedIds: draft.scenarioIds,
+      dataAttribute: "data-income-planning-stamp-scenario-id"
+    })}
     <div class="button-row income-planning-stamp-actions">
       <button class="button secondary" type="button" data-action="income-planning-close-stamp-picker">Abbrechen</button>
       <button class="button" type="button" data-action="income-planning-save-stamp">Speichern</button>
