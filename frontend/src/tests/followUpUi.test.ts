@@ -255,6 +255,23 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('data-action="toggle-cashback-investment"');
   });
 
+  it("keeps the account-year graphic visible as a compact pie chart", () => {
+    const html = renderAppShell();
+
+    expect(html).toContain('id="reserveChartPopup" class="reserve-chart-popup"');
+    expect(html).not.toContain('data-action="show-reserve-chart"');
+    expect(html).not.toContain('id="reserveChartPopup" class="reserve-chart-popup" role="dialog"');
+    expect(html).not.toContain('id="reserveChartPopup" class="reserve-chart-popup" hidden');
+    expect(mainSource).toContain("function reservePieChart");
+    expect(mainSource).not.toContain("function reserveBarChart");
+    expect(mainSource).not.toContain("reserve-chart-summary");
+    expect(mainSource).not.toContain("reserve-chart-controls");
+    expect(mainSource).not.toContain("set-reserve-chart-category");
+    expect(mainSource).not.toContain("set-reserve-chart-scenario");
+    expect(mainSource).not.toContain("set-reserve-chart-style");
+    expect(mainSource).not.toContain("close-reserve-chart");
+  });
+
   it("renders statutory pension as its own page outside combined wealth", () => {
     const html = renderAppShell();
     const statutoryPageIndex = html.indexOf('data-module-section="statutory_pension"');

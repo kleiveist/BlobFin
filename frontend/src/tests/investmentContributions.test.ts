@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { defaultInvestmentSettings } from "../data/defaults";
 import {
   buildAnnualInvestmentTransferPositions,
   investmentSavingsSelectionSummary,
   selectableInvestmentSavingsPositions,
+  selectedInvestmentContributionForProjectionMonth,
   selectedSavingsContributionForProjectionYear
 } from "../domain/investmentContributions";
 import type { PlanningSettings, ReservePosition } from "../types";
@@ -85,6 +87,16 @@ describe("investment contributions", () => {
       selectedCount: 3,
       yearlyAmount: 1950
     });
+  });
+
+  it("uses the investment position planning year as the settlement year", () => {
+    const position2025 = savingsPosition({ id: "investment-2025", amount: 100, planningYear: 2025, payoutYear: 2026 });
+    const position2026 = savingsPosition({ id: "investment-2026", amount: 200, planningYear: 2026, payoutYear: 2027 });
+    const settings = { ...defaultInvestmentSettings(), includedIds: ["investment-2025", "investment-2026"] };
+
+    expect(selectedInvestmentContributionForProjectionMonth([position2025], settings, 2025, 0)).toBe(100);
+    expect(selectedInvestmentContributionForProjectionMonth([position2025], settings, 2024, 0)).toBe(0);
+    expect(selectedInvestmentContributionForProjectionMonth([position2026], settings, 2026, 0)).toBe(200);
   });
 
   it("builds yearly interest transfers from real annual table values without cumulative carryover", () => {

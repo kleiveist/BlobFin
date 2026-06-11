@@ -87,7 +87,6 @@ import {
 } from "./domain/investmentContributions";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
 import {
-  calculatePlannedIncomeForSingleMonth,
   calculatePlannedOutflowForSingleMonth,
   calculateReserveSummary
 } from "./domain/reserveCalculator";
@@ -353,10 +352,6 @@ type NumericInvestmentSetting =
   | "capitalGainsTaxPercent"
   | "inflationRatePercent"
   | "bequestReservePercent";
-type ReserveChartCategory = "all" | "income" | "expense" | "reserve" | "savings";
-type ReserveChartScenario = "current" | "lowerExpenses" | "raiseSavings" | "balanced";
-type ReserveChartAdjustment = "none" | "down10" | "up10";
-type ReserveChartStyle = "bars" | "pie";
 type IncomeAnalysisChartType = "pie" | "bar" | "line" | "curve";
 type IncomeAnalysisDataView = "deductions" | "social" | "taxes" | "income" | "label_distribution";
 type IncomeAnalysisYearFilter = "all" | number;
@@ -405,15 +400,6 @@ interface IncomeAnalysisModel {
   yearPoints: IncomeAnalysisYearPoint[];
 }
 
-interface ReserveChartMonth {
-  month: string;
-  income: number;
-  expense: number;
-  reserve: number;
-  savings: number;
-  selected: number;
-}
-
 interface ReserveChartTotals {
   income: number;
   expense: number;
@@ -422,19 +408,8 @@ interface ReserveChartTotals {
   remaining: number;
 }
 
-interface ReserveChartPosition {
-  id: string;
-  name: string;
-  icon: string;
-  total: number;
-  category: Exclude<ReserveChartCategory, "all">;
-}
-
 interface ReserveChartModel {
-  months: ReserveChartMonth[];
   totals: ReserveChartTotals;
-  maxValue: number;
-  positions: ReserveChartPosition[];
   insight: string;
 }
 
@@ -592,12 +567,6 @@ let selectedExpenseCadence: PositionTableCadence = "monthly";
 let selectedReserveCadence: PositionTableCadence = "fixed";
 let selectedSavingsCadence: PositionTableCadence = "monthly";
 let showResultMaxNeeded = false;
-let reserveChartOpen = false;
-let reserveChartCategory: ReserveChartCategory = "all";
-let reserveChartScenario: ReserveChartScenario = "current";
-let reserveChartHighlightId: string | null = null;
-let reserveChartAdjustment: ReserveChartAdjustment = "none";
-let reserveChartStyle: ReserveChartStyle = "bars";
 let incomeTaxDialogEntryId: string | null = null;
 let positionCostDialogId: string | null = null;
 let incomeAnalysisOpen = false;
@@ -1739,22 +1708,6 @@ function bindEvents(): void {
     if (action === "add-real-estate-savings-source-equityCapital") addRealEstateSavingsSource("equityCapital");
     if (action === "add-real-estate-savings-source-monthlyPayment") addRealEstateSavingsSource("monthlyPayment");
     if (action === "add-real-estate-savings-source-specialRepayment") addRealEstateSavingsSource("specialRepayment");
-    if (action === "show-reserve-chart") showReserveChartPopup();
-    if (action === "close-reserve-chart") hideReserveChartPopup();
-    if (action?.startsWith("set-reserve-chart-category-")) {
-      setReserveChartCategory(action.replace("set-reserve-chart-category-", "") as ReserveChartCategory);
-    }
-    if (action?.startsWith("set-reserve-chart-scenario-")) {
-      setReserveChartScenario(action.replace("set-reserve-chart-scenario-", "") as ReserveChartScenario);
-    }
-    if (action?.startsWith("set-reserve-chart-style-")) {
-      setReserveChartStyle(action.replace("set-reserve-chart-style-", "") as ReserveChartStyle);
-    }
-    if (action === "highlight-reserve-position") setReserveChartHighlight(button.dataset.reservePositionId || null);
-    if (action === "clear-reserve-position-highlight") setReserveChartHighlight(null);
-    if (action?.startsWith("set-reserve-chart-adjustment-")) {
-      setReserveChartAdjustment(action.replace("set-reserve-chart-adjustment-", "") as ReserveChartAdjustment);
-    }
     if (action === "close-investment-chart-popup") hideInvestmentChartPopup();
     if (action === "close-statutory-pension-year-popup") hideStatutoryPensionYearPopup();
     if (action === "close-statutory-pension-projection-popup") hideStatutoryPensionProjectionYearPopup();
@@ -1878,7 +1831,6 @@ function bindEvents(): void {
       hideStatutoryPensionYearPopup();
       hideStatutoryPensionProjectionYearPopup();
       closeStatutoryPensionTaxPopup();
-      hideReserveChartPopup();
       hideInvestmentIncludePopup();
       hidePositionFilterPopup();
       hideIncomePlanningStampPicker();
@@ -10795,86 +10747,25 @@ function renderAccountYearTables(): void {
 function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSummary>): void {
   const popup = document.querySelector<HTMLDivElement>("#reserveChartPopup");
   if (!popup) return;
-  if (!reserveChartOpen) {
-    popup.hidden = true;
-    return;
-  }
 
   const model = buildReserveChartModel(summary);
   popup.innerHTML = `
-    <div class="reserve-chart-head">
-      <div>
-        <span>Positionsgrafik</span>
-        <strong>Einnahmen, Ausgaben, Ruecklagen und Sparrate</strong>
-      </div>
-      <div class="reserve-chart-head-actions">
-        <div class="reserve-chart-style-switch" role="group" aria-label="Grafikstil">
-          ${reserveChartToggle("style", "bars", "Balken", reserveChartStyle)}
-          ${reserveChartToggle("style", "pie", "Kreis", reserveChartStyle)}
-        </div>
-        <button class="chart-popup-close" type="button" data-action="close-reserve-chart" aria-label="Grafik schliessen">x</button>
-      </div>
-    </div>
-    <div class="reserve-chart-controls" aria-label="Darstellung">
-      ${reserveChartToggle("category", "all", "Alle", reserveChartCategory)}
-      ${reserveChartToggle("category", "income", "Einnahmen", reserveChartCategory)}
-      ${reserveChartToggle("category", "expense", "Ausgaben", reserveChartCategory)}
-      ${reserveChartToggle("category", "reserve", "Ruecklagen", reserveChartCategory)}
-      ${reserveChartToggle("category", "savings", "Sparen", reserveChartCategory)}
-    </div>
-    <div class="reserve-chart-controls scenario" aria-label="Szenario">
-      ${reserveChartToggle("scenario", "current", "Ist", reserveChartScenario)}
-      ${reserveChartToggle("scenario", "lowerExpenses", "Ausgaben -10%", reserveChartScenario)}
-      ${reserveChartToggle("scenario", "raiseSavings", "Sparen +10%", reserveChartScenario)}
-      ${reserveChartToggle("scenario", "balanced", "Beides", reserveChartScenario)}
-    </div>
-    <div class="reserve-chart-summary">
-      ${reserveChartStat("Einnahmen", model.totals.income, "income")}
-      ${reserveChartStat("Ausgaben", model.totals.expense, "expense")}
-      ${reserveChartStat("Ruecklagen", model.totals.reserve, "reserve")}
-      ${reserveChartStat("Sparrate", model.totals.savings, "savings")}
-      ${reserveChartStat("Uebrig", model.totals.remaining, model.totals.remaining >= 0 ? "income" : "expense")}
-    </div>
-    ${reserveChartGraphic(model)}
+    ${reservePieChart(model)}
     <div class="reserve-chart-legend">
       <span><i class="legend-dot green"></i>Einnahmen</span>
       <span><i class="legend-dot red"></i>Ausgaben</span>
       <span><i class="legend-dot orange"></i>Ruecklagen</span>
       <span><i class="legend-dot purple"></i>Sparen</span>
-      ${reserveChartHighlightId ? '<span><i class="legend-dot gold"></i>Markierte Position</span>' : ""}
     </div>
     <div class="reserve-chart-insight">${escapeHtml(model.insight)}</div>
-    <div class="reserve-chart-positions">
-      <div class="reserve-chart-subhead">
-        <strong>Positionen hervorheben</strong>
-        ${
-          reserveChartHighlightId
-            ? '<button class="button secondary mini" type="button" data-action="clear-reserve-position-highlight">Auswahl loeschen</button>'
-            : ""
-        }
-      </div>
-      ${
-        reserveChartHighlightId
-          ? `<div class="reserve-chart-controls reserve-chart-adjustment" aria-label="Markierte Position simulieren">
-              ${reserveChartToggle("adjustment", "none", "Ist", reserveChartAdjustment)}
-              ${reserveChartToggle("adjustment", "down10", "Position -10%", reserveChartAdjustment)}
-              ${reserveChartToggle("adjustment", "up10", "Position +10%", reserveChartAdjustment)}
-            </div>`
-          : ""
-      }
-      <div class="reserve-chart-position-grid">
-        ${model.positions.map(reserveChartPositionButton).join("")}
-      </div>
-    </div>
   `;
   popup.hidden = false;
 }
 
 function buildReserveChartModel(summary: ReturnType<typeof calculateReserveSummary>): ReserveChartModel {
-  const factors = reserveChartScenarioFactors();
   const chartPositions = activePlanningPositions();
   const chartSettings = activePlanningSettings();
-  const months = summary.rows.map((row) => {
+  const totals = summary.rows.reduce<ReserveChartTotals>((sum, row) => {
     const reserves = chartPositions.reduce((sum, position) => {
       return position.type === "reserve"
         ? sum + calculatePlannedOutflowForSingleMonth(position, chartSettings.year, row.monthNumber)
@@ -10885,76 +10776,23 @@ function buildReserveChartModel(summary: ReturnType<typeof calculateReserveSumma
         ? sum + calculatePlannedOutflowForSingleMonth(position, chartSettings.year, row.monthNumber)
         : sum;
     }, 0);
-    const selectedBase = reserveChartHighlightId
-      ? reservePositionMonthValue(reserveChartHighlightId, row.monthNumber)
-      : 0;
-    const selected = reserveChartAdjustedValue(selectedBase);
-    const selectedDelta = selected - selectedBase;
-    const selectedCategory = reserveChartHighlightId ? reserveHighlightedPositionCategory() : null;
-    const income = row.plannedIncome + (selectedCategory === "income" ? selectedDelta : 0);
-    const expense =
-      Math.max(0, row.plannedOutflow - reserves - savings) * factors.expense +
-      (selectedCategory === "expense" ? selectedDelta : 0);
-    const displayReserve = reserves + (selectedCategory === "reserve" ? selectedDelta : 0);
-    const displaySavings = savings * factors.savings + (selectedCategory === "savings" ? selectedDelta : 0);
+    const income = Math.max(0, row.plannedIncome);
+    const expense = Math.max(0, row.plannedOutflow - reserves - savings);
+    const reserve = Math.max(0, reserves);
+    const saving = Math.max(0, savings);
     return {
-      month: row.month,
-      income: Math.max(0, income),
-      expense: Math.max(0, expense),
-      reserve: Math.max(0, displayReserve),
-      savings: Math.max(0, displaySavings),
-      selected
+      income: sum.income + income,
+      expense: sum.expense + expense,
+      reserve: sum.reserve + reserve,
+      savings: sum.savings + saving,
+      remaining: sum.remaining + income - expense - reserve - saving
     };
-  });
-  const totals = months.reduce(
-    (sum, month) => ({
-      income: sum.income + month.income,
-      expense: sum.expense + month.expense,
-      reserve: sum.reserve + month.reserve,
-      savings: sum.savings + month.savings,
-      remaining: sum.remaining + month.income - month.expense - month.reserve - month.savings
-    }),
-    { income: 0, expense: 0, reserve: 0, savings: 0, remaining: 0 }
-  );
-  const maxValue = Math.max(
-    1,
-    ...months.flatMap((month) => [month.income, month.expense, month.reserve, month.savings, month.selected])
-  );
+  }, { income: 0, expense: 0, reserve: 0, savings: 0, remaining: 0 });
 
   return {
-    months,
     totals,
-    maxValue,
-    positions: reserveChartPositions(),
-    insight: reserveChartInsight(totals, summary)
+    insight: reserveChartInsight(totals)
   };
-}
-
-function reserveChartGraphic(model: ReserveChartModel): string {
-  return reserveChartStyle === "pie" ? reservePieChart(model) : reserveBarChart(model);
-}
-
-function reserveBarChart(model: ReserveChartModel): string {
-  return `
-    <div class="reserve-chart-plot" aria-label="Monatsvergleich">
-      ${model.months
-        .map(
-          (month) => `
-        <div class="reserve-chart-month">
-          <div class="reserve-chart-bars">
-            ${reserveChartBar("income", month.income, model.maxValue)}
-            ${reserveChartBar("expense", month.expense, model.maxValue)}
-            ${reserveChartBar("reserve", month.reserve, model.maxValue)}
-            ${reserveChartBar("savings", month.savings, model.maxValue)}
-            ${month.selected > 0 ? reserveChartSelectedBar(month.selected, model.maxValue) : ""}
-          </div>
-          <span>${escapeHtml(month.month.slice(0, 3))}</span>
-        </div>
-      `
-        )
-        .join("")}
-    </div>
-  `;
 }
 
 function reservePieChart(model: ReserveChartModel): string {
@@ -11011,155 +10849,25 @@ function reservePieBackground(segments: Array<{ key: string; value: number; colo
 }
 
 function reservePieField(key: string, label: string, value: number, detail: string): string {
-  const action =
-    key === "income" || key === "expense" || key === "reserve" || key === "savings"
-      ? `data-action="set-reserve-chart-category-${key}"`
-      : "";
-  const active =
-    key === reserveChartCategory || (key === "remaining" && reserveChartCategory === "all") ? " active" : "";
   return `
-    <button class="reserve-pie-field ${escapeHtml(key)}${active}" type="button" ${action}>
+    <div class="reserve-pie-field ${escapeHtml(key)}">
       <span>${escapeHtml(label)}</span>
       <strong>${money(value)}</strong>
       <small>${escapeHtml(detail)}</small>
-    </button>
-  `;
-}
-
-function reserveChartScenarioFactors(): { expense: number; savings: number } {
-  if (reserveChartScenario === "lowerExpenses") return { expense: 0.9, savings: 1 };
-  if (reserveChartScenario === "raiseSavings") return { expense: 1, savings: 1.1 };
-  if (reserveChartScenario === "balanced") return { expense: 0.9, savings: 1.1 };
-  return { expense: 1, savings: 1 };
-}
-
-function reserveChartInsight(totals: ReserveChartTotals, summary: ReturnType<typeof calculateReserveSummary>): string {
-  const savingsRate = totals.income > 0 ? totals.savings / totals.income : 0;
-  if (reserveChartScenario !== "current") {
-    const delta = totals.remaining - summary.yearlyRemaining;
-    return `Szenario nur fuer diese Grafik: Jahresrest ${money(totals.remaining)} (${delta >= 0 ? "+" : ""}${money(
-      delta
-    )} gegenueber Ist).`;
-  }
-  if (reserveChartHighlightId && reserveChartAdjustment !== "none") {
-    return `Markierte Position wird nur in dieser Grafik simuliert. Neuer Jahresrest: ${money(totals.remaining)}.`;
-  }
-  if (totals.income <= 0) return "Keine Einnahmen im Jahr: zuerst Einnahmepositionen pruefen oder ergaenzen.";
-  if (totals.remaining < 0) {
-    return `Jahresrest ist negativ. Markiere die groessten Ausgaben und teste das Szenario Ausgaben -10%.`;
-  }
-  if (savingsRate < 0.15) {
-    return `Sparquote ${percent(savingsRate * 100)}. Pruefe, ob freie Reste oder grosse Ausgaben in Sparen verschoben werden koennen.`;
-  }
-  return `Sparquote ${percent(savingsRate * 100)} bei ${money(totals.remaining)} freiem Jahresrest. Optimierung: schwache Monate gezielt ausgleichen.`;
-}
-
-function reserveChartPositions(): ReserveChartPosition[] {
-  return activePlanningPositions()
-    .map((position) => {
-      const category = reservePositionCategory(position);
-      const total = reservePositionYearValue(position);
-      return { id: position.id, name: position.name, icon: normalizePositionIcon(position.icon), total, category };
-    })
-    .filter((position) => position.total > 0.01)
-    .filter((position) => reserveChartCategory === "all" || position.category === reserveChartCategory)
-    .sort((first, second) => second.total - first.total)
-    .slice(0, 9);
-}
-
-function reservePositionCategory(position: ReservePosition): Exclude<ReserveChartCategory, "all"> {
-  if (isIncomePosition(position)) return "income";
-  if (position.type === "reserve") return "reserve";
-  if (position.type === "savings") return "savings";
-  return "expense";
-}
-
-function reserveHighlightedPositionCategory(): Exclude<ReserveChartCategory, "all"> | null {
-  const position = activePlanningPositions().find((item) => item.id === reserveChartHighlightId);
-  return position ? reservePositionCategory(position) : null;
-}
-
-function reservePositionYearValue(position: ReservePosition): number {
-  let total = 0;
-  for (let month = 1; month <= 12; month += 1) {
-    total += reservePositionMonthValue(position.id, month);
-  }
-  return total;
-}
-
-function reservePositionMonthValue(positionId: string, month: number): number {
-  const position = activePlanningPositions().find((item) => item.id === positionId);
-  if (!position) return 0;
-  const year = activePlanningSettings().year;
-  if (isIncomePosition(position)) {
-    return calculatePlannedIncomeForSingleMonth(position, year, month);
-  }
-  return calculatePlannedOutflowForSingleMonth(position, year, month);
-}
-
-function reserveChartAdjustedValue(value: number): number {
-  if (reserveChartAdjustment === "down10") return value * 0.9;
-  if (reserveChartAdjustment === "up10") return value * 1.1;
-  return value;
-}
-
-function reserveChartToggle(
-  group: "category" | "scenario" | "adjustment" | "style",
-  value: string,
-  label: string,
-  activeValue: string
-): string {
-  return `
-    <button
-      class="reserve-chart-toggle ${value === activeValue ? "active" : ""}"
-      type="button"
-      data-action="set-reserve-chart-${group}-${value}"
-      aria-pressed="${value === activeValue}"
-    >${escapeHtml(label)}</button>
-  `;
-}
-
-function reserveChartStat(label: string, value: number, tone: string): string {
-  return `
-    <div class="reserve-chart-stat ${escapeHtml(tone)}">
-      <span>${escapeHtml(label)}</span>
-      <strong>${money(value)}</strong>
     </div>
   `;
 }
 
-function reserveChartBar(category: Exclude<ReserveChartCategory, "all">, value: number, maxValue: number): string {
-  const height = reserveChartBarHeight(value, maxValue);
-  const muted = reserveChartCategory !== "all" && reserveChartCategory !== category ? " muted" : "";
-  return `<i class="reserve-chart-bar ${category}${muted}" style="height: ${height}%"></i>`;
-}
-
-function reserveChartSelectedBar(value: number, maxValue: number): string {
-  return `<i class="reserve-chart-bar selected" style="height: ${reserveChartBarHeight(value, maxValue)}%"></i>`;
-}
-
-function reserveChartBarHeight(value: number, maxValue: number): number {
-  return Math.round(clamp((value / Math.max(1, maxValue)) * 100, 2, 100));
-}
-
-function reserveChartPositionButton(position: ReserveChartPosition): string {
-  const active = reserveChartHighlightId === position.id;
-  return `
-    <button
-      class="reserve-chart-position ${position.category} ${active ? "active" : ""}"
-      type="button"
-      data-action="highlight-reserve-position"
-      data-reserve-position-id="${escapeHtml(position.id)}"
-      aria-pressed="${active}"
-    >
-      <span class="reserve-chart-position-title">
-        ${positionIconSvg(position.icon)}
-        <span>${escapeHtml(position.name)}</span>
-      </span>
-      <strong>${money(position.total)}</strong>
-      <small>${labelForType(activePlanningPositions().find((item) => item.id === position.id)?.type || "temporary")}</small>
-    </button>
-  `;
+function reserveChartInsight(totals: ReserveChartTotals): string {
+  const savingsRate = totals.income > 0 ? totals.savings / totals.income : 0;
+  if (totals.income <= 0) return "Keine Einnahmen im Jahr: zuerst Einnahmepositionen pruefen oder ergaenzen.";
+  if (totals.remaining < 0) {
+    return `Jahresrest ist negativ: ${money(Math.abs(totals.remaining))} Fehlbetrag.`;
+  }
+  if (savingsRate < 0.15) {
+    return `Sparquote ${percent(savingsRate * 100)} bei ${money(totals.remaining)} freiem Jahresrest.`;
+  }
+  return `Sparquote ${percent(savingsRate * 100)} bei ${money(totals.remaining)} freiem Jahresrest.`;
 }
 
 function renderInvestmentIncludeList(): void {
@@ -12779,49 +12487,6 @@ function toggleResultMaxNeeded(): void {
   renderAll();
 }
 
-function showReserveChartPopup(): void {
-  reserveChartOpen = true;
-  renderReserveChartPopup(calculateReserveSummary(activePlanningSettings(), activePlanningPositions()));
-}
-
-function hideReserveChartPopup(): void {
-  reserveChartOpen = false;
-  const popup = document.querySelector<HTMLDivElement>("#reserveChartPopup");
-  if (popup) popup.hidden = true;
-}
-
-function setReserveChartCategory(category: ReserveChartCategory): void {
-  if (!["all", "income", "expense", "reserve", "savings"].includes(category)) return;
-  reserveChartCategory = category;
-  reserveChartHighlightId = null;
-  reserveChartAdjustment = "none";
-  showReserveChartPopup();
-}
-
-function setReserveChartScenario(scenario: ReserveChartScenario): void {
-  if (!["current", "lowerExpenses", "raiseSavings", "balanced"].includes(scenario)) return;
-  reserveChartScenario = scenario;
-  showReserveChartPopup();
-}
-
-function setReserveChartStyle(style: ReserveChartStyle): void {
-  if (!["bars", "pie"].includes(style)) return;
-  reserveChartStyle = style;
-  showReserveChartPopup();
-}
-
-function setReserveChartHighlight(positionId: string | null): void {
-  if (reserveChartHighlightId !== positionId) reserveChartAdjustment = "none";
-  reserveChartHighlightId = positionId;
-  showReserveChartPopup();
-}
-
-function setReserveChartAdjustment(adjustment: ReserveChartAdjustment): void {
-  if (!["none", "down10", "up10"].includes(adjustment)) return;
-  reserveChartAdjustment = adjustment;
-  showReserveChartPopup();
-}
-
 function setSelectedPositionMode(mode: PositionTableMode): void {
   selectedPositionMode = mode;
   renderPositions();
@@ -12832,7 +12497,6 @@ function setSelectedPlanningYear(value: string): void {
     ...state.ui,
     selectedPlanningYear: sanitizePlanningYearSelection(value, state.settings.year)
   };
-  reserveChartHighlightId = null;
   positionCostDialogId = null;
   renderAll();
 }
@@ -13445,31 +13109,17 @@ function pensionScenarioLabel(scenarioId: StatutoryPensionScenarioId): string {
 }
 
 function buildDepotAssetProjection(depot: InvestmentDepotKey, accountId = selectedInvestmentPlanningAccount().id): AssetProjection {
-  return buildAssetProjection(
-    state.settings.year,
-    investmentPositionsForProjection(depot, accountId),
-    investmentSettingsForProjection(depot, accountId)
-  );
-}
-
-function investmentPositionsForProjection(depot: InvestmentDepotKey, accountId: string): ReservePosition[] {
   const account = planningAccountById(accountId) ?? selectedInvestmentPlanningAccount();
   const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettingsForAccount(depot, accountId));
   const virtualPositions = annualTransferInvestmentPositions(account.yearlyRows, settings);
-  return [...account.yearlyRows, ...virtualPositions];
-}
-
-function investmentSettingsForProjection(depot: InvestmentDepotKey, accountId: string): InvestmentSettings {
-  const account = planningAccountById(accountId) ?? selectedInvestmentPlanningAccount();
-  const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettingsForAccount(depot, accountId));
   const includedIds = new Set(settings.includedIds);
-  for (const position of annualTransferInvestmentPositions(account.yearlyRows, settings)) {
+  for (const position of virtualPositions) {
     includedIds.add(position.id);
   }
-  return {
+  return buildAssetProjection(state.settings.year, [...account.yearlyRows, ...virtualPositions], {
     ...settings,
     includedIds: Array.from(includedIds)
-  };
+  });
 }
 
 function annualTransferInvestmentPositions(

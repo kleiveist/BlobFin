@@ -1,5 +1,5 @@
-import { calculateReserveSummary, isOneTimePayoutInMonth, isSavingsActiveInMonth } from "./reserveCalculator";
-import { positionsForPlanningYear } from "../lib/planningYears";
+import { calculateReserveSummary, isOneTimePayoutInMonth } from "./reserveCalculator";
+import { positionPlanningYear } from "../lib/planningYears";
 import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, PlanningSettings, ReservePosition } from "../types";
 
@@ -18,7 +18,7 @@ export interface AnnualInvestmentTransferPositionOptions {
 
 export function investmentContributionForMonth(position: ReservePosition, year: number, month: number): number {
   if (position.payoutType === "once") return 0;
-  if (!isSavingsActiveInMonth(position, year, month)) return 0;
+  if (!isInvestmentSavingsActiveInMonth(position, year, month)) return 0;
   if (position.payoutType === "yearly") {
     return Number(position.payoutMonth) === month ? Number(position.amount) : 0;
   }
@@ -31,7 +31,7 @@ export function oneTimeInvestmentContributionForMonth(
   month: number
 ): number {
   if (position.payoutType === "once") {
-    return isOneTimePayoutInMonth(position, year, month) ? Number(position.amount) : 0;
+    return isOneTimeInvestmentPayoutInMonth(position, year, month) ? Number(position.amount) : 0;
   }
   if (position.payoutType === "none") return investmentContributionForMonth(position, year, month);
   return 0;
@@ -160,20 +160,43 @@ function annualInvestmentTransferValuesByYear(
 ): Map<number, number> {
   const startYear = Math.round(options.startYear);
   const endYear = Math.max(startYear, Math.round(options.endYear));
-  const startPositions = positionsForPlanningYear(options.positions, null);
+  const startPositions: ReservePosition[] = [];
+  const positionsByYear = new Map<number, ReservePosition[]>();
   const valuesByYear = new Map<number, number>();
 
-  for (let year = startYear; year <= endYear; year += 1) {
-    const yearlyPositions = positionsForPlanningYear(options.positions, year);
-    const sourcePositions = year === startYear && yearlyPositions.length === 0 ? startPositions : yearlyPositions;
-    if (!sourcePositions.length) continue;
+  for (const position of options.positions) {
+    const planningYear = positionPlanningYear(position);
+    if (planningYear === null) {
+      startPositions.push(position);
+      continue;
+    }
+    if (planningYear < startYear || planningYear > endYear) continue;
+    positionsByYear.set(planningYear, [...(positionsByYear.get(planningYear) ?? []), position]);
+  }
 
-    const summary = calculateReserveSummary({ ...options.settings, year }, sourcePositions);
-    const value = options.kind === "interest" ? summary.totalInterest : summary.totalCashback;
-    valuesByYear.set(year, roundMoney(Math.max(0, value)));
+  const startYearPositions = positionsByYear.get(startYear);
+  if (startYearPositions?.length) {
+    valuesByYear.set(startYear, annualInvestmentTransferValue(options, startYear, startYearPositions));
+  } else if (startPositions.length) {
+    valuesByYear.set(startYear, annualInvestmentTransferValue(options, startYear, startPositions));
+  }
+
+  for (const [year, yearlyPositions] of positionsByYear) {
+    if (year === startYear) continue;
+    valuesByYear.set(year, annualInvestmentTransferValue(options, year, yearlyPositions));
   }
 
   return valuesByYear;
+}
+
+function annualInvestmentTransferValue(
+  options: AnnualInvestmentTransferPositionOptions,
+  year: number,
+  positions: ReservePosition[]
+): number {
+  const summary = calculateReserveSummary({ ...options.settings, year }, positions);
+  const value = options.kind === "interest" ? summary.totalInterest : summary.totalCashback;
+  return roundMoney(Math.max(0, value));
 }
 
 function annualInvestmentTransferPosition(
@@ -238,7 +261,7 @@ export function selectedInvestmentStartYear(
   fallbackYear: number
 ): number {
   return selectedInvestmentPositions(positions, settings).reduce((earliestYear, position) => {
-    const startYear = Number(position.payoutYear || fallbackYear);
+    const startYear = investmentPositionYear(position, fallbackYear);
     return Number.isFinite(startYear) ? Math.min(earliestYear, startYear) : earliestYear;
   }, fallbackYear);
 }
@@ -251,6 +274,39 @@ export function selectableInvestmentSavingsPositions(positions: ReservePosition[
 
 function selectedInvestmentPositions(positions: ReservePosition[], settings: InvestmentSettings): ReservePosition[] {
   return selectableInvestmentSavingsPositions(positions).filter((position) => settings.includedIds.includes(position.id));
+}
+
+function isInvestmentSavingsActiveInMonth(position: ReservePosition, year: number, monthNumber: number): boolean {
+  if (!position.active || position.type !== "savings") return false;
+  const startYear = investmentPositionYear(position, year);
+  if (position.payoutType === "none") {
+    return (
+      year === startYear &&
+      monthNumber >= Number(position.startMonth || 1) &&
+      monthNumber <= Number(position.endMonth || 12)
+    );
+  }
+  if (year < startYear) return false;
+  return year > startYear || monthNumber >= Number(position.startMonth || 1);
+}
+
+function isOneTimeInvestmentPayoutInMonth(position: ReservePosition, year: number, monthNumber: number): boolean {
+  if (isOneTimePayoutInMonth(position, year, monthNumber)) return true;
+  return (
+    position.active &&
+    position.payoutType === "once" &&
+    investmentPositionYear(position, year) === year &&
+    Number(position.payoutMonth) === monthNumber
+  );
+}
+
+function investmentPositionYear(position: ReservePosition, fallbackYear: number): number {
+  const planningYear = Number(position.planningYear);
+  if (position.planningYear !== null && position.planningYear !== undefined && Number.isFinite(planningYear)) {
+    return planningYear;
+  }
+  const payoutYear = Number(position.payoutYear || fallbackYear);
+  return Number.isFinite(payoutYear) ? payoutYear : fallbackYear;
 }
 
 function roundMoney(value: number): number {

@@ -360,10 +360,9 @@ export function renderAppShell(): string {
                 Max. Bedarf Monatsanfang
               </button>
             </div>
-            <button class="button secondary" type="button" data-action="show-reserve-chart">Grafik anzeigen</button>
           </div>
         </div>
-        <div id="reserveChartPopup" class="reserve-chart-popup" role="dialog" aria-label="Einnahmen Ausgaben Sparrate Grafik" hidden></div>
+        <div id="reserveChartPopup" class="reserve-chart-popup" aria-label="Einnahmen Ausgaben Sparrate Grafik"></div>
         <div id="accountYearTableOverview" class="account-year-table-overview"></div>
       </section>
 
