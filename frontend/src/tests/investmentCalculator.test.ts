@@ -329,7 +329,7 @@ describe("investment calculator", () => {
     expect(projection.annualSavingsRate).toBe(1200);
     expect(projection.savingMonths).toBe(240);
     expect(projection.totalContribution).toBe(24000);
-    expect(currentAgePoint?.contribution).toBe(3600);
+    expect(currentAgePoint?.contribution).toBe(4800);
     expect(projection.wealthAtRetirement).toBeGreaterThan(24000);
   });
 
@@ -351,6 +351,41 @@ describe("investment calculator", () => {
     expect(projection.annualSavingsRate).toBe(0);
     expect(projection.totalContribution).toBe(1200);
     expect(projection.wealthAtRetirement).toBeGreaterThan(1200);
+  });
+
+  it("shows one-time investment savings in their configured planning year in depot development", () => {
+    const state = defaultAppState();
+    const investmentYear = 2025;
+    const template = state.positions.find((position) => position.id === "investitionsrate")!;
+    const position = {
+      ...template,
+      id: "one-time-2025",
+      amount: 2654,
+      payoutType: "once" as const,
+      planningYear: investmentYear,
+      payoutYear: investmentYear + 1,
+      payoutMonth: 1
+    };
+    const investment = {
+      ...state.investment,
+      birthYear: investmentYear - 25,
+      chartStartAge: 25,
+      payoutEndAge: 28,
+      payoutYears: 1,
+      percentageWithdrawalRatePercent: 0,
+      investmentReturnPercent: 0,
+      includedIds: [position.id]
+    };
+
+    const projection = buildAssetProjection(investmentYear, [position], investment);
+    const investmentYearPoint = projection.points.find((point) => point.age === 25);
+    const followingYearPoint = projection.points.find((point) => point.age === 26);
+
+    expect(projection.monthlyRate).toBe(0);
+    expect(projection.annualSavingsRate).toBe(0);
+    expect(investmentYearPoint?.contribution).toBe(2654);
+    expect(investmentYearPoint?.netBalance).toBe(2654);
+    expect(followingYearPoint?.contribution).toBe(2654);
   });
 
   it("treats savings without rhythm as one-time contributions in their configured year range", () => {

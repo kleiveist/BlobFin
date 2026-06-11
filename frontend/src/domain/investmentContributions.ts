@@ -1,4 +1,4 @@
-import { calculateReserveSummary, isOneTimePayoutInMonth } from "./reserveCalculator";
+import { calculateReserveSummary } from "./reserveCalculator";
 import { positionPlanningYear } from "../lib/planningYears";
 import { positionFlow } from "../lib/positionKinds";
 import type { InvestmentSettings, PlanningSettings, ReservePosition } from "../types";
@@ -291,7 +291,6 @@ function isInvestmentSavingsActiveInMonth(position: ReservePosition, year: numbe
 }
 
 function isOneTimeInvestmentPayoutInMonth(position: ReservePosition, year: number, monthNumber: number): boolean {
-  if (isOneTimePayoutInMonth(position, year, monthNumber)) return true;
   return (
     position.active &&
     position.payoutType === "once" &&

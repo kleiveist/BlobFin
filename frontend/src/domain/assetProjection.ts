@@ -118,7 +118,7 @@ export function buildAssetProjection(
   let previousTax = 0;
 
   for (let age = startAge; age <= endAge; age += 1) {
-    const snapshot = snapshotAtAge(
+    const snapshot = snapshotForProjectionPoint(
       positions,
       simulationStartYear,
       monthlyReturn,
@@ -250,6 +250,33 @@ function snapshotAtAge(
     ageToday,
     retirementAge,
     targetAge
+  );
+}
+
+function snapshotForProjectionPoint(
+  positions: ReservePosition[],
+  baseYear: number,
+  monthlyReturn: number,
+  monthlyPension: number,
+  settings: InvestmentSettings,
+  simulationStartAge: number,
+  ageToday: number,
+  retirementAge: number,
+  pointAge: number,
+  retirementSnapshot: SavingSnapshot
+): SavingSnapshot {
+  const targetAge = pointAge < retirementAge ? Math.min(pointAge + 1, retirementAge) : pointAge;
+  return snapshotAtAge(
+    positions,
+    baseYear,
+    monthlyReturn,
+    monthlyPension,
+    settings,
+    simulationStartAge,
+    ageToday,
+    retirementAge,
+    targetAge,
+    retirementSnapshot
   );
 }
 
