@@ -66,6 +66,7 @@ export type IncomePlanningHabitStatus = "planned" | "active" | "difficult" | "st
 export type IncomePlanningPriority = "low" | "medium" | "high";
 export type IncomePlanningHabitDurationUnit = "day" | "week";
 export type IncomePlanningManualBlockType = "private_commitment" | "free_time" | "buffer" | "other_event";
+export type IncomePlanningWeekScenarioId = "normal" | "uni" | "self_employed" | "project";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -477,6 +478,11 @@ export interface IncomePlanningPlannedStamp {
   description: string;
 }
 
+export interface IncomePlanningWeekScenarioAssignment {
+  weekStartDate: string;
+  scenarioId: IncomePlanningWeekScenarioId;
+}
+
 export interface IncomePlanningAssumptions {
   sleepHoursPerDay: number;
   sleepSlots: IncomePlanningSleepSlot[];
@@ -488,6 +494,7 @@ export interface IncomePlanningState {
   manualBlocks: IncomePlanningManualBlock[];
   calendarStamps: IncomePlanningCalendarStamp[];
   plannedStamps: IncomePlanningPlannedStamp[];
+  weekScenarioAssignments: IncomePlanningWeekScenarioAssignment[];
   assumptions: IncomePlanningAssumptions;
 }
 

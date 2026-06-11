@@ -15,6 +15,7 @@ import {
   isIncomePlanningHabitType,
   isIncomePlanningManualBlockType,
   isIncomePlanningPriority,
+  isIncomePlanningWeekScenarioId,
   isIncomePlanningWeekday
 } from "../domain/incomePlanning";
 import { calculateMonthlyRows } from "../domain/reserveCalculator";
@@ -42,6 +43,7 @@ import type {
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningState,
+  IncomePlanningWeekScenarioAssignment,
   IncomePlanningWorkBlock,
   PlanningSettings,
   PayoutType,
@@ -288,7 +290,9 @@ const INCOME_PLANNING_CSV_HEADER = [
   "Habit-Prioritaet",
   "Icon",
   "Schlaf-Stunden-Pro-Tag",
-  "Datum"
+  "Datum",
+  "Wochenstart",
+  "Szenario-ID"
 ];
 
 type IncomePlanningCsvRowKind =
@@ -301,6 +305,7 @@ type IncomePlanningCsvRowKind =
   | "manual_slot"
   | "stamp"
   | "planned_stamp"
+  | "week_scenario"
   | "sleep"
   | "unknown";
 
@@ -389,6 +394,15 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
     );
   }
 
+  for (const assignment of planning.weekScenarioAssignments ?? []) {
+    rows.push(
+      incomePlanningCsvRow("Wochenszenario", {
+        28: assignment.weekStartDate,
+        29: assignment.scenarioId
+      })
+    );
+  }
+
   for (const slot of planning.assumptions.sleepSlots) {
     rows.push(incomePlanningCsvRow("Schlaf", incomePlanningSleepSlotCsvCells(slot)));
   }
@@ -422,6 +436,7 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
   const slotsByOwnerId = new Map<string, IncomePlanningSlot[]>();
   const calendarStamps: IncomePlanningCalendarStamp[] = [];
   const plannedStamps: IncomePlanningPlannedStamp[] = [];
+  const weekScenarioAssignments: IncomePlanningWeekScenarioAssignment[] = [];
   const sleepSlots: IncomePlanningSleepSlot[] = [];
   let sleepHoursPerDay: number | null = null;
   let recognizedRows = 0;
@@ -479,6 +494,15 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
       continue;
     }
 
+    if (kind === "week_scenario") {
+      const assignment = parseIncomePlanningWeekScenarioAssignment(row, get);
+      if (assignment) {
+        weekScenarioAssignments.push(assignment);
+        recognizedRows += 1;
+      }
+      continue;
+    }
+
     if (kind === "sleep") {
       const slot = parseIncomePlanningCsvSleepSlot(row, get);
       if (slot) {
@@ -506,6 +530,7 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
     })),
     calendarStamps,
     plannedStamps,
+    weekScenarioAssignments: normalizeIncomePlanningCsvWeekScenarioAssignments(weekScenarioAssignments),
     assumptions: {
       sleepHoursPerDay:
         sleepHoursPerDay ?? incomePlanningAverageSleepHours({ sleepHoursPerDay: 0, sleepSlots: importedSleepSlots }),
@@ -573,6 +598,9 @@ function parseIncomePlanningCsvRowKind(value: unknown): IncomePlanningCsvRowKind
   if (["stempel", "stamp", "calendarstamp", "kalenderstempel"].includes(normalized)) return "stamp";
   if (["geplanterstempel", "geplanter-stempel", "plannedstamp", "plannedcalendarstamp"].includes(normalized)) {
     return "planned_stamp";
+  }
+  if (["wochenszenario", "weekscenario", "weekscenarioassignment", "wochenmodus"].includes(normalized)) {
+    return "week_scenario";
   }
   if (["schlaf", "sleep", "sleepslot"].includes(normalized)) return "sleep";
   return "unknown";
@@ -674,6 +702,18 @@ function parseIncomePlanningPlannedStamp(row: string[], get: CsvRowGetter): Inco
   };
 }
 
+function parseIncomePlanningWeekScenarioAssignment(
+  row: string[],
+  get: CsvRowGetter
+): IncomePlanningWeekScenarioAssignment | null {
+  const weekStartDate = parseIncomePlanningWeekStartDate(
+    get(row, ["wochenstart", "weekstart", "weekstartdate", "datum", "date"], 28)
+  );
+  const scenarioId = cleanText(get(row, ["szenarioid", "szenario", "scenarioid", "scenario", "kategorie", "category"], 29));
+  if (!weekStartDate || !isIncomePlanningWeekScenarioId(scenarioId) || scenarioId === "normal") return null;
+  return { weekStartDate, scenarioId };
+}
+
 function parseIncomePlanningCsvSlot(row: string[], get: CsvRowGetter): IncomePlanningSlot | null {
   const id = cleanText(get(row, ["slotid", "id"], 2)) || createId();
   const day = parseIncomePlanningWeekday(get(row, ["tag", "day", "wochentag"], 8), "sunday");
@@ -769,6 +809,28 @@ function parseIncomePlanningDate(value: unknown, fallback: string): string {
   const day = Number(dayRaw);
   const parsed = new Date(year, month - 1, day);
   return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day ? cleaned : fallback;
+}
+
+function parseIncomePlanningWeekStartDate(value: unknown): string | null {
+  const cleaned = cleanText(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return null;
+  const [yearRaw, monthRaw, dayRaw] = cleaned.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const parsed = new Date(year, month - 1, day);
+  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null;
+  return parsed.getDay() === 1 ? cleaned : null;
+}
+
+function normalizeIncomePlanningCsvWeekScenarioAssignments(
+  assignments: IncomePlanningWeekScenarioAssignment[]
+): IncomePlanningWeekScenarioAssignment[] {
+  const byWeek = new Map<string, IncomePlanningWeekScenarioAssignment>();
+  for (const assignment of assignments) {
+    byWeek.set(assignment.weekStartDate, assignment);
+  }
+  return Array.from(byWeek.values()).sort((first, second) => first.weekStartDate.localeCompare(second.weekStartDate));
 }
 
 function todayLocalDateString(): string {

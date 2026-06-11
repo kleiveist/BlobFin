@@ -19,6 +19,8 @@ describe("income planning", () => {
   it("calculates the default time budget without income amounts", () => {
     const model = buildIncomePlanningModel(defaultIncomePlanningState());
 
+    expect(model.scenarioId).toBe("normal");
+    expect(model.scenarioSuggestionHours).toBe(0);
     expect(model.grossWorkHours).toBe(51.3);
     expect(model.totalWorkHours).toBe(51.3);
     expect(model.pauseHours).toBe(0);
@@ -32,6 +34,35 @@ describe("income planning", () => {
     expect(model.status).toBe("realistic");
     expect(model.warnings).toHaveLength(0);
     expect("totalMonthlyIncome" in model).toBe(false);
+  });
+
+  it("applies week scenarios as non-destructive overlays", () => {
+    const state: IncomePlanningState = {
+      ...defaultIncomePlanningState(),
+      workBlocks: [],
+      manualBlocks: [],
+      habits: [
+        buildIncomePlanningHabit("low", { priority: "low", slots: [flexiblePlanningSlot("low-slot", 1)] }),
+        buildIncomePlanningHabit("medium", { priority: "medium", slots: [flexiblePlanningSlot("medium-slot", 1)] }),
+        buildIncomePlanningHabit("high", { priority: "high", slots: [flexiblePlanningSlot("high-slot", 1)] })
+      ]
+    };
+    const snapshot = JSON.stringify(state);
+
+    const normal = buildIncomePlanningModel(state, { scenarioId: "normal" });
+    const uni = buildIncomePlanningModel(state, { scenarioId: "uni" });
+    const selfEmployed = buildIncomePlanningModel(state, { scenarioId: "self_employed" });
+    const project = buildIncomePlanningModel(state, { scenarioId: "project" });
+
+    expect(normal.activeHabits.map((habit) => habit.id)).toEqual(["low", "medium", "high"]);
+    expect(uni.activeHabits.map((habit) => habit.id)).toEqual(["medium", "high"]);
+    expect(selfEmployed.activeHabits.map((habit) => habit.id)).toEqual(["medium", "high"]);
+    expect(project.activeHabits.map((habit) => habit.id)).toEqual(["high"]);
+    expect(uni.calendarEntries.filter((entry) => entry.type === "scenario_suggestion")).toHaveLength(3);
+    expect(project.calendarEntries.filter((entry) => entry.type === "scenario_suggestion").every((entry) => entry.readOnly)).toBe(true);
+    expect(uni.scenarioSuggestionHours).toBeGreaterThan(0);
+    expect(uni.usedHours).toBeGreaterThan(normal.usedHours - normal.habitHours);
+    expect(JSON.stringify(state)).toBe(snapshot);
   });
 
   it("preloads the requested default work and sleep slots", () => {
@@ -367,6 +398,12 @@ describe("income planning", () => {
           description: "Projekttermin"
         }
       ],
+      weekScenarioAssignments: [
+        {
+          weekStartDate: "2026-07-13",
+          scenarioId: "project"
+        }
+      ],
       assumptions: {
         sleepHoursPerDay: 7.5,
         sleepSlots: [
@@ -388,6 +425,7 @@ describe("income planning", () => {
     expect(csv).toContain("Arbeit-Slot");
     expect(csv).toContain("Pause-Startzeit");
     expect(csv).toContain("Geplanter-Stempel");
+    expect(csv).toContain("Wochenszenario");
     expect(imported?.workBlocks[0]).toMatchObject({
       id: "main",
       active: true,
@@ -429,6 +467,7 @@ describe("income planning", () => {
       label: "Workshop",
       description: "Projekttermin"
     });
+    expect(imported?.weekScenarioAssignments).toEqual([{ weekStartDate: "2026-07-13", scenarioId: "project" }]);
     expect(imported?.assumptions.sleepHoursPerDay).toBe(7.5);
     expect(imported?.assumptions.sleepSlots[0]).toMatchObject({
       id: "sleep-slot",

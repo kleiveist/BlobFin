@@ -176,6 +176,18 @@ describe("follow-up ui rendering", () => {
     expect(stampPlannerButtonIndex).toBeLessThan(homeButtonIndex);
   });
 
+  it("wires week scenario controls into the income planning calendar", () => {
+    expect(mainSource).toContain("Wochenszenario");
+    expect(mainSource).toContain('data-action="income-planning-prev-week"');
+    expect(mainSource).toContain('data-action="income-planning-next-week"');
+    expect(mainSource).toContain('data-action="income-planning-current-week"');
+    expect(mainSource).toContain("select-income-planning-week-scenario-");
+    expect(mainSource).toContain("function setIncomePlanningWeekScenario");
+    expect(mainSource).toContain("weekScenarioAssignments");
+    expect(mainSource).toContain("return incomePlanningActiveWeekRange();");
+    expect(mainSource).toContain("data-income-planning-scenario-suggestion");
+  });
+
   it("renders the stamp planner as an independent page", () => {
     const html = renderAppShell();
 

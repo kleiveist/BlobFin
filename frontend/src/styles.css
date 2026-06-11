@@ -5467,6 +5467,97 @@ tfoot th {
   min-width: 0;
 }
 
+.income-planning-week-toolbar,
+.income-planning-week-scenario {
+  display: grid;
+  grid-template-columns: minmax(240px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.income-planning-week-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.income-planning-week-label,
+.income-planning-week-range,
+.income-planning-week-scenario > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.income-planning-week-label {
+  min-width: 132px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.income-planning-week-label span,
+.income-planning-week-range span,
+.income-planning-week-scenario span,
+.income-planning-week-scenario small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.income-planning-week-label strong,
+.income-planning-week-range strong,
+.income-planning-week-scenario strong {
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
+.income-planning-week-scenario {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.income-planning-week-scenario-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.income-planning-week-scenario-button {
+  display: inline-grid;
+  grid-template-columns: 18px minmax(0, auto);
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 6px 9px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.income-planning-week-scenario-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-planning-week-scenario-button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .income-planning-calendar-head {
   display: grid;
   grid-template-columns: var(--calendar-axis-width) repeat(7, var(--calendar-day-width));
@@ -5653,6 +5744,16 @@ tfoot th {
   cursor: grabbing;
 }
 
+.income-planning-calendar-block.read-only {
+  cursor: default;
+  touch-action: auto;
+}
+
+.income-planning-calendar-block.read-only:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .income-planning-calendar-block.flexible {
   border-style: dashed;
   background:
@@ -5768,6 +5869,13 @@ tfoot th {
 .income-planning-calendar-block.type-other_event {
   border-left-color: var(--entry-color, #6f7785);
   background: var(--entry-bg, rgba(111, 119, 133, 0.12));
+}
+
+.income-planning-calendar-block.type-scenario_suggestion {
+  border-left-color: var(--entry-color, #6f7785);
+  background:
+    linear-gradient(135deg, var(--entry-bg, rgba(111, 119, 133, 0.12)), rgba(255, 255, 255, 0.02)),
+    var(--surface-soft);
 }
 
 .income-planning-calendar-block.type-pause {
@@ -8184,6 +8292,8 @@ tfoot th {
   #incomePlanningManualBlocks.income-planning-block-list,
   .income-planning-habit-stamp-layout,
   .income-planning-weekly-head,
+  .income-planning-week-toolbar,
+  .income-planning-week-scenario,
   .income-planning-block-grid.work,
   .income-planning-block-grid.manual,
   .income-planning-block-grid.habit,
@@ -8210,10 +8320,20 @@ tfoot th {
   .income-planning-work-card-main,
   .income-planning-dialog-section-head,
   .income-stamp-planner-control-stack,
+  .income-planning-week-scenario-options,
   .income-planning-career-item {
     align-items: flex-start;
     flex-direction: column;
     grid-template-columns: 1fr;
+  }
+
+  .income-planning-week-nav,
+  .income-planning-week-scenario-options {
+    width: 100%;
+  }
+
+  .income-planning-week-scenario-button {
+    flex: 1 1 140px;
   }
 
   .income-planning-weekly-head p {

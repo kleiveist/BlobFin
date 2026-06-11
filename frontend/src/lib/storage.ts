@@ -33,6 +33,7 @@ import {
   isIncomePlanningHabitType,
   isIncomePlanningManualBlockType,
   isIncomePlanningPriority,
+  isIncomePlanningWeekScenarioId,
   isIncomePlanningWeekday
 } from "../domain/incomePlanning";
 import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
@@ -63,6 +64,7 @@ import type {
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
   IncomePlanningState,
+  IncomePlanningWeekScenarioAssignment,
   IncomePlanningWorkBlock,
   IncomePerson,
   IncomeProjectionMode,
@@ -893,6 +895,9 @@ function normalizeIncomePlanningState(value: unknown): IncomePlanningState {
           .map(normalizeIncomePlanningPlannedStamp)
           .filter((stamp): stamp is IncomePlanningPlannedStamp => stamp !== null)
       : fallback.plannedStamps,
+    weekScenarioAssignments: Array.isArray(value.weekScenarioAssignments)
+      ? normalizeIncomePlanningWeekScenarioAssignments(value.weekScenarioAssignments)
+      : fallback.weekScenarioAssignments,
     assumptions: normalizeIncomePlanningAssumptions(value.assumptions)
   };
 }
@@ -1008,6 +1013,22 @@ function normalizeIncomePlanningPlannedStamp(value: unknown): IncomePlanningPlan
     label: label || "Stempel",
     description: String(value.description || "")
   };
+}
+
+function normalizeIncomePlanningWeekScenarioAssignments(values: unknown[]): IncomePlanningWeekScenarioAssignment[] {
+  const assignments = new Map<string, IncomePlanningWeekScenarioAssignment>();
+  for (const value of values) {
+    const assignment = normalizeIncomePlanningWeekScenarioAssignment(value);
+    if (assignment) assignments.set(assignment.weekStartDate, assignment);
+  }
+  return Array.from(assignments.values()).sort((first, second) => first.weekStartDate.localeCompare(second.weekStartDate));
+}
+
+function normalizeIncomePlanningWeekScenarioAssignment(value: unknown): IncomePlanningWeekScenarioAssignment | null {
+  if (!isRecord(value)) return null;
+  if (!isIncomePlanningWeekScenarioId(value.scenarioId) || value.scenarioId === "normal") return null;
+  const weekStartDate = normalizeIncomePlanningWeekStartDate(value.weekStartDate);
+  return weekStartDate ? { weekStartDate, scenarioId: value.scenarioId } : null;
 }
 
 function normalizeIncomePlanningSlot(
@@ -1134,6 +1155,18 @@ function normalizeIncomePlanningDate(value: unknown, fallback: string): string {
   const day = Number(dayRaw);
   const parsed = new Date(year, month - 1, day);
   return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day ? date : fallback;
+}
+
+function normalizeIncomePlanningWeekStartDate(value: unknown): string | null {
+  const date = String(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const [yearRaw, monthRaw, dayRaw] = date.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const parsed = new Date(year, month - 1, day);
+  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null;
+  return parsed.getDay() === 1 ? date : null;
 }
 
 function todayLocalDateString(): string {

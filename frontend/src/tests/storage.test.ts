@@ -131,6 +131,7 @@ describe("storage", () => {
       "buffer"
     ]);
     expect(loaded.incomePlanning.plannedStamps).toEqual([]);
+    expect(loaded.incomePlanning.weekScenarioAssignments).toEqual([]);
     expect(loaded.incomePlanning.habits.map((habit) => habit.name)).toContain("Buch lesen");
   });
 
@@ -212,6 +213,13 @@ describe("storage", () => {
           description: "Projekt"
         }
       ],
+      weekScenarioAssignments: [
+        { weekStartDate: "2026-07-13", scenarioId: "uni" },
+        { weekStartDate: "2026-07-14", scenarioId: "project" },
+        { weekStartDate: "2026-07-20", scenarioId: "normal" },
+        { weekStartDate: "bad-date", scenarioId: "self_employed" },
+        { weekStartDate: "2026-07-13", scenarioId: "self_employed" }
+      ],
       manualBlocks: [],
       assumptions: { sleepHoursPerDay: 30 }
     };
@@ -243,6 +251,9 @@ describe("storage", () => {
       label: "Stempel",
       description: "Projekt"
     });
+    expect(loaded.incomePlanning.weekScenarioAssignments).toEqual([
+      { weekStartDate: "2026-07-13", scenarioId: "self_employed" }
+    ]);
   });
 
   it("migrates legacy slot pauses while stripping pauses from habits", () => {

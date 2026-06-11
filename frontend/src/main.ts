@@ -29,11 +29,13 @@ import {
   enforceSingleActiveIncomePlanningMainJob,
   INCOME_PLANNING_CATEGORY_CONFIGS,
   INCOME_PLANNING_WEEK_DAYS,
+  INCOME_PLANNING_WEEK_SCENARIOS,
   incomePlanningDefaultWorkCategory,
   incomePlanningCategoryConfig,
   incomePlanningDefaultManualColor,
   incomePlanningDefaultManualIcon,
   incomePlanningDefaultWorkColor,
+  incomePlanningWeekScenarioConfig,
   incomePlanningAverageSleepHours,
   incomePlanningSlotGrossDurationMinutes,
   incomePlanningSlotNetDurationMinutes,
@@ -41,6 +43,7 @@ import {
   incomePlanningSleepSlotDurationMinutes,
   incomePlanningSlotCalendarSegments,
   incomePlanningStripSlotPause,
+  isIncomePlanningWeekScenarioId,
   parseTimeMinutes,
   type IncomePlanningCalendarEntry,
   type IncomePlanningModel,
@@ -178,6 +181,7 @@ import type {
   IncomePlanningPlannedStamp,
   IncomePlanningSleepSlot,
   IncomePlanningSlot,
+  IncomePlanningWeekScenarioId,
   IncomePlanningWeekday,
   IncomePlanningWorkBlock,
   IncomeTrackerSettings,
@@ -592,6 +596,7 @@ let incomePlanningStampPicker: {
   left: number;
 } | null = null;
 let incomePlanningStampMenu: { stampId: string; top: number; left: number } | null = null;
+let incomePlanningWeekCursor = incomeStampPlannerWeekStart(new Date());
 let incomeStampPlannerMonthCursor = incomeStampPlannerMonthStart(new Date());
 let incomeStampPlannerStampDragState: IncomeStampPlannerStampDragState = null;
 let incomeStampPlannerSuppressNextClick = false;
@@ -1636,6 +1641,12 @@ function bindEvents(): void {
     }
     if (action === "income-planning-save-stamp") saveIncomePlanningStampPicker();
     if (action === "income-planning-delete-stamp") deleteIncomePlanningStamp(button.dataset.incomePlanningStampId || "");
+    if (action === "income-planning-prev-week") showPreviousIncomePlanningWeek();
+    if (action === "income-planning-next-week") showNextIncomePlanningWeek();
+    if (action === "income-planning-current-week") showCurrentIncomePlanningWeek();
+    if (action?.startsWith("select-income-planning-week-scenario-")) {
+      setIncomePlanningWeekScenario(action.replace("select-income-planning-week-scenario-", ""));
+    }
     if (action === "income-stamp-planner-add") openIncomeStampPlannerDialogForDate();
     if (action === "income-stamp-planner-add-date") {
       openIncomeStampPlannerDialogForDate(button.dataset.incomeStampPlannerDate || "");
@@ -2113,13 +2124,14 @@ function renderIncomeTracker(): void {
 function renderIncomePlanning(): void {
   const panel = document.querySelector<HTMLElement>('[data-module-section="income_planning"]');
   if (!panel) return;
+  const activeWeekModel = incomePlanningModelForActiveWeek();
   renderIncomePlanningSources();
-  renderIncomePlanningCareerLife(buildIncomePlanningModel(state.incomePlanning));
+  renderIncomePlanningCareerLife(activeWeekModel);
   renderIncomePlanningAssumptions();
   renderIncomePlanningManualBlocks();
   renderIncomePlanningHabits();
   renderIncomePlanningCalendarStamps();
-  renderIncomePlanningSummary();
+  renderIncomePlanningSummary(activeWeekModel);
   renderIncomePlanningDialog();
   renderIncomePlanningHabitIconPicker();
   renderIncomePlanningStampPicker();
@@ -2392,9 +2404,67 @@ function compareIncomePlanningPlannedStamps(first: IncomePlanningPlannedStamp, s
   );
 }
 
-function incomeStampPlannerCurrentWeekRange(): { start: Date; end: Date } {
-  const start = incomeStampPlannerWeekStart(new Date());
+function incomePlanningModelForActiveWeek(): IncomePlanningModel {
+  return buildIncomePlanningModel(state.incomePlanning, { scenarioId: incomePlanningActiveWeekScenarioId() });
+}
+
+function incomePlanningActiveWeekScenarioId(): IncomePlanningWeekScenarioId {
+  const weekStartDate = incomePlanningActiveWeekStartDate();
+  return (
+    (state.incomePlanning.weekScenarioAssignments ?? []).find((assignment) => assignment.weekStartDate === weekStartDate)?.scenarioId ??
+    "normal"
+  );
+}
+
+function incomePlanningActiveWeekStartDate(): string {
+  return incomeStampPlannerDateString(incomePlanningWeekCursor);
+}
+
+function incomePlanningActiveWeekRange(): { start: Date; end: Date } {
+  const start = incomeStampPlannerWeekStart(incomePlanningWeekCursor);
   return { start, end: incomeStampPlannerAddDays(start, 6) };
+}
+
+function incomeStampPlannerCurrentWeekRange(): { start: Date; end: Date } {
+  return incomePlanningActiveWeekRange();
+}
+
+function incomePlanningIsCurrentWeek(): boolean {
+  return incomeStampPlannerDateString(incomeStampPlannerWeekStart(new Date())) === incomePlanningActiveWeekStartDate();
+}
+
+function showPreviousIncomePlanningWeek(): void {
+  incomePlanningWeekCursor = incomeStampPlannerAddDays(incomePlanningWeekCursor, -7);
+  renderIncomePlanning();
+}
+
+function showNextIncomePlanningWeek(): void {
+  incomePlanningWeekCursor = incomeStampPlannerAddDays(incomePlanningWeekCursor, 7);
+  renderIncomePlanning();
+}
+
+function showCurrentIncomePlanningWeek(): void {
+  incomePlanningWeekCursor = incomeStampPlannerWeekStart(new Date());
+  renderIncomePlanning();
+}
+
+function setIncomePlanningWeekScenario(value: string): void {
+  if (!isIncomePlanningWeekScenarioId(value)) return;
+  const weekStartDate = incomePlanningActiveWeekStartDate();
+  const assignments = (state.incomePlanning.weekScenarioAssignments ?? []).filter(
+    (assignment) => assignment.weekStartDate !== weekStartDate
+  );
+  state.incomePlanning = {
+    ...state.incomePlanning,
+    weekScenarioAssignments:
+      value === "normal"
+        ? assignments
+        : [...assignments, { weekStartDate, scenarioId: value }].sort((first, second) =>
+            first.weekStartDate.localeCompare(second.weekStartDate)
+          )
+  };
+  renderIncomePlanning();
+  saveState(state);
 }
 
 function incomePlanningWeekdayForDate(date: Date): IncomePlanningWeekday {
@@ -2606,8 +2676,7 @@ function deleteIncomeStampPlannerStamp(stampId: string | null = incomeStampPlann
   renderAll();
 }
 
-function renderIncomePlanningSummary(): void {
-  const model = buildIncomePlanningModel(state.incomePlanning);
+function renderIncomePlanningSummary(model = incomePlanningModelForActiveWeek()): void {
   renderIncomePlanningMetrics(model);
   renderIncomePlanningWarnings(model);
   renderIncomePlanningTimeCharts(model);
@@ -3005,9 +3074,48 @@ function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
   const graphicEntries = model.calendarEntries.filter((entry) => !entry.invalid);
   const backgroundEntries = incomePlanningCalendarBackgroundEntries();
   const flexibleCount = graphicEntries.filter((entry) => entry.flexible).length;
-  const currentTime = incomePlanningCurrentTimeMarker();
+  const currentTime = incomePlanningIsCurrentWeek() ? incomePlanningCurrentTimeMarker() : null;
+  const weekRange = incomePlanningActiveWeekRange();
+  const scenario = incomePlanningWeekScenarioConfig(model.scenarioId);
   host.innerHTML = `
     <div class="income-planning-calendar" data-income-planning-calendar>
+      <div class="income-planning-week-toolbar">
+        <div class="income-planning-week-nav" role="group" aria-label="Kalenderwoche">
+          <button class="income-stamp-planner-month-button" type="button" data-action="income-planning-prev-week" aria-label="Vorherige Woche" title="Vorherige Woche">
+            ${incomePlanningHeaderIcon("chevron-left")}
+          </button>
+          <div class="income-planning-week-label">
+            <span>Woche</span>
+            <strong>${escapeHtml(`${incomeStampPlannerShortDate(weekRange.start)}-${incomeStampPlannerShortDate(weekRange.end)}${weekRange.end.getFullYear()}`)}</strong>
+          </div>
+          <button class="income-stamp-planner-month-button" type="button" data-action="income-planning-next-week" aria-label="Naechste Woche" title="Naechste Woche">
+            ${incomePlanningHeaderIcon("chevron-right")}
+          </button>
+          ${
+            incomePlanningIsCurrentWeek()
+              ? ""
+              : '<button class="income-stamp-planner-today-button" type="button" data-action="income-planning-current-week">Heute</button>'
+          }
+        </div>
+        <div class="income-planning-week-range">
+          <strong>${escapeHtml(model.scenarioLabel)}</strong>
+          <span>${escapeHtml(scenario.description)}</span>
+        </div>
+      </div>
+      <div class="income-planning-week-scenario" aria-label="Wochenszenario">
+        <div>
+          <span>Wochenszenario</span>
+          <strong>${escapeHtml(model.scenarioLabel)}</strong>
+          <small>${escapeHtml(
+            model.scenarioSuggestionHours > 0
+              ? `${hoursLabel(model.scenarioSuggestionHours)} Vorschlagszeit`
+              : "Standard-Zeitbudget ohne Zusatzvorschlaege"
+          )}</small>
+        </div>
+        <div class="income-planning-week-scenario-options" role="group" aria-label="Wochenszenario auswaehlen">
+          ${INCOME_PLANNING_WEEK_SCENARIOS.map((option) => incomePlanningWeekScenarioButton(option.id, model.scenarioId)).join("")}
+        </div>
+      </div>
       <div class="income-planning-calendar-head">
         <span></span>
         ${INCOME_PLANNING_WEEK_DAYS.map((day) => `<strong>${escapeHtml(incomePlanningWeekdayLabel(day))}</strong>`).join("")}
@@ -3023,10 +3131,31 @@ function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
       <div class="income-planning-calendar-note">
         <span>${intNumber(graphicEntries.length)} Zeitbloecke in der Grafik</span>
         <span>${intNumber(flexibleCount)} flexible Zeitbloecke</span>
+        <span>${hoursLabel(model.scenarioSuggestionHours)} Szenario-Vorschlaege</span>
         <span>${intNumber(state.incomePlanning.assumptions.sleepSlots.length)} Schlafhorizonte im Hintergrund</span>
-        <span>Ist-Zeit ${escapeHtml(currentTime.label)}</span>
+        ${currentTime ? `<span>Ist-Zeit ${escapeHtml(currentTime.label)}</span>` : ""}
       </div>
     </div>
+  `;
+}
+
+function incomePlanningWeekScenarioButton(
+  scenarioId: IncomePlanningWeekScenarioId,
+  activeScenarioId: IncomePlanningWeekScenarioId
+): string {
+  const scenario = incomePlanningWeekScenarioConfig(scenarioId);
+  const active = scenarioId === activeScenarioId;
+  return `
+    <button
+      class="income-planning-week-scenario-button ${active ? "active" : ""}"
+      type="button"
+      data-action="select-income-planning-week-scenario-${scenarioId}"
+      aria-pressed="${active}"
+      title="${escapeHtml(scenario.description)}"
+    >
+      ${positionIconSvg(scenario.icon, "position-icon-svg income-planning-type-icon")}
+      <span>${escapeHtml(scenario.label)}</span>
+    </button>
   `;
 }
 
@@ -3034,7 +3163,7 @@ function incomePlanningCalendarDayColumn(
   day: IncomePlanningWeekday,
   entries: IncomePlanningCalendarEntry[],
   backgroundEntries: IncomePlanningCalendarBackgroundEntry[],
-  currentTime: { day: IncomePlanningWeekday; minute: number; label: string }
+  currentTime: { day: IncomePlanningWeekday; minute: number; label: string } | null
 ): string {
   const dayEntries = entries.filter((entry) => entry.day === day);
   const dayBackgrounds = backgroundEntries.filter((entry) => entry.day === day);
@@ -3051,7 +3180,7 @@ function incomePlanningCalendarDayColumn(
       ${dayEntries.map(incomePlanningCalendarEntryBlock).join("")}
       ${dayStamps.map(incomePlanningCalendarStampMarker).join("")}
       ${plannedStamps.map(incomePlanningPlannedStampMarker).join("")}
-      ${currentTime.day === day ? incomePlanningCurrentTimeLine(currentTime.minute, currentTime.label) : ""}
+      ${currentTime?.day === day ? incomePlanningCurrentTimeLine(currentTime.minute, currentTime.label) : ""}
     </div>
   `;
 }
@@ -3123,7 +3252,6 @@ function incomePlanningCalendarBackgroundBlock(entry: IncomePlanningCalendarBack
 }
 
 function incomePlanningCalendarEntryBlock(entry: IncomePlanningCalendarEntry): string {
-  const ownerType = incomePlanningOwnerTypeForEntry(entry);
   const meta = incomePlanningCalendarEntryMeta(entry);
   const color = incomePlanningCalendarEntryColor(entry);
   const range = incomePlanningCalendarEntryVisualRange(entry);
@@ -3141,6 +3269,25 @@ function incomePlanningCalendarEntryBlock(entry: IncomePlanningCalendarEntry): s
   ]
     .filter(Boolean)
     .join(" ");
+  if (entry.type === "scenario_suggestion") {
+    return `
+      <div
+        class="${escapeHtml(classes)} read-only"
+        style="--top:${top.toFixed(3)}%; --height:${height.toFixed(3)}%; --start-minute:${start}; --duration-minutes:${end - start}; ${incomePlanningColorStyle(color)}"
+        title="${escapeHtml(`${incomePlanningEntryTime(entry)} · ${entry.title} · Szenario-Vorschlag`)}"
+        data-income-planning-scenario-suggestion="true"
+      >
+        <span class="income-planning-calendar-label">
+          ${positionIconSvg(meta.icon, "position-icon-svg income-planning-calendar-icon")}
+          <span>${escapeHtml(meta.label)}</span>
+        </span>
+        <strong>${escapeHtml(entry.title)}</strong>
+        <small>${escapeHtml(incomePlanningEntryTime(entry))}</small>
+        <em>${escapeHtml(entry.detail || "Szenario-Vorschlag")}</em>
+      </div>
+    `;
+  }
+  const ownerType = incomePlanningOwnerTypeForEntry(entry);
   return `
     <button
       class="${escapeHtml(classes)}"
@@ -3248,6 +3395,7 @@ function incomePlanningCurrentTimeMarker(): { day: IncomePlanningWeekday; minute
 
 function incomePlanningCalendarEntryMeta(entry: IncomePlanningCalendarEntry): { label: string; icon: string } {
   if (entry.type === "pause") return { label: "Pause", icon: "calendar" };
+  if (entry.type === "scenario_suggestion") return { label: "Vorschlag", icon: normalizePositionIcon(entry.icon, "calendar") };
   const workBlock = state.incomePlanning.workBlocks.find((block) => block.id === entry.ownerId);
   if (workBlock && (entry.type === "career" || entry.type === "side_work")) {
     const config = incomePlanningCategoryConfig(workBlock.category);
@@ -3269,6 +3417,7 @@ function incomePlanningCalendarEntryMeta(entry: IncomePlanningCalendarEntry): { 
 
 function incomePlanningCalendarEntryColor(entry: IncomePlanningCalendarEntry): string {
   if (entry.type === "pause") return "#6f7785";
+  if (entry.type === "scenario_suggestion") return normalizeIncomePlanningColor(entry.color, "#6f7785");
   const workBlock = state.incomePlanning.workBlocks.find((block) => block.id === entry.ownerId);
   if (workBlock && (entry.type === "career" || entry.type === "side_work")) {
     return normalizeIncomePlanningColor(workBlock.color, incomePlanningDefaultWorkColor(workBlock.category));
@@ -3380,6 +3529,7 @@ function incomePlanningPlannerTypeLabel(type: IncomePlanningPlannerEntryType): s
   if (type === "good_habit") return "Gute Habit";
   if (type === "bad_habit") return "Schlechte Habit";
   if (type === "replacement_habit") return "Ersatz-Habit";
+  if (type === "scenario_suggestion") return "Szenario-Vorschlag";
   return "Sonstiges";
 }
 
@@ -3395,6 +3545,7 @@ function incomePlanningOwnerTypeForEntry(entry: IncomePlanningCalendarEntry): Ex
   if (entry.type === "career" || entry.type === "side_work") return "work";
   if (entry.type === "good_habit" || entry.type === "bad_habit" || entry.type === "replacement_habit") return "habit";
   if (entry.type === "pause") return incomePlanningOwnerTypeForId(entry.ownerId);
+  if (entry.type === "scenario_suggestion") return "manual";
   return "manual";
 }
 
