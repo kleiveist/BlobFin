@@ -33,6 +33,12 @@ export function isOneTimePayoutInMonth(position: ReservePosition, year: number, 
   );
 }
 
+function calculateYearlyReserveCycleBalance(position: ReservePosition, monthNumber: number): number {
+  const payoutMonth = Number(position.payoutMonth);
+  const cycleMonth = ((monthNumber - payoutMonth + 11) % 12) + 1;
+  return Number(position.amount) * cycleMonth;
+}
+
 export function calculatePositionValueAtMonthStart(
   position: ReservePosition,
   year: number,
@@ -48,6 +54,9 @@ export function calculatePositionValueAtMonthStart(
   if (position.payoutType === "once") return 0;
   if (position.type === "fixed") return Number(position.amount);
   if (position.type === "temporary") return Number(position.amount);
+  if (position.type === "reserve" && position.payoutType === "yearly") {
+    return calculateYearlyReserveCycleBalance(position, monthNumber);
+  }
 
   let balance = 0;
   for (let month = 1; month <= monthNumber; month += 1) {
@@ -70,6 +79,9 @@ export function calculatePositionEndOfMonthPermanent(position: ReservePosition, 
     return isActiveInMonth(position, monthNumber) ? Number(position.amount) : 0;
   }
   if (position.type === "temporary" || position.type === "savings") return 0;
+  if (position.type === "reserve" && position.payoutType === "yearly" && isActiveInMonth(position, monthNumber)) {
+    return isPayoutMonth(position, monthNumber) ? 0 : calculateYearlyReserveCycleBalance(position, monthNumber);
+  }
 
   let balance = 0;
   for (let month = 1; month <= monthNumber; month += 1) {

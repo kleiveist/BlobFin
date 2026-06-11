@@ -1,6 +1,20 @@
-import { isOneTimePayoutInMonth, isSavingsActiveInMonth } from "./reserveCalculator";
+import { calculateReserveSummary, isOneTimePayoutInMonth, isSavingsActiveInMonth } from "./reserveCalculator";
+import { positionsForPlanningYear } from "../lib/planningYears";
 import { positionFlow } from "../lib/positionKinds";
-import type { InvestmentSettings, ReservePosition } from "../types";
+import type { InvestmentSettings, PlanningSettings, ReservePosition } from "../types";
+
+export type AnnualInvestmentTransferKind = "interest" | "cashback";
+
+export interface AnnualInvestmentTransferPositionOptions {
+  baseId: string;
+  name: string;
+  icon: string;
+  kind: AnnualInvestmentTransferKind;
+  settings: PlanningSettings;
+  positions: ReservePosition[];
+  startYear: number;
+  endYear: number;
+}
 
 export function investmentContributionForMonth(position: ReservePosition, year: number, month: number): number {
   if (position.payoutType === "once") return 0;
@@ -119,6 +133,75 @@ export function investmentSavingsSelectionSummary(
   };
 }
 
+export function buildAnnualInvestmentTransferPositions(
+  options: AnnualInvestmentTransferPositionOptions
+): ReservePosition[] {
+  const startYear = Math.round(options.startYear);
+  const endYear = Math.max(startYear, Math.round(options.endYear));
+  const actualValuesByYear = annualInvestmentTransferValuesByYear(options);
+  const positiveActualValues = Array.from(actualValuesByYear.values()).filter((value) => value > 0);
+  const forecastValue = positiveActualValues.length
+    ? roundMoney(positiveActualValues.reduce((sum, value) => sum + value, 0) / positiveActualValues.length)
+    : 0;
+  const positions: ReservePosition[] = [];
+
+  for (let year = startYear; year <= endYear; year += 1) {
+    const actualValue = actualValuesByYear.get(year);
+    const amount = actualValue === undefined ? forecastValue : actualValue;
+    if (amount <= 0) continue;
+    positions.push(annualInvestmentTransferPosition(options, year, amount));
+  }
+
+  return positions;
+}
+
+function annualInvestmentTransferValuesByYear(
+  options: AnnualInvestmentTransferPositionOptions
+): Map<number, number> {
+  const startYear = Math.round(options.startYear);
+  const endYear = Math.max(startYear, Math.round(options.endYear));
+  const startPositions = positionsForPlanningYear(options.positions, null);
+  const valuesByYear = new Map<number, number>();
+
+  for (let year = startYear; year <= endYear; year += 1) {
+    const yearlyPositions = positionsForPlanningYear(options.positions, year);
+    const sourcePositions = year === startYear && yearlyPositions.length === 0 ? startPositions : yearlyPositions;
+    if (!sourcePositions.length) continue;
+
+    const summary = calculateReserveSummary({ ...options.settings, year }, sourcePositions);
+    const value = options.kind === "interest" ? summary.totalInterest : summary.totalCashback;
+    valuesByYear.set(year, roundMoney(Math.max(0, value)));
+  }
+
+  return valuesByYear;
+}
+
+function annualInvestmentTransferPosition(
+  options: AnnualInvestmentTransferPositionOptions,
+  year: number,
+  amount: number
+): ReservePosition {
+  return {
+    id: `${options.baseId}-${year}`,
+    planningYear: year,
+    flow: "expense",
+    active: true,
+    visible: false,
+    name: options.name,
+    icon: options.icon,
+    type: "savings",
+    amount,
+    startMonth: 12,
+    endMonth: 12,
+    payoutType: "once",
+    payoutYear: year,
+    payoutMonth: 12,
+    payoutDay: 31,
+    interestBearing: false,
+    cashback: false
+  };
+}
+
 export function selectedRecurringInvestmentContributionForProjectionYear(
   positions: ReservePosition[],
   settings: InvestmentSettings,
@@ -168,4 +251,8 @@ export function selectableInvestmentSavingsPositions(positions: ReservePosition[
 
 function selectedInvestmentPositions(positions: ReservePosition[], settings: InvestmentSettings): ReservePosition[] {
   return selectableInvestmentSavingsPositions(positions).filter((position) => settings.includedIds.includes(position.id));
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
 }

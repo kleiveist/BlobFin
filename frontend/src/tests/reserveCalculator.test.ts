@@ -40,9 +40,43 @@ describe("reserve calculator", () => {
 
     const summary = calculateReserveSummary(state.settings, state.positions);
 
-    expect(summary.rows[8].values[reserve.id]).toBe(585);
+    expect(summary.rows[8].values[reserve.id]).toBe(780);
     expect(summary.rows[11].values[reserve.id]).toBe(195);
     expect(calculateYearTableFooterValue(reserve, summary.rows, state.settings.year)).toBe(780);
+  });
+
+  it("uses the yearly reserve payout month as the reset point", () => {
+    const state = defaultAppState();
+    const reserve: ReservePosition = {
+      id: "april-reserve",
+      flow: "expense",
+      active: true,
+      visible: true,
+      name: "April Reserve",
+      type: "reserve",
+      amount: 50,
+      startMonth: 1,
+      endMonth: 12,
+      payoutType: "yearly",
+      payoutYear: state.settings.year,
+      payoutMonth: 4,
+      payoutDay: 30,
+      interestBearing: false,
+      cashback: false
+    };
+    state.positions = [reserve];
+
+    const summary = calculateReserveSummary(state.settings, state.positions);
+
+    expect(summary.rows[0].values[reserve.id]).toBe(450);
+    expect(summary.rows[2].values[reserve.id]).toBe(550);
+    expect(summary.rows[3].values[reserve.id]).toBe(600);
+    expect(summary.rows[3].permanentAfterMonthlyOutflows).toBe(0);
+    expect(summary.rows[4].values[reserve.id]).toBe(50);
+    expect(summary.rows[4].permanentAfterMonthlyOutflows).toBe(50);
+    expect(summary.rows[3].plannedOutflow).toBe(50);
+    expect(summary.rows[4].plannedOutflow).toBe(50);
+    expect(calculateYearTableFooterValue(reserve, summary.rows, state.settings.year)).toBe(600);
   });
 
   it("keeps reserve-funded expenses out of the remaining cashflow", () => {

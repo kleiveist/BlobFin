@@ -78,6 +78,7 @@ import {
 } from "./domain/statutoryPension";
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
 import {
+  buildAnnualInvestmentTransferPositions,
   investmentSavingsSelectionSummary,
   investmentContributionForMonth,
   oneTimeInvestmentContributionForMonth,
@@ -1941,14 +1942,12 @@ function renderAll(): void {
     updateModuleVisibility();
     renderPlanningAccounts();
     renderPlanningYearNavigation();
-    const investmentAccount = selectedInvestmentPlanningAccount();
     const planningSettings = activePlanningSettings();
-    const investmentReserve = calculateReserveSummary(state.settings, investmentAccount.yearlyRows);
     const activeReserve = calculateReserveSummary(planningSettings, activePlanningPositions());
     renderPositions();
     renderPositionCostDialog();
-    renderInvestmentIncludeList(investmentReserve);
-    renderCalculations(investmentReserve, activeReserve);
+    renderInvestmentIncludeList();
+    renderCalculations(activeReserve);
     syncPlanningInputsFromState();
     syncRealEstateInputsFromState();
     syncCombinedToggleInputsFromState();
@@ -1963,13 +1962,10 @@ function renderAll(): void {
   }
 }
 
-function renderCalculations(
-  reserve: ReturnType<typeof calculateReserveSummary>,
-  activeReserve: ReturnType<typeof calculateReserveSummary>
-): void {
-  const standardProjection = buildDepotAssetProjection(reserve, "standard");
-  const retirementProjection = buildDepotAssetProjection(reserve, "retirement");
-  const childProjection = buildDepotAssetProjection(reserve, "child");
+function renderCalculations(activeReserve: ReturnType<typeof calculateReserveSummary>): void {
+  const standardProjection = buildDepotAssetProjection("standard");
+  const retirementProjection = buildDepotAssetProjection("retirement");
+  const childProjection = buildDepotAssetProjection("child");
   const activeDepot = activeInvestmentDepot();
   const projection =
     activeDepot === "child" ? childProjection : activeDepot === "retirement" ? retirementProjection : standardProjection;
@@ -2061,14 +2057,10 @@ function renderCalculations(
     ? state.investmentByAccountId[combinedLeadAccount.id] ?? defaultInvestmentSettingsForNewAccount()
     : null;
   const combinedStandardProjection = combinedLeadAccount
-    ? buildDepotAssetProjection(calculateReserveSummary(state.settings, combinedLeadAccount.yearlyRows), "standard", combinedLeadAccount.id)
+    ? buildDepotAssetProjection("standard", combinedLeadAccount.id)
     : combinedProjectionWithoutAccounts(standardProjection);
   const combinedRetirementProjection = combinedLeadAccount
-    ? buildDepotAssetProjection(
-        calculateReserveSummary(state.settings, combinedLeadAccount.yearlyRows),
-        "retirement",
-        combinedLeadAccount.id
-      )
+    ? buildDepotAssetProjection("retirement", combinedLeadAccount.id)
     : combinedProjectionWithoutAccounts(retirementProjection);
   const combinedDepotProjections = combinedDepotProjectionInputs(combinedLeadAccount);
   const combinedBirthYear = combinedLeadSettings?.birthYear ?? state.settings.year;
@@ -8358,8 +8350,7 @@ function realEstateWithdrawalProfiles(accountIds: string[] | null = null): RealE
   const withdrawalAccounts = accountIds ? planningAccountsByIds(accountIds) : selectedRealEstateWithdrawalAccounts();
   return withdrawalAccounts.map((account) => {
     const settings = state.investmentByAccountId[account.id] ?? defaultInvestmentSettingsForNewAccount();
-    const reserve = calculateReserveSummary(state.settings, account.yearlyRows);
-    const projection = buildDepotAssetProjection(reserve, "standard", account.id);
+    const projection = buildDepotAssetProjection("standard", account.id);
     const withdrawalStartYear = realEstateWithdrawalStartYear(projection, settings);
     const withdrawalEndYear = Math.min(planningEndYear(), settings.birthYear + Math.floor(projection.endAge));
     const depotSavingsRateAvailable = realEstateDepotSavingsRateAvailable(projection);
@@ -8535,9 +8526,8 @@ function inactiveCombinedRealEstateResult(startYear: number): RealEstateFinancin
 
 function combinedDepotProjectionInputs(account: PlanningAccount | null): CombinedWealthDepotProjection[] {
   if (!account) return [];
-  const summary = calculateReserveSummary(state.settings, account.yearlyRows);
   return selectedCombinedDepotKeys().map((key) => {
-    const projection = buildDepotAssetProjection(summary, key, account.id);
+    const projection = buildDepotAssetProjection(key, account.id);
     const settings = depotInvestmentSettingsForAccount(key, account.id);
     return {
       id: key,
@@ -11172,15 +11162,18 @@ function reserveChartPositionButton(position: ReserveChartPosition): string {
   `;
 }
 
-function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserveSummary>): void {
+function renderInvestmentIncludeList(): void {
   const list = document.querySelector<HTMLDivElement>("#investmentIncludeList");
   if (!list) return;
 
   const depot = activeInvestmentDepot();
   const settings = depotInvestmentSettings(depot);
+  const investmentAccount = selectedInvestmentPlanningAccount();
   const otherDepots = otherInvestmentDepots(depot);
   const blockedInterestDepot = otherDepots.find((item) => depotInvestmentSettings(item).includeAccountInterest);
   const blockedCashbackDepot = otherDepots.find((item) => depotInvestmentSettings(item).includeAccountCashback);
+  const currentInterestTransfer = currentAnnualInvestmentTransferAmount(investmentAccount.yearlyRows, "interest");
+  const currentCashbackTransfer = currentAnnualInvestmentTransferAmount(investmentAccount.yearlyRows, "cashback");
   const interestButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-interest-investment']");
   if (interestButton) {
     const blocked = Boolean(blockedInterestDepot);
@@ -11201,16 +11194,16 @@ function renderInvestmentIncludeList(summary: ReturnType<typeof calculateReserve
     "interestInvestmentAmount",
     blockedInterestDepot
       ? `belegt im ${depotLabel(blockedInterestDepot)}`
-      : `${money(summary.totalInterest)} jaehrlich aus Jahrestabelle`
+      : `${money(currentInterestTransfer)} jaehrlich aus Jahrestabelle`
   );
   setText(
     "cashbackInvestmentAmount",
     blockedCashbackDepot
       ? `belegt im ${depotLabel(blockedCashbackDepot)}`
-      : `${money(summary.totalCashback)} jaehrlich aus Jahrestabelle`
+      : `${money(currentCashbackTransfer)} jaehrlich aus Jahrestabelle`
   );
 
-  const savingsPositions = selectableInvestmentSavingsPositions(selectedInvestmentPlanningAccount().yearlyRows);
+  const savingsPositions = selectableInvestmentSavingsPositions(investmentAccount.yearlyRows);
   if (!savingsPositions.length) {
     list.innerHTML = `<div class="include-empty">Keine Sparrate angelegt.</div>`;
     hideInvestmentIncludePopup();
@@ -11248,11 +11241,10 @@ function renderInvestmentSelectionChange(): void {
   };
   investmentAccountContextId = investmentAccount.id;
 
-  const investmentReserve = calculateReserveSummary(state.settings, investmentAccount.yearlyRows);
   const activeReserve = calculateReserveSummary(activePlanningSettings(), activePlanningPositions());
 
   syncInvestmentIncludeSelectionState();
-  renderCalculations(investmentReserve, activeReserve);
+  renderCalculations(activeReserve);
   saveState(state);
 }
 
@@ -13183,11 +13175,10 @@ function setDetailLineHidden(id: string, hidden: boolean): void {
 
 function drawCurrentInvestmentChart(): void {
   const investmentAccount = selectedInvestmentPlanningAccount();
-  const reserve = calculateReserveSummary(state.settings, investmentAccount.yearlyRows);
-  const projection = buildDepotAssetProjection(reserve, activeInvestmentDepot(), investmentAccount.id);
+  const projection = buildDepotAssetProjection(activeInvestmentDepot(), investmentAccount.id);
   const combinedProjection = combineAssetProjections(
-    buildDepotAssetProjection(reserve, "standard", investmentAccount.id),
-    buildDepotAssetProjection(reserve, "retirement", investmentAccount.id)
+    buildDepotAssetProjection("standard", investmentAccount.id),
+    buildDepotAssetProjection("retirement", investmentAccount.id)
   );
   hideInvestmentChartPopup();
   drawInvestmentChartWithPopup(projection);
@@ -13453,56 +13444,91 @@ function pensionScenarioLabel(scenarioId: StatutoryPensionScenarioId): string {
   return "Basis";
 }
 
-function buildDepotAssetProjection(
-  summary: ReturnType<typeof calculateReserveSummary>,
-  depot: InvestmentDepotKey,
-  accountId = selectedInvestmentPlanningAccount().id
-): AssetProjection {
+function buildDepotAssetProjection(depot: InvestmentDepotKey, accountId = selectedInvestmentPlanningAccount().id): AssetProjection {
   return buildAssetProjection(
     state.settings.year,
-    investmentPositionsForProjection(summary, depot, accountId),
-    investmentSettingsForProjection(summary, depot, accountId)
+    investmentPositionsForProjection(depot, accountId),
+    investmentSettingsForProjection(depot, accountId)
   );
 }
 
-function investmentPositionsForProjection(
-  summary: ReturnType<typeof calculateReserveSummary>,
-  depot: InvestmentDepotKey,
-  accountId: string
-): ReservePosition[] {
+function investmentPositionsForProjection(depot: InvestmentDepotKey, accountId: string): ReservePosition[] {
   const account = planningAccountById(accountId) ?? selectedInvestmentPlanningAccount();
-  const settings = depotInvestmentSettingsForAccount(depot, accountId);
-  const virtualPositions: ReservePosition[] = [];
-  if (settings.includeAccountInterest && summary.totalInterest > 0) {
-    virtualPositions.push(
-      virtualInvestmentPosition(INTEREST_INVESTMENT_POSITION_ID, "Zinsen aus Jahrestabelle", summary.totalInterest)
-    );
-  }
-  if (settings.includeAccountCashback && summary.totalCashback > 0) {
-    virtualPositions.push(
-      virtualInvestmentPosition(CASHBACK_INVESTMENT_POSITION_ID, "Cashback aus Jahrestabelle", summary.totalCashback)
-    );
-  }
+  const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettingsForAccount(depot, accountId));
+  const virtualPositions = annualTransferInvestmentPositions(account.yearlyRows, settings);
   return [...account.yearlyRows, ...virtualPositions];
 }
 
-function investmentSettingsForProjection(
-  summary: ReturnType<typeof calculateReserveSummary>,
-  depot: InvestmentDepotKey,
-  accountId: string
-): InvestmentSettings {
+function investmentSettingsForProjection(depot: InvestmentDepotKey, accountId: string): InvestmentSettings {
+  const account = planningAccountById(accountId) ?? selectedInvestmentPlanningAccount();
   const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettingsForAccount(depot, accountId));
   const includedIds = new Set(settings.includedIds);
-  if (settings.includeAccountInterest && summary.totalInterest > 0) {
-    includedIds.add(INTEREST_INVESTMENT_POSITION_ID);
-  }
-  if (settings.includeAccountCashback && summary.totalCashback > 0) {
-    includedIds.add(CASHBACK_INVESTMENT_POSITION_ID);
+  for (const position of annualTransferInvestmentPositions(account.yearlyRows, settings)) {
+    includedIds.add(position.id);
   }
   return {
     ...settings,
     includedIds: Array.from(includedIds)
   };
+}
+
+function annualTransferInvestmentPositions(
+  positions: ReservePosition[],
+  settings: InvestmentSettings
+): ReservePosition[] {
+  const endYear = investmentProjectionEndYear(settings);
+  const transferPositions: ReservePosition[] = [];
+  if (settings.includeAccountInterest) {
+    transferPositions.push(
+      ...buildAnnualInvestmentTransferPositions({
+        baseId: INTEREST_INVESTMENT_POSITION_ID,
+        name: "Zinsen aus Jahrestabelle",
+        icon: "interest",
+        kind: "interest",
+        settings: state.settings,
+        positions,
+        startYear: state.settings.year,
+        endYear
+      })
+    );
+  }
+  if (settings.includeAccountCashback) {
+    transferPositions.push(
+      ...buildAnnualInvestmentTransferPositions({
+        baseId: CASHBACK_INVESTMENT_POSITION_ID,
+        name: "Cashback aus Jahrestabelle",
+        icon: "cashback",
+        kind: "cashback",
+        settings: state.settings,
+        positions,
+        startYear: state.settings.year,
+        endYear
+      })
+    );
+  }
+  return transferPositions;
+}
+
+function investmentProjectionEndYear(settings: InvestmentSettings): number {
+  return Math.max(state.settings.year, Math.round(settings.birthYear + settings.payoutEndAge));
+}
+
+function currentAnnualInvestmentTransferAmount(
+  positions: ReservePosition[],
+  kind: "interest" | "cashback"
+): number {
+  return (
+    buildAnnualInvestmentTransferPositions({
+      baseId: kind === "interest" ? INTEREST_INVESTMENT_POSITION_ID : CASHBACK_INVESTMENT_POSITION_ID,
+      name: kind === "interest" ? "Zinsen aus Jahrestabelle" : "Cashback aus Jahrestabelle",
+      icon: kind,
+      kind,
+      settings: state.settings,
+      positions,
+      startYear: state.settings.year,
+      endYear: state.settings.year
+    })[0]?.amount ?? 0
+  );
 }
 
 function investmentSettingsWithGlobalEndDate(settings: InvestmentSettings): InvestmentSettings {
@@ -13604,27 +13630,6 @@ function sumProjectionPoint(
     netBalance: (standard?.netBalance ?? 0) + (retirement?.netBalance ?? 0),
     realNetBalance: (standard?.realNetBalance ?? 0) + (retirement?.realNetBalance ?? 0),
     normalDepot: (standard?.normalDepot ?? 0) + (retirement?.normalDepot ?? 0)
-  };
-}
-
-function virtualInvestmentPosition(id: string, name: string, amount: number): ReservePosition {
-  return {
-    id,
-    flow: "expense",
-    active: true,
-    name,
-    icon: id === INTEREST_INVESTMENT_POSITION_ID ? "interest" : "cashback",
-    type: "savings",
-    amount,
-    startMonth: 1,
-    endMonth: 12,
-    payoutType: "yearly",
-    payoutYear: state.settings.year,
-    payoutMonth: 12,
-    payoutDay: 31,
-    visible: false,
-    interestBearing: false,
-    cashback: false
   };
 }
 
