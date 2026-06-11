@@ -147,7 +147,7 @@ export function buildAnnualInvestmentTransferPositions(
 
   for (let year = startYear; year <= endYear; year += 1) {
     const actualValue = actualValuesByYear.get(year);
-    const amount = actualValue === undefined ? forecastValue : actualValue;
+    const amount = actualValue !== undefined && actualValue > 0 ? actualValue : forecastValue;
     if (amount <= 0) continue;
     positions.push(annualInvestmentTransferPosition(options, year, amount));
   }
