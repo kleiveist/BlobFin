@@ -1476,27 +1476,9 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
   if (!isRecord(value)) return fallback;
   return {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
-    includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
-    includeAccountCashback: booleanOrDefault(value.includeAccountCashback, fallback.includeAccountCashback),
     activeDepot: normalizeInvestmentDepotKey(value.activeDepot, fallback.activeDepot),
     retirementIncludedIds: stringArrayOrDefault(value.retirementIncludedIds, fallback.retirementIncludedIds),
-    retirementIncludeAccountInterest: booleanOrDefault(
-      value.retirementIncludeAccountInterest,
-      fallback.retirementIncludeAccountInterest
-    ),
-    retirementIncludeAccountCashback: booleanOrDefault(
-      value.retirementIncludeAccountCashback,
-      fallback.retirementIncludeAccountCashback
-    ),
     childIncludedIds: stringArrayOrDefault(value.childIncludedIds, fallback.childIncludedIds),
-    childIncludeAccountInterest: booleanOrDefault(
-      value.childIncludeAccountInterest,
-      fallback.childIncludeAccountInterest
-    ),
-    childIncludeAccountCashback: booleanOrDefault(
-      value.childIncludeAccountCashback,
-      fallback.childIncludeAccountCashback
-    ),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
@@ -1559,27 +1541,9 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
   if (!isRecord(value)) return fallback;
   return {
     includedIds: stringArrayOrDefault(value.includedIds, fallback.includedIds),
-    includeAccountInterest: booleanOrDefault(value.includeAccountInterest, fallback.includeAccountInterest),
-    includeAccountCashback: booleanOrDefault(value.includeAccountCashback, fallback.includeAccountCashback),
     activeDepot: normalizeInvestmentDepotKey(value.activeDepot, fallback.activeDepot),
     retirementIncludedIds: stringArrayOrDefault(value.retirementIncludedIds, fallback.retirementIncludedIds),
-    retirementIncludeAccountInterest: booleanOrDefault(
-      value.retirementIncludeAccountInterest,
-      fallback.retirementIncludeAccountInterest
-    ),
-    retirementIncludeAccountCashback: booleanOrDefault(
-      value.retirementIncludeAccountCashback,
-      fallback.retirementIncludeAccountCashback
-    ),
     childIncludedIds: stringArrayOrDefault(value.childIncludedIds, fallback.childIncludedIds),
-    childIncludeAccountInterest: booleanOrDefault(
-      value.childIncludeAccountInterest,
-      fallback.childIncludeAccountInterest
-    ),
-    childIncludeAccountCashback: booleanOrDefault(
-      value.childIncludeAccountCashback,
-      fallback.childIncludeAccountCashback
-    ),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),

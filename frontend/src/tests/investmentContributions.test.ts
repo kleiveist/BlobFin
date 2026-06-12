@@ -2,13 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { defaultInvestmentSettings } from "../data/defaults";
 import {
-  buildAnnualInvestmentTransferPositions,
   investmentSavingsSelectionSummary,
   selectableInvestmentSavingsPositions,
   selectedInvestmentContributionForProjectionMonth,
   selectedSavingsContributionForProjectionYear
 } from "../domain/investmentContributions";
-import type { PlanningSettings, ReservePosition } from "../types";
+import type { ReservePosition } from "../types";
 
 function savingsPosition(values: Partial<ReservePosition> & Pick<ReservePosition, "id" | "amount">): ReservePosition {
   return {
@@ -32,15 +31,6 @@ function savingsPosition(values: Partial<ReservePosition> & Pick<ReservePosition
     ...(values.costBreakdown ? { costBreakdown: values.costBreakdown } : {})
   };
 }
-
-const planningSettings: PlanningSettings = {
-  year: 2026,
-  monthlyNetIncome: 0,
-  interestRatePercent: 12,
-  cashbackRatePercent: 10,
-  endDate: "2040-12-31",
-  emergencyFund: 0
-};
 
 describe("investment contributions", () => {
   it("sums selected savings contributions by cadence for each projection year", () => {
@@ -110,178 +100,5 @@ describe("investment contributions", () => {
     expect(selectedInvestmentContributionForProjectionMonth([position2025], settings, 2024, 0)).toBe(0);
     expect(selectedInvestmentContributionForProjectionMonth([position2025], settings, 2026, 0)).toBe(0);
     expect(selectedInvestmentContributionForProjectionMonth([position2026], settings, 2026, 0)).toBe(200);
-  });
-
-  it("builds yearly interest transfers from real annual values and forecasts zero years", () => {
-    const sourcePositions: ReservePosition[] = [
-      savingsPosition({
-        id: "interest-2026",
-        planningYear: null,
-        type: "fixed",
-        amount: 1000,
-        payoutType: "none",
-        interestBearing: true
-      }),
-      savingsPosition({
-        id: "interest-2027",
-        planningYear: 2027,
-        type: "fixed",
-        amount: 2000,
-        payoutType: "none",
-        interestBearing: true
-      }),
-      savingsPosition({
-        id: "zero-2028",
-        planningYear: 2028,
-        type: "temporary",
-        amount: 500,
-        payoutType: "monthly",
-        interestBearing: false
-      }),
-      savingsPosition({
-        id: "interest-2033",
-        planningYear: 2033,
-        type: "fixed",
-        amount: 3000,
-        payoutType: "none",
-        interestBearing: true
-      })
-    ];
-
-    const transfers = buildAnnualInvestmentTransferPositions({
-      baseId: "__interest",
-      name: "Zinsen aus Jahrestabelle",
-      icon: "interest",
-      kind: "interest",
-      settings: planningSettings,
-      positions: sourcePositions,
-      startYear: 2026,
-      endYear: 2034
-    });
-    const amountsByYear = new Map(transfers.map((position) => [position.payoutYear, position.amount]));
-
-    expect(amountsByYear.get(2026)).toBe(120);
-    expect(amountsByYear.get(2027)).toBe(240);
-    expect(amountsByYear.get(2028)).toBe(240);
-    expect(amountsByYear.get(2029)).toBe(240);
-    expect(amountsByYear.get(2033)).toBe(360);
-    expect(amountsByYear.get(2034)).toBe(240);
-  });
-
-  it("uses later real interest years for the average when the start year is zero", () => {
-    const sourcePositions: ReservePosition[] = [
-      savingsPosition({
-        id: "zero-start",
-        planningYear: null,
-        type: "fixed",
-        amount: 0,
-        payoutType: "none",
-        interestBearing: true
-      }),
-      savingsPosition({
-        id: "interest-2027",
-        planningYear: 2027,
-        type: "fixed",
-        amount: 2000,
-        payoutType: "none",
-        interestBearing: true
-      })
-    ];
-
-    const transfers = buildAnnualInvestmentTransferPositions({
-      baseId: "__interest",
-      name: "Zinsen aus Jahrestabelle",
-      icon: "interest",
-      kind: "interest",
-      settings: planningSettings,
-      positions: sourcePositions,
-      startYear: 2026,
-      endYear: 2027
-    });
-    const amountsByYear = new Map(transfers.map((position) => [position.payoutYear, position.amount]));
-
-    expect(amountsByYear.get(2026)).toBe(240);
-    expect(amountsByYear.get(2027)).toBe(240);
-  });
-
-  it("does not build forecast transfers when no positive annual values exist", () => {
-    const sourcePositions: ReservePosition[] = [
-      savingsPosition({
-        id: "zero-start",
-        planningYear: null,
-        type: "fixed",
-        amount: 0,
-        payoutType: "none",
-        interestBearing: true
-      }),
-      savingsPosition({
-        id: "zero-2027",
-        planningYear: 2027,
-        type: "temporary",
-        amount: 0,
-        payoutType: "monthly",
-        cashback: true
-      })
-    ];
-
-    expect(
-      buildAnnualInvestmentTransferPositions({
-        baseId: "__interest",
-        name: "Zinsen aus Jahrestabelle",
-        icon: "interest",
-        kind: "interest",
-        settings: planningSettings,
-        positions: sourcePositions,
-        startYear: 2026,
-        endYear: 2028
-      })
-    ).toEqual([]);
-  });
-
-  it("builds cashback transfer forecasts from positive non-zero annual values and forecasts zero years", () => {
-    const sourcePositions: ReservePosition[] = [
-      savingsPosition({
-        id: "cashback-2026",
-        planningYear: null,
-        type: "temporary",
-        amount: 100,
-        payoutType: "monthly",
-        cashback: true
-      }),
-      savingsPosition({
-        id: "cashback-zero-2027",
-        planningYear: 2027,
-        type: "temporary",
-        amount: 0,
-        payoutType: "monthly",
-        cashback: true
-      }),
-      savingsPosition({
-        id: "cashback-2028",
-        planningYear: 2028,
-        type: "temporary",
-        amount: 300,
-        payoutType: "yearly",
-        payoutMonth: 12,
-        cashback: true
-      })
-    ];
-
-    const transfers = buildAnnualInvestmentTransferPositions({
-      baseId: "__cashback",
-      name: "Cashback aus Jahrestabelle",
-      icon: "cashback",
-      kind: "cashback",
-      settings: planningSettings,
-      positions: sourcePositions,
-      startYear: 2026,
-      endYear: 2029
-    });
-    const amountsByYear = new Map(transfers.map((position) => [position.payoutYear, position.amount]));
-
-    expect(amountsByYear.get(2026)).toBe(120);
-    expect(amountsByYear.get(2027)).toBe(75);
-    expect(amountsByYear.get(2028)).toBe(30);
-    expect(amountsByYear.get(2029)).toBe(75);
   });
 });

@@ -81,14 +81,11 @@ import {
 } from "./domain/statutoryPension";
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
 import {
-  buildAnnualInvestmentTransferPositions,
   investmentSavingsSelectionSummary,
   investmentContributionForMonth,
   oneTimeInvestmentContributionForMonth,
   selectableInvestmentSavingsPositions,
-  selectedSavingsContributionForProjectionYear,
-  type AnnualInvestmentTransferKind,
-  type AnnualInvestmentTransferPositionOptions
+  selectedSavingsContributionForProjectionYear
 } from "./domain/investmentContributions";
 import { RETIREMENT_DEPOT_MIN_AGE } from "./domain/retirementDepot";
 import {
@@ -230,9 +227,6 @@ import {
 } from "./views/statutoryPensionView";
 
 const root = requireRootElement();
-const INTEREST_INVESTMENT_POSITION_ID = "__account-interest-investment";
-const CASHBACK_INVESTMENT_POSITION_ID = "__account-cashback-investment";
-let annualInvestmentTransferCache = new WeakMap<ReservePosition[], Map<string, ReservePosition[]>>();
 const depotAssetProjectionCache = new Map<string, AssetProjection>();
 const FORM_RENDER_DEBOUNCE_MS = 40;
 const CHILD_DEPOT_MIN_PAYOUT_AGE = 18;
@@ -1718,8 +1712,6 @@ function bindEvents(): void {
     if (action === "set-investment-depot-standard") setInvestmentDepot("standard");
     if (action === "set-investment-depot-retirement") setInvestmentDepot("retirement");
     if (action === "set-investment-depot-child") setInvestmentDepot("child");
-    if (action === "toggle-interest-investment") toggleInterestInvestment();
-    if (action === "toggle-cashback-investment") toggleCashbackInvestment();
     if (action === "toggle-investment-include-popup") toggleInvestmentIncludePopup();
     if (action === "close-investment-include-popup") hideInvestmentIncludePopup();
     if (action === "toggle-real-estate-withdrawal-gain-source") toggleRealEstateWithdrawalGainSource();
@@ -1892,7 +1884,6 @@ function startIncomePlanningCurrentTimeTicker(): void {
 }
 
 function clearInvestmentProjectionCaches(): void {
-  annualInvestmentTransferCache = new WeakMap();
   depotAssetProjectionCache.clear();
 }
 
@@ -11331,46 +11322,6 @@ function renderInvestmentIncludeList(): void {
   const settings = depotInvestmentSettings(depot);
   const investmentAccount = selectedInvestmentPlanningAccount();
   const otherDepots = otherInvestmentDepots(depot);
-  const blockedInterestDepot = otherDepots.find((item) => depotInvestmentSettings(item).includeAccountInterest);
-  const blockedCashbackDepot = otherDepots.find((item) => depotInvestmentSettings(item).includeAccountCashback);
-  const currentInterestTransfer = currentAnnualInvestmentTransferAmount(
-    investmentAccount.yearlyRows,
-    "interest",
-    settings
-  );
-  const currentCashbackTransfer = currentAnnualInvestmentTransferAmount(
-    investmentAccount.yearlyRows,
-    "cashback",
-    settings
-  );
-  const interestButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-interest-investment']");
-  if (interestButton) {
-    const blocked = Boolean(blockedInterestDepot);
-    interestButton.classList.toggle("active", settings.includeAccountInterest);
-    interestButton.disabled = blocked;
-    interestButton.classList.toggle("blocked", blocked);
-    interestButton.setAttribute("aria-pressed", String(settings.includeAccountInterest));
-  }
-  const cashbackButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-cashback-investment']");
-  if (cashbackButton) {
-    const blocked = Boolean(blockedCashbackDepot);
-    cashbackButton.classList.toggle("active", settings.includeAccountCashback);
-    cashbackButton.disabled = blocked;
-    cashbackButton.classList.toggle("blocked", blocked);
-    cashbackButton.setAttribute("aria-pressed", String(settings.includeAccountCashback));
-  }
-  setText(
-    "interestInvestmentAmount",
-    blockedInterestDepot
-      ? `belegt im ${depotLabel(blockedInterestDepot)}`
-      : `${money(currentInterestTransfer)} jaehrlich aus Jahrestabelle`
-  );
-  setText(
-    "cashbackInvestmentAmount",
-    blockedCashbackDepot
-      ? `belegt im ${depotLabel(blockedCashbackDepot)}`
-      : `${money(currentCashbackTransfer)} jaehrlich aus Jahrestabelle`
-  );
 
   const savingsPositions = selectableInvestmentSavingsPositions(investmentAccount.yearlyRows);
   if (!savingsPositions.length) {
@@ -12494,8 +12445,6 @@ function depotInvestmentSettingsForBase(depot: InvestmentDepotKey, settings: Inv
       ...settings,
       activeDepot: "child",
       includedIds: settings.childIncludedIds,
-      includeAccountInterest: settings.childIncludeAccountInterest,
-      includeAccountCashback: settings.childIncludeAccountCashback,
       retirementDepotEnabled: false,
       retirementDepotChildren: 0,
       birthYear: settings.childBirthYear,
@@ -12517,8 +12466,6 @@ function depotInvestmentSettingsForBase(depot: InvestmentDepotKey, settings: Inv
     activeDepot: "retirement",
     retirementDepotEnabled: true,
     includedIds: settings.retirementIncludedIds,
-    includeAccountInterest: settings.retirementIncludeAccountInterest,
-    includeAccountCashback: settings.retirementIncludeAccountCashback,
     birthYear: settings.retirementBirthYear,
     chartStartAge: settings.retirementChartStartAge,
     payoutEndAge: settings.retirementPayoutEndAge,
@@ -12894,54 +12841,6 @@ function toggleInvestmentPosition(id: string, checked: boolean): void {
     return;
   }
   state.investment = { ...state.investment, retirementIncludedIds: Array.from(includedIds) };
-}
-
-function toggleInterestInvestment(): void {
-  const depot = activeInvestmentDepot();
-  if (
-    !depotInvestmentSettings(depot).includeAccountInterest &&
-    otherInvestmentDepots(depot).some((item) => depotInvestmentSettings(item).includeAccountInterest)
-  ) {
-    return;
-  }
-  if (depot === "standard") {
-    state.investment = { ...state.investment, includeAccountInterest: !state.investment.includeAccountInterest };
-  } else if (depot === "child") {
-    state.investment = {
-      ...state.investment,
-      childIncludeAccountInterest: !state.investment.childIncludeAccountInterest
-    };
-  } else {
-    state.investment = {
-      ...state.investment,
-      retirementIncludeAccountInterest: !state.investment.retirementIncludeAccountInterest
-    };
-  }
-  renderAll();
-}
-
-function toggleCashbackInvestment(): void {
-  const depot = activeInvestmentDepot();
-  if (
-    !depotInvestmentSettings(depot).includeAccountCashback &&
-    otherInvestmentDepots(depot).some((item) => depotInvestmentSettings(item).includeAccountCashback)
-  ) {
-    return;
-  }
-  if (depot === "standard") {
-    state.investment = { ...state.investment, includeAccountCashback: !state.investment.includeAccountCashback };
-  } else if (depot === "child") {
-    state.investment = {
-      ...state.investment,
-      childIncludeAccountCashback: !state.investment.childIncludeAccountCashback
-    };
-  } else {
-    state.investment = {
-      ...state.investment,
-      retirementIncludeAccountCashback: !state.investment.retirementIncludeAccountCashback
-    };
-  }
-  renderAll();
 }
 
 function toggleResultMaxNeeded(): void {
@@ -13577,123 +13476,9 @@ function buildDepotAssetProjection(depot: InvestmentDepotKey, accountId = select
 
   const account = planningAccountById(accountId) ?? selectedInvestmentPlanningAccount();
   const settings = investmentSettingsWithGlobalEndDate(depotInvestmentSettingsForAccount(depot, accountId));
-  const virtualPositions = annualTransferInvestmentPositions(account.yearlyRows, settings);
-  const includedIds = new Set(settings.includedIds);
-  for (const position of virtualPositions) {
-    includedIds.add(position.id);
-  }
-  const projection = buildAssetProjection(state.settings.year, [...account.yearlyRows, ...virtualPositions], {
-    ...settings,
-    includedIds: Array.from(includedIds)
-  });
+  const projection = buildAssetProjection(state.settings.year, account.yearlyRows, settings);
   depotAssetProjectionCache.set(cacheKey, projection);
   return projection;
-}
-
-function annualTransferInvestmentPositions(
-  positions: ReservePosition[],
-  settings: InvestmentSettings
-): ReservePosition[] {
-  const endYear = investmentProjectionEndYear(settings);
-  const cacheKey = [
-    "combined",
-    state.settings.year,
-    endYear,
-    state.settings.interestRatePercent,
-    state.settings.cashbackRatePercent,
-    settings.includeAccountInterest ? "interest" : "no-interest",
-    settings.includeAccountCashback ? "cashback" : "no-cashback"
-  ].join("|");
-  const positionsCache = annualInvestmentTransferPositionsCacheFor(positions);
-  const cachedPositions = positionsCache.get(cacheKey);
-  if (cachedPositions) return cachedPositions;
-
-  const transferPositions: ReservePosition[] = [];
-  if (settings.includeAccountInterest) {
-    transferPositions.push(
-      ...cachedAnnualInvestmentTransferPositions({
-        baseId: INTEREST_INVESTMENT_POSITION_ID,
-        name: "Zinsen aus Jahrestabelle",
-        icon: "interest",
-        kind: "interest",
-        settings: state.settings,
-        positions,
-        startYear: state.settings.year,
-        endYear
-      })
-    );
-  }
-  if (settings.includeAccountCashback) {
-    transferPositions.push(
-      ...cachedAnnualInvestmentTransferPositions({
-        baseId: CASHBACK_INVESTMENT_POSITION_ID,
-        name: "Cashback aus Jahrestabelle",
-        icon: "cashback",
-        kind: "cashback",
-        settings: state.settings,
-        positions,
-        startYear: state.settings.year,
-        endYear
-      })
-    );
-  }
-  positionsCache.set(cacheKey, transferPositions);
-  return transferPositions;
-}
-
-function investmentProjectionEndYear(settings: InvestmentSettings): number {
-  return Math.max(state.settings.year, Math.round(settings.birthYear + settings.payoutEndAge));
-}
-
-function currentAnnualInvestmentTransferAmount(
-  positions: ReservePosition[],
-  kind: AnnualInvestmentTransferKind,
-  settings: InvestmentSettings
-): number {
-  const endYear = investmentProjectionEndYear(investmentSettingsWithGlobalEndDate(settings));
-  const transfer = cachedAnnualInvestmentTransferPositions({
-    baseId: kind === "interest" ? INTEREST_INVESTMENT_POSITION_ID : CASHBACK_INVESTMENT_POSITION_ID,
-    name: kind === "interest" ? "Zinsen aus Jahrestabelle" : "Cashback aus Jahrestabelle",
-    icon: kind,
-    kind,
-    settings: state.settings,
-    positions,
-    startYear: state.settings.year,
-    endYear
-  }).find((position) => position.payoutYear === state.settings.year);
-  return transfer?.amount ?? 0;
-}
-
-function cachedAnnualInvestmentTransferPositions(
-  options: AnnualInvestmentTransferPositionOptions
-): ReservePosition[] {
-  const cacheKey = [
-    options.baseId,
-    options.kind,
-    options.settings.year,
-    options.settings.interestRatePercent,
-    options.settings.cashbackRatePercent,
-    Math.round(options.startYear),
-    Math.round(options.endYear)
-  ].join("|");
-  const positionsCache = annualInvestmentTransferPositionsCacheFor(options.positions);
-  const cachedPositions = positionsCache.get(cacheKey);
-  if (cachedPositions) return cachedPositions;
-
-  const transferPositions = buildAnnualInvestmentTransferPositions(options);
-  positionsCache.set(cacheKey, transferPositions);
-  return transferPositions;
-}
-
-function annualInvestmentTransferPositionsCacheFor(
-  positions: ReservePosition[]
-): Map<string, ReservePosition[]> {
-  let positionsCache = annualInvestmentTransferCache.get(positions);
-  if (!positionsCache) {
-    positionsCache = new Map();
-    annualInvestmentTransferCache.set(positions, positionsCache);
-  }
-  return positionsCache;
 }
 
 function investmentSettingsWithGlobalEndDate(settings: InvestmentSettings): InvestmentSettings {
@@ -13858,8 +13643,6 @@ function normalizeInvestmentBounds(): void {
   const retirementSettings = {
     ...nextInvestment,
     includedIds: nextInvestment.retirementIncludedIds,
-    includeAccountInterest: nextInvestment.retirementIncludeAccountInterest,
-    includeAccountCashback: nextInvestment.retirementIncludeAccountCashback,
     retirementDepotEnabled: true,
     birthYear: nextInvestment.retirementBirthYear,
     chartStartAge: nextInvestment.retirementChartStartAge,
@@ -13949,19 +13732,7 @@ function normalizeInvestmentDepotSelections(): void {
   state.investment = {
     ...state.investment,
     retirementIncludedIds: retirementIds,
-    childIncludedIds: childIds,
-    retirementIncludeAccountInterest:
-      state.investment.includeAccountInterest ? false : state.investment.retirementIncludeAccountInterest,
-    retirementIncludeAccountCashback:
-      state.investment.includeAccountCashback ? false : state.investment.retirementIncludeAccountCashback,
-    childIncludeAccountInterest:
-      state.investment.includeAccountInterest || state.investment.retirementIncludeAccountInterest
-        ? false
-        : state.investment.childIncludeAccountInterest,
-    childIncludeAccountCashback:
-      state.investment.includeAccountCashback || state.investment.retirementIncludeAccountCashback
-        ? false
-        : state.investment.childIncludeAccountCashback
+    childIncludedIds: childIds
   };
 }
 

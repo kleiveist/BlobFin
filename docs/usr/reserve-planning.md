@@ -71,8 +71,6 @@ Monthly, yearly, and one-time expense rows plus one-time income rows can open a 
 
 Interest is only calculated for positions with `Zinsen` enabled. One-time positions do not earn account interest.
 
-The yearly interest result can be transferred into one investment depot with the `Zinsen` toggle in the investment section.
-
 ## Cashback
 
 Cashback is only valid for `Temporar` positions with `Cashback` enabled.
@@ -80,8 +78,6 @@ Cashback is only valid for `Temporar` positions with `Cashback` enabled.
 - Monthly payout creates monthly cashback.
 - Yearly payout creates cashback in the payout month.
 - One-time payout creates cashback once in the configured payout year and month.
-
-The yearly cashback result can be transferred into one investment depot with the `Cashback` toggle.
 
 ## Positions Chart
 

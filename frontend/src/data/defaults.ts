@@ -177,14 +177,8 @@ export function defaultInvestmentSettings(): InvestmentSettings {
   return {
     activeDepot: "standard",
     includedIds: ["investitionsrate"],
-    includeAccountInterest: false,
-    includeAccountCashback: false,
     retirementIncludedIds: [],
-    retirementIncludeAccountInterest: false,
-    retirementIncludeAccountCashback: false,
     childIncludedIds: [],
-    childIncludeAccountInterest: false,
-    childIncludeAccountCashback: false,
     retirementDepotEnabled: false,
     retirementDepotChildren: 0,
     birthYear: 1993,
@@ -243,14 +237,8 @@ export function defaultInvestmentSettingsForNewAccount(): InvestmentSettings {
     ...defaultInvestmentSettings(),
     activeDepot: "standard",
     includedIds: [],
-    includeAccountInterest: false,
-    includeAccountCashback: false,
     retirementIncludedIds: [],
-    retirementIncludeAccountInterest: false,
-    retirementIncludeAccountCashback: false,
-    childIncludedIds: [],
-    childIncludeAccountInterest: false,
-    childIncludeAccountCashback: false
+    childIncludedIds: []
   };
 }
 

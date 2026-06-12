@@ -1,20 +1,5 @@
-import { calculateReserveSummary } from "./reserveCalculator";
-import { positionPlanningYear } from "../lib/planningYears";
 import { positionFlow } from "../lib/positionKinds";
-import type { InvestmentSettings, PlanningSettings, ReservePosition } from "../types";
-
-export type AnnualInvestmentTransferKind = "interest" | "cashback";
-
-export interface AnnualInvestmentTransferPositionOptions {
-  baseId: string;
-  name: string;
-  icon: string;
-  kind: AnnualInvestmentTransferKind;
-  settings: PlanningSettings;
-  positions: ReservePosition[];
-  startYear: number;
-  endYear: number;
-}
+import type { InvestmentSettings, ReservePosition } from "../types";
 
 export function investmentContributionForMonth(position: ReservePosition, year: number, month: number): number {
   if (position.payoutType === "once") return 0;
@@ -133,98 +118,6 @@ export function investmentSavingsSelectionSummary(
   };
 }
 
-export function buildAnnualInvestmentTransferPositions(
-  options: AnnualInvestmentTransferPositionOptions
-): ReservePosition[] {
-  const startYear = Math.round(options.startYear);
-  const endYear = Math.max(startYear, Math.round(options.endYear));
-  const actualValuesByYear = annualInvestmentTransferValuesByYear(options);
-  const positiveActualValues = Array.from(actualValuesByYear.values()).filter((value) => value > 0);
-  const forecastValue = positiveActualValues.length
-    ? roundMoney(positiveActualValues.reduce((sum, value) => sum + value, 0) / positiveActualValues.length)
-    : 0;
-  const positions: ReservePosition[] = [];
-
-  for (let year = startYear; year <= endYear; year += 1) {
-    const actualValue = actualValuesByYear.get(year);
-    const amount = actualValue !== undefined && actualValue > 0 ? actualValue : forecastValue;
-    if (amount <= 0) continue;
-    positions.push(annualInvestmentTransferPosition(options, year, amount));
-  }
-
-  return positions;
-}
-
-function annualInvestmentTransferValuesByYear(
-  options: AnnualInvestmentTransferPositionOptions
-): Map<number, number> {
-  const startYear = Math.round(options.startYear);
-  const endYear = Math.max(startYear, Math.round(options.endYear));
-  const startPositions: ReservePosition[] = [];
-  const positionsByYear = new Map<number, ReservePosition[]>();
-  const valuesByYear = new Map<number, number>();
-
-  for (const position of options.positions) {
-    const planningYear = positionPlanningYear(position);
-    if (planningYear === null) {
-      startPositions.push(position);
-      continue;
-    }
-    if (planningYear < startYear || planningYear > endYear) continue;
-    positionsByYear.set(planningYear, [...(positionsByYear.get(planningYear) ?? []), position]);
-  }
-
-  const startYearPositions = positionsByYear.get(startYear);
-  if (startYearPositions?.length) {
-    valuesByYear.set(startYear, annualInvestmentTransferValue(options, startYear, startYearPositions));
-  } else if (startPositions.length) {
-    valuesByYear.set(startYear, annualInvestmentTransferValue(options, startYear, startPositions));
-  }
-
-  for (const [year, yearlyPositions] of positionsByYear) {
-    if (year === startYear) continue;
-    valuesByYear.set(year, annualInvestmentTransferValue(options, year, yearlyPositions));
-  }
-
-  return valuesByYear;
-}
-
-function annualInvestmentTransferValue(
-  options: AnnualInvestmentTransferPositionOptions,
-  year: number,
-  positions: ReservePosition[]
-): number {
-  const summary = calculateReserveSummary({ ...options.settings, year }, positions);
-  const value = options.kind === "interest" ? summary.totalInterest : summary.totalCashback;
-  return roundMoney(Math.max(0, value));
-}
-
-function annualInvestmentTransferPosition(
-  options: AnnualInvestmentTransferPositionOptions,
-  year: number,
-  amount: number
-): ReservePosition {
-  return {
-    id: `${options.baseId}-${year}`,
-    planningYear: year,
-    flow: "expense",
-    active: true,
-    visible: false,
-    name: options.name,
-    icon: options.icon,
-    type: "savings",
-    amount,
-    startMonth: 12,
-    endMonth: 12,
-    payoutType: "once",
-    payoutYear: year,
-    payoutMonth: 12,
-    payoutDay: 31,
-    interestBearing: false,
-    cashback: false
-  };
-}
-
 export function selectedRecurringInvestmentContributionForProjectionYear(
   positions: ReservePosition[],
   settings: InvestmentSettings,
@@ -306,8 +199,4 @@ function investmentPositionYear(position: ReservePosition, fallbackYear: number)
   }
   const payoutYear = Number(position.payoutYear || fallbackYear);
   return Number.isFinite(payoutYear) ? payoutYear : fallbackYear;
-}
-
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
 }

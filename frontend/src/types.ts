@@ -171,14 +171,8 @@ export interface AppUiState {
 export interface InvestmentSettings {
   activeDepot: InvestmentDepotKey;
   includedIds: string[];
-  includeAccountInterest: boolean;
-  includeAccountCashback: boolean;
   retirementIncludedIds: string[];
-  retirementIncludeAccountInterest: boolean;
-  retirementIncludeAccountCashback: boolean;
   childIncludedIds: string[];
-  childIncludeAccountInterest: boolean;
-  childIncludeAccountCashback: boolean;
   retirementDepotEnabled: boolean;
   retirementDepotChildren: number;
   birthYear: number;

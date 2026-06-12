@@ -50,7 +50,7 @@ Interest is calculated only when `interestBearing` is true.
 - Temporary and savings positions use payout-day timing.
 - Reserve positions use accumulated balance and payout timing.
 
-The yearly interest total can be represented as a virtual investment position when the user enables `Zinsen` in one depot.
+The yearly interest total stays in the yearly table and is not transferred into investment projections.
 
 ## Cashback Calculation
 
@@ -60,13 +60,13 @@ Cashback is calculated only when all of these are true:
 - `cashback` is true,
 - `type` is `temporary`.
 
-Monthly, yearly, and one-time payout cadence decides when cashback is created. The yearly cashback total can be represented as a virtual investment position when the user enables `Cashback` in one depot.
+Monthly, yearly, and one-time payout cadence decides when cashback is created. The yearly cashback total stays in the yearly table and is not transferred into investment projections.
 
 ## Investment Contributions
 
 Implemented in `frontend/src/domain/investmentContributions.ts`.
 
-Only active selected expense positions with `type = savings` are investable. A selected savings position, account interest, or cashback transfer can belong to only one investment depot at a time.
+Only active selected expense positions with `type = savings` are investable. A selected savings position can belong to only one investment depot at a time.
 
 Recurring contributions:
 

@@ -272,8 +272,8 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain("Investment- und Auszahlungsplanung");
     expect(html).toContain('id="investmentIncludeList"');
     expect(html).toContain('id="investmentIncludePopup"');
-    expect(html).toContain('data-action="toggle-interest-investment"');
-    expect(html).toContain('data-action="toggle-cashback-investment"');
+    expect(html).not.toContain('data-action="toggle-interest-investment"');
+    expect(html).not.toContain('data-action="toggle-cashback-investment"');
   });
 
   it("keeps the account-year graphic visible as a compact pie chart", () => {

@@ -16,12 +16,7 @@ Monthly and yearly savings positions contribute to the recurring annual savings 
 - positions without rhythm are added only in their configured year and active month range,
 - they do not increase the displayed recurring `Jaehrliche Sparrate`.
 
-Two additional investment toggles can be enabled per depot:
-
-- `Zinsen`: invests yearly account interest from the yearly table.
-- `Cashback`: invests yearly cashback from the yearly table.
-
-Each savings position, `Zinsen`, and `Cashback` can be assigned to only one depot at a time. Savings positions already used by another depot are hidden in the current tab.
+Each savings position can be assigned to only one depot at a time. Savings positions already used by another depot are hidden in the current tab.
 
 If a selected recurring savings position starts in a future year, the displayed monthly and yearly savings rate uses the first active contribution year in the saving phase. One-time savings positions and savings positions without rhythm still count toward the projection wealth, but not toward the running savings-rate display.
 

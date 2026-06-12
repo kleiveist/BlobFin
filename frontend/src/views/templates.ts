@@ -583,16 +583,6 @@ export function renderAppShell(): string {
         <div class="investment-grid">
           <div class="investment-selector">
             <h3>Investierbare Positionen</h3>
-            <div class="include-special-toggles">
-              <button class="include-transfer-toggle" type="button" data-action="toggle-interest-investment" aria-pressed="false">
-                <span>Zinsen</span>
-                <strong id="interestInvestmentAmount">-</strong>
-              </button>
-              <button class="include-transfer-toggle" type="button" data-action="toggle-cashback-investment" aria-pressed="false">
-                <span>Cashback</span>
-                <strong id="cashbackInvestmentAmount">-</strong>
-              </button>
-            </div>
             <div id="investmentIncludeList" class="include-list"></div>
             <div id="investmentIncludePopup" class="investment-include-popup" role="dialog" aria-modal="true" aria-label="Investierbare Positionen auswaehlen" hidden></div>
           </div>
