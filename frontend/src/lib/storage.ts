@@ -920,6 +920,7 @@ function normalizeIncomePlanningWorkBlock(
   const category = normalizeIncomePlanningCategory(value.category);
   const id = String(value.id || createId());
   const fallback = buildIncomePlanningWorkBlock(category, id);
+  const legacyScenarioIds = normalizeIncomePlanningScenarioIds(value.scenarioIds, allowedScenarioIds);
   return {
     id,
     active: booleanOrDefault(value.active, true),
@@ -927,16 +928,20 @@ function normalizeIncomePlanningWorkBlock(
     name: String(value.name || fallback.name),
     description: String(value.description || ""),
     color: normalizeIncomePlanningColor(value.color, fallback.color ?? incomePlanningDefaultWorkColor(category)),
-    slots: Array.isArray(value.slots)
-      ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", 60)).filter(isSlot)
-      : fallback.slots,
-    scenarioIds: normalizeIncomePlanningScenarioIds(value.scenarioIds, allowedScenarioIds)
+    slots: normalizeIncomePlanningSlots(
+      value.slots,
+      fallback.slots,
+      "sunday",
+      60,
+      allowedScenarioIds,
+      legacyScenarioIds
+    )
   };
 }
 
 function normalizeLegacyIncomePlanningSource(
   value: unknown,
-  _allowedScenarioIds: Set<IncomePlanningWeekScenarioId>
+  allowedScenarioIds: Set<IncomePlanningWeekScenarioId>
 ): IncomePlanningWorkBlock | null {
   if (!isRecord(value)) return null;
   const category = normalizeIncomePlanningCategory(value.category);
@@ -944,6 +949,7 @@ function normalizeLegacyIncomePlanningSource(
   const config = incomePlanningCategoryConfig(category);
   const fallbackHours = config.defaultSlots.reduce((sum, slot) => sum + slot.durationMinutes, 0) / 60;
   const hoursPerWeek = clampNumber(numberOrDefault(value.hoursPerWeek, fallbackHours), 0, 168);
+  const scenarioIds = normalizeIncomePlanningScenarioIds(value.scenarioIds, allowedScenarioIds);
   return buildIncomePlanningWorkBlock(category, id, {
     active: booleanOrDefault(value.active, true),
     name: String(value.name || config.defaultName),
@@ -955,7 +961,8 @@ function normalizeLegacyIncomePlanningSource(
         startTime: "00:00",
         endTime: "00:00",
         flexible: true,
-        durationMinutes: Math.round(hoursPerWeek * 60)
+        durationMinutes: Math.round(hoursPerWeek * 60),
+        scenarioIds
       }
     ]
   });
@@ -969,6 +976,7 @@ function normalizeIncomePlanningHabit(
   const fallback = defaultIncomePlanningState().habits[0];
   const durationMinutes = Math.round(clampNumber(numberOrDefault(value.durationMinutes, fallback.durationMinutes), 0, 1440));
   const type = isIncomePlanningHabitType(value.type) ? value.type : fallback.type;
+  const legacyScenarioIds = normalizeIncomePlanningScenarioIds(value.scenarioIds, allowedScenarioIds);
   return {
     id: String(value.id || createId()),
     active: booleanOrDefault(value.active, true),
@@ -983,13 +991,15 @@ function normalizeIncomePlanningHabit(
     status: isIncomePlanningHabitStatus(value.status) ? value.status : fallback.status,
     priority: isIncomePlanningPriority(value.priority) ? value.priority : fallback.priority,
     icon: normalizePositionIcon(value.icon, type === "bad" ? "snack" : "book"),
-    slots: Array.isArray(value.slots)
-      ? value.slots
-          .map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", durationMinutes))
-          .filter(isSlot)
-          .map(incomePlanningStripSlotPause)
-      : fallback.slots,
-    scenarioIds: normalizeIncomePlanningScenarioIds(value.scenarioIds, allowedScenarioIds)
+    slots: normalizeIncomePlanningSlots(
+      value.slots,
+      fallback.slots,
+      "sunday",
+      durationMinutes,
+      allowedScenarioIds,
+      legacyScenarioIds,
+      true
+    )
   };
 }
 
@@ -1000,6 +1010,7 @@ function normalizeIncomePlanningManualBlock(
   if (!isRecord(value)) return null;
   const type = isIncomePlanningManualBlockType(value.type) ? value.type : "other_event";
   const fallback = buildIncomePlanningManualBlock(type, String(value.id || createId()));
+  const legacyScenarioIds = normalizeIncomePlanningScenarioIds(value.scenarioIds, allowedScenarioIds);
   return {
     id: fallback.id,
     active: booleanOrDefault(value.active, true),
@@ -1008,10 +1019,14 @@ function normalizeIncomePlanningManualBlock(
     description: String(value.description || ""),
     color: normalizeIncomePlanningColor(value.color, fallback.color ?? incomePlanningDefaultManualColor(type)),
     icon: normalizePositionIcon(value.icon, incomePlanningDefaultManualIcon(type)),
-    slots: Array.isArray(value.slots)
-      ? value.slots.map((slotValue) => normalizeIncomePlanningSlot(slotValue, "sunday", 60)).filter(isSlot)
-      : fallback.slots,
-    scenarioIds: normalizeIncomePlanningScenarioIds(value.scenarioIds, allowedScenarioIds)
+    slots: normalizeIncomePlanningSlots(
+      value.slots,
+      fallback.slots,
+      "sunday",
+      60,
+      allowedScenarioIds,
+      legacyScenarioIds
+    )
   };
 }
 
@@ -1115,7 +1130,8 @@ function normalizeIncomePlanningScenarioIds(
 function normalizeIncomePlanningSlot(
   value: unknown,
   fallbackDay: IncomePlanningSlot["day"],
-  fallbackDurationMinutes: number
+  fallbackDurationMinutes: number,
+  allowedScenarioIds: Set<IncomePlanningWeekScenarioId>
 ): IncomePlanningSlot | null {
   if (!isRecord(value)) return null;
   const startTime = normalizeIncomePlanningTime(value.startTime, "09:00");
@@ -1128,11 +1144,15 @@ function normalizeIncomePlanningSlot(
   );
   const normalizedSlot: IncomePlanningSlot = {
     id: String(value.id || createId()),
+    ...(String(value.note ?? value.slotNote ?? "").trim()
+      ? { note: String(value.note ?? value.slotNote).trim() }
+      : {}),
     day: isIncomePlanningWeekday(value.day) ? value.day : fallbackDay,
     startTime,
     endTime,
     flexible: booleanOrDefault(value.flexible, false),
-    durationMinutes: clockDuration ?? storedDuration
+    durationMinutes: clockDuration ?? storedDuration,
+    scenarioIds: normalizeIncomePlanningScenarioIds(value.scenarioIds, allowedScenarioIds)
   };
   const pauseStartTime = "pauseStartTime" in value ? normalizeIncomePlanningTime(value.pauseStartTime, "12:00") : undefined;
   const pauseEndTime = "pauseEndTime" in value ? normalizeIncomePlanningTime(value.pauseEndTime, "12:30") : undefined;
@@ -1147,6 +1167,28 @@ function normalizeIncomePlanningSlot(
     pauseEndTime,
     pauseDurationMinutes
   };
+}
+
+function normalizeIncomePlanningSlots(
+  value: unknown,
+  fallbackSlots: IncomePlanningSlot[],
+  fallbackDay: IncomePlanningSlot["day"],
+  fallbackDurationMinutes: number,
+  allowedScenarioIds: Set<IncomePlanningWeekScenarioId>,
+  legacyScenarioIds: IncomePlanningWeekScenarioId[] | undefined,
+  stripPause = false
+): IncomePlanningSlot[] {
+  const slots = Array.isArray(value)
+    ? value
+        .map((slotValue) => normalizeIncomePlanningSlot(slotValue, fallbackDay, fallbackDurationMinutes, allowedScenarioIds))
+        .filter(isSlot)
+    : fallbackSlots;
+  return slots.map((slot) => {
+    const migratedSlot = slot.scenarioIds?.length || !legacyScenarioIds?.length
+      ? slot
+      : { ...slot, scenarioIds: legacyScenarioIds };
+    return stripPause ? incomePlanningStripSlotPause(migratedSlot) : migratedSlot;
+  });
 }
 
 function normalizeIncomePlanningColor(value: unknown, fallback: string): string {

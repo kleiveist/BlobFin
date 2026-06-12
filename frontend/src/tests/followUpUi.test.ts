@@ -236,6 +236,8 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain("function updateIncomeStampPlannerStampAfterPlannerDrag");
     expect(mainSource).toContain("function incomePlanningPlannedStampsForCurrentWeek");
     expect(mainSource).toContain('class="income-planning-dialog-grid basis"');
+    expect(mainSource).toContain("function incomePlanningSlotDialogFields");
+    expect(mainSource).toContain('data-income-planning-dialog-field="slotNote"');
     expect(mainSource).toContain("function incomePlanningDialogCanDeleteSlot");
   });
 

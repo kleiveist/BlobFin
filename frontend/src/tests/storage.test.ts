@@ -275,7 +275,26 @@ describe("storage", () => {
           name: "Job",
           description: "",
           scenarioIds: ["focus", "missing", "uni"],
-          slots: []
+          slots: [
+            {
+              id: "work-slot",
+              slotNote: "Team A",
+              day: "monday",
+              startTime: "09:00",
+              endTime: "12:00",
+              flexible: false,
+              durationMinutes: 180
+            },
+            {
+              id: "work-slot-own-scenario",
+              day: "tuesday",
+              startTime: "09:00",
+              endTime: "10:00",
+              flexible: false,
+              durationMinutes: 60,
+              scenarioIds: ["self_employed"]
+            }
+          ]
         }
       ],
       habits: [
@@ -293,7 +312,16 @@ describe("storage", () => {
           status: "planned",
           priority: "medium",
           scenarioIds: ["self_employed", "project"],
-          slots: []
+          slots: [
+            {
+              id: "habit-slot",
+              day: "wednesday",
+              startTime: "21:00",
+              endTime: "21:30",
+              flexible: false,
+              durationMinutes: 30
+            }
+          ]
         }
       ],
       manualBlocks: [
@@ -304,7 +332,16 @@ describe("storage", () => {
           name: "Freizeit",
           description: "",
           scenarioIds: ["normal", "self_employed", "focus"],
-          slots: []
+          slots: [
+            {
+              id: "manual-slot",
+              day: "friday",
+              startTime: "18:00",
+              endTime: "19:00",
+              flexible: false,
+              durationMinutes: 60
+            }
+          ]
         }
       ],
       calendarStamps: [
@@ -353,9 +390,16 @@ describe("storage", () => {
     const loaded = loadState(storage);
 
     expect(loaded.incomePlanning.weekScenarios).toEqual([{ id: "focus", label: "Fokuswoche neu" }]);
-    expect(loaded.incomePlanning.workBlocks[0].scenarioIds).toEqual(["focus"]);
-    expect(loaded.incomePlanning.habits[0].scenarioIds).toEqual(["self_employed"]);
-    expect(loaded.incomePlanning.manualBlocks[0].scenarioIds).toBeUndefined();
+    expect(loaded.incomePlanning.workBlocks[0]).not.toHaveProperty("scenarioIds");
+    expect(loaded.incomePlanning.workBlocks[0].slots[0]).toMatchObject({
+      note: "Team A",
+      scenarioIds: ["focus"]
+    });
+    expect(loaded.incomePlanning.workBlocks[0].slots[1].scenarioIds).toEqual(["self_employed"]);
+    expect(loaded.incomePlanning.habits[0]).not.toHaveProperty("scenarioIds");
+    expect(loaded.incomePlanning.habits[0].slots[0].scenarioIds).toEqual(["self_employed"]);
+    expect(loaded.incomePlanning.manualBlocks[0]).not.toHaveProperty("scenarioIds");
+    expect(loaded.incomePlanning.manualBlocks[0].slots[0].scenarioIds).toBeUndefined();
     expect(loaded.incomePlanning.calendarStamps[0].scenarioIds).toEqual(["focus"]);
     expect(loaded.incomePlanning.plannedStamps[0].scenarioIds).toEqual(["focus"]);
     expect(loaded.incomePlanning.assumptions.sleepSlots[0].scenarioIds).toEqual(["focus"]);

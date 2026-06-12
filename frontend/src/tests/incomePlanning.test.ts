@@ -42,33 +42,27 @@ describe("income planning", () => {
       workBlocks: [
         buildIncomePlanningWorkBlock("salary", "all-work", { slots: [flexiblePlanningSlot("all-work-slot", 2)] }),
         buildIncomePlanningWorkBlock("self_employed", "self-work", {
-          scenarioIds: ["self_employed"],
-          slots: [flexiblePlanningSlot("self-work-slot", 3)]
+          slots: [{ ...flexiblePlanningSlot("self-work-slot", 3), scenarioIds: ["self_employed"] }]
         }),
         buildIncomePlanningWorkBlock("freelance", "focus-work", {
-          scenarioIds: ["focus"],
-          slots: [flexiblePlanningSlot("focus-work-slot", 4)]
+          slots: [{ ...flexiblePlanningSlot("focus-work-slot", 4), scenarioIds: ["focus"] }]
         })
       ],
       manualBlocks: [
         buildIncomePlanningManualBlock("free_time", "normal-manual", {
-          scenarioIds: ["normal"],
-          slots: [flexiblePlanningSlot("normal-manual-slot", 1)]
+          slots: [{ ...flexiblePlanningSlot("normal-manual-slot", 1), scenarioIds: ["normal"] }]
         }),
         buildIncomePlanningManualBlock("buffer", "focus-manual", {
-          scenarioIds: ["focus"],
-          slots: [flexiblePlanningSlot("focus-manual-slot", 2)]
+          slots: [{ ...flexiblePlanningSlot("focus-manual-slot", 2), scenarioIds: ["focus"] }]
         })
       ],
       habits: [
         buildIncomePlanningHabit("all-habit", { slots: [flexiblePlanningSlot("all-habit-slot", 1)] }),
         buildIncomePlanningHabit("self-habit", {
-          scenarioIds: ["self_employed"],
-          slots: [flexiblePlanningSlot("self-habit-slot", 1)]
+          slots: [{ ...flexiblePlanningSlot("self-habit-slot", 1), scenarioIds: ["self_employed"] }]
         }),
         buildIncomePlanningHabit("focus-habit", {
-          scenarioIds: ["focus"],
-          slots: [flexiblePlanningSlot("focus-habit-slot", 1)]
+          slots: [{ ...flexiblePlanningSlot("focus-habit-slot", 1), scenarioIds: ["focus"] }]
         })
       ],
       assumptions: {
@@ -100,6 +94,31 @@ describe("income planning", () => {
       "scenario_suggestion"
     );
     expect(JSON.stringify(state)).toBe(snapshot);
+  });
+
+  it("renders only saved separated slots without filling weekday gaps", () => {
+    const state: IncomePlanningState = {
+      ...defaultIncomePlanningState(),
+      workBlocks: [
+        buildIncomePlanningWorkBlock("salary", "shift-work", {
+          slots: [
+            fixedPlanningSlot("tuesday-slot", "tuesday", "09:00", "12:00"),
+            fixedPlanningSlot("wednesday-slot", "wednesday", "09:00", "12:00"),
+            fixedPlanningSlot("friday-slot", "friday", "10:00", "14:00")
+          ]
+        })
+      ],
+      habits: [],
+      manualBlocks: [],
+      assumptions: { sleepHoursPerDay: 0, sleepSlots: [] }
+    };
+
+    const model = buildIncomePlanningModel(state);
+    const workEntries = model.calendarEntries.filter((entry) => entry.ownerId === "shift-work" && entry.slotPart === "main");
+
+    expect(workEntries.map((entry) => entry.day)).toEqual(["tuesday", "wednesday", "friday"]);
+    expect(workEntries.map((entry) => entry.day)).not.toContain("thursday");
+    expect(model.activeWorkBlocks[0].slots.map((slot) => slot.id)).toEqual(["tuesday-slot", "wednesday-slot", "friday-slot"]);
   });
 
   it("preloads the requested default work and sleep slots", () => {
@@ -204,6 +223,29 @@ describe("income planning", () => {
       title: "Buch lesen",
       type: "good_habit"
     });
+  });
+
+  it("does not create fallback calendar entries for habits without slots", () => {
+    const state: IncomePlanningState = {
+      ...defaultIncomePlanningState(),
+      workBlocks: [],
+      manualBlocks: [],
+      habits: [
+        buildIncomePlanningHabit("book", {
+          name: "Buch lesen",
+          durationMinutes: 30,
+          durationUnit: "day",
+          slots: []
+        })
+      ],
+      assumptions: { sleepHoursPerDay: 0, sleepSlots: [] }
+    };
+
+    const model = buildIncomePlanningModel(state);
+
+    expect(model.activeHabits).toHaveLength(0);
+    expect(model.habitHours).toBe(0);
+    expect(model.calendarEntries.some((entry) => entry.type === "good_habit")).toBe(false);
   });
 
   it("marks a bad habit and replacement habit in the same slot as conflicts", () => {
@@ -369,10 +411,10 @@ describe("income planning", () => {
           name: "Fruehschicht",
           description: "Hauptjob",
           color: "#123456",
-          scenarioIds: ["self_employed", "focus"],
           slots: [
             {
               id: "main-slot",
+              note: "Team A",
               day: "monday",
               startTime: "06:30",
               endTime: "15:45",
@@ -381,7 +423,8 @@ describe("income planning", () => {
               pauseEnabled: true,
               pauseStartTime: "12:00",
               pauseEndTime: "12:30",
-              pauseDurationMinutes: 30
+              pauseDurationMinutes: 30,
+              scenarioIds: ["self_employed", "focus"]
             }
           ]
         })
@@ -398,15 +441,16 @@ describe("income planning", () => {
           status: "difficult",
           priority: "high",
           icon: "snack",
-          scenarioIds: ["focus"],
           slots: [
             {
               id: "habit-slot",
+              note: "Nur kurz",
               day: "tuesday",
               startTime: "21:30",
               endTime: "21:50",
               flexible: false,
-              durationMinutes: 20
+              durationMinutes: 20,
+              scenarioIds: ["focus"]
             }
           ]
         })
@@ -415,8 +459,7 @@ describe("income planning", () => {
         buildIncomePlanningManualBlock("free_time", "free", {
           name: "Freizeit",
           icon: "health",
-          scenarioIds: ["normal"],
-          slots: [flexiblePlanningSlot("free-slot", 5)]
+          slots: [{ ...flexiblePlanningSlot("free-slot", 5), note: "Puffer", scenarioIds: ["normal"] }]
         })
       ],
       calendarStamps: [
@@ -472,21 +515,26 @@ describe("income planning", () => {
     expect(csv).toContain("Wochenszenario");
     expect(csv).toContain("Wochenszenario-Label");
     expect(csv).toContain("Szenario-IDs");
+    expect(csv).toContain("Slot-Notiz");
+    expect(csv).toContain("Team A");
+    expect(csv).toContain("Nur kurz");
     expect(imported?.workBlocks[0]).toMatchObject({
       id: "main",
       active: true,
       category: "salary",
       name: "Fruehschicht",
       description: "Hauptjob",
-      color: "#123456",
-      scenarioIds: ["self_employed", "focus"]
+      color: "#123456"
     });
+    expect(imported?.workBlocks[0]).not.toHaveProperty("scenarioIds");
     expect(imported?.workBlocks[0]?.slots[0]).toMatchObject({
       id: "main-slot",
+      note: "Team A",
       pauseEnabled: true,
       pauseStartTime: "12:00",
       pauseEndTime: "12:30",
-      pauseDurationMinutes: 30
+      pauseDurationMinutes: 30,
+      scenarioIds: ["self_employed", "focus"]
     });
     expect(imported?.habits[0]).toMatchObject({
       id: "habit",
@@ -495,11 +543,23 @@ describe("income planning", () => {
       replacementHabit: "Buch lesen",
       status: "difficult",
       priority: "high",
-      icon: "snack",
+      icon: "snack"
+    });
+    expect(imported?.habits[0]).not.toHaveProperty("scenarioIds");
+    expect(imported?.habits[0]?.slots[0]).toMatchObject({
+      id: "habit-slot",
+      note: "Nur kurz",
       scenarioIds: ["focus"]
     });
-    expect(imported?.manualBlocks[0]).toMatchObject({ id: "free", icon: "health", scenarioIds: ["normal"] });
-    expect(imported?.manualBlocks[0]?.slots[0]).toMatchObject({ id: "free-slot", flexible: true, durationMinutes: 300 });
+    expect(imported?.manualBlocks[0]).toMatchObject({ id: "free", icon: "health" });
+    expect(imported?.manualBlocks[0]).not.toHaveProperty("scenarioIds");
+    expect(imported?.manualBlocks[0]?.slots[0]).toMatchObject({
+      id: "free-slot",
+      flexible: true,
+      durationMinutes: 300,
+      note: "Puffer",
+      scenarioIds: ["normal"]
+    });
     expect(imported?.calendarStamps[0]).toMatchObject({
       id: "stamp-walk",
       day: "wednesday",
@@ -528,6 +588,107 @@ describe("income planning", () => {
       durationMinutes: 480,
       scenarioIds: ["focus"]
     });
+  });
+
+  it("imports legacy owner scenarios onto slots without rewriting base entries", () => {
+    const csv = [
+      incomePlanningCsvTestRow({
+        0: "Datensatz",
+        1: "Block-ID",
+        2: "Slot-ID",
+        3: "Aktiv",
+        4: "Kategorie",
+        5: "Name",
+        6: "Beschreibung",
+        7: "Farbe",
+        8: "Tag",
+        9: "Startzeit",
+        10: "Endzeit",
+        11: "Flexibel",
+        12: "Dauer-Minuten",
+        13: "Pause-Aktiv",
+        14: "Pause-Startzeit",
+        15: "Pause-Endzeit",
+        16: "Pause-Minuten",
+        17: "Habit-Typ",
+        18: "Habit-Timing",
+        19: "Habit-Dauer-Minuten",
+        20: "Habit-Dauer-Einheit",
+        21: "Habit-Ziel",
+        22: "Habit-Ersatz",
+        23: "Habit-Status",
+        24: "Habit-Prioritaet",
+        25: "Icon",
+        26: "Schlaf-Stunden-Pro-Tag",
+        27: "Datum",
+        28: "Wochenstart",
+        29: "Szenario-ID",
+        30: "Szenario-IDs",
+        31: "Szenario-Label",
+        32: "Slot-Notiz"
+      }),
+      incomePlanningCsvTestRow({ 0: "Arbeit", 1: "legacy-work", 4: "salary", 5: "Job", 30: "self_employed" }),
+      incomePlanningCsvTestRow({
+        0: "Arbeit-Slot",
+        1: "legacy-work",
+        2: "legacy-work-slot",
+        8: "monday",
+        9: "09:00",
+        10: "12:00",
+        11: "false",
+        12: "180"
+      }),
+      incomePlanningCsvTestRow({
+        0: "Habit",
+        1: "legacy-habit",
+        5: "Lesen",
+        17: "good",
+        18: "abends",
+        19: "30",
+        20: "day",
+        21: "build",
+        23: "planned",
+        24: "medium",
+        25: "book",
+        30: "self_employed"
+      }),
+      incomePlanningCsvTestRow({
+        0: "Habit-Slot",
+        1: "legacy-habit",
+        2: "legacy-habit-slot",
+        8: "tuesday",
+        9: "21:00",
+        10: "21:30",
+        11: "false",
+        12: "30"
+      }),
+      incomePlanningCsvTestRow({
+        0: "Zeitblock",
+        1: "legacy-manual",
+        4: "free_time",
+        5: "Freizeit",
+        30: "self_employed"
+      }),
+      incomePlanningCsvTestRow({
+        0: "Zeitblock-Slot",
+        1: "legacy-manual",
+        2: "legacy-manual-slot",
+        8: "friday",
+        9: "18:00",
+        10: "19:00",
+        11: "false",
+        12: "60"
+      })
+    ].join("\n");
+
+    const imported = incomePlanningFromCsvRows(parseCsv(csv));
+
+    expect(imported?.workBlocks[0]).not.toHaveProperty("scenarioIds");
+    expect(imported?.workBlocks[0].slots[0].scenarioIds).toEqual(["self_employed"]);
+    expect(imported?.habits[0]).not.toHaveProperty("scenarioIds");
+    expect(imported?.habits[0].slots[0].scenarioIds).toEqual(["self_employed"]);
+    expect(imported?.manualBlocks[0]).not.toHaveProperty("scenarioIds");
+    expect(imported?.manualBlocks[0].slots[0].scenarioIds).toEqual(["self_employed"]);
   });
 
   it("uses the yearly income labels as work planning categories", () => {
@@ -576,4 +737,30 @@ function flexiblePlanningSlot(id: string, hours: number): IncomePlanningSlot {
     flexible: true,
     durationMinutes: hours * 60
   };
+}
+
+function fixedPlanningSlot(
+  id: string,
+  day: IncomePlanningSlot["day"],
+  startTime: string,
+  endTime: string
+): IncomePlanningSlot {
+  const [startHour, startMinute] = startTime.split(":").map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
+  return {
+    id,
+    day,
+    startTime,
+    endTime,
+    flexible: false,
+    durationMinutes: (endHour * 60 + endMinute) - (startHour * 60 + startMinute)
+  };
+}
+
+function incomePlanningCsvTestRow(values: Partial<Record<number, string>>): string {
+  const row = Array.from({ length: 33 }, () => "");
+  for (const [index, value] of Object.entries(values)) {
+    row[Number(index)] = value;
+  }
+  return row.map((value) => `"${value.replaceAll('"', '""')}"`).join(",");
 }

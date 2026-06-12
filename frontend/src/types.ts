@@ -397,6 +397,7 @@ export interface IncomeTrackerState {
 
 export interface IncomePlanningSlot {
   id: string;
+  note?: string;
   day: IncomePlanningWeekday;
   startTime: string;
   endTime: string;
@@ -406,6 +407,7 @@ export interface IncomePlanningSlot {
   pauseStartTime?: string;
   pauseEndTime?: string;
   pauseDurationMinutes?: number;
+  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningSleepSlot {
@@ -426,7 +428,6 @@ export interface IncomePlanningWorkBlock {
   description: string;
   color?: string;
   slots: IncomePlanningSlot[];
-  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningHabit {
@@ -444,7 +445,6 @@ export interface IncomePlanningHabit {
   priority: IncomePlanningPriority;
   icon?: string;
   slots: IncomePlanningSlot[];
-  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningManualBlock {
@@ -456,7 +456,6 @@ export interface IncomePlanningManualBlock {
   color?: string;
   icon?: string;
   slots: IncomePlanningSlot[];
-  scenarioIds?: IncomePlanningWeekScenarioId[];
 }
 
 export interface IncomePlanningCalendarStamp {

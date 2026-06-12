@@ -297,7 +297,8 @@ const INCOME_PLANNING_CSV_HEADER = [
   "Wochenstart",
   "Szenario-ID",
   "Szenario-IDs",
-  "Szenario-Label"
+  "Szenario-Label",
+  "Slot-Notiz"
 ];
 
 type IncomePlanningCsvRowKind =
@@ -327,8 +328,7 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         4: block.category,
         5: block.name,
         6: block.description,
-        7: block.color ?? incomePlanningDefaultWorkColor(block.category),
-        30: formatIncomePlanningScenarioIds(block.scenarioIds)
+        7: block.color ?? incomePlanningDefaultWorkColor(block.category)
       })
     );
     for (const slot of block.slots) {
@@ -351,8 +351,7 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         22: habit.replacementHabit,
         23: habit.status,
         24: habit.priority,
-        25: habit.icon ?? (habit.type === "bad" ? "snack" : "book"),
-        30: formatIncomePlanningScenarioIds(habit.scenarioIds)
+        25: habit.icon ?? (habit.type === "bad" ? "snack" : "book")
       })
     );
     for (const slot of habit.slots) {
@@ -369,8 +368,7 @@ export function exportIncomePlanningCsv(planning: IncomePlanningState): string {
         5: block.name,
         6: block.description,
         7: block.color ?? incomePlanningDefaultManualColor(block.type),
-        25: block.icon ?? incomePlanningDefaultManualIcon(block.type),
-        30: formatIncomePlanningScenarioIds(block.scenarioIds)
+        25: block.icon ?? incomePlanningDefaultManualIcon(block.type)
       })
     );
     for (const slot of block.slots) {
@@ -454,6 +452,7 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
   const habits = new Map<string, IncomePlanningHabit>();
   const manualBlocks = new Map<string, IncomePlanningManualBlock>();
   const slotsByOwnerId = new Map<string, IncomePlanningSlot[]>();
+  const legacyScenarioIdsByOwnerId = new Map<string, IncomePlanningWeekScenarioId[]>();
   const calendarStamps: IncomePlanningCalendarStamp[] = [];
   const plannedStamps: IncomePlanningPlannedStamp[] = [];
   const weekScenarios: IncomePlanningWeekScenario[] = [];
@@ -475,6 +474,8 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
     if (kind === "work") {
       const block = parseIncomePlanningWorkBlock(row, get);
       workBlocks.set(block.id, block);
+      const scenarioIds = parseIncomePlanningScenarioIds(row, get);
+      if (scenarioIds?.length) legacyScenarioIdsByOwnerId.set(block.id, scenarioIds);
       recognizedRows += 1;
       continue;
     }
@@ -482,6 +483,8 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
     if (kind === "habit") {
       const habit = parseIncomePlanningHabit(row, get);
       habits.set(habit.id, habit);
+      const scenarioIds = parseIncomePlanningScenarioIds(row, get);
+      if (scenarioIds?.length) legacyScenarioIdsByOwnerId.set(habit.id, scenarioIds);
       recognizedRows += 1;
       continue;
     }
@@ -489,6 +492,8 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
     if (kind === "manual") {
       const block = parseIncomePlanningManualBlock(row, get);
       manualBlocks.set(block.id, block);
+      const scenarioIds = parseIncomePlanningScenarioIds(row, get);
+      if (scenarioIds?.length) legacyScenarioIdsByOwnerId.set(block.id, scenarioIds);
       recognizedRows += 1;
       continue;
     }
@@ -551,16 +556,28 @@ export function incomePlanningFromCsvRows(rows: string[][]): IncomePlanningState
   );
   return {
     workBlocks: Array.from(workBlocks.values()).map((block) => ({
-      ...normalizeIncomePlanningCsvEntryScenarioIds(block, allowedScenarioIds),
-      slots: slotsByOwnerId.get(block.id) ?? []
+      ...block,
+      slots: normalizeIncomePlanningCsvSlots(
+        slotsByOwnerId.get(block.id) ?? [],
+        allowedScenarioIds,
+        legacyScenarioIdsByOwnerId.get(block.id)
+      )
     })),
     habits: Array.from(habits.values()).map((habit) => ({
-      ...normalizeIncomePlanningCsvEntryScenarioIds(habit, allowedScenarioIds),
-      slots: (slotsByOwnerId.get(habit.id) ?? []).map(incomePlanningStripSlotPause)
+      ...habit,
+      slots: normalizeIncomePlanningCsvSlots(
+        slotsByOwnerId.get(habit.id) ?? [],
+        allowedScenarioIds,
+        legacyScenarioIdsByOwnerId.get(habit.id)
+      ).map(incomePlanningStripSlotPause)
     })),
     manualBlocks: Array.from(manualBlocks.values()).map((block) => ({
-      ...normalizeIncomePlanningCsvEntryScenarioIds(block, allowedScenarioIds),
-      slots: slotsByOwnerId.get(block.id) ?? []
+      ...block,
+      slots: normalizeIncomePlanningCsvSlots(
+        slotsByOwnerId.get(block.id) ?? [],
+        allowedScenarioIds,
+        legacyScenarioIdsByOwnerId.get(block.id)
+      )
     })),
     calendarStamps: calendarStamps.map((stamp) => normalizeIncomePlanningCsvEntryScenarioIds(stamp, allowedScenarioIds)),
     plannedStamps: plannedStamps.map((stamp) => normalizeIncomePlanningCsvEntryScenarioIds(stamp, allowedScenarioIds)),
@@ -606,7 +623,9 @@ function incomePlanningSlotCsvCells(slot: IncomePlanningSlot): Partial<Record<nu
     13: slot.pauseEnabled === undefined ? "" : booleanCsv(slot.pauseEnabled),
     14: slot.pauseStartTime ?? "",
     15: slot.pauseEndTime ?? "",
-    16: slot.pauseDurationMinutes === undefined ? "" : String(Math.round(slot.pauseDurationMinutes))
+    16: slot.pauseDurationMinutes === undefined ? "" : String(Math.round(slot.pauseDurationMinutes)),
+    30: formatIncomePlanningScenarioIds(slot.scenarioIds),
+    32: slot.note ?? ""
   };
 }
 
@@ -664,8 +683,7 @@ function parseIncomePlanningWorkBlock(row: string[], get: CsvRowGetter): IncomeP
     name: cleanText(get(row, ["name", "titel", "title"], 5)) || fallback.name,
     description: cleanText(get(row, ["beschreibung", "description"], 6)),
     color,
-    slots: [],
-    scenarioIds: parseIncomePlanningScenarioIds(row, get)
+    slots: []
   };
 }
 
@@ -696,8 +714,7 @@ function parseIncomePlanningHabit(row: string[], get: CsvRowGetter): IncomePlann
     status: parseIncomePlanningHabitStatus(get(row, ["habitstatus", "status"], 23), fallback.status),
     priority: parseIncomePlanningPriority(get(row, ["habitprioritaet", "priority", "prioritaet"], 24), fallback.priority),
     icon: normalizePositionIcon(get(row, ["habiticon", "icon", "symbol"], 25), type === "bad" ? "snack" : "book"),
-    slots: [],
-    scenarioIds: parseIncomePlanningScenarioIds(row, get)
+    slots: []
   };
 }
 
@@ -716,8 +733,7 @@ function parseIncomePlanningManualBlock(row: string[], get: CsvRowGetter): Incom
     description: cleanText(get(row, ["beschreibung", "description"], 6)),
     color,
     icon,
-    slots: [],
-    scenarioIds: parseIncomePlanningScenarioIds(row, get)
+    slots: []
   };
 }
 
@@ -790,6 +806,7 @@ function parseIncomePlanningScenarioIds(
 
 function parseIncomePlanningCsvSlot(row: string[], get: CsvRowGetter): IncomePlanningSlot | null {
   const id = cleanText(get(row, ["slotid", "id"], 2)) || createId();
+  const note = cleanText(get(row, ["slotnotiz", "slot-notiz", "slotnote", "slot-note", "notiz", "note"], 32));
   const day = parseIncomePlanningWeekday(get(row, ["tag", "day", "wochentag"], 8), "sunday");
   const startTime = parseIncomePlanningTime(get(row, ["startzeit", "start", "starttime"], 9), "09:00");
   const endTime = parseIncomePlanningTime(get(row, ["endzeit", "ende", "end", "endtime"], 10), "10:00");
@@ -800,7 +817,16 @@ function parseIncomePlanningCsvSlot(row: string[], get: CsvRowGetter): IncomePla
     flexible ? 60 : fallbackTimeDuration(startTime, endTime, 60)
   );
   const durationMinutes = clockDuration > 0 ? clockDuration : parsedDurationMinutes;
-  const slot: IncomePlanningSlot = { id, day, startTime, endTime, flexible, durationMinutes };
+  const slot: IncomePlanningSlot = {
+    id,
+    ...(note ? { note } : {}),
+    day,
+    startTime,
+    endTime,
+    flexible,
+    durationMinutes,
+    scenarioIds: parseIncomePlanningScenarioIds(row, get)
+  };
   const pauseEnabledRaw = get(row, ["pauseaktiv", "pauseenabled"], 13);
   const pauseStartRaw = get(row, ["pausestartzeit", "pausestart", "pausestarttime"], 14);
   const pauseEndRaw = get(row, ["pauseendzeit", "pauseende", "pauseend", "pauseendtime"], 15);
@@ -936,6 +962,19 @@ function normalizeIncomePlanningCsvEntryScenarioIds<T extends { scenarioIds?: In
   if (scenarioIds) return { ...entry, scenarioIds };
   const { scenarioIds: _scenarioIds, ...rest } = entry;
   return rest as T;
+}
+
+function normalizeIncomePlanningCsvSlots(
+  slots: IncomePlanningSlot[],
+  allowedScenarioIds: Set<IncomePlanningWeekScenarioId>,
+  legacyScenarioIds: IncomePlanningWeekScenarioId[] | undefined
+): IncomePlanningSlot[] {
+  const normalizedLegacyScenarioIds = normalizeIncomePlanningCsvScenarioIds(legacyScenarioIds, allowedScenarioIds);
+  return slots.map((slot) => {
+    const normalizedSlot = normalizeIncomePlanningCsvEntryScenarioIds(slot, allowedScenarioIds);
+    if (normalizedSlot.scenarioIds?.length || !normalizedLegacyScenarioIds?.length) return normalizedSlot;
+    return { ...normalizedSlot, scenarioIds: normalizedLegacyScenarioIds };
+  });
 }
 
 function normalizeIncomePlanningCsvScenarioIds(

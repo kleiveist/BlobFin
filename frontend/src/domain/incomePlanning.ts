@@ -406,12 +406,19 @@ export function buildIncomePlanningManualBlock(
 export function buildIncomePlanningModel(state: IncomePlanningState, options: IncomePlanningModelOptions = {}): IncomePlanningModel {
   const scenarioId = options.scenarioId ?? "normal";
   const scenario = incomePlanningWeekScenarioConfig(scenarioId, state.weekScenarios);
-  const activeWorkBlocks = state.workBlocks.filter((block) => block.active && incomePlanningEntryActiveInScenario(block, scenarioId));
+  const activeWorkBlocks = state.workBlocks
+    .filter((block) => block.active)
+    .map((block) => ({ ...block, slots: incomePlanningSlotsActiveInScenario(block.slots, scenarioId) }))
+    .filter((block) => block.slots.length);
   const careerWorkBlocks = activeWorkBlocks.filter((block) => isIncomePlanningMainJobCategory(block.category));
-  const activeHabits = state.habits.filter((habit) => habit.active && incomePlanningEntryActiveInScenario(habit, scenarioId));
-  const activeManualBlocks = state.manualBlocks.filter(
-    (block) => block.active && incomePlanningEntryActiveInScenario(block, scenarioId)
-  );
+  const activeHabits = state.habits
+    .filter((habit) => habit.active)
+    .map((habit) => ({ ...habit, slots: incomePlanningSlotsActiveInScenario(habit.slots, scenarioId) }))
+    .filter((habit) => habit.slots.length);
+  const activeManualBlocks = state.manualBlocks
+    .filter((block) => block.active)
+    .map((block) => ({ ...block, slots: incomePlanningSlotsActiveInScenario(block.slots, scenarioId) }))
+    .filter((block) => block.slots.length);
   const scenarioSleepSlots = state.assumptions.sleepSlots.filter((slot) =>
     incomePlanningEntryActiveInScenario(slot, scenarioId)
   );
@@ -488,13 +495,20 @@ export function incomePlanningEntryActiveInScenario(
   return !entry.scenarioIds?.length || entry.scenarioIds.includes(scenarioId);
 }
 
+function incomePlanningSlotsActiveInScenario(
+  slots: IncomePlanningSlot[],
+  scenarioId: IncomePlanningWeekScenarioId
+): IncomePlanningSlot[] {
+  return slots.filter((slot) => incomePlanningEntryActiveInScenario(slot, scenarioId));
+}
+
 function workBlockCalendarEntries(block: IncomePlanningWorkBlock): CalendarEntryDraft[] {
   const type: IncomePlanningPlannerEntryType = isIncomePlanningMainJobCategory(block.category) ? "career" : "side_work";
   return block.slots.flatMap((slot) => calendarEntriesFromSlot(block.id, slot, block.name, type));
 }
 
 function habitCalendarEntries(habit: IncomePlanningHabit): CalendarEntryDraft[] {
-  const slots = habit.slots.length ? habit.slots : habitFallbackSlots(habit);
+  const slots = habit.slots;
   const ownType: IncomePlanningPlannerEntryType = habit.type === "good" ? "good_habit" : "bad_habit";
   const entries = slots.map((slot) => calendarEntryFromSlot(habit.id, incomePlanningStripSlotPause(slot), habit.name, ownType));
   if (habit.type === "bad" && habit.goalChange === "replace" && habit.replacementHabit.trim()) {
@@ -540,6 +554,7 @@ function calendarEntryFromSlot(
   const startMinute = parseTimeMinutes(slot.startTime);
   const endMinute = parseTimeMinutes(slot.endTime);
   const invalid = !slot.flexible && (startMinute === null || endMinute === null || endMinute <= startMinute);
+  const detail = slot.note?.trim() ?? "";
   return {
     id: `${idPrefix}:${slot.id}:${type}`,
     ownerId,
@@ -550,6 +565,7 @@ function calendarEntryFromSlot(
     flexible: slot.flexible,
     durationMinutes: incomePlanningSlotGrossDurationMinutes(slot),
     title,
+    detail: detail || undefined,
     type,
     invalid,
     startMinute: startMinute ?? 0,
@@ -605,11 +621,13 @@ export function incomePlanningSlotNetDurationMinutes(slot: IncomePlanningSlot): 
 export function incomePlanningStripSlotPause(slot: IncomePlanningSlot): IncomePlanningSlot {
   return {
     id: slot.id,
+    note: slot.note,
     day: slot.day,
     startTime: slot.startTime,
     endTime: slot.endTime,
     flexible: slot.flexible,
-    durationMinutes: slot.durationMinutes
+    durationMinutes: slot.durationMinutes,
+    scenarioIds: slot.scenarioIds
   };
 }
 
@@ -647,29 +665,6 @@ export function incomePlanningSlotCalendarSegments(
     { day: slot.day, startMinute: start, endMinute: 24 * 60, durationMinutes: 24 * 60 - start },
     { day: nextIncomePlanningWeekday(slot.day), startMinute: 0, endMinute: end, durationMinutes: end }
   ].filter((segment) => segment.durationMinutes > 0);
-}
-
-function habitFallbackSlots(habit: IncomePlanningHabit): IncomePlanningSlot[] {
-  if (habit.durationUnit === "day") {
-    return INCOME_PLANNING_WEEK_DAYS.map((day, index) => ({
-      id: `${habit.id}-fallback-${index + 1}`,
-      day,
-      startTime: "00:00",
-      endTime: "00:00",
-      flexible: true,
-      durationMinutes: Math.max(0, Math.round(habit.durationMinutes))
-    }));
-  }
-  return [
-    {
-      id: `${habit.id}-fallback-week`,
-      day: "sunday",
-      startTime: "00:00",
-      endTime: "00:00",
-      flexible: true,
-      durationMinutes: Math.max(0, Math.round(habit.durationMinutes))
-    }
-  ];
 }
 
 function detectConflicts(entries: CalendarEntryDraft[]): { entryIds: Set<string>; count: number } {
