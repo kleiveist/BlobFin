@@ -1522,6 +1522,10 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     retirementIncludedIds: stringArrayOrDefault(value.retirementIncludedIds, fallback.retirementIncludedIds),
     childIncludedIds: stringArrayOrDefault(value.childIncludedIds, fallback.childIncludedIds),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
+    retirementDepotAllowanceEnabled: booleanOrDefault(
+      value.retirementDepotAllowanceEnabled,
+      fallback.retirementDepotAllowanceEnabled
+    ),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
@@ -1550,6 +1554,14 @@ function normalizeInvestmentSettings(value: unknown): InvestmentSettings {
     retirementCapitalGainsTaxPercent: numberOrDefault(
       value.retirementCapitalGainsTaxPercent,
       fallback.retirementCapitalGainsTaxPercent
+    ),
+    retirementIncomeTaxRatePercent: clampNumber(
+      numberOrDefault(
+        value.retirementIncomeTaxRatePercent ?? value.retirementCapitalGainsTaxPercent,
+        fallback.retirementIncomeTaxRatePercent
+      ),
+      20,
+      45
     ),
     retirementInflationRatePercent: numberOrDefault(
       value.retirementInflationRatePercent,
@@ -1587,6 +1599,10 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     retirementIncludedIds: stringArrayOrDefault(value.retirementIncludedIds, fallback.retirementIncludedIds),
     childIncludedIds: stringArrayOrDefault(value.childIncludedIds, fallback.childIncludedIds),
     retirementDepotEnabled: booleanOrDefault(value.retirementDepotEnabled, fallback.retirementDepotEnabled),
+    retirementDepotAllowanceEnabled: booleanOrDefault(
+      value.retirementDepotAllowanceEnabled,
+      fallback.retirementDepotAllowanceEnabled
+    ),
     retirementDepotChildren: numberOrDefault(value.retirementDepotChildren, fallback.retirementDepotChildren),
     birthYear: numberOrDefault(value.birthYear, fallback.birthYear),
     chartStartAge: numberOrDefault(value.chartStartAge, fallback.chartStartAge),
@@ -1615,6 +1631,14 @@ function normalizeLegacyInvestmentSettings(value: unknown): InvestmentSettings {
     retirementCapitalGainsTaxPercent: numberOrDefault(
       value.retirementCapitalGainsTax ?? value.capitalGainsTax,
       fallback.retirementCapitalGainsTaxPercent
+    ),
+    retirementIncomeTaxRatePercent: clampNumber(
+      numberOrDefault(
+        value.retirementIncomeTaxRatePercent ?? value.retirementCapitalGainsTax ?? value.capitalGainsTax,
+        fallback.retirementIncomeTaxRatePercent
+      ),
+      20,
+      45
     ),
     retirementInflationRatePercent: numberOrDefault(
       value.retirementInflationRate ?? value.inflationRate,

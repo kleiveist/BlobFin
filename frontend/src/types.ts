@@ -174,6 +174,7 @@ export interface InvestmentSettings {
   retirementIncludedIds: string[];
   childIncludedIds: string[];
   retirementDepotEnabled: boolean;
+  retirementDepotAllowanceEnabled: boolean;
   retirementDepotChildren: number;
   birthYear: number;
   chartStartAge: number;
@@ -191,6 +192,7 @@ export interface InvestmentSettings {
   retirementPayoutYears: number;
   retirementInvestmentReturnPercent: number;
   retirementCapitalGainsTaxPercent: number;
+  retirementIncomeTaxRatePercent: number;
   retirementInflationRatePercent: number;
   retirementBequestReservePercent: number;
   childBirthYear: number;
@@ -612,6 +614,7 @@ export interface AssetProjection {
   monthlyRate: number;
   annualSavingsRate: number;
   retirementDepotEnabled: boolean;
+  retirementDepotAllowanceEnabled: boolean;
   retirementDepotAnnualOwnContribution: number;
   retirementDepotBaseAllowanceAnnual: number;
   retirementDepotChildAllowanceAnnual: number;

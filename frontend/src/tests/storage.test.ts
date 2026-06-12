@@ -63,6 +63,24 @@ describe("storage", () => {
     expect(loaded.settings.endDate).toBe("2044-06-30");
   });
 
+  it("normalizes retirement depot allowance and income tax settings", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState() as any;
+    state.investment = {
+      ...state.investment,
+      retirementDepotAllowanceEnabled: false,
+      retirementCapitalGainsTaxPercent: 18
+    };
+    delete state.investment.retirementIncomeTaxRatePercent;
+    state.investmentByAccountId[state.ui.selectedInvestmentAccountId] = state.investment;
+    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.investment.retirementDepotAllowanceEnabled).toBe(false);
+    expect(loaded.investment.retirementIncomeTaxRatePercent).toBe(20);
+  });
+
   it("migrates missing global planning end date from investment end age", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();

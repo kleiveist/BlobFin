@@ -55,7 +55,8 @@ export function calculateInvestmentResult(
   }
 
   const growth = Math.max(0, grossWealth - totalContribution - totalAllowance);
-  const tax = growth * (settings.capitalGainsTaxPercent / 100);
+  const taxBase = settings.retirementDepotEnabled ? grossWealth : growth;
+  const tax = taxBase * investmentTaxRate(settings);
   const netWealth = Math.max(0, grossWealth - tax);
   const inflationFactor = (1 + settings.inflationRatePercent / 100) ** yearsUntilPayout;
   const realWealth = inflationFactor > 0 ? netWealth / inflationFactor : netWealth;
@@ -79,4 +80,12 @@ export function calculateInvestmentResult(
     monthlyPensionNet,
     realMonthlyPension
   };
+}
+
+function investmentTaxRate(settings: InvestmentSettings): number {
+  if (settings.retirementDepotEnabled) {
+    return Math.min(45, Math.max(20, settings.retirementIncomeTaxRatePercent)) / 100;
+  }
+
+  return settings.capitalGainsTaxPercent / 100;
 }

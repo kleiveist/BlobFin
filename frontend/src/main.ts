@@ -1714,6 +1714,10 @@ function bindEvents(): void {
     if (action === "set-investment-depot-standard") setInvestmentDepot("standard");
     if (action === "set-investment-depot-retirement") setInvestmentDepot("retirement");
     if (action === "set-investment-depot-child") setInvestmentDepot("child");
+    if (action === "toggle-retirement-depot-allowance") {
+      toggleRetirementDepotAllowance();
+      return;
+    }
     if (action === "toggle-investment-include-popup") toggleInvestmentIncludePopup();
     if (action === "close-investment-include-popup") hideInvestmentIncludePopup();
     if (action === "toggle-real-estate-withdrawal-gain-source") toggleRealEstateWithdrawalGainSource();
@@ -1961,7 +1965,7 @@ function renderCalculations(activeReserve: ReturnType<typeof calculateReserveSum
   setText("combinedMonthlyRateMetric", money(combinedProjection.monthlyRate));
   setText("combinedMonthlyPensionMetric", money(combinedProjection.monthlyPension));
   setText("combinedRealWealthMetric", money(combinedProjection.realWealthAtRetirement));
-  setText("retirementDepotFundingStatus", "Aktiv nach Reformlogik ab 2027");
+  setText("retirementDepotFundingStatus", projection.retirementDepotAllowanceEnabled ? "Zulage ein" : "Zulage aus");
   setText("retirementDepotOwnContributionMetric", money(projection.retirementDepotAnnualOwnContribution));
   setText("retirementDepotBaseAllowanceMetric", money(projection.retirementDepotBaseAllowanceAnnual));
   setText("retirementDepotChildAllowanceMetric", money(projection.retirementDepotChildAllowanceAnnual));
@@ -11800,6 +11804,12 @@ function syncInvestmentInputBounds(): void {
     investmentMin("childPayoutAge"),
     investmentMax("childPayoutAge")
   );
+  setInputBounds(
+    '[data-investment="capitalGainsTaxPercent"]',
+    investmentMinForDepot("capitalGainsTaxPercent", depot),
+    investmentMaxForDepot("capitalGainsTaxPercent", depot)
+  );
+  syncInvestmentTaxControl(depot);
 }
 
 function syncRetirementDepotControls(): void {
@@ -11808,6 +11818,7 @@ function syncRetirementDepotControls(): void {
   const isRetirement = depot === "retirement";
   const isChild = depot === "child";
   syncDepotScopedInvestmentFields(depot);
+  syncRetirementDepotAllowanceToggle();
   setSectionHidden("#retirementDepotFunding", !isRetirement);
   setDetailLineHidden("detailAllowance", !isRetirement);
   setDetailLineHidden("detailAllowanceBasis", !isRetirement);
@@ -11820,6 +11831,33 @@ function syncRetirementDepotControls(): void {
   setDetailLineHidden("detailBequestReserve", isChild);
   setSectionHidden("#combinedInvestmentCard", isChild);
   setSectionHidden("#monthlyPensionMetricCard", isChild);
+}
+
+function syncInvestmentTaxControl(depot: InvestmentDepotKey): void {
+  const label = document.getElementById("capitalGainsTaxPercentLabel");
+  if (label) {
+    label.textContent =
+      depot === "retirement" ? "individueller Einkommensteuersatz nach § 22 Nr. 5 EStG" : "Kapitalertragsteuer";
+  }
+  for (const legend of document.querySelectorAll<HTMLElement>("[data-investment-tax-legend]")) {
+    legend.textContent =
+      legend.dataset.investmentTaxLegend === "combined"
+        ? "Steuern"
+        : depot === "retirement"
+          ? "Einkommensteuer"
+          : "Kapitalertragsteuer";
+  }
+}
+
+function syncRetirementDepotAllowanceToggle(): void {
+  const enabled = state.investment.retirementDepotAllowanceEnabled;
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    '[data-action="toggle-retirement-depot-allowance"]'
+  )) {
+    button.classList.toggle("active", enabled);
+    button.setAttribute("aria-pressed", String(enabled));
+    button.textContent = enabled ? "Zulage ein" : "Zulage aus";
+  }
 }
 
 function syncInvestmentDepotTabs(): void {
@@ -12335,10 +12373,21 @@ function inputInvestmentFields(): NumericInvestmentSetting[] {
 }
 
 function numericInvestmentValue(field: NumericInvestmentSetting, value: string): number {
-  const min = field === "birthYear" && activeInvestmentDepot() === "child" ? childBirthYearMin() : investmentMin(field);
-  const max = field === "birthYear" && activeInvestmentDepot() === "child" ? state.settings.year : investmentMax(field);
+  const depot = activeInvestmentDepot();
+  const min = field === "birthYear" && depot === "child" ? childBirthYearMin() : investmentMinForDepot(field, depot);
+  const max = field === "birthYear" && depot === "child" ? state.settings.year : investmentMaxForDepot(field, depot);
   const nextValue = clamp(numberValue(value), min, max);
   return field === "retirementDepotChildren" || field === "childPayoutAge" ? Math.floor(nextValue) : nextValue;
+}
+
+function investmentMinForDepot(field: keyof InvestmentSettings, depot: InvestmentDepotKey): number {
+  if (field === "capitalGainsTaxPercent" && depot === "retirement") return 20;
+  return investmentMin(field);
+}
+
+function investmentMaxForDepot(field: keyof InvestmentSettings, depot: InvestmentDepotKey): number {
+  if (field === "capitalGainsTaxPercent" && depot === "retirement") return 45;
+  return investmentMax(field);
 }
 
 function childBirthYearMin(): number {
@@ -12397,6 +12446,14 @@ function toggleInvestmentIncludePopup(): void {
   renderAll();
 }
 
+function toggleRetirementDepotAllowance(): void {
+  state.investment = {
+    ...state.investment,
+    retirementDepotAllowanceEnabled: !state.investment.retirementDepotAllowanceEnabled
+  };
+  renderAll();
+}
+
 function activeInvestmentDepot(): InvestmentDepotKey {
   return INVESTMENT_DEPOTS.includes(state.investment.activeDepot) ? state.investment.activeDepot : "standard";
 }
@@ -12425,6 +12482,7 @@ function depotInvestmentSettingsForBase(depot: InvestmentDepotKey, settings: Inv
       ...settings,
       activeDepot: "standard",
       retirementDepotEnabled: false,
+      retirementDepotAllowanceEnabled: false,
       retirementDepotChildren: 0
     };
   }
@@ -12436,6 +12494,7 @@ function depotInvestmentSettingsForBase(depot: InvestmentDepotKey, settings: Inv
       activeDepot: "child",
       includedIds: settings.childIncludedIds,
       retirementDepotEnabled: false,
+      retirementDepotAllowanceEnabled: false,
       retirementDepotChildren: 0,
       birthYear: settings.childBirthYear,
       chartStartAge: settings.childChartStartAge,
@@ -12455,6 +12514,7 @@ function depotInvestmentSettingsForBase(depot: InvestmentDepotKey, settings: Inv
     ...settings,
     activeDepot: "retirement",
     retirementDepotEnabled: true,
+    retirementDepotAllowanceEnabled: settings.retirementDepotAllowanceEnabled,
     includedIds: settings.retirementIncludedIds,
     birthYear: settings.retirementBirthYear,
     chartStartAge: settings.retirementChartStartAge,
@@ -12463,7 +12523,8 @@ function depotInvestmentSettingsForBase(depot: InvestmentDepotKey, settings: Inv
     percentageWithdrawalStartAge: settings.retirementPayoutEndAge - settings.retirementPayoutYears,
     percentageWithdrawalRatePercent: 0,
     investmentReturnPercent: settings.retirementInvestmentReturnPercent,
-    capitalGainsTaxPercent: settings.retirementCapitalGainsTaxPercent,
+    capitalGainsTaxPercent: settings.retirementIncomeTaxRatePercent,
+    retirementIncomeTaxRatePercent: settings.retirementIncomeTaxRatePercent,
     inflationRatePercent: settings.retirementInflationRatePercent,
     bequestReservePercent: settings.retirementBequestReservePercent
   };
@@ -12500,6 +12561,8 @@ function updateDepotInvestmentSettings(depot: InvestmentDepotKey, updates: Parti
   state.investment = {
     ...state.investment,
     payoutEndAge,
+    retirementDepotAllowanceEnabled:
+      updates.retirementDepotAllowanceEnabled ?? state.investment.retirementDepotAllowanceEnabled,
     retirementDepotChildren: updates.retirementDepotChildren ?? state.investment.retirementDepotChildren,
     retirementBirthYear: updates.birthYear ?? state.investment.retirementBirthYear,
     retirementChartStartAge: updates.chartStartAge ?? state.investment.retirementChartStartAge,
@@ -12507,8 +12570,8 @@ function updateDepotInvestmentSettings(depot: InvestmentDepotKey, updates: Parti
     retirementPayoutYears: updates.payoutYears ?? state.investment.retirementPayoutYears,
     retirementInvestmentReturnPercent:
       updates.investmentReturnPercent ?? state.investment.retirementInvestmentReturnPercent,
-    retirementCapitalGainsTaxPercent:
-      updates.capitalGainsTaxPercent ?? state.investment.retirementCapitalGainsTaxPercent,
+    retirementIncomeTaxRatePercent:
+      updates.capitalGainsTaxPercent ?? state.investment.retirementIncomeTaxRatePercent,
     retirementInflationRatePercent: updates.inflationRatePercent ?? state.investment.retirementInflationRatePercent,
     retirementBequestReservePercent:
       updates.bequestReservePercent ?? state.investment.retirementBequestReservePercent
@@ -13255,13 +13318,23 @@ function showInvestmentChartPopup(
       ${chartPopupLine("orange", "Zulagen", money(allowance))}
       ${chartPopupLine("green", "Wertzuwachs", money(growth))}
       ${chartPopupLine("purple", "Restguthaben (Auszahlung)", money(payoutBalance))}
-      ${chartPopupLine("red", "Kapitalertragsteuer", tax > 0 ? `-${money(tax)}` : money(0))}
+      ${chartPopupLine(
+        "red",
+        investmentTaxLabelForProjection(projection),
+        tax > 0 ? `-${money(tax)}` : money(0)
+      )}
       ${chartPopupTotalLine("Gesamtkapital", money(Math.max(0, point.netBalance)))}
     </div>
   `;
 
   popup.hidden = false;
   positionChartPopup(popup, card, clientX, clientY);
+}
+
+function investmentTaxLabelForProjection(projection: AssetProjection): string {
+  if (!projection.retirementDepotEnabled) return "Kapitalertragsteuer";
+  if (projection.annualSavingsRate > projection.retirementDepotAnnualOwnContribution + 0.01) return "Steuern";
+  return "Einkommensteuer";
 }
 
 function showRealEstateChartPopup(
@@ -13509,6 +13582,7 @@ function combineAssetProjections(standard: AssetProjection, retirement: AssetPro
     monthlyRate: standard.monthlyRate + retirement.monthlyRate,
     annualSavingsRate: standard.annualSavingsRate + retirement.annualSavingsRate,
     retirementDepotEnabled: retirement.retirementDepotEnabled,
+    retirementDepotAllowanceEnabled: retirement.retirementDepotAllowanceEnabled,
     retirementDepotAnnualOwnContribution: retirement.retirementDepotAnnualOwnContribution,
     retirementDepotBaseAllowanceAnnual: retirement.retirementDepotBaseAllowanceAnnual,
     retirementDepotChildAllowanceAnnual: retirement.retirementDepotChildAllowanceAnnual,
@@ -13641,7 +13715,8 @@ function normalizeInvestmentBounds(): void {
     percentageWithdrawalStartAge: nextInvestment.retirementPayoutEndAge - nextInvestment.retirementPayoutYears,
     percentageWithdrawalRatePercent: 0,
     investmentReturnPercent: nextInvestment.retirementInvestmentReturnPercent,
-    capitalGainsTaxPercent: nextInvestment.retirementCapitalGainsTaxPercent,
+    capitalGainsTaxPercent: nextInvestment.retirementIncomeTaxRatePercent,
+    retirementIncomeTaxRatePercent: nextInvestment.retirementIncomeTaxRatePercent,
     inflationRatePercent: nextInvestment.retirementInflationRatePercent,
     bequestReservePercent: nextInvestment.retirementBequestReservePercent
   };
@@ -13682,6 +13757,16 @@ function normalizeInvestmentBounds(): void {
     retirementDepotChildren: numericInvestmentValue(
       "retirementDepotChildren",
       String(nextInvestment.retirementDepotChildren)
+    ),
+    capitalGainsTaxPercent: clamp(
+      nextInvestment.capitalGainsTaxPercent,
+      investmentMinForDepot("capitalGainsTaxPercent", "standard"),
+      investmentMaxForDepot("capitalGainsTaxPercent", "standard")
+    ),
+    retirementIncomeTaxRatePercent: clamp(
+      nextInvestment.retirementIncomeTaxRatePercent,
+      investmentMinForDepot("capitalGainsTaxPercent", "retirement"),
+      investmentMaxForDepot("capitalGainsTaxPercent", "retirement")
     ),
     bequestReservePercent: numericInvestmentValue(
       "bequestReservePercent",

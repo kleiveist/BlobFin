@@ -138,6 +138,49 @@ describe("investment calculator", () => {
     expect(projection.points.some((point) => point.allowance > 0)).toBe(true);
   });
 
+  it("can disable retirement depot allowances without disabling own savings", () => {
+    const state = defaultAppState();
+    const enabledProjection = buildAssetProjection(state.settings.year, state.positions, {
+      ...state.investment,
+      retirementDepotEnabled: true,
+      retirementDepotAllowanceEnabled: true
+    });
+    const disabledProjection = buildAssetProjection(state.settings.year, state.positions, {
+      ...state.investment,
+      retirementDepotEnabled: true,
+      retirementDepotAllowanceEnabled: false
+    });
+
+    expect(disabledProjection.retirementDepotAllowanceEnabled).toBe(false);
+    expect(disabledProjection.retirementDepotAnnualOwnContribution).toBe(1800);
+    expect(disabledProjection.retirementDepotAllowanceAnnual).toBe(0);
+    expect(disabledProjection.allowanceAtRetirement).toBe(0);
+    expect(disabledProjection.points.every((point) => point.allowance === 0)).toBe(true);
+    expect(enabledProjection.grossWealthAtRetirement).toBeGreaterThan(disabledProjection.grossWealthAtRetirement);
+  });
+
+  it("taxes retirement depot payouts with the individual income tax rate", () => {
+    const state = defaultAppState();
+    state.investment = {
+      ...state.investment,
+      retirementDepotEnabled: true,
+      retirementDepotAllowanceEnabled: false,
+      retirementIncomeTaxRatePercent: 30,
+      investmentReturnPercent: 0,
+      capitalGainsTaxPercent: 0,
+      payoutEndAge: 66,
+      payoutYears: 1,
+      bequestReservePercent: 0
+    };
+
+    const projection = buildAssetProjection(state.settings.year, state.positions, state.investment);
+
+    expect(projection.growthAtRetirement).toBe(0);
+    expect(projection.unrealizedTaxAtRetirement).toBeCloseTo(projection.wealthAtRetirement * 0.3, 2);
+    expect(projection.netWealthAfterFullTaxAtRetirement).toBeCloseTo(projection.wealthAtRetirement * 0.7, 2);
+    expect(projection.taxAtEnd).toBeGreaterThan(0);
+  });
+
   it("uses the first active contribution year for retirement depot annual allowance metrics", () => {
     const state = defaultAppState();
     state.positions = state.positions.map((position) =>

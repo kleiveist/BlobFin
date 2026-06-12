@@ -50,7 +50,7 @@ export function retirementDepotAllowanceForProjectionMonth(
   baseYear: number,
   projectionMonthIndex: number
 ): number {
-  if (!settings.retirementDepotEnabled) return 0;
+  if (!settings.retirementDepotEnabled || !settings.retirementDepotAllowanceEnabled) return 0;
 
   const monthlyOwnContribution = selectedInvestmentContributionForProjectionMonth(
     positions,

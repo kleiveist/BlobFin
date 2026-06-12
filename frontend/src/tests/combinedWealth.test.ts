@@ -34,6 +34,7 @@ function projection(points: AssetProjectionPoint[], monthlyPension = 0, retireme
     monthlyRate: 0,
     annualSavingsRate: 0,
     retirementDepotEnabled: false,
+    retirementDepotAllowanceEnabled: false,
     retirementDepotAnnualOwnContribution: 0,
     retirementDepotBaseAllowanceAnnual: 0,
     retirementDepotChildAllowanceAnnual: 0,

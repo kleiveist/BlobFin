@@ -590,7 +590,16 @@ export function renderAppShell(): string {
           <div class="investment-controls">
             <div class="investment-control-top">
               <aside class="savings-rate-card" aria-label="Sparrate">
-                <span>Jaehrliche Sparrate</span>
+                <div class="savings-rate-card-head">
+                  <span>Jaehrliche Sparrate</span>
+                  <button
+                    class="savings-rate-toggle"
+                    type="button"
+                    data-action="toggle-retirement-depot-allowance"
+                    data-depot-scope="retirement"
+                    aria-pressed="true"
+                  >Zulage ein</button>
+                </div>
                 <strong id="annualSavingsRateMetric">-</strong>
                 <small id="monthlySavingsRateMetric">-</small>
               </aside>
@@ -613,7 +622,7 @@ export function renderAppShell(): string {
               </div>
               <div class="investment-range-panel">
                 ${rangeField("investmentReturnPercent", "Jaehrliche Rendite", 0, 30, 0.1)}
-                ${rangeField("capitalGainsTaxPercent", "Kapitalertragsteuer auf Wertzuwachs", 0, 50, 0.1)}
+                ${rangeField("capitalGainsTaxPercent", "Kapitalertragsteuer", 0, 50, 0.1)}
                 ${rangeField("inflationRatePercent", "Inflation pro Jahr", 1, 10, 0.1)}
                 ${rangeField("bequestReservePercent", "Reserve/Erbe vom Maximalvermoegen", 0, 50, 0.5, { depotScope: "standard retirement" })}
               </div>
@@ -639,7 +648,7 @@ export function renderAppShell(): string {
                 <span class="legend-item"><span class="legend-dot orange"></span> Zulagen</span>
                 <span class="legend-item"><span class="legend-dot green"></span> Wertzuwachs</span>
                 <span class="legend-item"><span class="legend-dot purple"></span> Restguthaben (Auszahlung)</span>
-                <span class="legend-item"><span class="legend-dot red"></span> Kapitalertragsteuer</span>
+                <span class="legend-item"><span class="legend-dot red"></span> <span data-investment-tax-legend="active">Kapitalertragsteuer</span></span>
                 <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
               </div>
               <div class="retirement-depot-funding" id="retirementDepotFunding" aria-label="Foerderung">
@@ -707,7 +716,7 @@ export function renderAppShell(): string {
                 <span class="legend-item"><span class="legend-dot orange"></span> Zulagen</span>
                 <span class="legend-item"><span class="legend-dot green"></span> Wertzuwachs</span>
                 <span class="legend-item"><span class="legend-dot purple"></span> Restguthaben (Auszahlung)</span>
-                <span class="legend-item"><span class="legend-dot red"></span> Kapitalertragsteuer</span>
+                <span class="legend-item"><span class="legend-dot red"></span> <span data-investment-tax-legend="combined">Steuern</span></span>
                 <span class="legend-item"><span class="legend-dash"></span> Normales Depot</span>
               </div>
             </section>
@@ -1359,7 +1368,7 @@ function rangeField(
   const depotScopeAttr = options.depotScope ? `data-depot-scope="${options.depotScope}"` : "";
   return `
     <label class="range-field" ${depotScopeAttr}>
-      <span>${label}</span>
+      <span id="${key}Label">${label}</span>
       <input type="range" min="${min}" max="${max}" step="${step}" data-investment="${key}" />
       <strong id="${key}Value">-</strong>
     </label>

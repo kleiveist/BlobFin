@@ -65,9 +65,9 @@ export function buildAssetProjection(
   );
   const monthlyRate = annualSavingsRate / 12;
   const retirementDepotAnnualOwnContribution = annualSavingsRate;
-  const retirementDepotAllowance = settings.retirementDepotEnabled
+  const retirementDepotAllowance = retirementDepotAllowanceEnabled(settings)
     ? calculateRetirementDepotAllowance(retirementDepotAnnualOwnContribution, settings.retirementDepotChildren)
-    : calculateRetirementDepotAllowance(0, 0);
+    : retirementDepotAllowanceOff(retirementDepotAnnualOwnContribution);
   const annualReturn = settings.investmentReturnPercent / 100;
   const monthlyReturn = (1 + annualReturn) ** (1 / 12) - 1;
   const retirementSnapshot = savingSnapshot(
@@ -144,6 +144,7 @@ export function buildAssetProjection(
     monthlyRate,
     annualSavingsRate,
     retirementDepotEnabled: settings.retirementDepotEnabled,
+    retirementDepotAllowanceEnabled: retirementDepotAllowanceEnabled(settings),
     retirementDepotAnnualOwnContribution: retirementDepotAllowance.annualOwnContribution,
     retirementDepotBaseAllowanceAnnual: retirementDepotAllowance.baseAllowance,
     retirementDepotChildAllowanceAnnual: retirementDepotAllowance.childAllowance,
@@ -465,6 +466,18 @@ function applyGrossWithdrawal(
     return { grossBalance, costBasis, allowanceBasis, netWithdrawal: 0, tax: 0 };
   }
 
+  if (settings.retirementDepotEnabled) {
+    const balanceShare = grossWithdrawal / grossBalance;
+    const tax = grossWithdrawal * retirementDepotIncomeTaxRate(settings);
+    return {
+      grossBalance: Math.max(0, grossBalance - grossWithdrawal),
+      costBasis: Math.max(0, costBasis - costBasis * balanceShare),
+      allowanceBasis: Math.max(0, allowanceBasis - allowanceBasis * balanceShare),
+      netWithdrawal: Math.max(0, grossWithdrawal - tax),
+      tax
+    };
+  }
+
   const growth = Math.max(0, grossBalance - costBasis);
   const gainShare = growth > 0 ? growth / grossBalance : 0;
   const taxableGain = grossWithdrawal * gainShare;
@@ -491,6 +504,11 @@ function applyNetWithdrawal(
   if (requestedNetWithdrawal <= 0 || grossBalance <= 0) {
     return { grossBalance, costBasis, allowanceBasis, netWithdrawal: 0, tax: 0 };
   }
+  if (settings.retirementDepotEnabled) {
+    const grossWithdrawal = requestedNetWithdrawal / Math.max(0.0001, 1 - retirementDepotIncomeTaxRate(settings));
+    return applyGrossWithdrawal(grossBalance, costBasis, allowanceBasis, grossWithdrawal, settings);
+  }
+
   const growth = Math.max(0, grossBalance - costBasis);
   const gainShare = growth > 0 ? growth / grossBalance : 0;
   const taxDrag = gainShare * (settings.capitalGainsTaxPercent / 100);
@@ -574,7 +592,32 @@ function netPercentageWithdrawalAtStart(snapshot: SavingSnapshot, settings: Inve
 }
 
 function taxForUnrealizedGrowth(snapshot: SavingSnapshot, settings: InvestmentSettings): number {
+  if (settings.retirementDepotEnabled) {
+    return Math.max(0, snapshot.netBalance) * retirementDepotIncomeTaxRate(settings);
+  }
+
   return Math.max(0, snapshot.growth) * (settings.capitalGainsTaxPercent / 100);
+}
+
+function retirementDepotAllowanceEnabled(settings: InvestmentSettings): boolean {
+  return settings.retirementDepotEnabled && settings.retirementDepotAllowanceEnabled;
+}
+
+function retirementDepotAllowanceOff(
+  annualOwnContribution: number
+): ReturnType<typeof calculateRetirementDepotAllowance> {
+  return {
+    annualOwnContribution: Math.max(0, annualOwnContribution),
+    baseAllowance: 0,
+    childAllowance: 0,
+    totalAllowance: 0,
+    allowanceRatePercent: 0,
+    annualContributionWithAllowance: Math.max(0, annualOwnContribution)
+  };
+}
+
+function retirementDepotIncomeTaxRate(settings: InvestmentSettings): number {
+  return Math.min(45, Math.max(20, settings.retirementIncomeTaxRatePercent)) / 100;
 }
 
 function pointFromSnapshot(

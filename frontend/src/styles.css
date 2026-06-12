@@ -1801,6 +1801,31 @@ tfoot th {
   font-weight: 850;
 }
 
+.savings-rate-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.savings-rate-toggle {
+  flex: 0 0 auto;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.savings-rate-toggle.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .savings-rate-card strong {
   font-size: 1.2rem;
   overflow-wrap: anywhere;
