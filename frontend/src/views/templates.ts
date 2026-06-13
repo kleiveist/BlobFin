@@ -13,7 +13,8 @@ type OverviewIconName =
   | "property"
   | "combine"
   | "account"
-  | "pension";
+  | "pension"
+  | "self_employment";
 
 interface OverviewCardConfig {
   sectionId: string;
@@ -168,12 +169,30 @@ export function renderAppShell(): string {
                 actionLabel: "Zeitbudget planen",
                 icon: "income_plan",
                 badge: "Persoenlich"
+              },
+              {
+                sectionId: "self_employment_dashboard",
+                title: "Selbststaendigkeits-Dashboard",
+                subtitle: "Projekte, Zeit, Budget und Gewinnpotenzial",
+                description:
+                  "Selbststaendigkeitsprojekte planen, pruefen und mit Zeit, Budget, Aufgaben und Gewinnpotenzial verbinden.",
+                actionLabel: "Dashboard oeffnen",
+                icon: "self_employment",
+                badge: "Projekt"
               }
             ],
             "section",
             "landing-personal-grid"
           )}
         </div>
+      </section>
+
+      <section class="panel self-employment-panel" data-module-section="self_employment_dashboard">
+        ${moduleTopBar("Selbststaendigkeits-Dashboard", "Projektzentrale fuer Idee, Zeit, Budget und Gewinnpotenzial", [
+          { label: "Zeitbudget", action: "open-section-income_planning", className: "secondary" },
+          { label: "Planungen", action: "open-section-planning_scenarios", className: "secondary" }
+        ])}
+        <div id="selfEmploymentDashboard" class="self-employment-dashboard"></div>
       </section>
 
       <section class="panel income-planning-panel" data-module-section="income_planning">
@@ -1211,7 +1230,9 @@ function overviewIcon(icon: OverviewIconName): string {
     account:
       '<rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h8" /><path d="M8 13h5" /><path d="M8 17h7" />',
     pension:
-      '<path d="M6 19V7" /><path d="M18 19V7" /><path d="M4 19h16" /><path d="M4 7h16" /><path d="M8 7a4 4 0 0 1 8 0" /><path d="M9 12h6" /><path d="M9 15h4" />'
+      '<path d="M6 19V7" /><path d="M18 19V7" /><path d="M4 19h16" /><path d="M4 7h16" /><path d="M8 7a4 4 0 0 1 8 0" /><path d="M9 12h6" /><path d="M9 15h4" />',
+    self_employment:
+      '<path d="M4 19V8" /><path d="M20 19V8" /><path d="M4 19h16" /><path d="M7 8V5h10v3" /><path d="M4 12h16" /><path d="M8 16h3" /><path d="M14 16h2" />'
   };
   return `
     <span class="overview-card-icon" aria-hidden="true">

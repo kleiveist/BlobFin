@@ -86,6 +86,7 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('data-action="open-section-income"');
     expect(html).toContain('data-action="open-section-income_planning"');
     expect(html).toContain('data-action="open-section-income_stamp_planner"');
+    expect(html).toContain('data-action="open-section-self_employment_dashboard"');
     expect(html).toContain('data-action="open-section-planning_scenarios"');
     expect(html).toContain('data-action="open-section-real_estate_financing"');
     expect(html).toContain('data-action="open-section-combined_wealth"');
@@ -114,7 +115,12 @@ describe("follow-up ui rendering", () => {
     expect(landingMainGrid.indexOf("Planungen und Szenarien")).toBeLessThan(landingMainGrid.indexOf("Immobilien"));
     expect(landingMainGrid.indexOf("Immobilien")).toBeLessThan(landingMainGrid.indexOf("Vermoegen"));
     expect(landingPersonalGridStart).toBeLessThan(html.indexOf("Zeitbudget & Habits", landingPersonalGridStart));
+    expect(html.indexOf("Zeitbudget & Habits", landingPersonalGridStart)).toBeLessThan(
+      html.indexOf("Selbststaendigkeits-Dashboard", landingPersonalGridStart)
+    );
     expect(html).toContain("Jahresnettoeinkommen");
+    expect(html).toContain("Selbststaendigkeits-Dashboard");
+    expect(html).toContain("Dashboard oeffnen");
     expect(html).toContain("Zeitbudget & Habits");
     expect(html).toContain("Wochenplaner, Arbeit und Gewohnheiten");
     expect(html).toContain("Zeitbudget planen");
@@ -128,6 +134,25 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain("Zeitbudget, Nebeneinkuenfte und Ziel-Szenarien");
     expect(html).not.toContain("Vermoegen und Altersvorsorge");
     expect(html).not.toContain("Vorsorge oeffnen");
+  });
+
+  it("renders the self employment dashboard as an independent page", () => {
+    const html = renderAppShell();
+
+    expect(html).toContain('data-module-section="self_employment_dashboard"');
+    expect(html).toContain('id="selfEmploymentDashboard"');
+    expect(html).toContain("Selbststaendigkeits-Dashboard");
+    expect(html).toContain("Projektzentrale fuer Idee, Zeit, Budget und Gewinnpotenzial");
+    expect(html).toContain('data-action="open-section-income_planning"');
+    expect(html).toContain('data-action="open-section-planning_scenarios"');
+    expect(mainSource).toContain("function renderSelfEmploymentDashboard");
+    expect(mainSource).toContain('data-action="self-employment-add-project"');
+    expect(mainSource).toContain('data-action="self-employment-select-project"');
+    expect(mainSource).toContain('data-action="self-employment-rename-project"');
+    expect(mainSource).toContain('data-action="self-employment-delete-project"');
+    expect(mainSource).toContain('data-action="self-employment-toggle-label"');
+    expect(mainSource).toContain("evaluateSelfEmploymentProject");
+    expect(mainSource).toContain("selfEmploymentEvaluationContext");
   });
 
   it("renders the income planning dashboard as an independent page", () => {

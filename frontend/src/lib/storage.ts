@@ -12,6 +12,7 @@ import {
   defaultPositionTableViewState,
   defaultRealEstateFinancingSettings,
   defaultRepaymentSourceToggles,
+  defaultSelfEmploymentState,
   defaultStatutoryPensionSettings
 } from "../data/defaults";
 import { DEFAULT_CAPITAL_GAINS_CHURCH_TAX_RATE_PERCENT } from "../domain/incomeTracker";
@@ -95,6 +96,17 @@ import type {
   RealEstateFinancingSettings,
   RepaymentSourceToggle,
   ReservePosition,
+  SelfEmploymentContact,
+  SelfEmploymentContactStatus,
+  SelfEmploymentInvoice,
+  SelfEmploymentInvoiceStatus,
+  SelfEmploymentProject,
+  SelfEmploymentProjectStatus,
+  SelfEmploymentRiskLevel,
+  SelfEmploymentState,
+  SelfEmploymentTask,
+  SelfEmploymentTaskPriority,
+  SelfEmploymentTaskStatus,
   StatutoryPensionIncomeMode,
   StatutoryPensionScenarioId,
   StatutoryPensionScenarioSettings,
@@ -189,6 +201,7 @@ function normalizeState(value: unknown): AppState {
     statutoryPension: normalizeStatutoryPensionSettings(value.statutoryPension),
     incomeTracker: normalizeIncomeTrackerState(value.incomeTracker),
     incomePlanning: normalizeIncomePlanningState(value.incomePlanning),
+    selfEmployment: normalizeSelfEmploymentState(value.selfEmployment),
     positions,
     investmentByAccountId,
     investment,
@@ -234,6 +247,7 @@ function normalizeLegacyState(value: unknown): AppState {
     statutoryPension: defaultStatutoryPensionSettings(),
     incomeTracker: defaultIncomeTrackerState(),
     incomePlanning: defaultIncomePlanningState(),
+    selfEmployment: defaultSelfEmploymentState(),
     positions,
     investmentByAccountId,
     investment,
@@ -530,6 +544,7 @@ function normalizeAppSectionId(value: unknown, fallback: AppSectionId): AppSecti
     value === "home" ||
     value === "income_planning" ||
     value === "income_stamp_planner" ||
+    value === "self_employment_dashboard" ||
     value === "real_estate_financing" ||
     value === "statutory_pension" ||
     value === "combined_wealth"
@@ -861,6 +876,159 @@ function normalizeStatutoryPensionIncomeMode(
   fallback: StatutoryPensionIncomeMode
 ): StatutoryPensionIncomeMode {
   return value === "constant" || value === "income_projection" ? value : fallback;
+}
+
+function normalizeSelfEmploymentState(value: unknown): SelfEmploymentState {
+  const fallback = defaultSelfEmploymentState();
+  if (!isRecord(value)) return fallback;
+  const projects = Array.isArray(value.projects)
+    ? value.projects
+        .map(normalizeSelfEmploymentProject)
+        .filter((project): project is SelfEmploymentProject => project !== null)
+    : fallback.projects;
+  const normalizedProjects = projects;
+  const selectedProjectId = String(value.selectedProjectId || normalizedProjects[0]?.id || "");
+  return {
+    selectedProjectId: normalizedProjects.some((project) => project.id === selectedProjectId)
+      ? selectedProjectId
+      : normalizedProjects[0]?.id ?? "",
+    projects: normalizedProjects
+  };
+}
+
+function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentProject | null {
+  if (!isRecord(value)) return null;
+  const fallback = defaultSelfEmploymentState().projects[0];
+  return {
+    id: String(value.id || createId()),
+    name: String(value.name || "Neues Projekt"),
+    icon: String(value.icon || fallback.icon),
+    labels: stringArrayOrDefault(value.labels, []),
+    status: normalizeSelfEmploymentProjectStatus(value.status, fallback.status),
+    idea: String(value.idea ?? ""),
+    problem: String(value.problem ?? ""),
+    targetGroup: String(value.targetGroup ?? ""),
+    revenueModel: String(value.revenueModel ?? ""),
+    risk: normalizeSelfEmploymentRiskLevel(value.risk, fallback.risk),
+    motivation: String(value.motivation ?? ""),
+    projectGoal: String(value.projectGoal ?? ""),
+    milestones: stringArrayOrDefault(value.milestones, []),
+    startDate: String(value.startDate ?? ""),
+    plannedDurationWeeks: clampNumber(numberOrDefault(value.plannedDurationWeeks, 0), 0, 520),
+    nextSteps: stringArrayOrDefault(value.nextSteps, []),
+    dependencies: String(value.dependencies ?? ""),
+    requiredHoursPerWeek: clampNumber(numberOrDefault(value.requiredHoursPerWeek, 0), 0, 168),
+    fixedProjectHoursPerWeek: clampNumber(numberOrDefault(value.fixedProjectHoursPerWeek, 0), 0, 168),
+    flexibleProjectHoursPerWeek: clampNumber(numberOrDefault(value.flexibleProjectHoursPerWeek, 0), 0, 168),
+    linkedHabits: stringArrayOrDefault(value.linkedHabits, []),
+    blockingHabits: stringArrayOrDefault(value.blockingHabits, []),
+    weekScenario: String(value.weekScenario ?? ""),
+    startCapitalRequired: clampNumber(numberOrDefault(value.startCapitalRequired, 0), 0, Number.MAX_SAFE_INTEGER),
+    availableReserveOverride: nullableNumberOrDefault(value.availableReserveOverride, null),
+    monthlyRevenueExpected: clampNumber(numberOrDefault(value.monthlyRevenueExpected, 0), 0, Number.MAX_SAFE_INTEGER),
+    monthlyRunningCosts: clampNumber(numberOrDefault(value.monthlyRunningCosts, 0), 0, Number.MAX_SAFE_INTEGER),
+    oneTimeCosts: clampNumber(numberOrDefault(value.oneTimeCosts, 0), 0, Number.MAX_SAFE_INTEGER),
+    taxReservePercent: clampNumber(numberOrDefault(value.taxReservePercent, fallback.taxReservePercent), 0, 100),
+    monthlyWorkHours: clampNumber(numberOrDefault(value.monthlyWorkHours, 0), 0, 744),
+    contacts: Array.isArray(value.contacts)
+      ? value.contacts.map(normalizeSelfEmploymentContact).filter((contact): contact is SelfEmploymentContact => contact !== null)
+      : [],
+    invoices: Array.isArray(value.invoices)
+      ? value.invoices.map(normalizeSelfEmploymentInvoice).filter((invoice): invoice is SelfEmploymentInvoice => invoice !== null)
+      : [],
+    tasks: Array.isArray(value.tasks)
+      ? value.tasks.map(normalizeSelfEmploymentTask).filter((task): task is SelfEmploymentTask => task !== null)
+      : []
+  };
+}
+
+function normalizeSelfEmploymentContact(value: unknown): SelfEmploymentContact | null {
+  if (!isRecord(value)) return null;
+  return {
+    id: String(value.id || createId()),
+    name: String(value.name || "Kontakt"),
+    status: normalizeSelfEmploymentContactStatus(value.status, "lead"),
+    lastContact: String(value.lastContact ?? ""),
+    nextStep: String(value.nextStep ?? ""),
+    revenuePotential: clampNumber(numberOrDefault(value.revenuePotential, 0), 0, Number.MAX_SAFE_INTEGER),
+    probabilityPercent: clampNumber(numberOrDefault(value.probabilityPercent, 0), 0, 100)
+  };
+}
+
+function normalizeSelfEmploymentInvoice(value: unknown): SelfEmploymentInvoice | null {
+  if (!isRecord(value)) return null;
+  return {
+    id: String(value.id || createId()),
+    label: String(value.label || "Angebot / Rechnung"),
+    status: normalizeSelfEmploymentInvoiceStatus(value.status, "offer_open"),
+    dueDate: String(value.dueDate ?? ""),
+    amount: clampNumber(numberOrDefault(value.amount, 0), 0, Number.MAX_SAFE_INTEGER)
+  };
+}
+
+function normalizeSelfEmploymentTask(value: unknown): SelfEmploymentTask | null {
+  if (!isRecord(value)) return null;
+  return {
+    id: String(value.id || createId()),
+    title: String(value.title || "Aufgabe"),
+    priority: normalizeSelfEmploymentTaskPriority(value.priority, "medium"),
+    dueDate: String(value.dueDate ?? ""),
+    estimatedHours: clampNumber(numberOrDefault(value.estimatedHours, 0), 0, 1000),
+    status: normalizeSelfEmploymentTaskStatus(value.status, "open")
+  };
+}
+
+function normalizeSelfEmploymentProjectStatus(
+  value: unknown,
+  fallback: SelfEmploymentProjectStatus
+): SelfEmploymentProjectStatus {
+  if (
+    value === "idea" ||
+    value === "review" ||
+    value === "preparation" ||
+    value === "active" ||
+    value === "paused" ||
+    value === "completed" ||
+    value === "discarded"
+  ) {
+    return value;
+  }
+  return fallback;
+}
+
+function normalizeSelfEmploymentRiskLevel(value: unknown, fallback: SelfEmploymentRiskLevel): SelfEmploymentRiskLevel {
+  return value === "low" || value === "medium" || value === "high" ? value : fallback;
+}
+
+function normalizeSelfEmploymentContactStatus(
+  value: unknown,
+  fallback: SelfEmploymentContactStatus
+): SelfEmploymentContactStatus {
+  if (value === "lead" || value === "first_contact" || value === "offer_sent" || value === "customer" || value === "paused") {
+    return value;
+  }
+  return fallback;
+}
+
+function normalizeSelfEmploymentInvoiceStatus(
+  value: unknown,
+  fallback: SelfEmploymentInvoiceStatus
+): SelfEmploymentInvoiceStatus {
+  if (value === "offer_open" || value === "offer_accepted" || value === "invoice_created" || value === "paid") {
+    return value;
+  }
+  return fallback;
+}
+
+function normalizeSelfEmploymentTaskPriority(
+  value: unknown,
+  fallback: SelfEmploymentTaskPriority
+): SelfEmploymentTaskPriority {
+  return value === "low" || value === "medium" || value === "high" ? value : fallback;
+}
+
+function normalizeSelfEmploymentTaskStatus(value: unknown, fallback: SelfEmploymentTaskStatus): SelfEmploymentTaskStatus {
+  return value === "open" || value === "in_progress" || value === "done" ? value : fallback;
 }
 
 function normalizeIncomePlanningState(value: unknown): IncomePlanningState {

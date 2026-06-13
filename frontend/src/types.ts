@@ -13,6 +13,7 @@ export type AppSectionId =
   | "income"
   | "income_planning"
   | "income_stamp_planner"
+  | "self_employment_dashboard"
   | "planning_scenarios"
   | "real_estate_financing"
   | "statutory_pension"
@@ -67,6 +68,20 @@ export type IncomePlanningPriority = "low" | "medium" | "high";
 export type IncomePlanningHabitDurationUnit = "day" | "week";
 export type IncomePlanningManualBlockType = "private_commitment" | "free_time" | "buffer" | "other_event";
 export type IncomePlanningWeekScenarioId = string;
+export type SelfEmploymentProjectStatus =
+  | "idea"
+  | "review"
+  | "preparation"
+  | "active"
+  | "paused"
+  | "completed"
+  | "discarded";
+export type SelfEmploymentRiskLevel = "low" | "medium" | "high";
+export type SelfEmploymentFeasibility = "realistic" | "borderline" | "unrealistic";
+export type SelfEmploymentTaskPriority = "low" | "medium" | "high";
+export type SelfEmploymentTaskStatus = "open" | "in_progress" | "done";
+export type SelfEmploymentContactStatus = "lead" | "first_contact" | "offer_sent" | "customer" | "paused";
+export type SelfEmploymentInvoiceStatus = "offer_open" | "offer_accepted" | "invoice_created" | "paid";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -202,6 +217,74 @@ export interface InvestmentSettings {
   childCapitalGainsTaxPercent: number;
   childInflationRatePercent: number;
   childBequestReservePercent: number;
+}
+
+export interface SelfEmploymentContact {
+  id: string;
+  name: string;
+  status: SelfEmploymentContactStatus;
+  lastContact: string;
+  nextStep: string;
+  revenuePotential: number;
+  probabilityPercent: number;
+}
+
+export interface SelfEmploymentInvoice {
+  id: string;
+  label: string;
+  status: SelfEmploymentInvoiceStatus;
+  dueDate: string;
+  amount: number;
+}
+
+export interface SelfEmploymentTask {
+  id: string;
+  title: string;
+  priority: SelfEmploymentTaskPriority;
+  dueDate: string;
+  estimatedHours: number;
+  status: SelfEmploymentTaskStatus;
+}
+
+export interface SelfEmploymentProject {
+  id: string;
+  name: string;
+  icon: string;
+  labels: string[];
+  status: SelfEmploymentProjectStatus;
+  idea: string;
+  problem: string;
+  targetGroup: string;
+  revenueModel: string;
+  risk: SelfEmploymentRiskLevel;
+  motivation: string;
+  projectGoal: string;
+  milestones: string[];
+  startDate: string;
+  plannedDurationWeeks: number;
+  nextSteps: string[];
+  dependencies: string;
+  requiredHoursPerWeek: number;
+  fixedProjectHoursPerWeek: number;
+  flexibleProjectHoursPerWeek: number;
+  linkedHabits: string[];
+  blockingHabits: string[];
+  weekScenario: string;
+  startCapitalRequired: number;
+  availableReserveOverride: number | null;
+  monthlyRevenueExpected: number;
+  monthlyRunningCosts: number;
+  oneTimeCosts: number;
+  taxReservePercent: number;
+  monthlyWorkHours: number;
+  contacts: SelfEmploymentContact[];
+  invoices: SelfEmploymentInvoice[];
+  tasks: SelfEmploymentTask[];
+}
+
+export interface SelfEmploymentState {
+  selectedProjectId: string;
+  projects: SelfEmploymentProject[];
 }
 
 export interface RealEstateFinancingSettings {
@@ -542,6 +625,7 @@ export interface AppState {
   statutoryPension: StatutoryPensionSettings;
   incomeTracker: IncomeTrackerState;
   incomePlanning: IncomePlanningState;
+  selfEmployment: SelfEmploymentState;
   positions: ReservePosition[];
   investmentByAccountId: Record<string, InvestmentSettings>;
   investment: InvestmentSettings;

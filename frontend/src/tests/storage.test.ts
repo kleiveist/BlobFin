@@ -113,6 +113,7 @@ describe("storage", () => {
       "income",
       "income_planning",
       "income_stamp_planner",
+      "self_employment_dashboard",
       "planning_scenarios",
       "real_estate_financing",
       "combined_wealth",
@@ -126,6 +127,15 @@ describe("storage", () => {
 
       expect(loaded.ui.activeSection).toBe(section);
     }
+  });
+
+  it("starts with a self employment example project", () => {
+    const state = defaultAppState();
+
+    expect(state.selfEmployment.projects).toHaveLength(1);
+    expect(state.selfEmployment.projects[0].labels).toContain("Beratung");
+    expect(state.selfEmployment.projects[0].name).toBe("Beispielprojekt");
+    expect(state.selfEmployment.selectedProjectId).toBe(state.selfEmployment.projects[0].id);
   });
 
   it("adds missing income planning defaults to saved app state", () => {

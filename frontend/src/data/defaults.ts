@@ -11,6 +11,7 @@ import type {
   RealEstateFinancingSettings,
   RepaymentSourceToggle,
   ReservePosition,
+  SelfEmploymentState,
   StatutoryPensionSettings
 } from "../types";
 import {
@@ -422,6 +423,84 @@ export function defaultIncomePlanningState(): IncomePlanningState {
   };
 }
 
+export function defaultSelfEmploymentState(): SelfEmploymentState {
+  return {
+    selectedProjectId: "self-project-example",
+    projects: [
+      {
+        id: "self-project-example",
+        name: "Beispielprojekt",
+        icon: "briefcase",
+        labels: ["Beratung", "Pruefung"],
+        status: "review",
+        idea: "Nebenprojekt Beratung",
+        problem: "Kleine Selbststaendige brauchen einfache Finanz- und Prozessstruktur.",
+        targetGroup: "kleine Selbststaendige",
+        revenueModel: "Stundenhonorar",
+        risk: "medium",
+        motivation: "Finanzwissen produktiv einsetzen und wiederholbare Beratungspakete testen.",
+        projectGoal: "Ein erstes bezahltes Beratungspaket validieren.",
+        milestones: ["Angebotspaket definieren", "Landingpage erstellen", "Ersten Testkunden gewinnen"],
+        startDate: "2026-07-01",
+        plannedDurationWeeks: 12,
+        nextSteps: ["Leistungsumfang schaerfen", "Beispielangebot erstellen", "Kontaktliste pruefen"],
+        dependencies: "Zeitfenster im Selbststaendigkeits-Szenario und kleines Startbudget.",
+        requiredHoursPerWeek: 8,
+        fixedProjectHoursPerWeek: 3,
+        flexibleProjectHoursPerWeek: 5,
+        linkedHabits: ["Wochenreview", "Fokusblock"],
+        blockingHabits: ["Handy im Bett"],
+        weekScenario: "Selbststaendigkeitswoche",
+        startCapitalRequired: 1500,
+        availableReserveOverride: null,
+        monthlyRevenueExpected: 800,
+        monthlyRunningCosts: 150,
+        oneTimeCosts: 500,
+        taxReservePercent: 30,
+        monthlyWorkHours: 20,
+        contacts: [
+          {
+            id: "self-contact-example",
+            name: "Max Mustermann",
+            status: "first_contact",
+            lastContact: "2026-06-10",
+            nextStep: "Angebot senden",
+            revenuePotential: 800,
+            probabilityPercent: 40
+          }
+        ],
+        invoices: [
+          {
+            id: "self-invoice-example",
+            label: "Beratungspaket Erstangebot",
+            status: "offer_open",
+            dueDate: "2026-07-15",
+            amount: 800
+          }
+        ],
+        tasks: [
+          {
+            id: "self-task-landingpage",
+            title: "Landingpage erstellen",
+            priority: "high",
+            dueDate: "2026-07-05",
+            estimatedHours: 3,
+            status: "open"
+          },
+          {
+            id: "self-task-offer",
+            title: "Angebotsstruktur ausarbeiten",
+            priority: "medium",
+            dueDate: "2026-06-28",
+            estimatedHours: 2,
+            status: "in_progress"
+          }
+        ]
+      }
+    ]
+  };
+}
+
 export function defaultAppState(): AppState {
   const planningAccounts = defaultPlanningAccounts();
   const investment = defaultInvestmentSettings();
@@ -435,6 +514,7 @@ export function defaultAppState(): AppState {
     statutoryPension: defaultStatutoryPensionSettings(),
     incomeTracker: defaultIncomeTrackerState(),
     incomePlanning: defaultIncomePlanningState(),
+    selfEmployment: defaultSelfEmploymentState(),
     positions: planningAccounts[0].yearlyRows,
     investmentByAccountId: {
       [planningAccounts[0].id]: investment
