@@ -68,6 +68,30 @@ export function renderAppShell(): string {
               <strong>Settings</strong>
               <button class="chart-popup-close" type="button" data-action="close-theme-settings" aria-label="Einstellungen schliessen">x</button>
             </div>
+            <button class="settings-accordion-toggle" type="button" data-action="toggle-settings-vault" aria-expanded="false" aria-controls="vaultSettingsContent">
+              VAULT
+            </button>
+            <div id="vaultSettingsContent" class="settings-accordion-content" hidden>
+              <div class="vault-settings-panel">
+                <div class="vault-action-grid">
+                  <button class="button secondary" type="button" data-action="vault-select">Vault auswaehlen</button>
+                  <button class="button secondary" type="button" data-action="vault-create">Neuen Vault erstellen</button>
+                </div>
+                <div class="vault-status-grid" aria-live="polite">
+                  <span>Aktiver Pfad</span>
+                  <strong id="vaultActivePath">-</strong>
+                  <span>Status</span>
+                  <strong id="vaultStatusText">Nicht verbunden</strong>
+                  <span>Details</span>
+                  <strong id="vaultStatusDetail">Kein Vault verbunden.</strong>
+                </div>
+                <div class="vault-action-grid">
+                  <button class="button" type="button" data-action="vault-save-now">Jetzt speichern</button>
+                  <button class="button secondary" type="button" data-action="vault-reload">Aus Vault neu laden</button>
+                  <button class="button secondary" type="button" data-action="vault-snapshot">Vault sichern / Snapshot erstellen</button>
+                </div>
+              </div>
+            </div>
             <button class="settings-accordion-toggle" type="button" data-action="toggle-settings-grunddaten" aria-expanded="true" aria-controls="grunddatenSettingsContent">
               Grunddaten
             </button>

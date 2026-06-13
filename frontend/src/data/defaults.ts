@@ -231,6 +231,7 @@ export function defaultAppUiState(): AppUiState {
     selectedRealEstateWithdrawalGainAccountIds: ["default-account"],
     selectedCombinedAccountIds: ["default-account"],
     selectedCombinedLeadInvestmentAccountId: "default-account",
+    settingsVaultExpanded: false,
     settingsGrunddatenExpanded: true
   };
 }

@@ -154,7 +154,17 @@ import {
   positionsForPlanningYear,
   sanitizePlanningYearSelection
 } from "./lib/planningYears";
-import { loadState, resetStoredState, saveState } from "./lib/storage";
+import {
+  createVault,
+  flushVaultSave,
+  getVaultStatus,
+  initializeStorage,
+  reloadFromVault,
+  resetStoredState,
+  saveState,
+  selectVault,
+  snapshotVault
+} from "./lib/storage";
 import type {
   AppSectionId,
   AppState,
@@ -599,7 +609,7 @@ type IncomeStampPlannerStampDragState = {
 } | null;
 
 let investmentAccountContextId: string | null = null;
-let state = loadInitialState();
+let state = defaultAppState();
 let draggedPositionId: string | null = null;
 let exportStatusTimeoutId: number | undefined;
 let selectedPositionMode: PositionTableMode = "expense";
@@ -673,20 +683,24 @@ let combinedWealthLineVisibility: CombinedWealthLineVisibility = {
 let latestStatutoryPensionModel: StatutoryPensionModel | null = null;
 let statutoryPensionTaxPopupScenarioId: StatutoryPensionScenarioId | null = null;
 let accountDialog: AccountDialogState = null;
-normalizeInvestmentBounds();
-applyInitialRoute();
-applyTheme();
+void bootstrapApp();
 
-renderShell();
-bindEvents();
-startIncomePlanningCurrentTimeTicker();
-syncAllInputsFromState();
-syncThemeControls();
-renderAll();
+async function bootstrapApp(): Promise<void> {
+  state = await loadInitialState();
+  normalizeInvestmentBounds();
+  applyInitialRoute();
+  applyTheme();
+  renderShell();
+  bindEvents();
+  startIncomePlanningCurrentTimeTicker();
+  syncAllInputsFromState();
+  syncThemeControls();
+  renderAll();
+}
 
-function loadInitialState(): AppState {
+async function loadInitialState(): Promise<AppState> {
   try {
-    return sanitizeAppState(loadState());
+    return sanitizeAppState(await initializeStorage());
   } catch (error) {
     console.warn("Stored state could not be loaded; falling back to defaults.", error);
     return sanitizeAppState(defaultAppState());
@@ -703,6 +717,7 @@ function sanitizeAppState(appState: AppState): AppState {
     selectedRealEstateWithdrawalGainAccountIds: ["default-account"],
     selectedCombinedAccountIds: ["default-account"],
     selectedCombinedLeadInvestmentAccountId: "default-account",
+    settingsVaultExpanded: false,
     settingsGrunddatenExpanded: true
   };
   const ui = appState.ui ?? fallbackUi;
@@ -1937,6 +1952,27 @@ function bindEvents(): void {
       return;
     }
     if (action === "toggle-theme-settings") toggleThemeSettings();
+    if (action === "toggle-settings-vault") toggleSettingsVault();
+    if (action === "vault-select") {
+      void handleVaultSelect();
+      return;
+    }
+    if (action === "vault-create") {
+      void handleVaultCreate();
+      return;
+    }
+    if (action === "vault-save-now") {
+      void handleVaultSaveNow();
+      return;
+    }
+    if (action === "vault-reload") {
+      void handleVaultReload();
+      return;
+    }
+    if (action === "vault-snapshot") {
+      void handleVaultSnapshot();
+      return;
+    }
     if (action === "toggle-settings-grunddaten") toggleSettingsGrunddaten();
     if (action === "close-theme-settings") hideThemeSettings();
     if (action === "open-base-data-popup") openBaseDataPopup();
@@ -13844,11 +13880,116 @@ function toggleSettingsGrunddaten(): void {
   saveState(state);
 }
 
+function toggleSettingsVault(): void {
+  state.ui = { ...state.ui, settingsVaultExpanded: !state.ui.settingsVaultExpanded };
+  syncSettingsAccordionState();
+  saveState(state);
+}
+
+async function handleVaultSelect(): Promise<void> {
+  setVaultStatusDetail("Vault-Auswahl wird geoeffnet...");
+  await selectVault(state);
+  syncVaultControls();
+}
+
+async function handleVaultCreate(): Promise<void> {
+  setVaultStatusDetail("Vault-Ordner wird vorbereitet...");
+  await createVault(state);
+  syncVaultControls();
+}
+
+async function handleVaultSaveNow(): Promise<void> {
+  setVaultStatusDetail("Vault wird gespeichert...");
+  saveState(state);
+  await flushVaultSave(state);
+  syncVaultControls();
+}
+
+async function handleVaultReload(): Promise<void> {
+  setVaultStatusDetail("Vault wird geladen...");
+  const loadedState = await reloadFromVault();
+  if (!loadedState) {
+    syncVaultControls();
+    return;
+  }
+
+  state = sanitizeAppState(loadedState);
+  investmentAccountContextId = state.ui.selectedInvestmentAccountId;
+  selectedRealEstateYear = null;
+  selectedCombinedWealthYear = null;
+  applyTheme();
+  syncAllInputsFromState();
+  renderAll();
+}
+
+async function handleVaultSnapshot(): Promise<void> {
+  setVaultStatusDetail("Snapshot wird erstellt...");
+  const result = await snapshotVault();
+  syncVaultControls(result ? `Snapshot erstellt: ${result.backupPath}` : undefined);
+}
+
 function syncSettingsAccordionState(): void {
+  const vaultContent = document.querySelector<HTMLDivElement>("#vaultSettingsContent");
+  const vaultButton = document.querySelector<HTMLButtonElement>("[data-action='toggle-settings-vault']");
+  if (vaultContent) vaultContent.hidden = !state.ui.settingsVaultExpanded;
+  if (vaultButton) vaultButton.setAttribute("aria-expanded", String(state.ui.settingsVaultExpanded));
+
   const content = document.querySelector<HTMLDivElement>("#grunddatenSettingsContent");
   const button = document.querySelector<HTMLButtonElement>("[data-action='toggle-settings-grunddaten']");
   if (content) content.hidden = !state.ui.settingsGrunddatenExpanded;
   if (button) button.setAttribute("aria-expanded", String(state.ui.settingsGrunddatenExpanded));
+  syncVaultControls();
+}
+
+function syncVaultControls(detailOverride?: string): void {
+  const vault = getVaultStatus();
+  const statusText = vaultStatusLabel(vault.status);
+  const detail =
+    detailOverride ??
+    (vault.pendingWrites > 0
+      ? "Speichern laeuft..."
+      : vault.status === "error"
+        ? vault.lastError || "Vault-Fehler."
+        : vault.status === "connected"
+          ? vault.lastSavedAt
+            ? `Zuletzt gespeichert: ${formatVaultTimestamp(vault.lastSavedAt)}`
+            : "Verbunden."
+          : vault.status === "csvOnly"
+            ? "Vault ist nur in der Tauri-Desktop-App verfuegbar."
+            : "Kein Vault verbunden.");
+
+  setText("vaultActivePath", vault.vaultRootPath || "-");
+  setText("vaultStatusText", statusText);
+  setText("vaultStatusDetail", detail);
+
+  const tauriVaultAvailable = vault.status !== "csvOnly";
+  const hasVaultPath = Boolean(vault.vaultRootPath);
+  setButtonDisabled("[data-action='vault-select']", !tauriVaultAvailable);
+  setButtonDisabled("[data-action='vault-create']", !tauriVaultAvailable);
+  setButtonDisabled("[data-action='vault-save-now']", !tauriVaultAvailable || !hasVaultPath || vault.pendingWrites > 0);
+  setButtonDisabled("[data-action='vault-reload']", !tauriVaultAvailable || !hasVaultPath);
+  setButtonDisabled("[data-action='vault-snapshot']", !tauriVaultAvailable || !hasVaultPath || vault.pendingWrites > 0);
+}
+
+function setVaultStatusDetail(message: string): void {
+  setText("vaultStatusDetail", message);
+}
+
+function vaultStatusLabel(status: ReturnType<typeof getVaultStatus>["status"]): string {
+  if (status === "connected") return "Verbunden";
+  if (status === "error") return "Fehler";
+  if (status === "csvOnly") return "Nur CSV-Modus";
+  return "Nicht verbunden";
+}
+
+function formatVaultTimestamp(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("de-DE");
+}
+
+function setButtonDisabled(selector: string, disabled: boolean): void {
+  const button = document.querySelector<HTMLButtonElement>(selector);
+  if (button) button.disabled = disabled;
 }
 
 function updatePlanningSetting(field: keyof PlanningSettings, value: string): void {

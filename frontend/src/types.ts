@@ -190,6 +190,7 @@ export interface AppUiState {
   selectedRealEstateWithdrawalGainAccountIds: string[];
   selectedCombinedAccountIds: string[];
   selectedCombinedLeadInvestmentAccountId: string;
+  settingsVaultExpanded: boolean;
   settingsGrunddatenExpanded: boolean;
 }
 
