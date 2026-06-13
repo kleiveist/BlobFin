@@ -32,12 +32,18 @@ def main(args: argparse.Namespace) -> int:
     env = appimage.appimage_build_env() if _bundles_include_appimage(bundles) else None
     result = common.run_command(command, cwd=paths.ROOT, dry_run=dry_run, env=env)
     if result.returncode != 0 and _bundles_include_appimage(bundles) and not dry_run:
-        fallback_code = appimage.package_existing_appdir()
-        if fallback_code == 0:
-            logger.warn("Tauri linuxdeploy failed, but AppImage was packaged from the generated AppDir.")
-            logger.ok("Linux Tauri build completed")
-            common.print_build_artifacts()
-            return 0
+        if appimage.is_linuxdeploy_failure(result):
+            fallback_code = appimage.package_existing_appdir()
+            if fallback_code == 0:
+                logger.warn("Tauri linuxdeploy failed, but AppImage was packaged from the generated AppDir.")
+                logger.ok("Linux Tauri build completed")
+                common.print_build_artifacts()
+                return 0
+        else:
+            logger.fail(
+                "AppImage fallback skipped: Tauri failed before linuxdeploy. "
+                "Fix the build error above; stale AppImage artifacts were not treated as a successful build."
+            )
 
     code = common.print_result(result, "Linux Tauri build completed", "Linux Tauri build failed")
     if code == 0 and dry_run:

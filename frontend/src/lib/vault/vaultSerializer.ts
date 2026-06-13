@@ -103,34 +103,34 @@ export function deserializeVaultState(files: VaultDataFiles): AppState {
   return {
     ...fallback,
     theme: settingsTheme.theme === "dark" ? "dark" : settingsTheme.theme === "light" ? "light" : fallback.theme,
-    settings: isRecord(files.settingsBase) ? (files.settingsBase as AppState["settings"]) : fallback.settings,
-    ui: isRecord(files.settingsUi) ? (files.settingsUi as AppState["ui"]) : fallback.ui,
+    settings: isRecord(files.settingsBase) ? (files.settingsBase as unknown as AppState["settings"]) : fallback.settings,
+    ui: isRecord(files.settingsUi) ? (files.settingsUi as unknown as AppState["ui"]) : fallback.ui,
     realEstate: isRecord(files.realEstateFinancing)
-      ? (files.realEstateFinancing as AppState["realEstate"])
+      ? (files.realEstateFinancing as unknown as AppState["realEstate"])
       : fallback.realEstate,
     combinedWealth: isRecord(files.combinedWealth)
-      ? (files.combinedWealth as AppState["combinedWealth"])
+      ? (files.combinedWealth as unknown as AppState["combinedWealth"])
       : fallback.combinedWealth,
     statutoryPension: isRecord(files.statutoryPension)
-      ? (files.statutoryPension as AppState["statutoryPension"])
+      ? (files.statutoryPension as unknown as AppState["statutoryPension"])
       : fallback.statutoryPension,
     incomeTracker,
     incomePlanning,
     selfEmployment: isRecord(files.selfEmploymentState)
-      ? (files.selfEmploymentState as AppState["selfEmployment"])
+      ? (files.selfEmploymentState as unknown as AppState["selfEmployment"])
       : fallback.selfEmployment,
     planningAccounts: arrayOr(planningAccountsFile.planningAccounts, fallback.planningAccounts),
     positions: arrayOr(planningPositionsFile.positions, fallback.positions),
     investmentByAccountId: isRecord(investmentDepotsFile.investmentByAccountId)
-      ? (investmentDepotsFile.investmentByAccountId as AppState["investmentByAccountId"])
+      ? (investmentDepotsFile.investmentByAccountId as unknown as AppState["investmentByAccountId"])
       : isRecord(investmentSettingsFile.investmentByAccountId)
-        ? (investmentSettingsFile.investmentByAccountId as AppState["investmentByAccountId"])
+        ? (investmentSettingsFile.investmentByAccountId as unknown as AppState["investmentByAccountId"])
         : fallback.investmentByAccountId,
     investment: isRecord(investmentSettingsFile.investment)
-      ? (investmentSettingsFile.investment as AppState["investment"])
+      ? (investmentSettingsFile.investment as unknown as AppState["investment"])
       : fallback.investment,
     positionTableView: isRecord(planningTableViewsFile.positionTableView)
-      ? (planningTableViewsFile.positionTableView as AppState["positionTableView"])
+      ? (planningTableViewsFile.positionTableView as unknown as AppState["positionTableView"])
       : fallback.positionTableView
   };
 }

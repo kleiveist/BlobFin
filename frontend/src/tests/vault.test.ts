@@ -44,7 +44,7 @@ describe("vault serializer", () => {
     state.settings.interestRatePercent = 3.25;
     state.incomePlanning.habits[0] = { ...state.incomePlanning.habits[0], name: "Training" };
     state.selfEmployment.projects[0] = { ...state.selfEmployment.projects[0], name: "Vault-Projekt" };
-    state.positionTableView.savings.selectedLabels = ["ETF"];
+    state.positionTableView.savings.selectedLabels = ["tag"];
 
     const loaded = normalizeStoredState(deserializeVaultState(serializeVaultState(state)));
 
@@ -53,7 +53,7 @@ describe("vault serializer", () => {
     expect(loaded.settings.interestRatePercent).toBe(3.25);
     expect(loaded.incomePlanning.habits[0].name).toBe("Training");
     expect(loaded.selfEmployment.projects[0].name).toBe("Vault-Projekt");
-    expect(loaded.positionTableView.savings.selectedLabels).toEqual(["ETF"]);
+    expect(loaded.positionTableView.savings.selectedLabels).toEqual(["tag"]);
   });
 
   it("falls back to defaults for missing optional vault files", () => {

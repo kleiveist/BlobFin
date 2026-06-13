@@ -8,7 +8,7 @@ export function renderStatutoryPensionHtml(
   derivedSourceYear: number | null = null
 ): string {
   const hasContributions = model.totalContribution > 0;
-  const derivedSourceLabel = derivedSourceYear === null ? "" : intNumber(derivedSourceYear);
+  const derivedSourceLabel = derivedSourceYear === null ? "" : String(derivedSourceYear);
   return `
     <div class="statutory-pension-section">
       <div class="statutory-pension-head">

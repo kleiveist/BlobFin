@@ -760,7 +760,7 @@ function fixedPlanningSlot(
 function incomePlanningCsvTestRow(values: Partial<Record<number, string>>): string {
   const row = Array.from({ length: 33 }, () => "");
   for (const [index, value] of Object.entries(values)) {
-    row[Number(index)] = value;
+    row[Number(index)] = value ?? "";
   }
   return row.map((value) => `"${value.replaceAll('"', '""')}"`).join(",");
 }

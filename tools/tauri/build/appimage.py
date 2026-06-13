@@ -54,6 +54,12 @@ def main(args: argparse.Namespace) -> int:
     result = common.run_command(command, cwd=paths.ROOT, dry_run=dry_run, env=appimage_build_env())
     code = common.print_result(result, "Linux AppImage build completed", "Linux AppImage build failed")
     if code != 0:
+        if not is_linuxdeploy_failure(result):
+            logger.fail(
+                "AppImage fallback skipped: Tauri failed before linuxdeploy. "
+                "Fix the build error above; no AppDir/AppImage fallback was installed."
+            )
+            return code
         fallback_code = package_existing_appdir(dry_run=dry_run)
         if fallback_code != 0:
             return code
@@ -74,6 +80,24 @@ def appimage_build_env() -> dict[str, str]:
     if host_bin.exists():
         env["PATH"] = f"{host_bin}{os.pathsep}{os.environ.get('PATH', '')}"
     return env
+
+
+def is_linuxdeploy_failure(result: common.CommandResult) -> bool:
+    output = f"{result.stdout}\n{result.stderr}".lower()
+    before_build_failed = re.search(
+        r"beforebuildcommand\s+`[^`]+`\s+failed(?:\s+with\s+exit\s+code\s+\d+)?",
+        output,
+    )
+    frontend_build_failed = "npm run build` failed" in output or "npm run build failed" in output
+    typescript_failed = "error ts" in output
+    if before_build_failed or frontend_build_failed or typescript_failed:
+        return False
+    return (
+        "failed to run linuxdeploy" in output
+        or "appimage bundler" in output
+        or "appimage bundle" in output
+        or ("linuxdeploy" in output and ("failed" in output or "error" in output))
+    )
 
 
 def package_existing_appdir(*, dry_run: bool = False) -> int:

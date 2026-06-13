@@ -378,6 +378,52 @@ def test_tauri_linux_build_uses_appimage_fallback_when_linuxdeploy_fails(monkeyp
     assert fallback == [False]
 
 
+def test_tauri_linux_build_uses_appimage_fallback_when_before_build_succeeded_then_linuxdeploy_failed(monkeypatch) -> None:
+    fallback: list[bool] = []
+    output = """
+       Running beforeBuildCommand `cd ../frontend && npm run build`
+       Bundling BlobFin_0.1.0_amd64.AppImage
+       failed to bundle project `failed to run linuxdeploy`
+    """
+
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        common,
+        "run_command",
+        lambda command, **kwargs: common.CommandResult(command=command, cwd=paths.ROOT, returncode=1, stderr=output),
+    )
+    monkeypatch.setattr(appimage, "package_existing_appdir", lambda dry_run=False: fallback.append(dry_run) or 0)
+    monkeypatch.setattr(common, "print_build_artifacts", lambda: None)
+
+    code = control.main(["tauri", "build", "--target", "linux"])
+
+    assert code == 0
+    assert fallback == [False]
+
+
+def test_tauri_linux_build_does_not_use_appimage_fallback_for_frontend_build_failure(monkeypatch) -> None:
+    fallback: list[bool] = []
+
+    def fake_run_command(command: list[str], **kwargs) -> common.CommandResult:
+        return common.CommandResult(
+            command=command,
+            cwd=paths.ROOT,
+            returncode=1,
+            stderr="beforeBuildCommand `cd ../frontend && npm run build` failed with exit code 2",
+        )
+
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(common, "run_command", fake_run_command)
+    monkeypatch.setattr(appimage, "package_existing_appdir", lambda dry_run=False: fallback.append(dry_run) or 0)
+
+    code = control.main(["tauri", "build", "--target", "linux"])
+
+    assert code == 1
+    assert fallback == []
+
+
 def test_tauri_build_appimage_shortcut_builds_and_installs(monkeypatch) -> None:
     calls: list[tuple[list[str], bool]] = []
     installed: list[bool] = []
@@ -411,7 +457,12 @@ def test_tauri_build_appimage_shortcut_packages_appdir_on_linuxdeploy_failure(mo
     monkeypatch.setattr(
         common,
         "run_command",
-        lambda command, **kwargs: common.CommandResult(command=command, cwd=paths.ROOT, returncode=1),
+        lambda command, **kwargs: common.CommandResult(
+            command=command,
+            cwd=paths.ROOT,
+            returncode=1,
+            stderr="failed to run linuxdeploy",
+        ),
     )
     monkeypatch.setattr(appimage, "package_existing_appdir", lambda dry_run=False: fallback.append(dry_run) or 0)
     monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: installed.append(dry_run) or 0)
@@ -422,6 +473,33 @@ def test_tauri_build_appimage_shortcut_packages_appdir_on_linuxdeploy_failure(mo
     assert code == 0
     assert fallback == [False]
     assert installed == [False]
+
+
+def test_tauri_build_appimage_shortcut_does_not_install_on_frontend_build_failure(monkeypatch) -> None:
+    fallback: list[bool] = []
+    installed: list[bool] = []
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda: True)
+    monkeypatch.setattr(
+        common,
+        "run_command",
+        lambda command, **kwargs: common.CommandResult(
+            command=command,
+            cwd=paths.ROOT,
+            returncode=1,
+            stderr="beforeBuildCommand `cd ../frontend && npm run build` failed with exit code 2",
+        ),
+    )
+    monkeypatch.setattr(appimage, "package_existing_appdir", lambda dry_run=False: fallback.append(dry_run) or 0)
+    monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: installed.append(dry_run) or 0)
+
+    code = control.main(["tauri", "build", "--appimage"])
+
+    assert code == 1
+    assert fallback == []
+    assert installed == []
 
 
 def test_tauri_install_appimage_command_only_installs(monkeypatch) -> None:

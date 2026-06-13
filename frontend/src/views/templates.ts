@@ -212,6 +212,7 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel self-employment-panel" data-module-section="self_employment_dashboard">
+        ${moduleTopBar("Selbststaendigkeits-Dashboard", "Projekte, Zeit, Budget und Gewinnpotenzial")}
         <div id="selfEmploymentDashboard" class="self-employment-dashboard"></div>
         <div id="selfEmploymentIconPicker" class="position-icon-picker self-employment-icon-picker" role="dialog" aria-label="Projekt-Icon auswaehlen" hidden></div>
       </section>

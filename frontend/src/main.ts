@@ -3771,39 +3771,6 @@ function selfEmploymentTaskStatusFromValue(
   return value === "open" || value === "in_progress" || value === "done" ? value : fallback;
 }
 
-function selfEmploymentContactStatusLabel(status: SelfEmploymentProject["contacts"][number]["status"]): string {
-  const labels: Record<SelfEmploymentProject["contacts"][number]["status"], string> = {
-    lead: "Lead",
-    first_contact: "Erstkontakt",
-    offer_sent: "Angebot gesendet",
-    customer: "Kunde",
-    paused: "Pausiert"
-  };
-  return labels[status];
-}
-
-function selfEmploymentInvoiceStatusLabel(status: SelfEmploymentInvoice["status"]): string {
-  const labels: Record<SelfEmploymentInvoice["status"], string> = {
-    offer_open: "Angebot offen",
-    offer_accepted: "Angebot angenommen",
-    invoice_created: "Rechnung erstellt",
-    paid: "Bezahlt"
-  };
-  return labels[status];
-}
-
-function selfEmploymentTaskPriorityLabel(priority: SelfEmploymentTask["priority"]): string {
-  if (priority === "high") return "Prioritaet hoch";
-  if (priority === "low") return "Prioritaet niedrig";
-  return "Prioritaet mittel";
-}
-
-function selfEmploymentTaskStatusLabel(status: SelfEmploymentTask["status"]): string {
-  if (status === "done") return "Erledigt";
-  if (status === "in_progress") return "In Arbeit";
-  return "Offen";
-}
-
 function renderIncomeStampPlannerControls(): void {
   const host = document.querySelector<HTMLDivElement>("#incomeStampPlannerControls");
   if (!host) return;
