@@ -138,19 +138,32 @@ describe("follow-up ui rendering", () => {
 
   it("renders the self employment dashboard as an independent page", () => {
     const html = renderAppShell();
+    const selfEmploymentStart = html.indexOf('data-module-section="self_employment_dashboard"');
+    const incomePlanningStart = html.indexOf('data-module-section="income_planning"', selfEmploymentStart);
+    const selfEmploymentSection = html.slice(selfEmploymentStart, incomePlanningStart);
 
+    expect(selfEmploymentStart).toBeGreaterThanOrEqual(0);
+    expect(incomePlanningStart).toBeGreaterThan(selfEmploymentStart);
     expect(html).toContain('data-module-section="self_employment_dashboard"');
     expect(html).toContain('id="selfEmploymentDashboard"');
+    expect(html).toContain('id="selfEmploymentIconPicker"');
     expect(html).toContain("Selbststaendigkeits-Dashboard");
-    expect(html).toContain("Projektzentrale fuer Idee, Zeit, Budget und Gewinnpotenzial");
-    expect(html).toContain('data-action="open-section-income_planning"');
-    expect(html).toContain('data-action="open-section-planning_scenarios"');
+    expect(selfEmploymentSection).not.toContain("Projektzentrale fuer Idee, Zeit, Budget und Gewinnpotenzial");
+    expect(selfEmploymentSection).not.toContain('data-action="open-section-income_planning"');
+    expect(selfEmploymentSection).not.toContain('data-action="open-section-planning_scenarios"');
     expect(mainSource).toContain("function renderSelfEmploymentDashboard");
     expect(mainSource).toContain('data-action="self-employment-add-project"');
     expect(mainSource).toContain('data-action="self-employment-select-project"');
+    expect(mainSource).toContain('data-action="self-employment-select-roadmap-area"');
+    expect(mainSource).toContain('data-action="self-employment-open-icon-picker"');
+    expect(mainSource).toContain('data-action="self-employment-select-icon"');
     expect(mainSource).toContain('data-action="self-employment-rename-project"');
     expect(mainSource).toContain('data-action="self-employment-delete-project"');
     expect(mainSource).toContain('data-action="self-employment-toggle-label"');
+    expect(mainSource).toContain("SELF_EMPLOYMENT_ROADMAP_AREAS");
+    expect(mainSource).toContain('"Geschaeftsidee"');
+    expect(mainSource).toContain('"Kennzahlen"');
+    expect(mainSource).toContain("data-self-employment-field");
     expect(mainSource).toContain("evaluateSelfEmploymentProject");
     expect(mainSource).toContain("selfEmploymentEvaluationContext");
   });

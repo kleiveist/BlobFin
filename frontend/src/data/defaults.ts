@@ -426,6 +426,7 @@ export function defaultIncomePlanningState(): IncomePlanningState {
 export function defaultSelfEmploymentState(): SelfEmploymentState {
   return {
     selectedProjectId: "self-project-example",
+    selectedRoadmapAreaId: "idea",
     projects: [
       {
         id: "self-project-example",

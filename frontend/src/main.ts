@@ -206,6 +206,7 @@ import type {
   SelfEmploymentInvoice,
   SelfEmploymentProject,
   SelfEmploymentProjectStatus,
+  SelfEmploymentRoadmapAreaId,
   SelfEmploymentRiskLevel,
   SelfEmploymentTask,
   StatutoryPensionScenarioId,
@@ -255,6 +256,21 @@ const SELF_EMPLOYMENT_LABEL_OPTIONS = [
   "Immobiliennah",
   "Sonstiges",
   "Prioritaet"
+];
+const SELF_EMPLOYMENT_ROADMAP_AREAS: Array<{
+  id: SelfEmploymentRoadmapAreaId;
+  title: string;
+  icon: string;
+}> = [
+  { id: "idea", title: "Geschaeftsidee", icon: "pen" },
+  { id: "planning", title: "Projektplanung", icon: "calendar" },
+  { id: "contacts", title: "Kundenkontakte", icon: "boardroom" },
+  { id: "invoices", title: "Angebote & Rechnungen", icon: "receipt" },
+  { id: "tasks", title: "Aufgaben", icon: "stamp" },
+  { id: "time", title: "Zeitmanagement & Habits", icon: "book" },
+  { id: "budget", title: "Budget & Investitionen", icon: "investment" },
+  { id: "profit", title: "Gewinnschaetzung", icon: "coins" },
+  { id: "metrics", title: "Kennzahlen", icon: "wallet" }
 ];
 const APP_SECTION_IDS: AppSectionId[] = [
   "home",
@@ -636,6 +652,7 @@ let incomePlanningCurrentTimeTimerId: number | null = null;
 let incomeMilestoneTypePicker: { milestoneId: string; top: number; left: number } | null = null;
 let positionIconPicker: { positionId: string; top: number; left: number } | null = null;
 let selfEmploymentLabelPickerProjectId: string | null = null;
+let selfEmploymentIconPicker: { projectId: string; top: number; left: number } | null = null;
 let positionFilterDrafts = createPositionFilterDrafts();
 let positionFilterPopupOpen = false;
 let selectedRealEstateYear: number | null = null;
@@ -1159,6 +1176,38 @@ function bindEvents(): void {
       return;
     }
 
+    if (target.dataset.selfEmploymentField) {
+      updateSelfEmploymentProjectField(
+        target.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        target.dataset.selfEmploymentField,
+        target.value,
+        false
+      );
+      return;
+    }
+
+    if (target.dataset.selfEmploymentListField) {
+      updateSelfEmploymentProjectListField(
+        target.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        target.dataset.selfEmploymentListField,
+        target.value,
+        false
+      );
+      return;
+    }
+
+    if (target.dataset.selfEmploymentCollection && target.dataset.selfEmploymentItemId && target.dataset.selfEmploymentItemField) {
+      updateSelfEmploymentCollectionItemField(
+        target.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        target.dataset.selfEmploymentCollection,
+        target.dataset.selfEmploymentItemId,
+        target.dataset.selfEmploymentItemField,
+        target.value,
+        false
+      );
+      return;
+    }
+
     if (target.dataset.positionCostPositionId && target.dataset.positionCostItemId && target.dataset.positionCostField) {
       updatePositionCostBreakdownItem(
         target.dataset.positionCostPositionId,
@@ -1263,6 +1312,38 @@ function bindEvents(): void {
 
     if (target.dataset.incomeStampPlannerField) {
       updateIncomeStampPlannerDialogDraft(target.dataset.incomeStampPlannerField, target.value);
+      return;
+    }
+
+    if (target.dataset.selfEmploymentField) {
+      updateSelfEmploymentProjectField(
+        target.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        target.dataset.selfEmploymentField,
+        target.value,
+        true
+      );
+      return;
+    }
+
+    if (target.dataset.selfEmploymentListField) {
+      updateSelfEmploymentProjectListField(
+        target.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        target.dataset.selfEmploymentListField,
+        target.value,
+        true
+      );
+      return;
+    }
+
+    if (target.dataset.selfEmploymentCollection && target.dataset.selfEmploymentItemId && target.dataset.selfEmploymentItemField) {
+      updateSelfEmploymentCollectionItemField(
+        target.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        target.dataset.selfEmploymentCollection,
+        target.dataset.selfEmploymentItemId,
+        target.dataset.selfEmploymentItemField,
+        target.value,
+        true
+      );
       return;
     }
 
@@ -1435,6 +1516,9 @@ function bindEvents(): void {
       if (incomePlanningHabitIconPicker && !target?.closest("#incomePlanningHabitIconPicker")) {
         hideIncomePlanningHabitIconPicker();
       }
+      if (selfEmploymentIconPicker && !target?.closest("#selfEmploymentIconPicker")) {
+        hideSelfEmploymentIconPicker();
+      }
       if (incomePlanningStampPicker && !target?.closest("#incomePlanningStampPicker")) {
         hideIncomePlanningStampPicker();
       }
@@ -1486,6 +1570,14 @@ function bindEvents(): void {
       action !== "close-income-planning-icon-picker"
     ) {
       hideIncomePlanningHabitIconPicker();
+    }
+    if (
+      action !== "self-employment-open-icon-picker" &&
+      action !== "self-employment-select-icon" &&
+      action !== "self-employment-close-icon-picker" &&
+      !button.closest("#selfEmploymentIconPicker")
+    ) {
+      hideSelfEmploymentIconPicker();
     }
     if (
       action !== "income-planning-open-stamp-menu" &&
@@ -1571,6 +1663,22 @@ function bindEvents(): void {
       selectSelfEmploymentProject(button.dataset.selfEmploymentProjectId || "");
       return;
     }
+    if (action === "self-employment-select-roadmap-area") {
+      selectSelfEmploymentRoadmapArea(button.dataset.selfEmploymentRoadmapArea || "");
+      return;
+    }
+    if (action === "self-employment-open-icon-picker") {
+      showSelfEmploymentIconPicker(button);
+      return;
+    }
+    if (action === "self-employment-close-icon-picker") {
+      hideSelfEmploymentIconPicker();
+      return;
+    }
+    if (action === "self-employment-select-icon") {
+      selectSelfEmploymentIcon(button.dataset.selfEmploymentProjectId || "", button.dataset.selfEmploymentIcon || "");
+      return;
+    }
     if (action === "self-employment-rename-project") {
       renameSelfEmploymentProject(button.dataset.selfEmploymentProjectId || "");
       return;
@@ -1587,6 +1695,42 @@ function bindEvents(): void {
       toggleSelfEmploymentProjectLabel(
         button.dataset.selfEmploymentProjectId || "",
         button.dataset.selfEmploymentLabel || ""
+      );
+      return;
+    }
+    if (action === "self-employment-add-contact") {
+      addSelfEmploymentContact(button.dataset.selfEmploymentProjectId || "");
+      return;
+    }
+    if (action === "self-employment-remove-contact") {
+      removeSelfEmploymentCollectionItem(
+        button.dataset.selfEmploymentProjectId || "",
+        "contacts",
+        button.dataset.selfEmploymentItemId || ""
+      );
+      return;
+    }
+    if (action === "self-employment-add-invoice") {
+      addSelfEmploymentInvoice(button.dataset.selfEmploymentProjectId || "");
+      return;
+    }
+    if (action === "self-employment-remove-invoice") {
+      removeSelfEmploymentCollectionItem(
+        button.dataset.selfEmploymentProjectId || "",
+        "invoices",
+        button.dataset.selfEmploymentItemId || ""
+      );
+      return;
+    }
+    if (action === "self-employment-add-task") {
+      addSelfEmploymentTask(button.dataset.selfEmploymentProjectId || "");
+      return;
+    }
+    if (action === "self-employment-remove-task") {
+      removeSelfEmploymentCollectionItem(
+        button.dataset.selfEmploymentProjectId || "",
+        "tasks",
+        button.dataset.selfEmploymentItemId || ""
       );
       return;
     }
@@ -1976,6 +2120,7 @@ function renderAll(): void {
     renderInvestmentIncludeList();
     renderCalculations(activeReserve);
     renderSelfEmploymentDashboard();
+    renderSelfEmploymentIconPicker();
     syncPlanningInputsFromState();
     syncRealEstateInputsFromState();
     syncCombinedToggleInputsFromState();
@@ -2264,10 +2409,7 @@ function renderSelfEmploymentDashboard(): void {
 
   host.innerHTML = `
     <section class="self-employment-hero">
-      <div>
-        <span class="planning-account-summary">Selbststaendigkeitsprojekte</span>
-        <h2>Projekt anlegen, pruefen und auswerten</h2>
-      </div>
+      <h2>Selbststaendigkeits-Dashboard</h2>
       <button class="button" type="button" data-action="self-employment-add-project">Projekt anlegen</button>
     </section>
     <section class="self-employment-metrics" aria-label="Projektuebergreifende Kennzahlen">
@@ -2385,6 +2527,7 @@ function selfEmploymentTotals(
 function selfEmploymentProjectCard(evaluation: SelfEmploymentProjectEvaluation, selectedProjectId?: string): string {
   const { project } = evaluation;
   const active = project.id === selectedProjectId;
+  const icon = normalizePositionIcon(project.icon, "briefcase");
   const labelChips =
     project.labels.length > 0
       ? project.labels
@@ -2395,23 +2538,34 @@ function selfEmploymentProjectCard(evaluation: SelfEmploymentProjectEvaluation, 
     <article
       class="self-employment-project-card ${escapeHtml(evaluation.feasibility)}${active ? " active" : ""}"
     >
-      <button
-        class="self-employment-project-main"
-        type="button"
-        data-action="self-employment-select-project"
-        data-self-employment-project-id="${escapeHtml(project.id)}"
-        aria-pressed="${active}"
-      >
-        <span class="self-employment-project-title">
-          <span class="self-employment-project-icon">${escapeHtml(project.icon || "briefcase")}</span>
-          <strong>${escapeHtml(project.name)}</strong>
-        </span>
-        <span>Status: ${escapeHtml(selfEmploymentStatusLabel(project.status))}</span>
-        <span>Zeitbedarf: ${hoursLabel(project.requiredHoursPerWeek)} / Woche</span>
-        <span>Startkapital: ${money(project.startCapitalRequired)}</span>
-        <span>Gewinnpotenzial: ${money(evaluation.monthlyProfitAfterReserve)} / Monat</span>
-        <span>Machbarkeit: ${escapeHtml(selfEmploymentFeasibilityLabel(evaluation.feasibility))}</span>
-      </button>
+      <div class="self-employment-project-head">
+        <button
+          class="self-employment-project-icon-button"
+          type="button"
+          data-action="self-employment-open-icon-picker"
+          data-self-employment-project-id="${escapeHtml(project.id)}"
+          aria-label="Projekt-Icon aendern"
+          title="Projekt-Icon aendern"
+        >
+          ${positionIconSvg(icon, "position-icon-svg self-employment-project-icon-svg")}
+        </button>
+        <button
+          class="self-employment-project-main"
+          type="button"
+          data-action="self-employment-select-project"
+          data-self-employment-project-id="${escapeHtml(project.id)}"
+          aria-pressed="${active}"
+        >
+          <span class="self-employment-project-title">
+            <strong>${escapeHtml(project.name)}</strong>
+          </span>
+          <span>Status: ${escapeHtml(selfEmploymentStatusLabel(project.status))}</span>
+          <span>Zeitbedarf: ${hoursLabel(project.requiredHoursPerWeek)} / Woche</span>
+          <span>Startkapital: ${money(project.startCapitalRequired)}</span>
+          <span>Gewinnpotenzial: ${money(evaluation.monthlyProfitAfterReserve)} / Monat</span>
+          <span>Machbarkeit: ${escapeHtml(selfEmploymentFeasibilityLabel(evaluation.feasibility))}</span>
+        </button>
+      </div>
       <div class="self-employment-project-labels" aria-label="Projektlabels">${labelChips}</div>
       <div class="self-employment-project-actions">
         <button class="button mini secondary" type="button" data-action="self-employment-rename-project" data-self-employment-project-id="${escapeHtml(project.id)}">Umbenennen</button>
@@ -2584,6 +2738,8 @@ function profitTableRow(evaluation: SelfEmploymentProjectEvaluation): string {
 
 function selfEmploymentProjectDetails(evaluation: SelfEmploymentProjectEvaluation): string {
   const { project } = evaluation;
+  const selectedArea = selfEmploymentRoadmapAreaIdFromValue(state.selfEmployment.selectedRoadmapAreaId) ?? "idea";
+  const activeArea = SELF_EMPLOYMENT_ROADMAP_AREAS.find((area) => area.id === selectedArea) ?? SELF_EMPLOYMENT_ROADMAP_AREAS[0];
   return `
     <section class="self-employment-detail" aria-label="Projekt-Detailbereich">
       <div class="self-employment-detail-head">
@@ -2595,120 +2751,450 @@ function selfEmploymentProjectDetails(evaluation: SelfEmploymentProjectEvaluatio
           selfEmploymentFeasibilityLabel(evaluation.feasibility)
         )}</span>
       </div>
-      <div class="self-employment-detail-grid">
-        ${selfEmploymentArea("Geschaeftsidee", [
-          ["Idee", project.idea],
-          ["Problem", project.problem],
-          ["Zielgruppe", project.targetGroup],
-          ["Einnahmemodell", project.revenueModel],
-          ["Risiko", selfEmploymentRiskLabel(project.risk)],
-          ["Motivation", project.motivation]
-        ])}
-        ${selfEmploymentArea("Projektplanung", [
-          ["Projektziel", project.projectGoal],
-          ["Startdatum", project.startDate || "-"],
-          ["Laufzeit", `${intNumber(project.plannedDurationWeeks)} Wochen`],
-          ["Status", selfEmploymentStatusLabel(project.status)],
-          ["Meilensteine", project.milestones.join(", ") || "-"],
-          ["Naechste Schritte", project.nextSteps.join(", ") || "-"],
-          ["Abhaengigkeiten", project.dependencies || "-"]
-        ])}
-        ${selfEmploymentArea(
-          "Kundenkontakte",
-          project.contacts.length
-            ? project.contacts.map((contact) => [
-                contact.name,
-                `${selfEmploymentContactStatusLabel(contact.status)} | Potenzial ${money(
-                  contact.revenuePotential
-                )} | ${percent(contact.probabilityPercent)} | ${contact.nextStep || "kein naechster Schritt"}`
-              ] as [string, string])
-            : [["Noch keine Kontakte", "Kontaktliste fuer dieses Projekt anlegen"]]
-        )}
-        ${selfEmploymentArea(
-          "Angebote & Rechnungen",
-          project.invoices.length
-            ? project.invoices.map((invoice) => [
-                invoice.label,
-                `${selfEmploymentInvoiceStatusLabel(invoice.status)} | ${money(invoice.amount)} | Ziel ${
-                  invoice.dueDate || "-"
-                }`
-              ] as [string, string])
-            : [["Noch keine Angebote", "Offene Angebote und Rechnungen erscheinen hier"]]
-        )}
-        ${selfEmploymentArea(
-          "Aufgaben",
-          project.tasks.length
-            ? project.tasks.map((task) => [
-                task.title,
-                `${selfEmploymentTaskPriorityLabel(task.priority)} | ${hoursLabel(
-                  task.estimatedHours
-                )} | ${selfEmploymentTaskStatusLabel(task.status)}`
-              ] as [string, string])
-            : [["Noch keine Aufgaben", "Projektbezogene Aufgaben anlegen"]]
-        )}
-        ${selfEmploymentArea("Zeitmanagement & Habits", [
-          ["Projektzeit benoetigt", `${hoursLabel(project.requiredHoursPerWeek)} / Woche`],
-          ["Freie Reserve", `${hoursLabel(evaluation.availableTimeHours)} / Woche`],
-          ["Feste Projektzeit", `${hoursLabel(project.fixedProjectHoursPerWeek)} / Woche`],
-          ["Flexible Projektzeit", `${hoursLabel(project.flexibleProjectHoursPerWeek)} / Woche`],
-          ["Zugehoerige Habits", project.linkedHabits.join(", ") || "-"],
-          ["Blockierende Habits", project.blockingHabits.join(", ") || "-"],
-          ["Projekt-Szenario", project.weekScenario || "-"],
-          ["Hinweis", evaluation.reasons[0]]
-        ])}
-        ${selfEmploymentArea("Budget & Investitionen", [
-          ["Benoetigtes Startkapital", money(project.startCapitalRequired)],
-          ["Verfuegbare freie Ruecklage", money(evaluation.availableReserve)],
-          ["Offene Finanzierungsluecke", money(evaluation.fundingGap)],
-          ["Einmalige Kosten", money(project.oneTimeCosts)]
-        ])}
-        ${selfEmploymentArea("Gewinnschaetzung", [
-          ["Umsatz / Monat", money(project.monthlyRevenueExpected)],
-          ["Laufende Kosten", money(project.monthlyRunningCosts)],
-          ["Ruecklage/Steuer", percent(project.taxReservePercent)],
-          ["Gewinn vor Ruecklage", money(evaluation.monthlyProfitBeforeReserve)],
-          ["Freier Gewinn", money(evaluation.monthlyProfitAfterReserve)],
-          ["Arbeitszeit / Monat", hoursLabel(project.monthlyWorkHours)],
-          ["Effektiver Stundenwert", money(evaluation.effectiveHourlyValue)]
-        ])}
-        ${selfEmploymentArea("Kennzahlen", [
-          ["Machbarkeit", selfEmploymentFeasibilityLabel(evaluation.feasibility)],
-          ["Offene Rechnungen", money(evaluation.openInvoiceAmount)],
-          ["Offene Aufgabenzeit", hoursLabel(evaluation.openTaskHours)],
-          ["Bewertung", evaluation.reasons.join(" ")]
-        ])}
-      </div>
+      ${selfEmploymentRoadmap(selectedArea)}
+      <article class="self-employment-roadmap-panel">
+        <header>
+          ${positionIconSvg(activeArea.icon, "position-icon-svg self-employment-roadmap-panel-icon")}
+          <h3>${escapeHtml(activeArea.title)}</h3>
+        </header>
+        ${selfEmploymentRoadmapPanel(selectedArea, evaluation)}
+      </article>
     </section>
   `;
 }
 
-function selfEmploymentArea(title: string, rows: Array<[string, string]>): string {
+function selfEmploymentRoadmap(selectedArea: SelfEmploymentRoadmapAreaId): string {
   return `
-    <article class="self-employment-area">
-      <h3>${escapeHtml(title)}</h3>
-      <dl>
-        ${rows
-          .map(
-            ([label, value]) => `
-              <div>
-                <dt>${escapeHtml(label)}</dt>
-                <dd>${escapeHtml(value)}</dd>
-              </div>
-            `
-          )
-          .join("")}
-      </dl>
-    </article>
+    <div class="self-employment-roadmap" aria-label="Projekt-Roadmap">
+      ${SELF_EMPLOYMENT_ROADMAP_AREAS.map((area) => {
+        const active = area.id === selectedArea;
+        return `
+          <button
+            class="self-employment-roadmap-step${active ? " active" : ""}"
+            type="button"
+            data-action="self-employment-select-roadmap-area"
+            data-self-employment-roadmap-area="${area.id}"
+            aria-pressed="${active}"
+          >
+            ${positionIconSvg(area.icon, "position-icon-svg self-employment-roadmap-icon")}
+            <span>${escapeHtml(area.title)}</span>
+          </button>
+        `;
+      }).join("")}
+    </div>
   `;
 }
 
+function selfEmploymentRoadmapPanel(
+  areaId: SelfEmploymentRoadmapAreaId,
+  evaluation: SelfEmploymentProjectEvaluation
+): string {
+  const { project } = evaluation;
+  if (areaId === "idea") {
+    return `
+      <div class="self-employment-edit-grid">
+        ${selfEmploymentTextField(project, "idea", "Idee", project.idea)}
+        ${selfEmploymentTextareaField(project, "problem", "Problem", project.problem)}
+        ${selfEmploymentTextField(project, "targetGroup", "Zielgruppe", project.targetGroup)}
+        ${selfEmploymentTextField(project, "revenueModel", "Einnahmemodell", project.revenueModel)}
+        ${selfEmploymentSelectField(project, "risk", "Risiko", project.risk, [
+          ["low", "Niedrig"],
+          ["medium", "Mittel"],
+          ["high", "Hoch"]
+        ])}
+        ${selfEmploymentTextareaField(project, "motivation", "Motivation", project.motivation)}
+      </div>
+    `;
+  }
+  if (areaId === "planning") {
+    return `
+      <div class="self-employment-edit-grid">
+        ${selfEmploymentTextareaField(project, "projectGoal", "Projektziel", project.projectGoal)}
+        ${selfEmploymentTextField(project, "startDate", "Startdatum", project.startDate, "date")}
+        ${selfEmploymentNumberField(project, "plannedDurationWeeks", "Laufzeit in Wochen", project.plannedDurationWeeks, 0, 520, 1)}
+        ${selfEmploymentSelectField(project, "status", "Status", project.status, [
+          ["idea", "Idee"],
+          ["review", "In Pruefung"],
+          ["preparation", "Vorbereitung"],
+          ["active", "Aktiv"],
+          ["paused", "Pausiert"],
+          ["completed", "Abgeschlossen"],
+          ["discarded", "Verworfen"]
+        ])}
+        ${selfEmploymentListTextareaField(project, "milestones", "Meilensteine", project.milestones)}
+        ${selfEmploymentListTextareaField(project, "nextSteps", "Naechste Schritte", project.nextSteps)}
+        ${selfEmploymentTextareaField(project, "dependencies", "Abhaengigkeiten", project.dependencies)}
+      </div>
+    `;
+  }
+  if (areaId === "contacts") return selfEmploymentContactsEditor(project);
+  if (areaId === "invoices") return selfEmploymentInvoicesEditor(project);
+  if (areaId === "tasks") return selfEmploymentTasksEditor(project);
+  if (areaId === "time") {
+    return `
+      <div class="self-employment-edit-grid">
+        ${selfEmploymentNumberField(project, "requiredHoursPerWeek", "Projektzeit benoetigt / Woche", project.requiredHoursPerWeek, 0, 168, 0.5)}
+        ${selfEmploymentReadOnlyField("Freie Reserve / Woche", `${hoursLabel(evaluation.availableTimeHours)} / Woche`)}
+        ${selfEmploymentNumberField(project, "fixedProjectHoursPerWeek", "Feste Projektzeit / Woche", project.fixedProjectHoursPerWeek, 0, 168, 0.5)}
+        ${selfEmploymentNumberField(project, "flexibleProjectHoursPerWeek", "Flexible Projektzeit / Woche", project.flexibleProjectHoursPerWeek, 0, 168, 0.5)}
+        ${selfEmploymentListTextareaField(project, "linkedHabits", "Zugehoerige Habits", project.linkedHabits)}
+        ${selfEmploymentListTextareaField(project, "blockingHabits", "Blockierende Habits", project.blockingHabits)}
+        ${selfEmploymentTextField(project, "weekScenario", "Projekt-Szenario", project.weekScenario)}
+        ${selfEmploymentReadOnlyField("Hinweis", evaluation.reasons[0])}
+      </div>
+    `;
+  }
+  if (areaId === "budget") {
+    return `
+      <div class="self-employment-edit-grid">
+        ${selfEmploymentNumberField(project, "startCapitalRequired", "Benoetigtes Startkapital", project.startCapitalRequired, 0, 999999999, 50)}
+        ${selfEmploymentNumberField(project, "availableReserveOverride", "Freie Ruecklage Override", project.availableReserveOverride ?? "", 0, 999999999, 50)}
+        ${selfEmploymentReadOnlyField("Verfuegbare freie Ruecklage", money(evaluation.availableReserve))}
+        ${selfEmploymentReadOnlyField("Offene Finanzierungsluecke", money(evaluation.fundingGap))}
+        ${selfEmploymentNumberField(project, "oneTimeCosts", "Einmalige Kosten", project.oneTimeCosts, 0, 999999999, 50)}
+      </div>
+    `;
+  }
+  if (areaId === "profit") {
+    return `
+      <div class="self-employment-edit-grid">
+        ${selfEmploymentNumberField(project, "monthlyRevenueExpected", "Umsatz / Monat", project.monthlyRevenueExpected, 0, 999999999, 50)}
+        ${selfEmploymentNumberField(project, "monthlyRunningCosts", "Laufende Kosten", project.monthlyRunningCosts, 0, 999999999, 50)}
+        ${selfEmploymentNumberField(project, "taxReservePercent", "Ruecklage/Steuer in %", project.taxReservePercent, 0, 100, 1)}
+        ${selfEmploymentReadOnlyField("Gewinn vor Ruecklage", money(evaluation.monthlyProfitBeforeReserve))}
+        ${selfEmploymentReadOnlyField("Freier Gewinn", money(evaluation.monthlyProfitAfterReserve))}
+        ${selfEmploymentNumberField(project, "monthlyWorkHours", "Arbeitszeit / Monat", project.monthlyWorkHours, 0, 744, 1)}
+        ${selfEmploymentReadOnlyField("Effektiver Stundenwert", money(evaluation.effectiveHourlyValue))}
+      </div>
+    `;
+  }
+  return `
+    <div class="self-employment-edit-grid">
+      ${selfEmploymentReadOnlyField("Machbarkeit", selfEmploymentFeasibilityLabel(evaluation.feasibility))}
+      ${selfEmploymentReadOnlyField("Offene Rechnungen", money(evaluation.openInvoiceAmount))}
+      ${selfEmploymentReadOnlyField("Offene Aufgabenzeit", hoursLabel(evaluation.openTaskHours))}
+      ${selfEmploymentReadOnlyField("Bewertung", evaluation.reasons.join(" "))}
+    </div>
+  `;
+}
+
+function selfEmploymentTextField(
+  project: SelfEmploymentProject,
+  field: string,
+  label: string,
+  value: string,
+  type = "text"
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <input type="${escapeHtml(type)}" value="${escapeHtml(value)}" data-self-employment-project-id="${escapeHtml(
+        project.id
+      )}" data-self-employment-field="${escapeHtml(field)}" />
+    </label>
+  `;
+}
+
+function selfEmploymentNumberField(
+  project: SelfEmploymentProject,
+  field: string,
+  label: string,
+  value: number | "",
+  min: number,
+  max: number,
+  step: number
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <input type="number" min="${min}" max="${max}" step="${step}" value="${escapeHtml(value)}" data-self-employment-project-id="${escapeHtml(
+        project.id
+      )}" data-self-employment-field="${escapeHtml(field)}" />
+    </label>
+  `;
+}
+
+function selfEmploymentTextareaField(
+  project: SelfEmploymentProject,
+  field: string,
+  label: string,
+  value: string
+): string {
+  return `
+    <label class="field self-employment-edit-field wide">
+      <span>${escapeHtml(label)}</span>
+      <textarea rows="3" data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-field="${escapeHtml(
+        field
+      )}">${escapeHtml(value)}</textarea>
+    </label>
+  `;
+}
+
+function selfEmploymentListTextareaField(
+  project: SelfEmploymentProject,
+  field: string,
+  label: string,
+  value: string[]
+): string {
+  return `
+    <label class="field self-employment-edit-field wide">
+      <span>${escapeHtml(label)}</span>
+      <textarea rows="3" data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-list-field="${escapeHtml(
+        field
+      )}">${escapeHtml(value.join("\n"))}</textarea>
+    </label>
+  `;
+}
+
+function selfEmploymentSelectField(
+  project: SelfEmploymentProject,
+  field: string,
+  label: string,
+  value: string,
+  options: Array<[string, string]>
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <select data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-field="${escapeHtml(field)}">
+        ${options.map(([optionValue, optionLabel]) => selfEmploymentOption(optionValue, optionLabel, value)).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function selfEmploymentReadOnlyField(label: string, value: string): string {
+  return `
+    <div class="field self-employment-readonly-field">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function selfEmploymentContactsEditor(project: SelfEmploymentProject): string {
+  return `
+    <div class="self-employment-collection-editor">
+      <div class="self-employment-collection-head">
+        <span>${project.contacts.length ? `${intNumber(project.contacts.length)} Kontakte` : "Noch keine Kontakte"}</span>
+        <button class="button mini secondary" type="button" data-action="self-employment-add-contact" data-self-employment-project-id="${escapeHtml(
+          project.id
+        )}">Kontakt hinzufuegen</button>
+      </div>
+      <div class="self-employment-collection-list">
+        ${
+          project.contacts.length
+            ? project.contacts
+                .map(
+                  (contact) => `
+                    <article class="self-employment-collection-item">
+                      <header>
+                        <strong>${escapeHtml(contact.name || "Kontakt")}</strong>
+                        <button class="button mini danger" type="button" data-action="self-employment-remove-contact" data-self-employment-project-id="${escapeHtml(
+                          project.id
+                        )}" data-self-employment-item-id="${escapeHtml(contact.id)}">Loeschen</button>
+                      </header>
+                      <div class="self-employment-edit-grid compact">
+                        ${selfEmploymentCollectionTextField(project, "contacts", contact.id, "name", "Name", contact.name)}
+                        ${selfEmploymentCollectionSelectField(project, "contacts", contact.id, "status", "Status", contact.status, [
+                          ["lead", "Lead"],
+                          ["first_contact", "Erstkontakt"],
+                          ["offer_sent", "Angebot gesendet"],
+                          ["customer", "Kunde"],
+                          ["paused", "Pausiert"]
+                        ])}
+                        ${selfEmploymentCollectionTextField(project, "contacts", contact.id, "lastContact", "Letzter Kontakt", contact.lastContact, "date")}
+                        ${selfEmploymentCollectionTextField(project, "contacts", contact.id, "nextStep", "Naechster Schritt", contact.nextStep)}
+                        ${selfEmploymentCollectionNumberField(project, "contacts", contact.id, "revenuePotential", "Potenzial", contact.revenuePotential, 0, 999999999, 50)}
+                        ${selfEmploymentCollectionNumberField(project, "contacts", contact.id, "probabilityPercent", "Wahrscheinlichkeit in %", contact.probabilityPercent, 0, 100, 1)}
+                      </div>
+                    </article>
+                  `
+                )
+                .join("")
+            : `<p class="self-employment-empty-note">Kontaktliste fuer dieses Projekt anlegen</p>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function selfEmploymentInvoicesEditor(project: SelfEmploymentProject): string {
+  return `
+    <div class="self-employment-collection-editor">
+      <div class="self-employment-collection-head">
+        <span>${project.invoices.length ? `${intNumber(project.invoices.length)} Angebote / Rechnungen` : "Noch keine Angebote"}</span>
+        <button class="button mini secondary" type="button" data-action="self-employment-add-invoice" data-self-employment-project-id="${escapeHtml(
+          project.id
+        )}">Angebot hinzufuegen</button>
+      </div>
+      <div class="self-employment-collection-list">
+        ${
+          project.invoices.length
+            ? project.invoices
+                .map(
+                  (invoice) => `
+                    <article class="self-employment-collection-item">
+                      <header>
+                        <strong>${escapeHtml(invoice.label || "Angebot / Rechnung")}</strong>
+                        <button class="button mini danger" type="button" data-action="self-employment-remove-invoice" data-self-employment-project-id="${escapeHtml(
+                          project.id
+                        )}" data-self-employment-item-id="${escapeHtml(invoice.id)}">Loeschen</button>
+                      </header>
+                      <div class="self-employment-edit-grid compact">
+                        ${selfEmploymentCollectionTextField(project, "invoices", invoice.id, "label", "Bezeichnung", invoice.label)}
+                        ${selfEmploymentCollectionSelectField(project, "invoices", invoice.id, "status", "Status", invoice.status, [
+                          ["offer_open", "Angebot offen"],
+                          ["offer_accepted", "Angebot angenommen"],
+                          ["invoice_created", "Rechnung erstellt"],
+                          ["paid", "Bezahlt"]
+                        ])}
+                        ${selfEmploymentCollectionTextField(project, "invoices", invoice.id, "dueDate", "Zieldatum", invoice.dueDate, "date")}
+                        ${selfEmploymentCollectionNumberField(project, "invoices", invoice.id, "amount", "Betrag", invoice.amount, 0, 999999999, 50)}
+                      </div>
+                    </article>
+                  `
+                )
+                .join("")
+            : `<p class="self-employment-empty-note">Offene Angebote und Rechnungen erscheinen hier</p>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function selfEmploymentTasksEditor(project: SelfEmploymentProject): string {
+  return `
+    <div class="self-employment-collection-editor">
+      <div class="self-employment-collection-head">
+        <span>${project.tasks.length ? `${intNumber(project.tasks.length)} Aufgaben` : "Noch keine Aufgaben"}</span>
+        <button class="button mini secondary" type="button" data-action="self-employment-add-task" data-self-employment-project-id="${escapeHtml(
+          project.id
+        )}">Aufgabe hinzufuegen</button>
+      </div>
+      <div class="self-employment-collection-list">
+        ${
+          project.tasks.length
+            ? project.tasks
+                .map(
+                  (task) => `
+                    <article class="self-employment-collection-item">
+                      <header>
+                        <strong>${escapeHtml(task.title || "Aufgabe")}</strong>
+                        <button class="button mini danger" type="button" data-action="self-employment-remove-task" data-self-employment-project-id="${escapeHtml(
+                          project.id
+                        )}" data-self-employment-item-id="${escapeHtml(task.id)}">Loeschen</button>
+                      </header>
+                      <div class="self-employment-edit-grid compact">
+                        ${selfEmploymentCollectionTextField(project, "tasks", task.id, "title", "Titel", task.title)}
+                        ${selfEmploymentCollectionSelectField(project, "tasks", task.id, "priority", "Prioritaet", task.priority, [
+                          ["low", "Niedrig"],
+                          ["medium", "Mittel"],
+                          ["high", "Hoch"]
+                        ])}
+                        ${selfEmploymentCollectionTextField(project, "tasks", task.id, "dueDate", "Faelligkeit", task.dueDate, "date")}
+                        ${selfEmploymentCollectionNumberField(project, "tasks", task.id, "estimatedHours", "Zeit in Stunden", task.estimatedHours, 0, 1000, 0.5)}
+                        ${selfEmploymentCollectionSelectField(project, "tasks", task.id, "status", "Status", task.status, [
+                          ["open", "Offen"],
+                          ["in_progress", "In Arbeit"],
+                          ["done", "Erledigt"]
+                        ])}
+                      </div>
+                    </article>
+                  `
+                )
+                .join("")
+            : `<p class="self-employment-empty-note">Projektbezogene Aufgaben anlegen</p>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function selfEmploymentCollectionTextField(
+  project: SelfEmploymentProject,
+  collection: string,
+  itemId: string,
+  field: string,
+  label: string,
+  value: string,
+  type = "text"
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <input type="${escapeHtml(type)}" value="${escapeHtml(value)}" data-self-employment-project-id="${escapeHtml(
+        project.id
+      )}" data-self-employment-collection="${escapeHtml(collection)}" data-self-employment-item-id="${escapeHtml(
+        itemId
+      )}" data-self-employment-item-field="${escapeHtml(field)}" />
+    </label>
+  `;
+}
+
+function selfEmploymentCollectionNumberField(
+  project: SelfEmploymentProject,
+  collection: string,
+  itemId: string,
+  field: string,
+  label: string,
+  value: number,
+  min: number,
+  max: number,
+  step: number
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <input type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-self-employment-project-id="${escapeHtml(
+        project.id
+      )}" data-self-employment-collection="${escapeHtml(collection)}" data-self-employment-item-id="${escapeHtml(
+        itemId
+      )}" data-self-employment-item-field="${escapeHtml(field)}" />
+    </label>
+  `;
+}
+
+function selfEmploymentCollectionSelectField(
+  project: SelfEmploymentProject,
+  collection: string,
+  itemId: string,
+  field: string,
+  label: string,
+  value: string,
+  options: Array<[string, string]>
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <select data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-collection="${escapeHtml(
+        collection
+      )}" data-self-employment-item-id="${escapeHtml(itemId)}" data-self-employment-item-field="${escapeHtml(field)}">
+        ${options.map(([optionValue, optionLabel]) => selfEmploymentOption(optionValue, optionLabel, value)).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function selfEmploymentOption(value: string, label: string, selectedValue: string): string {
+  return `<option value="${escapeHtml(value)}" ${value === selectedValue ? "selected" : ""}>${escapeHtml(label)}</option>`;
+}
+
 function normalizeSelfEmploymentSelection(): void {
+  const selectedRoadmapAreaId = selfEmploymentRoadmapAreaIdFromValue(state.selfEmployment.selectedRoadmapAreaId) ?? "idea";
   if (state.selfEmployment.projects.length === 0) {
     state.selfEmployment = {
       ...state.selfEmployment,
-      selectedProjectId: ""
+      selectedProjectId: "",
+      selectedRoadmapAreaId
     };
     return;
+  }
+  if (state.selfEmployment.selectedRoadmapAreaId !== selectedRoadmapAreaId) {
+    state.selfEmployment = {
+      ...state.selfEmployment,
+      selectedRoadmapAreaId
+    };
   }
   if (!state.selfEmployment.projects.some((project) => project.id === state.selfEmployment.selectedProjectId)) {
     state.selfEmployment = {
@@ -2765,10 +3251,97 @@ function addSelfEmploymentProject(): void {
     monthlyWorkHours: 16
   };
   state.selfEmployment = {
+    ...state.selfEmployment,
     selectedProjectId: id,
+    selectedRoadmapAreaId: "idea",
     projects: [...state.selfEmployment.projects, project]
   };
   renderAll();
+}
+
+function selectSelfEmploymentRoadmapArea(rawAreaId: string): void {
+  const selectedRoadmapAreaId = selfEmploymentRoadmapAreaIdFromValue(rawAreaId);
+  if (!selectedRoadmapAreaId) return;
+  state.selfEmployment = {
+    ...state.selfEmployment,
+    selectedRoadmapAreaId
+  };
+  renderAll();
+}
+
+function showSelfEmploymentIconPicker(button: HTMLButtonElement): void {
+  const projectId = button.dataset.selfEmploymentProjectId;
+  if (!projectId || !state.selfEmployment.projects.some((project) => project.id === projectId)) return;
+  const rect = button.getBoundingClientRect();
+  const panelWidth = 320;
+  const panelHeight = 360;
+  const left =
+    rect.right + 12 + panelWidth <= window.innerWidth
+      ? rect.right + 12
+      : Math.max(12, rect.left - panelWidth - 12);
+  const top = Math.max(12, Math.min(rect.top, window.innerHeight - panelHeight - 12));
+  selfEmploymentIconPicker = { projectId, top, left };
+  renderSelfEmploymentIconPicker();
+}
+
+function hideSelfEmploymentIconPicker(): void {
+  selfEmploymentIconPicker = null;
+  renderSelfEmploymentIconPicker();
+}
+
+function selectSelfEmploymentIcon(projectId: string, icon: string): void {
+  selfEmploymentIconPicker = null;
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => ({ ...project, icon: normalizePositionIcon(icon, project.icon || "briefcase") }),
+    true
+  );
+}
+
+function renderSelfEmploymentIconPicker(): void {
+  const picker = document.querySelector<HTMLDivElement>("#selfEmploymentIconPicker");
+  if (!picker) return;
+  if (!selfEmploymentIconPicker) {
+    picker.hidden = true;
+    return;
+  }
+
+  const project = state.selfEmployment.projects.find((item) => item.id === selfEmploymentIconPicker?.projectId);
+  if (!project) {
+    selfEmploymentIconPicker = null;
+    picker.hidden = true;
+    return;
+  }
+
+  const currentIcon = normalizePositionIcon(project.icon, "briefcase");
+  picker.style.top = `${selfEmploymentIconPicker.top}px`;
+  picker.style.left = `${selfEmploymentIconPicker.left}px`;
+  picker.innerHTML = `
+    <div class="position-icon-picker-head">
+      <span>Projekt-Icon</span>
+      <button class="icon-button" type="button" data-action="self-employment-close-icon-picker" aria-label="Iconauswahl schliessen">x</button>
+    </div>
+    <div class="position-icon-picker-grid">
+      ${POSITION_ICONS.map((icon) => {
+        const active = icon.id === currentIcon;
+        return `
+          <button
+            class="position-icon-option ${active ? "active" : ""}"
+            type="button"
+            data-action="self-employment-select-icon"
+            data-self-employment-project-id="${escapeHtml(project.id)}"
+            data-self-employment-icon="${escapeHtml(icon.id)}"
+            aria-pressed="${active}"
+            title="${escapeHtml(icon.label)}"
+          >
+            ${positionIconSvg(icon.id)}
+            <span>${escapeHtml(icon.label)}</span>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+  picker.hidden = false;
 }
 
 function renameSelfEmploymentProject(projectId: string): void {
@@ -2791,6 +3364,7 @@ function deleteSelfEmploymentProject(projectId: string): void {
   const selectedProjectId =
     state.selfEmployment.selectedProjectId === projectId ? projects[0]?.id ?? "" : state.selfEmployment.selectedProjectId;
   if (selfEmploymentLabelPickerProjectId === projectId) selfEmploymentLabelPickerProjectId = null;
+  if (selfEmploymentIconPicker?.projectId === projectId) selfEmploymentIconPicker = null;
   state.selfEmployment = {
     ...state.selfEmployment,
     selectedProjectId,
@@ -2821,6 +3395,249 @@ function toggleSelfEmploymentProjectLabel(projectId: string, rawLabel: string): 
   renderAll();
 }
 
+function updateSelfEmploymentProjectField(
+  projectId: string,
+  field: string,
+  rawValue: string,
+  renderAfterUpdate: boolean
+): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      if (field === "idea") return { ...project, idea: rawValue };
+      if (field === "problem") return { ...project, problem: rawValue };
+      if (field === "targetGroup") return { ...project, targetGroup: rawValue };
+      if (field === "revenueModel") return { ...project, revenueModel: rawValue };
+      if (field === "motivation") return { ...project, motivation: rawValue };
+      if (field === "projectGoal") return { ...project, projectGoal: rawValue };
+      if (field === "startDate") return { ...project, startDate: rawValue };
+      if (field === "dependencies") return { ...project, dependencies: rawValue };
+      if (field === "weekScenario") return { ...project, weekScenario: rawValue };
+      if (field === "risk") return { ...project, risk: selfEmploymentRiskFromValue(rawValue, project.risk) };
+      if (field === "status") return { ...project, status: selfEmploymentStatusFromValue(rawValue, project.status) };
+      if (field === "availableReserveOverride") {
+        return {
+          ...project,
+          availableReserveOverride:
+            rawValue.trim() === "" ? null : selfEmploymentNumberValue(rawValue, project.availableReserveOverride ?? 0, 0, 999999999)
+        };
+      }
+      if (field === "plannedDurationWeeks") {
+        return { ...project, plannedDurationWeeks: selfEmploymentNumberValue(rawValue, project.plannedDurationWeeks, 0, 520) };
+      }
+      if (field === "requiredHoursPerWeek") {
+        return { ...project, requiredHoursPerWeek: selfEmploymentNumberValue(rawValue, project.requiredHoursPerWeek, 0, 168) };
+      }
+      if (field === "fixedProjectHoursPerWeek") {
+        return { ...project, fixedProjectHoursPerWeek: selfEmploymentNumberValue(rawValue, project.fixedProjectHoursPerWeek, 0, 168) };
+      }
+      if (field === "flexibleProjectHoursPerWeek") {
+        return { ...project, flexibleProjectHoursPerWeek: selfEmploymentNumberValue(rawValue, project.flexibleProjectHoursPerWeek, 0, 168) };
+      }
+      if (field === "startCapitalRequired") {
+        return { ...project, startCapitalRequired: selfEmploymentNumberValue(rawValue, project.startCapitalRequired, 0, 999999999) };
+      }
+      if (field === "oneTimeCosts") {
+        return { ...project, oneTimeCosts: selfEmploymentNumberValue(rawValue, project.oneTimeCosts, 0, 999999999) };
+      }
+      if (field === "monthlyRevenueExpected") {
+        return { ...project, monthlyRevenueExpected: selfEmploymentNumberValue(rawValue, project.monthlyRevenueExpected, 0, 999999999) };
+      }
+      if (field === "monthlyRunningCosts") {
+        return { ...project, monthlyRunningCosts: selfEmploymentNumberValue(rawValue, project.monthlyRunningCosts, 0, 999999999) };
+      }
+      if (field === "taxReservePercent") {
+        return { ...project, taxReservePercent: selfEmploymentNumberValue(rawValue, project.taxReservePercent, 0, 100) };
+      }
+      if (field === "monthlyWorkHours") {
+        return { ...project, monthlyWorkHours: selfEmploymentNumberValue(rawValue, project.monthlyWorkHours, 0, 744) };
+      }
+      return project;
+    },
+    renderAfterUpdate
+  );
+}
+
+function updateSelfEmploymentProjectListField(
+  projectId: string,
+  field: string,
+  rawValue: string,
+  renderAfterUpdate: boolean
+): void {
+  const items = selfEmploymentTextToList(rawValue);
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      if (field === "milestones") return { ...project, milestones: items };
+      if (field === "nextSteps") return { ...project, nextSteps: items };
+      if (field === "linkedHabits") return { ...project, linkedHabits: items };
+      if (field === "blockingHabits") return { ...project, blockingHabits: items };
+      return project;
+    },
+    renderAfterUpdate
+  );
+}
+
+function updateSelfEmploymentCollectionItemField(
+  projectId: string,
+  collection: string,
+  itemId: string,
+  field: string,
+  rawValue: string,
+  renderAfterUpdate: boolean
+): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      if (collection === "contacts") {
+        return {
+          ...project,
+          contacts: project.contacts.map((contact) => {
+            if (contact.id !== itemId) return contact;
+            if (field === "name") return { ...contact, name: rawValue };
+            if (field === "status") return { ...contact, status: selfEmploymentContactStatusFromValue(rawValue, contact.status) };
+            if (field === "lastContact") return { ...contact, lastContact: rawValue };
+            if (field === "nextStep") return { ...contact, nextStep: rawValue };
+            if (field === "revenuePotential") {
+              return { ...contact, revenuePotential: selfEmploymentNumberValue(rawValue, contact.revenuePotential, 0, 999999999) };
+            }
+            if (field === "probabilityPercent") {
+              return { ...contact, probabilityPercent: selfEmploymentNumberValue(rawValue, contact.probabilityPercent, 0, 100) };
+            }
+            return contact;
+          })
+        };
+      }
+      if (collection === "invoices") {
+        return {
+          ...project,
+          invoices: project.invoices.map((invoice) => {
+            if (invoice.id !== itemId) return invoice;
+            if (field === "label") return { ...invoice, label: rawValue };
+            if (field === "status") return { ...invoice, status: selfEmploymentInvoiceStatusFromValue(rawValue, invoice.status) };
+            if (field === "dueDate") return { ...invoice, dueDate: rawValue };
+            if (field === "amount") {
+              return { ...invoice, amount: selfEmploymentNumberValue(rawValue, invoice.amount, 0, 999999999) };
+            }
+            return invoice;
+          })
+        };
+      }
+      if (collection === "tasks") {
+        return {
+          ...project,
+          tasks: project.tasks.map((task) => {
+            if (task.id !== itemId) return task;
+            if (field === "title") return { ...task, title: rawValue };
+            if (field === "priority") return { ...task, priority: selfEmploymentTaskPriorityFromValue(rawValue, task.priority) };
+            if (field === "dueDate") return { ...task, dueDate: rawValue };
+            if (field === "estimatedHours") {
+              return { ...task, estimatedHours: selfEmploymentNumberValue(rawValue, task.estimatedHours, 0, 1000) };
+            }
+            if (field === "status") return { ...task, status: selfEmploymentTaskStatusFromValue(rawValue, task.status) };
+            return task;
+          })
+        };
+      }
+      return project;
+    },
+    renderAfterUpdate
+  );
+}
+
+function addSelfEmploymentContact(projectId: string): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => ({
+      ...project,
+      contacts: [
+        ...project.contacts,
+        {
+          id: createId(),
+          name: "Neuer Kontakt",
+          status: "lead",
+          lastContact: "",
+          nextStep: "",
+          revenuePotential: 0,
+          probabilityPercent: 0
+        }
+      ]
+    }),
+    true
+  );
+}
+
+function addSelfEmploymentInvoice(projectId: string): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => ({
+      ...project,
+      invoices: [
+        ...project.invoices,
+        {
+          id: createId(),
+          label: "Neues Angebot",
+          status: "offer_open",
+          dueDate: "",
+          amount: 0
+        }
+      ]
+    }),
+    true
+  );
+}
+
+function addSelfEmploymentTask(projectId: string): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => ({
+      ...project,
+      tasks: [
+        ...project.tasks,
+        {
+          id: createId(),
+          title: "Neue Aufgabe",
+          priority: "medium",
+          dueDate: "",
+          estimatedHours: 1,
+          status: "open"
+        }
+      ]
+    }),
+    true
+  );
+}
+
+function removeSelfEmploymentCollectionItem(projectId: string, collection: string, itemId: string): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      if (collection === "contacts") return { ...project, contacts: project.contacts.filter((item) => item.id !== itemId) };
+      if (collection === "invoices") return { ...project, invoices: project.invoices.filter((item) => item.id !== itemId) };
+      if (collection === "tasks") return { ...project, tasks: project.tasks.filter((item) => item.id !== itemId) };
+      return project;
+    },
+    true
+  );
+}
+
+function updateSelfEmploymentProject(
+  projectId: string,
+  updater: (project: SelfEmploymentProject) => SelfEmploymentProject,
+  renderAfterUpdate: boolean
+): void {
+  if (!projectId || !state.selfEmployment.projects.some((project) => project.id === projectId)) return;
+  state.selfEmployment = {
+    ...state.selfEmployment,
+    projects: state.selfEmployment.projects.map((project) => (project.id === projectId ? updater(project) : project))
+  };
+  if (renderAfterUpdate) {
+    renderAll();
+    return;
+  }
+  saveState(state);
+}
+
 function selfEmploymentProjectIsActive(project: SelfEmploymentProject): boolean {
   return project.status !== "completed" && project.status !== "discarded" && project.status !== "paused";
 }
@@ -2848,6 +3665,70 @@ function selfEmploymentFeasibilityLabel(feasibility: SelfEmploymentFeasibility):
   if (feasibility === "realistic") return "Realistisch";
   if (feasibility === "borderline") return "Grenzwertig";
   return "Unrealistisch";
+}
+
+function selfEmploymentRoadmapAreaIdFromValue(value: unknown): SelfEmploymentRoadmapAreaId | null {
+  return SELF_EMPLOYMENT_ROADMAP_AREAS.some((area) => area.id === value) ? (value as SelfEmploymentRoadmapAreaId) : null;
+}
+
+function selfEmploymentNumberValue(rawValue: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(String(rawValue).replace(",", "."));
+  return Number.isFinite(parsed) ? clamp(parsed, min, max) : fallback;
+}
+
+function selfEmploymentTextToList(rawValue: string): string[] {
+  return rawValue
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function selfEmploymentStatusFromValue(value: string, fallback: SelfEmploymentProjectStatus): SelfEmploymentProjectStatus {
+  return value === "idea" ||
+    value === "review" ||
+    value === "preparation" ||
+    value === "active" ||
+    value === "paused" ||
+    value === "completed" ||
+    value === "discarded"
+    ? value
+    : fallback;
+}
+
+function selfEmploymentRiskFromValue(value: string, fallback: SelfEmploymentRiskLevel): SelfEmploymentRiskLevel {
+  return value === "low" || value === "medium" || value === "high" ? value : fallback;
+}
+
+function selfEmploymentContactStatusFromValue(
+  value: string,
+  fallback: SelfEmploymentProject["contacts"][number]["status"]
+): SelfEmploymentProject["contacts"][number]["status"] {
+  return value === "lead" || value === "first_contact" || value === "offer_sent" || value === "customer" || value === "paused"
+    ? value
+    : fallback;
+}
+
+function selfEmploymentInvoiceStatusFromValue(
+  value: string,
+  fallback: SelfEmploymentInvoice["status"]
+): SelfEmploymentInvoice["status"] {
+  return value === "offer_open" || value === "offer_accepted" || value === "invoice_created" || value === "paid"
+    ? value
+    : fallback;
+}
+
+function selfEmploymentTaskPriorityFromValue(
+  value: string,
+  fallback: SelfEmploymentTask["priority"]
+): SelfEmploymentTask["priority"] {
+  return value === "low" || value === "medium" || value === "high" ? value : fallback;
+}
+
+function selfEmploymentTaskStatusFromValue(
+  value: string,
+  fallback: SelfEmploymentTask["status"]
+): SelfEmploymentTask["status"] {
+  return value === "open" || value === "in_progress" || value === "done" ? value : fallback;
 }
 
 function selfEmploymentContactStatusLabel(status: SelfEmploymentProject["contacts"][number]["status"]): string {

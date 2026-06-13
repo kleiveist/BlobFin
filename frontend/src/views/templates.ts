@@ -188,11 +188,8 @@ export function renderAppShell(): string {
       </section>
 
       <section class="panel self-employment-panel" data-module-section="self_employment_dashboard">
-        ${moduleTopBar("Selbststaendigkeits-Dashboard", "Projektzentrale fuer Idee, Zeit, Budget und Gewinnpotenzial", [
-          { label: "Zeitbudget", action: "open-section-income_planning", className: "secondary" },
-          { label: "Planungen", action: "open-section-planning_scenarios", className: "secondary" }
-        ])}
         <div id="selfEmploymentDashboard" class="self-employment-dashboard"></div>
+        <div id="selfEmploymentIconPicker" class="position-icon-picker self-employment-icon-picker" role="dialog" aria-label="Projekt-Icon auswaehlen" hidden></div>
       </section>
 
       <section class="panel income-planning-panel" data-module-section="income_planning">

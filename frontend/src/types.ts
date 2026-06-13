@@ -82,6 +82,16 @@ export type SelfEmploymentTaskPriority = "low" | "medium" | "high";
 export type SelfEmploymentTaskStatus = "open" | "in_progress" | "done";
 export type SelfEmploymentContactStatus = "lead" | "first_contact" | "offer_sent" | "customer" | "paused";
 export type SelfEmploymentInvoiceStatus = "offer_open" | "offer_accepted" | "invoice_created" | "paid";
+export type SelfEmploymentRoadmapAreaId =
+  | "idea"
+  | "planning"
+  | "contacts"
+  | "invoices"
+  | "tasks"
+  | "time"
+  | "budget"
+  | "profit"
+  | "metrics";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -284,6 +294,7 @@ export interface SelfEmploymentProject {
 
 export interface SelfEmploymentState {
   selectedProjectId: string;
+  selectedRoadmapAreaId: SelfEmploymentRoadmapAreaId;
   projects: SelfEmploymentProject[];
 }
 

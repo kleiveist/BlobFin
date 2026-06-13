@@ -102,6 +102,7 @@ import type {
   SelfEmploymentInvoiceStatus,
   SelfEmploymentProject,
   SelfEmploymentProjectStatus,
+  SelfEmploymentRoadmapAreaId,
   SelfEmploymentRiskLevel,
   SelfEmploymentState,
   SelfEmploymentTask,
@@ -892,6 +893,7 @@ function normalizeSelfEmploymentState(value: unknown): SelfEmploymentState {
     selectedProjectId: normalizedProjects.some((project) => project.id === selectedProjectId)
       ? selectedProjectId
       : normalizedProjects[0]?.id ?? "",
+    selectedRoadmapAreaId: normalizeSelfEmploymentRoadmapAreaId(value.selectedRoadmapAreaId, fallback.selectedRoadmapAreaId),
     projects: normalizedProjects
   };
 }
@@ -902,7 +904,7 @@ function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentProject |
   return {
     id: String(value.id || createId()),
     name: String(value.name || "Neues Projekt"),
-    icon: String(value.icon || fallback.icon),
+    icon: normalizePositionIcon(value.icon, fallback.icon),
     labels: stringArrayOrDefault(value.labels, []),
     status: normalizeSelfEmploymentProjectStatus(value.status, fallback.status),
     idea: String(value.idea ?? ""),
@@ -976,6 +978,23 @@ function normalizeSelfEmploymentTask(value: unknown): SelfEmploymentTask | null 
     estimatedHours: clampNumber(numberOrDefault(value.estimatedHours, 0), 0, 1000),
     status: normalizeSelfEmploymentTaskStatus(value.status, "open")
   };
+}
+
+function normalizeSelfEmploymentRoadmapAreaId(
+  value: unknown,
+  fallback: SelfEmploymentRoadmapAreaId
+): SelfEmploymentRoadmapAreaId {
+  return value === "idea" ||
+    value === "planning" ||
+    value === "contacts" ||
+    value === "invoices" ||
+    value === "tasks" ||
+    value === "time" ||
+    value === "budget" ||
+    value === "profit" ||
+    value === "metrics"
+    ? value
+    : fallback;
 }
 
 function normalizeSelfEmploymentProjectStatus(

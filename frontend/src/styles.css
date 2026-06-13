@@ -1857,8 +1857,7 @@ tfoot th {
 
 .self-employment-metrics,
 .self-employment-analysis,
-.self-employment-tables,
-.self-employment-detail-grid {
+.self-employment-tables {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
@@ -1911,6 +1910,36 @@ tfoot th {
 
 .self-employment-project-card.unrealistic {
   background: var(--danger-soft);
+}
+
+.self-employment-project-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.self-employment-project-icon-button {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  cursor: pointer;
+  padding: 0;
+}
+
+.self-employment-project-icon-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.self-employment-project-icon-svg {
+  width: 22px;
+  height: 22px;
 }
 
 .self-employment-empty-card {
@@ -2006,9 +2035,148 @@ tfoot th {
   color: var(--accent-strong);
 }
 
+.self-employment-roadmap {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(118px, 1fr));
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.self-employment-roadmap-step {
+  display: grid;
+  min-width: 118px;
+  min-height: 88px;
+  align-content: center;
+  justify-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.self-employment-roadmap-step:hover,
+.self-employment-roadmap-step.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.self-employment-roadmap-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.self-employment-roadmap-step span {
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.self-employment-roadmap-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 14px;
+}
+
+.self-employment-roadmap-panel > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.self-employment-roadmap-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.self-employment-roadmap-panel-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--accent-strong);
+}
+
+.self-employment-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.self-employment-edit-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.self-employment-edit-field.wide {
+  grid-column: 1 / -1;
+}
+
+.self-employment-edit-field textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.self-employment-readonly-field {
+  justify-content: start;
+  min-height: 70px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.self-employment-readonly-field strong {
+  overflow-wrap: anywhere;
+}
+
+.self-employment-collection-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.self-employment-collection-head,
+.self-employment-collection-item > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.self-employment-collection-head span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.self-employment-collection-list {
+  display: grid;
+  gap: 10px;
+}
+
+.self-employment-collection-item {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.self-employment-empty-note {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 750;
+}
+
 .self-employment-chart-card,
-.self-employment-table-card,
-.self-employment-area {
+.self-employment-table-card {
   display: grid;
   gap: 10px;
   min-width: 0;
@@ -2019,8 +2187,7 @@ tfoot th {
 }
 
 .self-employment-chart-card h3,
-.self-employment-table-card h3,
-.self-employment-area h3 {
+.self-employment-table-card h3 {
   margin: 0;
   font-size: 0.95rem;
 }
@@ -2138,29 +2305,6 @@ tfoot th {
 .self-employment-detail {
   display: grid;
   gap: 12px;
-}
-
-.self-employment-area dl {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-}
-
-.self-employment-area dl div {
-  display: grid;
-  gap: 2px;
-}
-
-.self-employment-area dt {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 850;
-}
-
-.self-employment-area dd {
-  margin: 0;
-  color: var(--text);
-  overflow-wrap: anywhere;
 }
 
 .include-item {

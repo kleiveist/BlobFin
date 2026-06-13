@@ -136,6 +136,20 @@ describe("storage", () => {
     expect(state.selfEmployment.projects[0].labels).toContain("Beratung");
     expect(state.selfEmployment.projects[0].name).toBe("Beispielprojekt");
     expect(state.selfEmployment.selectedProjectId).toBe(state.selfEmployment.projects[0].id);
+    expect(state.selfEmployment.selectedRoadmapAreaId).toBe("idea");
+  });
+
+  it("normalizes self employment roadmap selection and project icons", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState() as any;
+    delete state.selfEmployment.selectedRoadmapAreaId;
+    state.selfEmployment.projects[0].icon = "does-not-exist";
+
+    saveState(state, storage);
+    const loaded = loadState(storage);
+
+    expect(loaded.selfEmployment.selectedRoadmapAreaId).toBe("idea");
+    expect(loaded.selfEmployment.projects[0].icon).toBe("briefcase");
   });
 
   it("adds missing income planning defaults to saved app state", () => {
