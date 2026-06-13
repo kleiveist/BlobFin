@@ -1855,6 +1855,12 @@ tfoot th {
   font-size: 1.22rem;
 }
 
+.self-employment-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .self-employment-metrics,
 .self-employment-analysis,
 .self-employment-tables {
@@ -3573,6 +3579,25 @@ tfoot th {
 
 .statutory-pension-basis-grid {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.statutory-pension-readonly-field {
+  justify-content: start;
+  min-height: 70px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 9px;
+}
+
+.statutory-pension-readonly-field strong {
+  font-size: 0.95rem;
+}
+
+.statutory-pension-readonly-field small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .statutory-pension-metrics {

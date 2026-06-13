@@ -2,8 +2,13 @@ import { STATUTORY_PENSION_DEDUCTION_PERCENT_MAX, type StatutoryPensionModel } f
 import { escapeHtml, intNumber, money, percent } from "../lib/format";
 import type { StatutoryPensionScenarioId, StatutoryPensionSettings } from "../types";
 
-export function renderStatutoryPensionHtml(model: StatutoryPensionModel, settings: StatutoryPensionSettings): string {
+export function renderStatutoryPensionHtml(
+  model: StatutoryPensionModel,
+  settings: StatutoryPensionSettings,
+  derivedSourceYear: number | null = null
+): string {
   const hasContributions = model.totalContribution > 0;
+  const derivedSourceLabel = derivedSourceYear === null ? "" : intNumber(derivedSourceYear);
   return `
     <div class="statutory-pension-section">
       <div class="statutory-pension-head">
@@ -14,10 +19,10 @@ export function renderStatutoryPensionHtml(model: StatutoryPensionModel, setting
         </div>
         <div class="statutory-pension-basis-grid">
           ${statutoryPensionNumberField("contributionRatePercent", "Beitragssatz %", settings.contributionRatePercent, 0.1)}
-          ${statutoryPensionNumberField("averageAnnualIncome", "Durchschnittsentgelt", settings.averageAnnualIncome, 1)}
+          ${statutoryPensionReadonlyField("Durchschnittsentgelt", money(settings.averageAnnualIncome), derivedSourceLabel)}
           ${statutoryPensionNumberField("currentPensionValue", "Rentenwert aktuell", settings.currentPensionValue, 0.01)}
           ${statutoryPensionNumberField("projectionPensionValue", "Rentenwert Prognose", settings.projectionPensionValue, 0.01)}
-          ${statutoryPensionNumberField("annualContributionCeilingGross", "BBG Brutto/Jahr", settings.annualContributionCeilingGross, 1)}
+          ${statutoryPensionReadonlyField("BBG Brutto/Jahr", money(settings.annualContributionCeilingGross), derivedSourceLabel)}
         </div>
       </div>
       ${
@@ -435,6 +440,16 @@ function statutoryPensionNumberField(
         String(field)
       )}" />
     </label>
+  `;
+}
+
+function statutoryPensionReadonlyField(label: string, value: string, source: string): string {
+  return `
+    <div class="field statutory-pension-readonly-field">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      ${source ? `<small>${escapeHtml(source)}</small>` : ""}
+    </div>
   `;
 }
 

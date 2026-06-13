@@ -78,6 +78,7 @@ import {
 import {
   buildStatutoryPensionModel,
   STATUTORY_PENSION_DEDUCTION_PERCENT_MAX,
+  statutoryPensionDerivedSettingsFromLatestContribution,
   type StatutoryPensionModel
 } from "./domain/statutoryPension";
 import { calculateRealEstateFinancing, defaultRealEstateDetailYear } from "./domain/realEstateCalculator";
@@ -2410,7 +2411,10 @@ function renderSelfEmploymentDashboard(): void {
   host.innerHTML = `
     <section class="self-employment-hero">
       <h2>Selbststaendigkeits-Dashboard</h2>
-      <button class="button" type="button" data-action="self-employment-add-project">Projekt anlegen</button>
+      <div class="self-employment-hero-actions">
+        <button class="button secondary" type="button" data-action="open-section-home">Startseite</button>
+        <button class="button" type="button" data-action="self-employment-add-project">Projekt anlegen</button>
+      </div>
     </section>
     <section class="self-employment-metrics" aria-label="Projektuebergreifende Kennzahlen">
       ${selfEmploymentMetric("Aktive Projekte", intNumber(totals.activeProjects), `${intNumber(totals.totalProjects)} insgesamt`)}
@@ -10619,14 +10623,18 @@ function renderStatutoryPensionCalculations(birthYear: number): void {
   if (!host) return;
   hideStatutoryPensionYearPopup();
   hideStatutoryPensionProjectionYearPopup();
+  const statutoryPensionDerivedSettings = statutoryPensionDerivedSettingsFromLatestContribution(
+    state.incomeTracker,
+    state.statutoryPension
+  );
   const model = buildStatutoryPensionModel({
     tracker: state.incomeTracker,
-    settings: state.statutoryPension,
+    settings: statutoryPensionDerivedSettings.settings,
     currentYear: state.settings.year,
     birthYear
   });
   latestStatutoryPensionModel = model;
-  host.innerHTML = renderStatutoryPensionHtml(model, state.statutoryPension);
+  host.innerHTML = renderStatutoryPensionHtml(model, statutoryPensionDerivedSettings.settings, statutoryPensionDerivedSettings.sourceYear);
   renderStatutoryPensionTaxPopup(model);
 }
 
@@ -13622,10 +13630,8 @@ function updateCombinedNumber(key: CombinedNumberKey, value: string): void {
 function updateStatutoryPensionField(field: string, value: string): void {
   if (
     field !== "contributionRatePercent" &&
-    field !== "averageAnnualIncome" &&
     field !== "currentPensionValue" &&
-    field !== "projectionPensionValue" &&
-    field !== "annualContributionCeilingGross"
+    field !== "projectionPensionValue"
   ) {
     return;
   }

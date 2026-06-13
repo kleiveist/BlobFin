@@ -102,12 +102,37 @@ export interface StatutoryPensionModel {
   scenarios: StatutoryPensionScenarioResult[];
 }
 
+export interface StatutoryPensionDerivedSettings {
+  settings: StatutoryPensionSettings;
+  sourceYear: number | null;
+}
+
+interface StatutoryPensionReferenceValues {
+  averageAnnualIncome: number;
+  annualContributionCeilingGross: number;
+}
+
 const SCENARIO_LABELS: Record<StatutoryPensionScenarioId, string> = {
   pessimistic: "Pessimistisch",
   base: "Basis",
   optimistic: "Optimistisch"
 };
 export const STATUTORY_PENSION_DEDUCTION_PERCENT_MAX = 15;
+
+const STATUTORY_PENSION_REFERENCE_VALUES_BY_YEAR: Record<number, StatutoryPensionReferenceValues> = {
+  2024: {
+    averageAnnualIncome: 47085,
+    annualContributionCeilingGross: 90600
+  },
+  2025: {
+    averageAnnualIncome: 50493,
+    annualContributionCeilingGross: 96600
+  },
+  2026: {
+    averageAnnualIncome: 51944,
+    annualContributionCeilingGross: 101400
+  }
+};
 
 export function buildStatutoryPensionModel(input: {
   tracker: IncomeTrackerState;
@@ -163,6 +188,45 @@ export function buildStatutoryPensionModel(input: {
     }),
     scenarios
   };
+}
+
+export function statutoryPensionSettingsFromLatestContribution(
+  tracker: IncomeTrackerState,
+  settings: StatutoryPensionSettings
+): StatutoryPensionSettings {
+  return statutoryPensionDerivedSettingsFromLatestContribution(tracker, settings).settings;
+}
+
+export function statutoryPensionDerivedSettingsFromLatestContribution(
+  tracker: IncomeTrackerState,
+  settings: StatutoryPensionSettings
+): StatutoryPensionDerivedSettings {
+  const latestContributionEntry = tracker.yearlyEntries.reduce<IncomeYearEntry | null>((latest, entry) => {
+    if (!entry.active) return latest;
+    if (isCapitalGainsTaxRuleLabel(entry.label)) return latest;
+    const employeeContribution = numberValue(entry.taxDeductionItems.pensionInsurance);
+    const employerContribution = numberValue(entry.taxDeductionItems.employerPensionInsurance);
+    if (employeeContribution + employerContribution <= 0) return latest;
+    if (!latest || entry.year >= latest.year) return entry;
+    return latest;
+  }, null);
+  if (!latestContributionEntry) return { settings, sourceYear: null };
+
+  const referenceValues = statutoryPensionReferenceValuesForYear(latestContributionEntry.year);
+  if (!referenceValues) return { settings, sourceYear: latestContributionEntry.year };
+
+  return {
+    settings: {
+      ...settings,
+      averageAnnualIncome: referenceValues.averageAnnualIncome,
+      annualContributionCeilingGross: referenceValues.annualContributionCeilingGross
+    },
+    sourceYear: latestContributionEntry.year
+  };
+}
+
+function statutoryPensionReferenceValuesForYear(year: number): StatutoryPensionReferenceValues | null {
+  return STATUTORY_PENSION_REFERENCE_VALUES_BY_YEAR[year] ?? null;
 }
 
 export function statutoryPensionContributionYears(

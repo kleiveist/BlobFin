@@ -149,6 +149,8 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('id="selfEmploymentIconPicker"');
     expect(html).toContain("Selbststaendigkeits-Dashboard");
     expect(selfEmploymentSection).not.toContain("Projektzentrale fuer Idee, Zeit, Budget und Gewinnpotenzial");
+    expect(selfEmploymentSection).toContain('data-action="open-section-home"');
+    expect(selfEmploymentSection).toContain("Startseite");
     expect(selfEmploymentSection).not.toContain('data-action="open-section-income_planning"');
     expect(selfEmploymentSection).not.toContain('data-action="open-section-planning_scenarios"');
     expect(mainSource).toContain("function renderSelfEmploymentDashboard");

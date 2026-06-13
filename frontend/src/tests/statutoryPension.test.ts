@@ -4,7 +4,8 @@ import { defaultStatutoryPensionSettings } from "../data/defaults";
 import {
   buildStatutoryPensionModel,
   statutoryPensionTaxableSharePercent,
-  statutoryPensionContributionYears
+  statutoryPensionContributionYears,
+  statutoryPensionDerivedSettingsFromLatestContribution
 } from "../domain/statutoryPension";
 import { emptyIncomeTaxAdjustment, emptyIncomeTaxDeductionItems } from "../domain/incomeTracker";
 import type { IncomeTrackerState, IncomeYearEntry } from "../types";
@@ -97,6 +98,57 @@ describe("statutory pension model", () => {
 
     expect(year.relevantGrossIncome).toBeCloseTo(55400, 2);
     expect(year.pensionPoints).toBeCloseTo(1.0665, 4);
+  });
+
+  it("derives fixed pension reference values from the latest contribution year", () => {
+    const settings = defaultStatutoryPensionSettings();
+    const derived = statutoryPensionDerivedSettingsFromLatestContribution(
+      tracker([
+        yearlyEntry({
+          id: "older",
+          year: 2024,
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 1000,
+            employerPensionInsurance: 1000
+          }
+        }),
+        yearlyEntry({
+          id: "inactive-latest",
+          year: 2026,
+          active: false,
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 9000,
+            employerPensionInsurance: 9000
+          }
+        }),
+        yearlyEntry({
+          id: "latest",
+          year: 2025,
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 5152.2,
+            employerPensionInsurance: 5152.2
+          }
+        }),
+        yearlyEntry({
+          id: "older-entered-after-latest",
+          year: 2023,
+          taxDeductionItems: {
+            ...emptyIncomeTaxDeductionItems(),
+            pensionInsurance: 7000,
+            employerPensionInsurance: 7000
+          }
+        })
+      ]),
+      settings
+    );
+
+    expect(derived.settings.averageAnnualIncome).toBe(50493);
+    expect(derived.settings.annualContributionCeilingGross).toBe(96600);
+    expect(derived.settings.averageAnnualIncome).not.toBe(derived.settings.annualContributionCeilingGross);
+    expect(derived.sourceYear).toBe(2025);
   });
 
   it("ignores inactive entries but includes entries hidden from charts", () => {
@@ -389,6 +441,11 @@ describe("statutory pension model", () => {
 
   it("renders tax buttons, gross net legend and separated overlay bars", () => {
     const settings = defaultStatutoryPensionSettings();
+    const renderedSettings = {
+      ...settings,
+      averageAnnualIncome: 50493,
+      annualContributionCeilingGross: 96600
+    };
     const model = buildStatutoryPensionModel({
       tracker: tracker([
         yearlyEntry({
@@ -399,11 +456,11 @@ describe("statutory pension model", () => {
           }
         })
       ]),
-      settings,
+      settings: renderedSettings,
       currentYear: 2026,
       birthYear: 1990
     });
-    const html = renderStatutoryPensionHtml(model, settings);
+    const html = renderStatutoryPensionHtml(model, renderedSettings, 2025);
 
     expect(html).toContain('type="range"');
     expect(html).toContain('data-action="open-statutory-pension-tax-popup"');
@@ -436,6 +493,14 @@ describe("statutory pension model", () => {
     expect(html).toContain("statutory-pension-projection-fill base");
     expect(html).toContain("statutory-pension-projection-fill pessimistic");
     expect(html).toContain('id="statutoryPensionProjectionYearPopup"');
+    expect(html).toContain("Durchschnittsentgelt");
+    expect(html).toContain("BBG Brutto/Jahr");
+    expect(html).toContain("50.493");
+    expect(html).toContain("96.600");
+    expect(html).toContain("2025");
+    expect(html).not.toContain("aus letzter RV-Position 22/23");
+    expect(html).not.toContain('data-statutory-pension-field="averageAnnualIncome"');
+    expect(html).not.toContain('data-statutory-pension-field="annualContributionCeilingGross"');
   });
 
   it("renders the tax popup host and popup sliders separately", () => {
