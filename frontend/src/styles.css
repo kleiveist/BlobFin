@@ -1857,7 +1857,8 @@ tfoot th {
 
 .self-employment-hero-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
 }
 
@@ -3413,6 +3414,39 @@ tfoot th {
 
 .settings-accordion-content {
   padding-top: 10px;
+}
+
+.vault-settings-panel {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.vault-action-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.vault-status-grid {
+  display: grid;
+  grid-template-columns: minmax(86px, auto) minmax(0, 1fr);
+  gap: 6px 10px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 9px 10px;
+  font-size: 0.78rem;
+}
+
+.vault-status-grid span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.vault-status-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .account-panel {
