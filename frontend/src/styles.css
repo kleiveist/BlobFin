@@ -2432,9 +2432,11 @@ tfoot th {
 
 .business-canvas-workbench {
   display: grid;
+  position: relative;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 12px;
   min-height: 0;
+  overflow: visible;
 }
 
 .business-canvas-viewport {
@@ -2486,6 +2488,7 @@ tfoot th {
   fill: none;
   stroke: var(--muted);
   stroke-width: 2;
+  pointer-events: none;
 }
 
 .business-canvas-edge-line.business-canvas-edge-direction-none {
@@ -2519,6 +2522,63 @@ tfoot th {
   font-size: 13px;
   font-weight: 850;
   cursor: text;
+}
+
+.business-canvas-edge-label-foreign {
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.business-canvas-edge-label-button,
+.business-canvas-edge-label-input {
+  width: 100%;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.business-canvas-edge-label-button {
+  display: block;
+  overflow: hidden;
+  padding: 0 8px;
+  cursor: text;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.business-canvas-edge-label-button.empty {
+  color: var(--muted);
+}
+
+.business-canvas-edge-label-button:hover,
+.business-canvas-edge-label-button:focus-visible,
+.business-canvas-edge-label-input:focus {
+  border-color: var(--accent-strong);
+  background: var(--surface);
+  outline: 2px solid color-mix(in srgb, var(--accent-strong) 22%, transparent);
+  outline-offset: 1px;
+}
+
+.business-canvas-edge-label-input {
+  padding: 0 8px;
+}
+
+.business-canvas-connection-preview {
+  pointer-events: none;
+}
+
+.business-canvas-connection-preview-line {
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 2.5;
+  stroke-dasharray: 8 6;
 }
 
 .business-canvas-node {
@@ -2580,6 +2640,20 @@ tfoot th {
 .business-canvas-node.armed {
   outline: 3px dashed var(--gold);
   outline-offset: 4px;
+}
+
+.business-canvas-node.connection-target {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 4px;
+}
+
+.business-canvas-node.connection-target .business-canvas-anchor,
+.business-canvas-node.selected .business-canvas-anchor,
+.business-canvas-node.armed .business-canvas-anchor {
+  width: 15px;
+  height: 15px;
+  border-color: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-strong) 22%, transparent);
 }
 
 .business-canvas-node.editing {
@@ -2692,6 +2766,19 @@ tfoot th {
   border-radius: 50%;
   background: var(--accent-strong);
   cursor: crosshair;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.82);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.business-canvas-node:hover .business-canvas-anchor,
+.business-canvas-node.selected .business-canvas-anchor,
+.business-canvas-node.armed .business-canvas-anchor,
+.business-canvas-node.connection-target .business-canvas-anchor {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
 }
 
 .business-canvas-anchor.top {
@@ -2731,7 +2818,7 @@ tfoot th {
 .business-canvas-edge-toolbar,
 .business-canvas-line-menu {
   position: absolute;
-  z-index: 20;
+  z-index: 120;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2742,9 +2829,164 @@ tfoot th {
   padding: 7px;
 }
 
+.business-canvas-toolbar-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 110;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.business-canvas-toolbar-layer .business-canvas-node-toolbar,
+.business-canvas-toolbar-layer .business-canvas-multi-toolbar,
+.business-canvas-toolbar-layer .business-canvas-edge-toolbar {
+  pointer-events: auto;
+}
+
 .business-canvas-node-toolbar {
   max-width: min(720px, calc(100vw - 32px));
   flex-wrap: wrap;
+}
+
+.business-canvas-node-toolbar .icon-button,
+.business-canvas-multi-toolbar .icon-button,
+.business-canvas-edge-toolbar .icon-button,
+.business-canvas-line-menu .icon-button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.business-canvas-node-toolbar .icon-button:hover,
+.business-canvas-node-toolbar .icon-button:focus-visible,
+.business-canvas-multi-toolbar .icon-button:hover,
+.business-canvas-multi-toolbar .icon-button:focus-visible,
+.business-canvas-edge-toolbar .icon-button:hover,
+.business-canvas-edge-toolbar .icon-button:focus-visible,
+.business-canvas-line-menu .icon-button:hover,
+.business-canvas-line-menu .icon-button:focus-visible {
+  background: var(--surface-soft);
+  filter: none;
+}
+
+.business-canvas-node-toolbar .icon-button.danger,
+.business-canvas-multi-toolbar .icon-button.danger,
+.business-canvas-edge-toolbar .icon-button.danger,
+.business-canvas-line-menu .icon-button.danger {
+  border-color: color-mix(in srgb, var(--danger) 36%, var(--border));
+  background: transparent;
+  color: var(--danger);
+}
+
+.business-canvas-dropdown {
+  position: relative;
+}
+
+.business-canvas-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 34px;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+  list-style: none;
+  padding: 5px 8px;
+}
+
+.business-canvas-dropdown-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.business-canvas-dropdown[open] .business-canvas-dropdown-trigger,
+.business-canvas-dropdown-trigger:hover,
+.business-canvas-dropdown-trigger:focus-visible {
+  border-color: var(--accent-strong);
+  background: var(--surface-soft);
+}
+
+.business-canvas-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 140;
+  display: grid;
+  gap: 4px;
+  min-width: 156px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+  padding: 6px;
+}
+
+.business-canvas-dropdown-option {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 850;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.business-canvas-dropdown-option:hover,
+.business-canvas-dropdown-option:focus-visible,
+.business-canvas-dropdown-option.active {
+  background: var(--surface-soft);
+}
+
+.business-canvas-dropdown-option-icon {
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.business-canvas-label-trigger {
+  max-width: 128px;
+}
+
+.business-canvas-label-trigger span:last-child,
+.business-canvas-dropdown-option span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.business-canvas-phase-trigger {
+  padding: 0;
+}
+
+.business-canvas-phase-trigger .business-canvas-phase-badge-button {
+  border: 0;
+  background: transparent;
+}
+
+.business-canvas-phase-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 900;
 }
 
 .business-canvas-multi-toolbar strong {
@@ -2752,6 +2994,29 @@ tfoot th {
   color: var(--muted);
   font-size: 0.78rem;
   text-align: center;
+}
+
+.business-canvas-line-menu-action {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 132px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.business-canvas-line-menu-action:hover,
+.business-canvas-line-menu-action:focus-visible {
+  background: var(--surface-soft);
 }
 
 .business-canvas-selection-rect {

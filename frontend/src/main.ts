@@ -663,6 +663,10 @@ type BusinessIdeaCanvasConnectionDragState = {
   startPoint: { x: number; y: number };
   lineMenuPoint: { x: number; y: number } | null;
   lineMenuEdgeId: string | null;
+  previewPoint: { x: number; y: number };
+  previewTargetNodeId: string | null;
+  previewTargetSide: JsonCanvasSide | null;
+  frameId: number | null;
   moved: boolean;
 } | null;
 type BusinessIdeaCanvasSelectionDragState = {
@@ -740,6 +744,7 @@ let incomeStampPlannerSuppressNextClick = false;
 let businessIdeaCanvasSelectedNodeIds: { projectId: string; nodeIds: string[] } | null = null;
 let businessIdeaCanvasSelectedEdge: { projectId: string; edgeId: string } | null = null;
 let businessIdeaCanvasEditingNode: { projectId: string; nodeId: string } | null = null;
+let businessIdeaCanvasEditingEdgeLabel: { projectId: string; edgeId: string; draft: string } | null = null;
 let businessIdeaCanvasArmedConnection: { projectId: string; nodeId: string; side: JsonCanvasSide } | null = null;
 let businessIdeaCanvasLineMenu: BusinessIdeaCanvasLineMenuState | null = null;
 let businessIdeaCanvasDragState: BusinessIdeaCanvasDragState = null;
@@ -753,6 +758,7 @@ let businessIdeaCanvasPalettePopover: BusinessIdeaCanvasPalettePopoverState | nu
 let businessIdeaCanvasPaletteEditor: BusinessIdeaCanvasPaletteEditorState | null = null;
 let businessIdeaCanvasClipboard: BusinessIdeaCanvasClipboardState = null;
 let businessIdeaCanvasSpacePressed = false;
+let businessIdeaCanvasLastDragEndAt = 0;
 let incomeStampPlannerDialog: {
   stampId: string | null;
   date: string;
@@ -1227,6 +1233,14 @@ function bindEvents(): void {
       return;
     }
 
+    const edgeLabelInput = (event.target as HTMLElement | null)?.closest<HTMLInputElement>(
+      "[data-business-canvas-edge-label-input]"
+    );
+    if (edgeLabelInput?.dataset.businessCanvasEdgeLabelInput) {
+      updateBusinessIdeaCanvasEdgeLabelDraft(edgeLabelInput.dataset.businessCanvasEdgeLabelInput, edgeLabelInput.value);
+      return;
+    }
+
     const target = formControl(event.target);
     if (!target) return;
 
@@ -1666,8 +1680,14 @@ function bindEvents(): void {
       openIncomePlanningDialogFromCalendar(calendarDay, event.clientY);
       return;
     }
+    const canvasDropdown = target?.closest<HTMLDetailsElement>("[data-business-canvas-dropdown]");
     const button = target?.closest<HTMLButtonElement>("button[data-action]");
     if (!button) {
+      if (canvasDropdown) {
+        closeBusinessIdeaCanvasDropdowns(canvasDropdown);
+      } else {
+        closeBusinessIdeaCanvasDropdowns();
+      }
       if (positionIconPicker && !target?.closest("#positionIconPicker")) {
         hidePositionIconPicker();
       }
@@ -1721,6 +1741,11 @@ function bindEvents(): void {
     const action = button.dataset.action;
     if (action !== "open-position-icon-picker" && action !== "select-position-icon") {
       hidePositionIconPicker();
+    }
+    if (canvasDropdown) {
+      closeBusinessIdeaCanvasDropdowns(canvasDropdown);
+    } else {
+      closeBusinessIdeaCanvasDropdowns();
     }
     if (
       action !== "open-income-planning-icon-picker" &&
@@ -1903,6 +1928,13 @@ function bindEvents(): void {
       );
       return;
     }
+    if (action === "business-canvas-set-selected-edge-field") {
+      updateBusinessIdeaCanvasSelectedEdgeField(
+        button.dataset.businessCanvasSelectedEdgeField || "",
+        button.dataset.businessCanvasSelectedEdgeValue || ""
+      );
+      return;
+    }
     if (action === "business-canvas-add-node") {
       addBusinessIdeaCanvasNode();
       return;
@@ -1933,6 +1965,11 @@ function bindEvents(): void {
     }
     if (action === "business-canvas-delete-edge") {
       deleteBusinessIdeaCanvasSelectedEdge();
+      return;
+    }
+    if (action === "business-canvas-edit-edge-label") {
+      const selection = businessIdeaCanvasSelectedEdge;
+      if (selection) editBusinessIdeaCanvasEdgeLabel(selection.projectId, selection.edgeId);
       return;
     }
     if (action === "business-canvas-add-node-from-line") {
@@ -2327,6 +2364,7 @@ function bindEvents(): void {
   root.addEventListener("dblclick", handleBusinessIdeaCanvasDoubleClick);
   root.addEventListener("contextmenu", handleBusinessIdeaCanvasContextMenu);
   root.addEventListener("pointerdown", startBusinessIdeaCanvasPointer);
+  root.addEventListener("focusout", handleBusinessIdeaCanvasFocusOut);
   root.addEventListener("wheel", handleBusinessIdeaCanvasWheel, { passive: false });
   root.addEventListener("pointerdown", startIncomePlanningCalendarDrag);
   window.addEventListener("pointermove", moveBusinessIdeaCanvasPointer);
@@ -3173,6 +3211,8 @@ function businessIdeaCanvasRenderState(projectId: string): BusinessIdeaCanvasRen
     selectedNodeIds: businessIdeaCanvasSelectedNodeIds?.projectId === projectId ? businessIdeaCanvasSelectedNodeIds.nodeIds : [],
     selectedEdgeId: businessIdeaCanvasSelectedEdge?.projectId === projectId ? businessIdeaCanvasSelectedEdge.edgeId : null,
     editingNodeId: businessIdeaCanvasEditingNode?.projectId === projectId ? businessIdeaCanvasEditingNode.nodeId : null,
+    editingEdgeLabelId: businessIdeaCanvasEditingEdgeLabel?.projectId === projectId ? businessIdeaCanvasEditingEdgeLabel.edgeId : null,
+    editingEdgeLabelDraft: businessIdeaCanvasEditingEdgeLabel?.projectId === projectId ? businessIdeaCanvasEditingEdgeLabel.draft : "",
     armedNodeId: businessIdeaCanvasArmedConnection?.projectId === projectId ? businessIdeaCanvasArmedConnection.nodeId : null,
     lineMenu: businessIdeaCanvasLineMenu?.projectId === projectId ? businessIdeaCanvasLineMenu : null,
     selectionRect: businessIdeaCanvasSelectionRect?.projectId === projectId ? businessIdeaCanvasSelectionRect : null,
@@ -3191,6 +3231,7 @@ function selectBusinessIdeaCanvasNodes(projectId: string, nodeIds: string[]): vo
   const uniqueIds = Array.from(new Set(nodeIds.filter(Boolean)));
   businessIdeaCanvasSelectedNodeIds = uniqueIds.length ? { projectId, nodeIds: uniqueIds } : null;
   businessIdeaCanvasSelectedEdge = null;
+  businessIdeaCanvasEditingEdgeLabel = null;
   businessIdeaCanvasContextMenu = null;
 }
 
@@ -3198,6 +3239,7 @@ function clearBusinessIdeaCanvasSelection(): void {
   businessIdeaCanvasSelectedNodeIds = null;
   businessIdeaCanvasSelectedEdge = null;
   businessIdeaCanvasEditingNode = null;
+  businessIdeaCanvasEditingEdgeLabel = null;
   businessIdeaCanvasArmedConnection = null;
   businessIdeaCanvasLineMenu = null;
 }
@@ -3206,6 +3248,13 @@ function closeBusinessIdeaCanvasOverlays(): void {
   businessIdeaCanvasContextMenu = null;
   businessIdeaCanvasPalettePopover = null;
   businessIdeaCanvasPaletteEditor = null;
+  closeBusinessIdeaCanvasDropdowns();
+}
+
+function closeBusinessIdeaCanvasDropdowns(except?: HTMLDetailsElement): void {
+  for (const dropdown of document.querySelectorAll<HTMLDetailsElement>("[data-business-canvas-dropdown][open]")) {
+    if (dropdown !== except) dropdown.open = false;
+  }
 }
 
 function updateBusinessIdeaCanvasNodeText(nodeId: string, text: string): void {
@@ -3316,7 +3365,7 @@ function updateBusinessIdeaCanvasSelectedEdgeField(field: string, value: string)
       ...project.businessIdeaCanvas,
       edges: project.businessIdeaCanvas.edges.map((edge) => {
         if (edge.id !== selection.edgeId) return edge;
-        if (field === "label") return { ...edge, label: value.trim() };
+        if (field === "label") return { ...edge, label: value.trim() || undefined };
         if (field === "direction") {
           const direction: BusinessIdeaCanvasEdgeDirection =
             value === "none" || value === "backward" || value === "both" || value === "forward" ? value : "forward";
@@ -3422,6 +3471,7 @@ function deleteBusinessIdeaCanvasSelectedNode(): void {
   }, true);
   businessIdeaCanvasSelectedNodeIds = null;
   businessIdeaCanvasEditingNode = null;
+  businessIdeaCanvasEditingEdgeLabel = null;
   businessIdeaCanvasArmedConnection = null;
   businessIdeaCanvasContextMenu = null;
   businessIdeaCanvasPalettePopover = null;
@@ -3438,17 +3488,24 @@ function deleteBusinessIdeaCanvasSelectedEdge(): void {
     }
   }), true);
   businessIdeaCanvasSelectedEdge = null;
+  businessIdeaCanvasEditingEdgeLabel = null;
 }
 
 function addBusinessIdeaCanvasNodeFromLine(edgeId: string): void {
   const lineMenu = businessIdeaCanvasLineMenu;
   if (!lineMenu || lineMenu.edgeId !== edgeId) return;
   const project = selfEmploymentProjectById(lineMenu.projectId);
-  const edge = project?.businessIdeaCanvas.edges.find((item) => item.id === edgeId);
-  if (!project || !edge) return;
-  const endpoint = nearestBusinessIdeaCanvasEndpointForEdge(project.businessIdeaCanvas, edge, lineMenu);
+  if (!project) return;
+  const endpoint = lineMenu.fromNodeId && lineMenu.fromSide
+    ? { nodeId: lineMenu.fromNodeId, side: lineMenu.fromSide }
+    : businessIdeaCanvasEndpointForLineMenuEdge(project, edgeId, lineMenu);
   if (!endpoint) return;
-  const node = createBusinessIdeaCanvasTextNode(project, { x: lineMenu.x + 70, y: lineMenu.y + 70 }, "Neue Karte");
+  const sourceNode = project.businessIdeaCanvas.nodes.find((nodeItem) => nodeItem.id === endpoint.nodeId);
+  const nodePoint = lineMenu.fromNodeId
+    ? { x: lineMenu.x - 120, y: lineMenu.y - 55 }
+    : { x: lineMenu.x + 70, y: lineMenu.y + 70 };
+  const node = createBusinessIdeaCanvasTextNode(project, nodePoint, "Neue Karte");
+  const toSide = sourceNode ? nearestBusinessIdeaCanvasNodeSide(node, canvasAnchorPoint(sourceNode, endpoint.side)) : "left";
   businessIdeaCanvasSelectedNodeIds = { projectId: project.id, nodeIds: [node.id] };
   updateBusinessIdeaCanvasProject(project.id, (item) => ({
     ...insertBusinessIdeaCanvasNodeIntoProject(item, node),
@@ -3457,29 +3514,34 @@ function addBusinessIdeaCanvasNodeFromLine(edgeId: string): void {
       nodes: [...item.businessIdeaCanvas.nodes, node],
       edges: [
         ...item.businessIdeaCanvas.edges,
-        createBusinessIdeaCanvasEdge(endpoint.nodeId, endpoint.side, node.id, "left", "forward")
+        createBusinessIdeaCanvasEdge(endpoint.nodeId, endpoint.side, node.id, toSide, "forward")
       ]
     }
   }), true);
   businessIdeaCanvasLineMenu = null;
 }
 
+function businessIdeaCanvasEndpointForLineMenuEdge(
+  project: SelfEmploymentProject,
+  edgeId: string,
+  point: { x: number; y: number }
+): { nodeId: string; side: JsonCanvasSide } | null {
+  const edge = project.businessIdeaCanvas.edges.find((item) => item.id === edgeId);
+  return edge ? nearestBusinessIdeaCanvasEndpointForEdge(project.businessIdeaCanvas, edge, point) : null;
+}
+
 function handleBusinessIdeaCanvasDoubleClick(event: MouseEvent): void {
-  const nodeElement = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-business-canvas-node-id]");
+  if (Date.now() - businessIdeaCanvasLastDragEndAt < 350) return;
+  const target = event.target as HTMLElement | null;
+  if (!target?.closest("[data-business-canvas-node-text], .business-canvas-group-title")) return;
+  const nodeElement = target.closest<HTMLElement>("[data-business-canvas-node-id]");
   if (!nodeElement?.dataset.businessCanvasNodeId) return;
   const projectId = nodeElement.closest<HTMLElement>("[data-business-canvas-project-id]")?.dataset.businessCanvasProjectId;
-  if (!projectId) return;
-  businessIdeaCanvasSelectedNodeIds = { projectId, nodeIds: [nodeElement.dataset.businessCanvasNodeId] };
-  businessIdeaCanvasSelectedEdge = null;
-  businessIdeaCanvasEditingNode = { projectId, nodeId: nodeElement.dataset.businessCanvasNodeId };
-  businessIdeaCanvasLineMenu = null;
-  renderAll();
-  window.setTimeout(() => {
-    const editor = document.querySelector<HTMLElement>(
-      `[data-business-canvas-node-text="${cssEscape(nodeElement.dataset.businessCanvasNodeId ?? "")}"]`
-    );
-    editor?.focus();
-  }, 0);
+  const project = projectId ? selfEmploymentProjectById(projectId) : null;
+  const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === nodeElement.dataset.businessCanvasNodeId);
+  if (!projectId || !node || node.type !== "text") return;
+  event.preventDefault();
+  editBusinessIdeaCanvasNode(node.id);
 }
 
 function editBusinessIdeaCanvasNode(nodeId: string): void {
@@ -3558,7 +3620,27 @@ function handleBusinessIdeaCanvasWheel(event: WheelEvent): void {
   scheduleBusinessIdeaCanvasWheelZoom(projectId, nextViewport);
 }
 
+function handleBusinessIdeaCanvasFocusOut(event: FocusEvent): void {
+  const input = (event.target as HTMLElement | null)?.closest<HTMLInputElement>("[data-business-canvas-edge-label-input]");
+  if (input?.dataset.businessCanvasEdgeLabelInput) {
+    commitBusinessIdeaCanvasEdgeLabelEdit();
+  }
+}
+
 function handleBusinessIdeaCanvasKeyDown(event: KeyboardEvent): void {
+  const edgeLabelInput = (event.target as HTMLElement | null)?.closest<HTMLInputElement>("[data-business-canvas-edge-label-input]");
+  if (edgeLabelInput && businessIdeaCanvasEditingEdgeLabel) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitBusinessIdeaCanvasEdgeLabelEdit();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelBusinessIdeaCanvasEdgeLabelEdit();
+      return;
+    }
+  }
   if (event.code === "Space" && !isBusinessIdeaCanvasEditableFocus()) {
     businessIdeaCanvasSpacePressed = true;
     if (document.querySelector(".business-canvas-viewport:hover")) event.preventDefault();
@@ -3582,6 +3664,11 @@ function handleBusinessIdeaCanvasKeyDown(event: KeyboardEvent): void {
     deleteBusinessIdeaCanvasSelectedNode();
     return;
   }
+  if ((event.key === "Delete" || event.key === "Backspace") && businessIdeaCanvasSelectedEdge) {
+    event.preventDefault();
+    deleteBusinessIdeaCanvasSelectedEdge();
+    return;
+  }
   if (event.key === "Escape") {
     businessIdeaCanvasSelectionDragState = null;
     businessIdeaCanvasSelectionRect = null;
@@ -3591,6 +3678,8 @@ function handleBusinessIdeaCanvasKeyDown(event: KeyboardEvent): void {
     businessIdeaCanvasArmedConnection = null;
     businessIdeaCanvasLineMenu = null;
     businessIdeaCanvasEditingNode = null;
+    businessIdeaCanvasEditingEdgeLabel = null;
+    clearBusinessIdeaCanvasConnectionPreview();
     renderAll();
   }
 }
@@ -3611,7 +3700,7 @@ function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
   if (!target?.closest(".business-canvas-editor")) return;
   const isCanvasControl = Boolean(
     target.closest(
-      "[contenteditable='true'], [data-business-canvas-node-toolbar], [data-business-canvas-multi-toolbar], .business-canvas-topbar, [data-business-canvas-edge-toolbar], .business-canvas-line-menu, [data-business-canvas-context-menu], [data-business-canvas-palette-popover], [data-business-canvas-palette-editor]"
+      "[contenteditable='true'], [data-business-canvas-edge-label-input], [data-business-canvas-node-toolbar], [data-business-canvas-multi-toolbar], .business-canvas-topbar, [data-business-canvas-edge-toolbar], .business-canvas-line-menu, [data-business-canvas-context-menu], [data-business-canvas-palette-popover], [data-business-canvas-palette-editor]"
     )
   );
   if (isCanvasControl) return;
@@ -3667,6 +3756,10 @@ function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
       startPoint: canvasAnchorPoint(node, anchor.dataset.businessCanvasAnchor as JsonCanvasSide),
       lineMenuPoint: null,
       lineMenuEdgeId: null,
+      previewPoint: canvasAnchorPoint(node, anchor.dataset.businessCanvasAnchor as JsonCanvasSide),
+      previewTargetNodeId: null,
+      previewTargetSide: null,
+      frameId: null,
       moved: false
     };
     anchor.setPointerCapture?.(event.pointerId);
@@ -3735,7 +3828,7 @@ function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
     return;
   }
 
-  const edgeHit = target.closest<SVGElement>("[data-business-canvas-edge-hit], [data-business-canvas-edge-label]");
+  const edgeHit = target.closest<HTMLElement>("[data-business-canvas-edge-hit], [data-business-canvas-edge-label]");
   const edgeId = edgeHit?.dataset.businessCanvasEdgeHit || edgeHit?.dataset.businessCanvasEdgeLabel;
   if (edgeId) {
     event.preventDefault();
@@ -3744,8 +3837,11 @@ function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
     businessIdeaCanvasSelectedEdge = { projectId, edgeId };
     businessIdeaCanvasLineMenu = null;
     closeBusinessIdeaCanvasOverlays();
-    if (edgeHit?.dataset.businessCanvasEdgeLabel) editBusinessIdeaCanvasEdgeLabel(projectId, edgeId);
-    renderAll();
+    if (edgeHit?.dataset.businessCanvasEdgeLabel) {
+      editBusinessIdeaCanvasEdgeLabel(projectId, edgeId);
+    } else {
+      renderAll();
+    }
     return;
   }
 
@@ -3775,10 +3871,24 @@ function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
 
 function moveBusinessIdeaCanvasPointer(event: PointerEvent): void {
   if (businessIdeaCanvasConnectionDragState && event.pointerId === businessIdeaCanvasConnectionDragState.pointerId) {
-    businessIdeaCanvasConnectionDragState.moved =
-      businessIdeaCanvasConnectionDragState.moved ||
-      Math.abs(event.clientX - businessIdeaCanvasConnectionDragState.startClientX) > 3 ||
-      Math.abs(event.clientY - businessIdeaCanvasConnectionDragState.startClientY) > 3;
+    const drag = businessIdeaCanvasConnectionDragState;
+    const project = selfEmploymentProjectById(drag.projectId);
+    drag.moved =
+      drag.moved ||
+      Math.abs(event.clientX - drag.startClientX) > 3 ||
+      Math.abs(event.clientY - drag.startClientY) > 3;
+    if (!project) return;
+    const targetInfo = businessIdeaCanvasConnectionTargetFromEvent(event, project, drag.fromNodeId);
+    if (targetInfo) {
+      drag.previewTargetNodeId = targetInfo.node.id;
+      drag.previewTargetSide = targetInfo.side;
+      drag.previewPoint = canvasAnchorPoint(targetInfo.node, targetInfo.side);
+    } else {
+      drag.previewTargetNodeId = null;
+      drag.previewTargetSide = null;
+      drag.previewPoint = businessIdeaCanvasPointFromEvent(event, project);
+    }
+    scheduleBusinessIdeaCanvasConnectionPreview(drag);
     return;
   }
   if (businessIdeaCanvasPanDragState && event.pointerId === businessIdeaCanvasPanDragState.pointerId) {
@@ -3897,6 +4007,7 @@ function finishBusinessIdeaCanvasPointer(event: PointerEvent): void {
     renderAll();
     return;
   }
+  businessIdeaCanvasLastDragEndAt = Date.now();
   const draggedIds = new Set(drag.nodeIds);
   updateBusinessIdeaCanvasProject(drag.projectId, (item) => ({
     ...item,
@@ -3933,6 +4044,10 @@ function startBusinessIdeaCanvasBranchDrag(event: PointerEvent, projectId: strin
     startPoint: point,
     lineMenuPoint: point,
     lineMenuEdgeId: edgeId,
+    previewPoint: point,
+    previewTargetNodeId: null,
+    previewTargetSide: null,
+    frameId: null,
     moved: false
   };
   businessIdeaCanvasLineMenu = null;
@@ -3943,9 +4058,8 @@ function finishBusinessIdeaCanvasConnectionDrag(event: PointerEvent): void {
   const drag = businessIdeaCanvasConnectionDragState;
   if (!drag || event.pointerId !== drag.pointerId) return;
   businessIdeaCanvasConnectionDragState = null;
-  const target = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
-  const targetNodeElement = target?.closest<HTMLElement>("[data-business-canvas-node-id]");
-  const targetNodeId = targetNodeElement?.dataset.businessCanvasNodeId;
+  if (drag.frameId !== null) window.cancelAnimationFrame(drag.frameId);
+  clearBusinessIdeaCanvasConnectionPreview(drag.projectId);
   const project = selfEmploymentProjectById(drag.projectId);
   if (!project) return;
   if (!drag.moved && drag.lineMenuPoint) {
@@ -3953,13 +4067,26 @@ function finishBusinessIdeaCanvasConnectionDrag(event: PointerEvent): void {
     renderAll();
     return;
   }
+  const eventTarget = businessIdeaCanvasConnectionTargetFromEvent(event, project, drag.fromNodeId);
+  const targetNodeId = drag.previewTargetNodeId ?? eventTarget?.node.id ?? null;
   const targetNode = targetNodeId ? project.businessIdeaCanvas.nodes.find((node) => node.id === targetNodeId) : null;
   if (!targetNode || targetNode.type === "group" || targetNode.id === drag.fromNodeId) {
+    if (drag.moved) {
+      businessIdeaCanvasLineMenu = {
+        projectId: drag.projectId,
+        edgeId: "",
+        x: drag.previewPoint.x,
+        y: drag.previewPoint.y,
+        fromNodeId: drag.fromNodeId,
+        fromSide: drag.fromSide
+      };
+    }
     renderAll();
     return;
   }
-  const point = businessIdeaCanvasPointFromEvent(event, project);
-  const toSide = nearestBusinessIdeaCanvasNodeSide(targetNode, point);
+  const toSide = drag.previewTargetNodeId === targetNode.id && drag.previewTargetSide
+    ? drag.previewTargetSide
+    : nearestBusinessIdeaCanvasNodeSide(targetNode, businessIdeaCanvasPointFromEvent(event, project));
   addBusinessIdeaCanvasEdge(project.id, drag.fromNodeId, drag.fromSide, targetNode.id, toSide, "forward");
 }
 
@@ -3974,17 +4101,51 @@ function editBusinessIdeaCanvasEdgeLabel(projectId: string, edgeId: string): voi
   const project = selfEmploymentProjectById(projectId);
   const edge = project?.businessIdeaCanvas.edges.find((item) => item.id === edgeId);
   if (!project || !edge) return;
-  const label = window.prompt("Verbindungslabel", edge.label ?? "");
-  if (label === null) return;
-  updateBusinessIdeaCanvasProject(projectId, (item) => ({
+  const currentLabel = edge.label ?? "";
+  businessIdeaCanvasSelectedNodeIds = null;
+  businessIdeaCanvasSelectedEdge = { projectId, edgeId };
+  businessIdeaCanvasEditingNode = null;
+  businessIdeaCanvasEditingEdgeLabel = { projectId, edgeId, draft: currentLabel };
+  businessIdeaCanvasLineMenu = null;
+  closeBusinessIdeaCanvasOverlays();
+  renderAll();
+  window.setTimeout(() => {
+    const input = document.querySelector<HTMLInputElement>(
+      `[data-business-canvas-edge-label-input="${cssEscape(edgeId)}"]`
+    );
+    input?.focus();
+    input?.select();
+  }, 0);
+}
+
+function updateBusinessIdeaCanvasEdgeLabelDraft(edgeId: string, value: string): void {
+  if (!businessIdeaCanvasEditingEdgeLabel || businessIdeaCanvasEditingEdgeLabel.edgeId !== edgeId) return;
+  businessIdeaCanvasEditingEdgeLabel = {
+    ...businessIdeaCanvasEditingEdgeLabel,
+    draft: value
+  };
+}
+
+function commitBusinessIdeaCanvasEdgeLabelEdit(): void {
+  const edit = businessIdeaCanvasEditingEdgeLabel;
+  if (!edit) return;
+  const label = edit.draft.trim();
+  businessIdeaCanvasEditingEdgeLabel = null;
+  updateBusinessIdeaCanvasProject(edit.projectId, (item) => ({
     ...item,
     businessIdeaCanvas: {
       ...item.businessIdeaCanvas,
       edges: item.businessIdeaCanvas.edges.map((canvasEdge) =>
-        canvasEdge.id === edgeId ? { ...canvasEdge, label: label.trim() } : canvasEdge
+        canvasEdge.id === edit.edgeId ? { ...canvasEdge, label: label || undefined } : canvasEdge
       )
     }
   }), true);
+}
+
+function cancelBusinessIdeaCanvasEdgeLabelEdit(): void {
+  if (!businessIdeaCanvasEditingEdgeLabel) return;
+  businessIdeaCanvasEditingEdgeLabel = null;
+  renderAll();
 }
 
 function insertBusinessIdeaCanvasNode(projectId: string, node: JsonCanvasNode, renderAfterUpdate: boolean): void {
@@ -4405,6 +4566,74 @@ function scheduleBusinessIdeaCanvasDragFrame(drag: NonNullable<BusinessIdeaCanva
   });
 }
 
+function scheduleBusinessIdeaCanvasConnectionPreview(drag: NonNullable<BusinessIdeaCanvasConnectionDragState>): void {
+  if (drag.frameId !== null) return;
+  drag.frameId = window.requestAnimationFrame(() => {
+    const activeDrag = businessIdeaCanvasConnectionDragState;
+    if (!activeDrag || activeDrag.projectId !== drag.projectId || activeDrag.pointerId !== drag.pointerId) return;
+    activeDrag.frameId = null;
+    const project = selfEmploymentProjectById(activeDrag.projectId);
+    if (!project) return;
+    applyBusinessIdeaCanvasConnectionPreview(project, activeDrag);
+  });
+}
+
+function applyBusinessIdeaCanvasConnectionPreview(
+  project: SelfEmploymentProject,
+  drag: NonNullable<BusinessIdeaCanvasConnectionDragState>
+): void {
+  const svg = document.querySelector<SVGSVGElement>(
+    `[data-business-canvas-project-id="${cssEscape(project.id)}"] [data-business-canvas-svg]`
+  );
+  if (!svg) return;
+  let group = svg.querySelector<SVGGElement>(".business-canvas-connection-preview");
+  if (!group) {
+    group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.classList.add("business-canvas-connection-preview");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.classList.add("business-canvas-connection-preview-line");
+    path.setAttribute("marker-end", "url(#businessCanvasArrow)");
+    group.append(path);
+    svg.append(group);
+  }
+  const targetSide = drag.previewTargetSide ?? nearestBusinessIdeaCanvasSideForPreview(drag.startPoint, drag.previewPoint);
+  const path = group.querySelector<SVGPathElement>(".business-canvas-connection-preview-line");
+  path?.setAttribute(
+    "d",
+    businessIdeaCanvasLiveEdgePath(
+      businessIdeaCanvasSvgPoint(drag.startPoint),
+      businessIdeaCanvasSvgPoint(drag.previewPoint),
+      drag.fromSide,
+      targetSide
+    )
+  );
+  updateBusinessIdeaCanvasConnectionTargetHighlight(project.id, drag.previewTargetNodeId);
+}
+
+function clearBusinessIdeaCanvasConnectionPreview(projectId?: string): void {
+  const scope = projectId
+    ? document.querySelector<HTMLElement>(`[data-business-canvas-project-id="${cssEscape(projectId)}"]`)
+    : document;
+  scope?.querySelectorAll(".business-canvas-connection-preview").forEach((element) => element.remove());
+  scope?.querySelectorAll(".business-canvas-node.connection-target").forEach((element) => {
+    element.classList.remove("connection-target");
+  });
+}
+
+function updateBusinessIdeaCanvasConnectionTargetHighlight(projectId: string, targetNodeId: string | null): void {
+  const rootElement = document.querySelector<HTMLElement>(`[data-business-canvas-project-id="${cssEscape(projectId)}"]`);
+  if (!rootElement) return;
+  rootElement.querySelectorAll(".business-canvas-node.connection-target").forEach((element) => {
+    if (element.getAttribute("data-business-canvas-node-id") !== targetNodeId) {
+      element.classList.remove("connection-target");
+    }
+  });
+  if (!targetNodeId) return;
+  rootElement
+    .querySelector<HTMLElement>(`[data-business-canvas-node-id="${cssEscape(targetNodeId)}"]`)
+    ?.classList.add("connection-target");
+}
+
 function applyBusinessIdeaCanvasViewportTransform(projectId: string, viewport: BusinessIdeaCanvasViewport): void {
   const content = document.querySelector<HTMLElement>(
     `[data-business-canvas-project-id="${cssEscape(projectId)}"] [data-business-canvas-content]`
@@ -4447,17 +4676,20 @@ function updateBusinessIdeaCanvasLiveEdges(
     );
     const hit = edgeGroup?.querySelector<SVGPathElement>(".business-canvas-edge-hit");
     const line = edgeGroup?.querySelector<SVGPathElement>(".business-canvas-edge-line");
-    const label = edgeGroup?.querySelector<SVGTextElement>(".business-canvas-edge-label");
+    const label = edgeGroup?.querySelector<SVGForeignObjectElement>(".business-canvas-edge-label-foreign");
     const branch = edgeGroup?.querySelector<SVGCircleElement>(".business-canvas-edge-branch");
     hit?.setAttribute("d", geometry.path);
     line?.setAttribute("d", geometry.path);
-    label?.setAttribute("x", String(geometry.mid.x));
-    label?.setAttribute("y", String(geometry.mid.y - 8));
-    branch?.setAttribute("cx", String(geometry.mid.x));
-    branch?.setAttribute("cy", String(geometry.mid.y));
+    if (label) {
+      const width = numberValue(label.getAttribute("data-business-canvas-edge-label-width"));
+      label.setAttribute("x", String(geometry.label.x - (width || 58) / 2));
+      label.setAttribute("y", String(geometry.label.y - 14));
+    }
+    branch?.setAttribute("cx", String(geometry.label.x));
+    branch?.setAttribute("cy", String(geometry.label.y));
     if (branch) {
-      branch.dataset.businessCanvasBranchX = String(geometry.mid.x - BUSINESS_IDEA_CANVAS_ORIGIN);
-      branch.dataset.businessCanvasBranchY = String(geometry.mid.y - BUSINESS_IDEA_CANVAS_ORIGIN);
+      branch.dataset.businessCanvasBranchX = String(geometry.label.x - BUSINESS_IDEA_CANVAS_ORIGIN);
+      branch.dataset.businessCanvasBranchY = String(geometry.label.y - BUSINESS_IDEA_CANVAS_ORIGIN);
     }
   }
 }
@@ -4466,15 +4698,12 @@ function businessIdeaCanvasLiveEdgeGeometry(
   edge: JsonCanvasEdge,
   fromNode: JsonCanvasNode,
   toNode: JsonCanvasNode
-): { path: string; mid: { x: number; y: number } } {
+): { path: string; label: { x: number; y: number } } {
   const fromSide = edge.fromSide ?? "right";
   const toSide = edge.toSide ?? "left";
   const from = businessIdeaCanvasSvgPoint(canvasAnchorPoint(fromNode, fromSide));
   const to = businessIdeaCanvasSvgPoint(canvasAnchorPoint(toNode, toSide));
-  return {
-    path: businessIdeaCanvasLiveEdgePath(from, to, fromSide, toSide),
-    mid: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
-  };
+  return businessIdeaCanvasLiveEdgeGeometryForPoints(from, to, fromSide, toSide);
 }
 
 function businessIdeaCanvasSvgPoint(point: { x: number; y: number }): { x: number; y: number } {
@@ -4490,10 +4719,22 @@ function businessIdeaCanvasLiveEdgePath(
   fromSide: JsonCanvasSide,
   toSide: JsonCanvasSide
 ): string {
+  return businessIdeaCanvasLiveEdgeGeometryForPoints(from, to, fromSide, toSide).path;
+}
+
+function businessIdeaCanvasLiveEdgeGeometryForPoints(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  fromSide: JsonCanvasSide,
+  toSide: JsonCanvasSide
+): { path: string; label: { x: number; y: number } } {
   const distance = Math.max(80, Math.min(220, Math.abs(to.x - from.x) * 0.45 + Math.abs(to.y - from.y) * 0.25));
   const fromControl = businessIdeaCanvasLiveControlPoint(from, fromSide, distance);
   const toControl = businessIdeaCanvasLiveControlPoint(to, toSide, distance);
-  return `M ${from.x} ${from.y} C ${fromControl.x} ${fromControl.y}, ${toControl.x} ${toControl.y}, ${to.x} ${to.y}`;
+  return {
+    path: `M ${from.x} ${from.y} C ${fromControl.x} ${fromControl.y}, ${toControl.x} ${toControl.y}, ${to.x} ${to.y}`,
+    label: businessIdeaCanvasCubicPointAtHalfLength(from, fromControl, toControl, to)
+  };
 }
 
 function businessIdeaCanvasLiveControlPoint(
@@ -4505,6 +4746,77 @@ function businessIdeaCanvasLiveControlPoint(
   if (side === "right") return { x: point.x + distance, y: point.y };
   if (side === "bottom") return { x: point.x, y: point.y + distance };
   return { x: point.x - distance, y: point.y };
+}
+
+function businessIdeaCanvasCubicPointAtHalfLength(
+  start: { x: number; y: number },
+  controlA: { x: number; y: number },
+  controlB: { x: number; y: number },
+  end: { x: number; y: number }
+): { x: number; y: number } {
+  const samples = 24;
+  const points = Array.from({ length: samples + 1 }, (_, index) =>
+    businessIdeaCanvasCubicPoint(start, controlA, controlB, end, index / samples)
+  );
+  const distances = points.slice(1).map((point, index) => Math.hypot(point.x - points[index].x, point.y - points[index].y));
+  const total = distances.reduce((sum, distance) => sum + distance, 0);
+  if (!Number.isFinite(total) || total <= 0) return businessIdeaCanvasCubicPoint(start, controlA, controlB, end, 0.5);
+  const target = total / 2;
+  let walked = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const segment = distances[index - 1] ?? 0;
+    if (walked + segment >= target) {
+      const ratio = segment > 0 ? (target - walked) / segment : 0;
+      return {
+        x: points[index - 1].x + (points[index].x - points[index - 1].x) * ratio,
+        y: points[index - 1].y + (points[index].y - points[index - 1].y) * ratio
+      };
+    }
+    walked += segment;
+  }
+  return businessIdeaCanvasCubicPoint(start, controlA, controlB, end, 0.5);
+}
+
+function businessIdeaCanvasCubicPoint(
+  start: { x: number; y: number },
+  controlA: { x: number; y: number },
+  controlB: { x: number; y: number },
+  end: { x: number; y: number },
+  t: number
+): { x: number; y: number } {
+  const inverse = 1 - t;
+  const a = inverse * inverse * inverse;
+  const b = 3 * inverse * inverse * t;
+  const c = 3 * inverse * t * t;
+  const d = t * t * t;
+  return {
+    x: a * start.x + b * controlA.x + c * controlB.x + d * end.x,
+    y: a * start.y + b * controlA.y + c * controlB.y + d * end.y
+  };
+}
+
+function businessIdeaCanvasConnectionTargetFromEvent(
+  event: PointerEvent,
+  project: SelfEmploymentProject,
+  sourceNodeId: string
+): { node: JsonCanvasNode; side: JsonCanvasSide } | null {
+  const target = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+  const nodeElement = target?.closest<HTMLElement>("[data-business-canvas-node-id]");
+  const nodeId = nodeElement?.dataset.businessCanvasNodeId;
+  const node = nodeId ? project.businessIdeaCanvas.nodes.find((item) => item.id === nodeId) : null;
+  if (!node || node.type === "group" || node.id === sourceNodeId) return null;
+  const point = businessIdeaCanvasPointFromEvent(event, project);
+  return { node, side: nearestBusinessIdeaCanvasNodeSide(node, point) };
+}
+
+function nearestBusinessIdeaCanvasSideForPreview(
+  start: { x: number; y: number },
+  end: { x: number; y: number }
+): JsonCanvasSide {
+  const deltaX = end.x - start.x;
+  const deltaY = end.y - start.y;
+  if (Math.abs(deltaX) >= Math.abs(deltaY)) return deltaX >= 0 ? "left" : "right";
+  return deltaY >= 0 ? "top" : "bottom";
 }
 
 function businessIdeaCanvasPointFromEvent(event: PointerEvent | MouseEvent, project: SelfEmploymentProject): { x: number; y: number } {

@@ -28,6 +28,8 @@ export interface BusinessIdeaCanvasLineMenuState {
   edgeId: string;
   x: number;
   y: number;
+  fromNodeId?: string;
+  fromSide?: JsonCanvasSide;
 }
 
 export interface BusinessIdeaCanvasSelectionRectState {
@@ -66,6 +68,8 @@ export interface BusinessIdeaCanvasRenderState {
   selectedNodeIds: string[];
   selectedEdgeId: string | null;
   editingNodeId: string | null;
+  editingEdgeLabelId: string | null;
+  editingEdgeLabelDraft: string;
   armedNodeId: string | null;
   lineMenu: BusinessIdeaCanvasLineMenuState | null;
   selectionRect: BusinessIdeaCanvasSelectionRectState | null;
@@ -75,11 +79,18 @@ export interface BusinessIdeaCanvasRenderState {
   clipboardAvailable: boolean;
 }
 
-const BUSINESS_CANVAS_SHAPE_OPTIONS: Array<{ id: BusinessIdeaCanvasShape; icon: string; label: string }> = [
-  { id: "rectangle", icon: "▢", label: "Rechteck" },
-  { id: "rounded-rectangle", icon: "▣", label: "Abgerundet" },
-  { id: "ellipse", icon: "⬭", label: "Ellipse" },
-  { id: "diamond", icon: "◆", label: "Raute" }
+const BUSINESS_CANVAS_SHAPE_OPTIONS: Array<{ value: BusinessIdeaCanvasShape; icon: string; label: string }> = [
+  { value: "rectangle", icon: "▭", label: "Rechteck" },
+  { value: "diamond", icon: "◆", label: "Raute" },
+  { value: "ellipse", icon: "⬭", label: "Ellipse" },
+  { value: "rectangle", icon: "▢", label: "Eckig" },
+  { value: "rounded-rectangle", icon: "▣", label: "Abgerundet" }
+];
+const BUSINESS_CANVAS_EDGE_DIRECTION_OPTIONS: Array<{ value: BusinessIdeaCanvasEdgeDirection; icon: string; label: string }> = [
+  { value: "none", icon: "⋯", label: "Gestrichelt" },
+  { value: "forward", icon: "→", label: "Pfeil vorwaerts" },
+  { value: "backward", icon: "←", label: "Pfeil rueckwaerts" },
+  { value: "both", icon: "↔", label: "Beidseitig" }
 ];
 
 export function renderBusinessIdeaCanvasEditor(
@@ -112,11 +123,13 @@ export function renderBusinessIdeaCanvasEditor(
             ${renderBusinessIdeaCanvasSvg(project, renderState)}
             ${cardNodes.map((node) => renderBusinessIdeaCanvasNode(project, node, renderState)).join("")}
             ${renderBusinessIdeaCanvasSelectionRect(renderState)}
-            ${renderBusinessIdeaCanvasNodeToolbar(project, renderState)}
-            ${renderBusinessIdeaCanvasMultiToolbar(project, renderState)}
-            ${renderBusinessIdeaCanvasEdgeToolbar(project, renderState)}
             ${lineMenu}
           </div>
+        </div>
+        <div class="business-canvas-toolbar-layer" data-business-canvas-toolbar-layer>
+          ${renderBusinessIdeaCanvasNodeToolbar(project, renderState)}
+          ${renderBusinessIdeaCanvasMultiToolbar(project, renderState)}
+          ${renderBusinessIdeaCanvasEdgeToolbar(project, renderState)}
         </div>
         ${renderBusinessIdeaCanvasGantt(project)}
       </div>
@@ -141,15 +154,11 @@ function renderBusinessIdeaCanvasTopToolbar(project: SelfEmploymentProject, rend
       <div class="business-canvas-topbar-group">
         <div class="business-canvas-compact-field">
           <span>Label</span>
-          <div class="business-canvas-chip-group business-canvas-label-chip-group" role="group" aria-label="Aktives Label">
-            ${renderLabelButtons(meta.labels, meta.activeLabelId, "meta", "activeLabelId")}
-          </div>
+          ${renderLabelDropdown(meta.labels, meta.activeLabelId, "meta", "activeLabelId", "Aktives Label")}
         </div>
         <div class="business-canvas-compact-field">
           <span>Phase</span>
-          <div class="business-canvas-chip-group business-canvas-phase-chip-group" role="group" aria-label="Aktive Phase">
-            ${renderPhaseButtons(orderedPhases(meta), meta.activePhaseId, "meta", "activePhaseId")}
-          </div>
+          ${renderPhaseDropdown(orderedPhases(meta), meta.activePhaseId, "meta", "activePhaseId", "Aktive Phase")}
         </div>
         <label class="business-canvas-toggle">
           <input type="checkbox" data-business-canvas-grid-field="snap" ${meta.grid.snap ? "checked" : ""} />
@@ -170,7 +179,8 @@ function renderBusinessIdeaCanvasSvg(
       width="${BUSINESS_IDEA_CANVAS_WIDTH}"
       height="${BUSINESS_IDEA_CANVAS_HEIGHT}"
       viewBox="0 0 ${BUSINESS_IDEA_CANVAS_WIDTH} ${BUSINESS_IDEA_CANVAS_HEIGHT}"
-      aria-hidden="true"
+      data-business-canvas-svg
+      aria-label="Canvas-Verbindungen"
     >
       <defs>
         <marker id="businessCanvasArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -194,36 +204,79 @@ function renderBusinessIdeaCanvasEdge(
   const toSide = edge.toSide ?? "left";
   const from = toSvgPoint(canvasAnchorPoint(fromNode, fromSide));
   const to = toSvgPoint(canvasAnchorPoint(toNode, toSide));
-  const path = edgePath(from, to, fromSide, toSide);
-  const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  const geometry = edgeGeometry(from, to, fromSide, toSide);
   const direction = businessIdeaCanvasDirectionFromEdge(edge);
   const selected = renderState.selectedEdgeId === edge.id;
+  const labelText = renderState.editingEdgeLabelId === edge.id ? renderState.editingEdgeLabelDraft : edge.label ?? "";
+  const shouldRenderLabel = Boolean(labelText) || selected;
+  const labelWidth = edgeLabelWidth(labelText || "Label");
   return `
     <g class="business-canvas-edge-group${selected ? " selected" : ""}" data-business-canvas-edge-id="${escapeHtml(edge.id)}">
-      <path class="business-canvas-edge-hit" d="${path}" data-business-canvas-edge-hit="${escapeHtml(edge.id)}"></path>
+      <path class="business-canvas-edge-hit" d="${geometry.path}" data-business-canvas-edge-hit="${escapeHtml(edge.id)}"></path>
       <path
         class="business-canvas-edge-line business-canvas-edge-direction-${direction}"
-        d="${path}"
+        d="${geometry.path}"
         ${edge.fromEnd === "arrow" ? 'marker-start="url(#businessCanvasArrow)"' : ""}
         ${(edge.toEnd ?? "arrow") === "arrow" ? 'marker-end="url(#businessCanvasArrow)"' : ""}
       ></path>
-      ${
-        edge.label
-          ? `<text class="business-canvas-edge-label" x="${mid.x}" y="${mid.y - 8}" data-business-canvas-edge-label="${escapeHtml(
-              edge.id
-            )}">${escapeHtml(edge.label)}</text>`
-          : ""
-      }
       <circle
         class="business-canvas-edge-branch"
-        cx="${mid.x}"
-        cy="${mid.y}"
+        cx="${geometry.label.x}"
+        cy="${geometry.label.y}"
         r="7"
         data-business-canvas-edge-branch="${escapeHtml(edge.id)}"
-        data-business-canvas-branch-x="${mid.x - BUSINESS_IDEA_CANVAS_ORIGIN}"
-        data-business-canvas-branch-y="${mid.y - BUSINESS_IDEA_CANVAS_ORIGIN}"
+        data-business-canvas-branch-x="${geometry.label.x - BUSINESS_IDEA_CANVAS_ORIGIN}"
+        data-business-canvas-branch-y="${geometry.label.y - BUSINESS_IDEA_CANVAS_ORIGIN}"
       ></circle>
+      ${
+        shouldRenderLabel
+          ? renderBusinessIdeaCanvasEdgeLabel(edge.id, labelText, renderState.editingEdgeLabelId === edge.id, geometry.label, labelWidth)
+          : ""
+      }
     </g>
+  `;
+}
+
+function renderBusinessIdeaCanvasEdgeLabel(
+  edgeId: string,
+  label: string,
+  editing: boolean,
+  point: { x: number; y: number },
+  width: number
+): string {
+  const height = 28;
+  const x = point.x - width / 2;
+  const y = point.y - height / 2;
+  const value = label || "Label";
+  return `
+    <foreignObject
+      class="business-canvas-edge-label-foreign"
+      x="${x}"
+      y="${y}"
+      width="${width}"
+      height="${height}"
+      data-business-canvas-edge-label-width="${width}"
+    >
+      ${
+        editing
+          ? `<input
+              xmlns="http://www.w3.org/1999/xhtml"
+              class="business-canvas-edge-label-input"
+              type="text"
+              value="${escapeHtml(label)}"
+              data-business-canvas-edge-label-input="${escapeHtml(edgeId)}"
+              aria-label="Verbindungslabel bearbeiten"
+            />`
+          : `<button
+              xmlns="http://www.w3.org/1999/xhtml"
+              class="business-canvas-edge-label-button${label ? "" : " empty"}"
+              type="button"
+              data-business-canvas-edge-label="${escapeHtml(edgeId)}"
+              title="Verbindungslabel bearbeiten"
+              aria-label="Verbindungslabel bearbeiten"
+            >${escapeHtml(value)}</button>`
+      }
+    </foreignObject>
   `;
 }
 
@@ -241,7 +294,6 @@ function renderBusinessIdeaCanvasNode(
   const shape = node.type === "group" ? "rectangle" : meta?.shape ?? "rounded-rectangle";
   const colorClass = businessIdeaColorClass(node.color);
   const text = businessIdeaCanvasNodeText(node);
-  const isSingleCardSelection = selected && renderState.selectedNodeIds.length === 1 && node.type !== "group";
   return `
     <article
       class="business-canvas-node ${node.type === "group" ? "business-canvas-group-node" : ""} business-canvas-shape-${shape} ${colorClass}${selected ? " selected" : ""}${editing ? " editing" : ""}${armed ? " armed" : ""}"
@@ -267,7 +319,7 @@ function renderBusinessIdeaCanvasNode(
               ${editing && node.type === "text" ? 'contenteditable="true" spellcheck="true"' : ""}
             >${escapeHtml(text)}</div>`
       }
-      ${isSingleCardSelection ? renderBusinessIdeaCanvasAnchors(node.id) : ""}
+      ${node.type !== "group" ? renderBusinessIdeaCanvasAnchors(node.id) : ""}
       ${selected ? `<span class="business-canvas-resize-handle" data-business-canvas-resize="${escapeHtml(node.id)}"></span>` : ""}
     </article>
   `;
@@ -314,28 +366,21 @@ function renderBusinessIdeaCanvasNodeToolbar(
   if (!selectedNode) return "";
   const meta = project.businessIdeaCanvasMeta;
   const nodeMeta = meta.nodeMeta[selectedNode.id];
-  const left = Math.max(0, selectedNode.x + BUSINESS_IDEA_CANVAS_ORIGIN);
-  const top = Math.max(0, selectedNode.y + BUSINESS_IDEA_CANVAS_ORIGIN - 50);
+  const position = toolbarPosition(meta, selectedNode.x, selectedNode.y);
   if (selectedNode.type === "group") {
     return `
-      <div class="business-canvas-node-toolbar" style="left:${left}px;top:${top}px;" data-business-canvas-node-toolbar>
+      <div class="business-canvas-node-toolbar" style="left:${position.left}px;top:${position.top}px;" data-business-canvas-node-toolbar>
         ${renderPaletteButton([selectedNode.id], selectedNode.color)}
         <button class="icon-button danger" type="button" data-action="business-canvas-delete-node" title="Loeschen" aria-label="Loeschen">x</button>
       </div>
     `;
   }
   return `
-    <div class="business-canvas-node-toolbar" style="left:${left}px;top:${top}px;" data-business-canvas-node-toolbar>
+    <div class="business-canvas-node-toolbar" style="left:${position.left}px;top:${position.top}px;" data-business-canvas-node-toolbar>
       ${renderPaletteButton([selectedNode.id], selectedNode.color)}
-      <div class="business-canvas-icon-segment" role="group" aria-label="Form">
-        ${renderShapeButtons(nodeMeta?.shape ?? "rounded-rectangle")}
-      </div>
-      <div class="business-canvas-chip-group business-canvas-label-chip-group" role="group" aria-label="Label">
-        ${renderLabelButtons(meta.labels, nodeMeta?.labelId ?? meta.activeLabelId, "node", "labelId")}
-      </div>
-      <div class="business-canvas-chip-group business-canvas-phase-chip-group" role="group" aria-label="Phase">
-        ${renderPhaseButtons(orderedPhases(meta), nodeMeta?.phaseId ?? meta.activePhaseId, "node", "phaseId")}
-      </div>
+      ${renderShapeDropdown(nodeMeta?.shape ?? "rounded-rectangle")}
+      ${renderLabelDropdown(meta.labels, nodeMeta?.labelId ?? meta.activeLabelId, "node", "labelId", "Label")}
+      ${renderPhaseDropdown(orderedPhases(meta), nodeMeta?.phaseId ?? meta.activePhaseId, "node", "phaseId", "Phase")}
       <button class="icon-button" type="button" data-action="business-canvas-start-connect-node" title="Verbindung starten" aria-label="Verbindung starten">+</button>
       <button class="icon-button" type="button" data-action="business-canvas-copy-selection" title="Kopieren" aria-label="Kopieren">C</button>
       <button class="icon-button" type="button" data-action="business-canvas-duplicate-node" title="Duplizieren" aria-label="Duplizieren">::</button>
@@ -352,10 +397,9 @@ function renderBusinessIdeaCanvasMultiToolbar(
   const nodes = project.businessIdeaCanvas.nodes.filter((node) => renderState.selectedNodeIds.includes(node.id));
   const bounds = businessIdeaCanvasBoundsForNodes(nodes);
   if (!bounds) return "";
-  const left = Math.max(0, bounds.x + BUSINESS_IDEA_CANVAS_ORIGIN);
-  const top = Math.max(0, bounds.y + BUSINESS_IDEA_CANVAS_ORIGIN - 50);
+  const position = toolbarPosition(project.businessIdeaCanvasMeta, bounds.x, bounds.y);
   return `
-    <div class="business-canvas-multi-toolbar" style="left:${left}px;top:${top}px;" data-business-canvas-multi-toolbar>
+    <div class="business-canvas-multi-toolbar" style="left:${position.left}px;top:${position.top}px;" data-business-canvas-multi-toolbar>
       <strong>${intNumber(nodes.length)}</strong>
       <button class="icon-button" type="button" data-action="business-canvas-copy-selection" title="Kopieren" aria-label="Kopieren">C</button>
       <button class="icon-button" type="button" data-action="business-canvas-paste-selection" ${renderState.clipboardAvailable ? "" : "disabled"} title="Einfuegen" aria-label="Einfuegen">V</button>
@@ -368,82 +412,125 @@ function renderBusinessIdeaCanvasMultiToolbar(
   `;
 }
 
-function renderShapeButtons(selectedShape: BusinessIdeaCanvasShape): string {
-  return BUSINESS_CANVAS_SHAPE_OPTIONS.map(
-    (shape) => `
-      <button
-        class="business-canvas-icon-choice${shape.id === selectedShape ? " active" : ""}"
-        type="button"
-        data-action="business-canvas-set-selected-node-field"
-        data-business-canvas-selected-node-field="shape"
-        data-business-canvas-selected-node-value="${escapeHtml(shape.id)}"
-        title="${escapeHtml(shape.label)}"
-        aria-label="${escapeHtml(shape.label)}"
-        aria-pressed="${shape.id === selectedShape}"
-      >${escapeHtml(shape.icon)}</button>
-    `
-  ).join("");
+function renderShapeDropdown(selectedShape: BusinessIdeaCanvasShape): string {
+  const selectedIndex = Math.max(0, BUSINESS_CANVAS_SHAPE_OPTIONS.findIndex((shape) => shape.value === selectedShape));
+  const selected = BUSINESS_CANVAS_SHAPE_OPTIONS[selectedIndex] ?? BUSINESS_CANVAS_SHAPE_OPTIONS[0];
+  return `
+    <details class="business-canvas-dropdown business-canvas-shape-dropdown" data-business-canvas-dropdown>
+      <summary class="business-canvas-dropdown-trigger business-canvas-shape-trigger" title="Form" aria-label="Form">
+        <span aria-hidden="true">${escapeHtml(selected.icon)}</span>
+      </summary>
+      <div class="business-canvas-dropdown-menu" role="menu">
+        ${BUSINESS_CANVAS_SHAPE_OPTIONS.map(
+          (shape, index) => `
+            <button
+              class="business-canvas-dropdown-option${index === selectedIndex ? " active" : ""}"
+              type="button"
+              data-action="business-canvas-set-selected-node-field"
+              data-business-canvas-selected-node-field="shape"
+              data-business-canvas-selected-node-value="${escapeHtml(shape.value)}"
+              title="${escapeHtml(shape.label)}"
+              aria-label="${escapeHtml(shape.label)}"
+            >
+              <span class="business-canvas-dropdown-option-icon" aria-hidden="true">${escapeHtml(shape.icon)}</span>
+              <span>${escapeHtml(shape.label)}</span>
+            </button>
+          `
+        ).join("")}
+      </div>
+    </details>
+  `;
 }
 
-function renderLabelButtons(
+function renderLabelDropdown(
   labels: BusinessIdeaCanvasMeta["labels"],
   selectedLabelId: string,
   target: "meta" | "node",
-  field: "activeLabelId" | "labelId"
+  field: "activeLabelId" | "labelId",
+  ariaLabel: string
 ): string {
-  return labels
-    .map((label) => {
-      const selected = label.id === selectedLabelId;
-      return `
-        <button
-          class="business-canvas-label-chip ${businessIdeaColorClass(label.color)}${selected ? " active" : ""}"
-          type="button"
-          data-action="${target === "meta" ? "business-canvas-set-meta-field" : "business-canvas-set-selected-node-field"}"
-          ${
-            target === "meta"
-              ? `data-business-canvas-meta-field="${escapeHtml(field)}" data-business-canvas-meta-value="${escapeHtml(label.id)}"`
-              : `data-business-canvas-selected-node-field="${escapeHtml(field)}" data-business-canvas-selected-node-value="${escapeHtml(label.id)}"`
-          }
-          title="${escapeHtml(label.name)}"
-          aria-label="${escapeHtml(label.name)}"
-          aria-pressed="${selected}"
-          style="${businessIdeaColorStyle(label.color)}"
-        >
-          <span class="business-canvas-label-dot" aria-hidden="true"></span>
-          <span>${escapeHtml(label.name)}</span>
-        </button>
-      `;
-    })
-    .join("");
+  const selectedLabel = labels.find((label) => label.id === selectedLabelId) ?? labels[0];
+  return `
+    <details class="business-canvas-dropdown business-canvas-label-dropdown" data-business-canvas-dropdown>
+      <summary
+        class="business-canvas-dropdown-trigger business-canvas-label-trigger ${businessIdeaColorClass(selectedLabel?.color)}"
+        title="${escapeHtml(selectedLabel?.name ?? ariaLabel)}"
+        aria-label="${escapeHtml(ariaLabel)}"
+        style="${businessIdeaColorStyle(selectedLabel?.color)}"
+      >
+        <span class="business-canvas-label-dot" aria-hidden="true"></span>
+        <span>${escapeHtml(selectedLabel?.name ?? "Label")}</span>
+      </summary>
+      <div class="business-canvas-dropdown-menu" role="menu">
+        ${labels
+          .map((label) => {
+            const selected = label.id === selectedLabelId;
+            return `
+              <button
+                class="business-canvas-dropdown-option ${businessIdeaColorClass(label.color)}${selected ? " active" : ""}"
+                type="button"
+                data-action="${target === "meta" ? "business-canvas-set-meta-field" : "business-canvas-set-selected-node-field"}"
+                ${
+                  target === "meta"
+                    ? `data-business-canvas-meta-field="${escapeHtml(field)}" data-business-canvas-meta-value="${escapeHtml(label.id)}"`
+                    : `data-business-canvas-selected-node-field="${escapeHtml(field)}" data-business-canvas-selected-node-value="${escapeHtml(label.id)}"`
+                }
+                title="${escapeHtml(label.name)}"
+                aria-label="${escapeHtml(label.name)}"
+                style="${businessIdeaColorStyle(label.color)}"
+              >
+                <span class="business-canvas-label-dot" aria-hidden="true"></span>
+                <span>${escapeHtml(label.name)}</span>
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    </details>
+  `;
 }
 
-function renderPhaseButtons(
+function renderPhaseDropdown(
   phases: BusinessIdeaCanvasMeta["phases"],
   selectedPhaseId: string,
   target: "meta" | "node",
-  field: "activePhaseId" | "phaseId"
+  field: "activePhaseId" | "phaseId",
+  ariaLabel: string
 ): string {
-  return phases
-    .map((phase) => {
-      const selected = phase.id === selectedPhaseId;
-      const label = phaseBadgeLabel(phase.order);
-      return `
-        <button
-          class="business-canvas-phase-badge-button${selected ? " active" : ""}"
-          type="button"
-          data-action="${target === "meta" ? "business-canvas-set-meta-field" : "business-canvas-set-selected-node-field"}"
-          ${
-            target === "meta"
-              ? `data-business-canvas-meta-field="${escapeHtml(field)}" data-business-canvas-meta-value="${escapeHtml(phase.id)}"`
-              : `data-business-canvas-selected-node-field="${escapeHtml(field)}" data-business-canvas-selected-node-value="${escapeHtml(phase.id)}"`
-          }
-          title="${escapeHtml(phase.name)}"
-          aria-label="${escapeHtml(phase.name)}"
-          aria-pressed="${selected}"
-        >${escapeHtml(label)}</button>
-      `;
-    })
-    .join("");
+  const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0];
+  return `
+    <details class="business-canvas-dropdown business-canvas-phase-dropdown" data-business-canvas-dropdown>
+      <summary class="business-canvas-dropdown-trigger business-canvas-phase-trigger" title="${escapeHtml(
+        selectedPhase?.name ?? ariaLabel
+      )}" aria-label="${escapeHtml(ariaLabel)}">
+        <span class="business-canvas-phase-badge-button">${escapeHtml(phaseBadgeLabel(selectedPhase?.order ?? 1))}</span>
+      </summary>
+      <div class="business-canvas-dropdown-menu" role="menu">
+        ${phases
+          .map((phase) => {
+            const selected = phase.id === selectedPhaseId;
+            return `
+              <button
+                class="business-canvas-dropdown-option${selected ? " active" : ""}"
+                type="button"
+                data-action="${target === "meta" ? "business-canvas-set-meta-field" : "business-canvas-set-selected-node-field"}"
+                ${
+                  target === "meta"
+                    ? `data-business-canvas-meta-field="${escapeHtml(field)}" data-business-canvas-meta-value="${escapeHtml(phase.id)}"`
+                    : `data-business-canvas-selected-node-field="${escapeHtml(field)}" data-business-canvas-selected-node-value="${escapeHtml(phase.id)}"`
+                }
+                title="${escapeHtml(phase.name)}"
+                aria-label="${escapeHtml(phase.name)}"
+              >
+                <span class="business-canvas-phase-menu-badge" aria-hidden="true">${escapeHtml(phaseBadgeLabel(phase.order))}</span>
+                <span>${escapeHtml(phase.name)}</span>
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    </details>
+  `;
 }
 
 function renderPaletteButton(nodeIds: string[], color: string | undefined): string {
@@ -472,21 +559,43 @@ function renderBusinessIdeaCanvasEdgeToolbar(
   if (!fromNode || !toNode) return "";
   const from = canvasAnchorPoint(fromNode, edge.fromSide ?? "right");
   const to = canvasAnchorPoint(toNode, edge.toSide ?? "left");
-  const left = (from.x + to.x) / 2 + BUSINESS_IDEA_CANVAS_ORIGIN + 12;
-  const top = (from.y + to.y) / 2 + BUSINESS_IDEA_CANVAS_ORIGIN + 12;
+  const position = edgeToolbarPosition(project.businessIdeaCanvasMeta, from, to);
+  const direction = businessIdeaCanvasDirectionFromEdge(edge);
   return `
-    <div class="business-canvas-edge-toolbar" style="left:${left}px;top:${top}px;" data-business-canvas-edge-toolbar>
-      <input
-        type="text"
-        value="${escapeHtml(edge.label ?? "")}"
-        aria-label="Verbindungslabel"
-        data-business-canvas-selected-edge-field="label"
-      />
-      <select aria-label="Pfeilrichtung" data-business-canvas-selected-edge-field="direction">
-        ${businessIdeaCanvasDirectionOptions(businessIdeaCanvasDirectionFromEdge(edge))}
-      </select>
+    <div class="business-canvas-edge-toolbar" style="left:${position.left}px;top:${position.top}px;" data-business-canvas-edge-toolbar>
+      ${renderEdgeDirectionDropdown(direction)}
+      <button class="icon-button" type="button" data-action="business-canvas-edit-edge-label" title="Label bearbeiten" aria-label="Label bearbeiten">T</button>
       <button class="icon-button danger" type="button" data-action="business-canvas-delete-edge" aria-label="Verbindung loeschen" title="Verbindung loeschen">x</button>
     </div>
+  `;
+}
+
+function renderEdgeDirectionDropdown(selectedDirection: BusinessIdeaCanvasEdgeDirection): string {
+  const selected = BUSINESS_CANVAS_EDGE_DIRECTION_OPTIONS.find((item) => item.value === selectedDirection) ?? BUSINESS_CANVAS_EDGE_DIRECTION_OPTIONS[1];
+  return `
+    <details class="business-canvas-dropdown business-canvas-edge-direction-dropdown" data-business-canvas-dropdown>
+      <summary class="business-canvas-dropdown-trigger business-canvas-edge-direction-trigger" title="Linientyp" aria-label="Linientyp">
+        <span aria-hidden="true">${escapeHtml(selected.icon)}</span>
+      </summary>
+      <div class="business-canvas-dropdown-menu" role="menu">
+        ${BUSINESS_CANVAS_EDGE_DIRECTION_OPTIONS.map(
+          (item) => `
+            <button
+              class="business-canvas-dropdown-option${item.value === selectedDirection ? " active" : ""}"
+              type="button"
+              data-action="business-canvas-set-selected-edge-field"
+              data-business-canvas-selected-edge-field="direction"
+              data-business-canvas-selected-edge-value="${escapeHtml(item.value)}"
+              title="${escapeHtml(item.label)}"
+              aria-label="${escapeHtml(item.label)}"
+            >
+              <span class="business-canvas-dropdown-option-icon" aria-hidden="true">${escapeHtml(item.icon)}</span>
+              <span>${escapeHtml(item.label)}</span>
+            </button>
+          `
+        ).join("")}
+      </div>
+    </details>
   `;
 }
 
@@ -494,12 +603,15 @@ function renderBusinessIdeaCanvasLineMenu(projectId: string, lineMenu: BusinessI
   return `
     <div class="business-canvas-line-menu" style="left:${lineMenu.x + BUSINESS_IDEA_CANVAS_ORIGIN + 12}px;top:${lineMenu.y + BUSINESS_IDEA_CANVAS_ORIGIN + 12}px;">
       <button
-        class="button mini"
+        class="business-canvas-line-menu-action"
         type="button"
         data-action="business-canvas-add-node-from-line"
         data-business-canvas-project-id="${escapeHtml(projectId)}"
         data-business-canvas-edge-id="${escapeHtml(lineMenu.edgeId)}"
-      >Karte hinzufuegen</button>
+      >
+        <span class="business-canvas-context-menu-icon" aria-hidden="true">＋</span>
+        <span>Neue Karte</span>
+      </button>
     </div>
   `;
 }
@@ -669,6 +781,26 @@ function orderedPhases(meta: BusinessIdeaCanvasMeta): BusinessIdeaCanvasMeta["ph
   return [...meta.phases].sort((a, b) => a.order - b.order);
 }
 
+function toolbarPosition(meta: BusinessIdeaCanvasMeta, x: number, y: number): { left: number; top: number } {
+  const viewport = meta.viewport;
+  return {
+    left: Math.max(8, Math.round(viewport.x + (x + BUSINESS_IDEA_CANVAS_ORIGIN) * viewport.zoom)),
+    top: Math.max(8, Math.round(viewport.y + (y + BUSINESS_IDEA_CANVAS_ORIGIN) * viewport.zoom - 48))
+  };
+}
+
+function edgeToolbarPosition(
+  meta: BusinessIdeaCanvasMeta,
+  from: { x: number; y: number },
+  to: { x: number; y: number }
+): { left: number; top: number } {
+  const viewport = meta.viewport;
+  return {
+    left: Math.max(8, Math.round(viewport.x + ((from.x + to.x) / 2 + BUSINESS_IDEA_CANVAS_ORIGIN) * viewport.zoom + 12)),
+    top: Math.max(8, Math.round(viewport.y + ((from.y + to.y) / 2 + BUSINESS_IDEA_CANVAS_ORIGIN) * viewport.zoom + 12))
+  };
+}
+
 function phaseBadgeLabel(order: number): string {
   const normalized = Number.isFinite(order) && order > 0 ? Math.round(order) : 1;
   return String(normalized);
@@ -681,16 +813,19 @@ function toSvgPoint(point: { x: number; y: number }): { x: number; y: number } {
   };
 }
 
-function edgePath(
+function edgeGeometry(
   from: { x: number; y: number },
   to: { x: number; y: number },
   fromSide: JsonCanvasSide,
   toSide: JsonCanvasSide
-): string {
+): { path: string; label: { x: number; y: number } } {
   const distance = Math.max(80, Math.min(220, Math.abs(to.x - from.x) * 0.45 + Math.abs(to.y - from.y) * 0.25));
   const fromControl = controlPoint(from, fromSide, distance);
   const toControl = controlPoint(to, toSide, distance);
-  return `M ${from.x} ${from.y} C ${fromControl.x} ${fromControl.y}, ${toControl.x} ${toControl.y}, ${to.x} ${to.y}`;
+  return {
+    path: `M ${from.x} ${from.y} C ${fromControl.x} ${fromControl.y}, ${toControl.x} ${toControl.y}, ${to.x} ${to.y}`,
+    label: cubicPointAtHalfLength(from, fromControl, toControl, to)
+  };
 }
 
 function controlPoint(point: { x: number; y: number }, side: JsonCanvasSide, distance: number): { x: number; y: number } {
@@ -698,6 +833,59 @@ function controlPoint(point: { x: number; y: number }, side: JsonCanvasSide, dis
   if (side === "right") return { x: point.x + distance, y: point.y };
   if (side === "bottom") return { x: point.x, y: point.y + distance };
   return { x: point.x - distance, y: point.y };
+}
+
+function cubicPointAtHalfLength(
+  start: { x: number; y: number },
+  controlA: { x: number; y: number },
+  controlB: { x: number; y: number },
+  end: { x: number; y: number }
+): { x: number; y: number } {
+  const samples = 24;
+  const points = Array.from({ length: samples + 1 }, (_, index) => cubicPoint(start, controlA, controlB, end, index / samples));
+  const distances = points.slice(1).map((point, index) => pointDistance(points[index], point));
+  const total = distances.reduce((sum, distance) => sum + distance, 0);
+  if (!Number.isFinite(total) || total <= 0) return cubicPoint(start, controlA, controlB, end, 0.5);
+  const target = total / 2;
+  let walked = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const segment = distances[index - 1] ?? 0;
+    if (walked + segment >= target) {
+      const ratio = segment > 0 ? (target - walked) / segment : 0;
+      return {
+        x: points[index - 1].x + (points[index].x - points[index - 1].x) * ratio,
+        y: points[index - 1].y + (points[index].y - points[index - 1].y) * ratio
+      };
+    }
+    walked += segment;
+  }
+  return cubicPoint(start, controlA, controlB, end, 0.5);
+}
+
+function cubicPoint(
+  start: { x: number; y: number },
+  controlA: { x: number; y: number },
+  controlB: { x: number; y: number },
+  end: { x: number; y: number },
+  t: number
+): { x: number; y: number } {
+  const inverse = 1 - t;
+  const a = inverse * inverse * inverse;
+  const b = 3 * inverse * inverse * t;
+  const c = 3 * inverse * t * t;
+  const d = t * t * t;
+  return {
+    x: a * start.x + b * controlA.x + c * controlB.x + d * end.x,
+    y: a * start.y + b * controlA.y + c * controlB.y + d * end.y
+  };
+}
+
+function pointDistance(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function edgeLabelWidth(label: string): number {
+  return Math.max(58, Math.min(190, Math.round(label.length * 7.2 + 24)));
 }
 
 function businessIdeaColorClass(color: string | undefined): string {
