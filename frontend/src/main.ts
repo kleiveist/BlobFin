@@ -17,6 +17,7 @@ import {
   businessIdeaCanvasBoundsForNodes,
   businessIdeaCanvasEndsForDirection,
   businessIdeaCanvasNodesInsideRect,
+  businessIdeaCanvasPaletteWithCustomColor,
   businessIdeaCanvasViewportForZoomAtPoint,
   canvasAnchorPoint,
   clampBusinessIdeaCanvasNodeSize,
@@ -189,6 +190,7 @@ import type {
   BusinessIdeaCanvasEdgeDirection,
   BusinessIdeaCanvasNodeMeta,
   BusinessIdeaCanvasShape,
+  BusinessIdeaCanvasViewport,
   CareerMilestone,
   CareerMilestoneImpact,
   CombinedWealthDepotKey,
@@ -647,6 +649,8 @@ type BusinessIdeaCanvasDragState = {
   startClientY: number;
   originalNodes: Record<string, { x: number; y: number; width: number; height: number }>;
   elements: Record<string, HTMLElement>;
+  previewNodes: Record<string, { x: number; y: number; width: number; height: number }>;
+  frameId: number | null;
   moved: boolean;
 } | null;
 type BusinessIdeaCanvasConnectionDragState = {
@@ -677,7 +681,16 @@ type BusinessIdeaCanvasPanDragState = {
   startClientY: number;
   originalX: number;
   originalY: number;
+  previewX: number;
+  previewY: number;
+  frameId: number | null;
   moved: boolean;
+} | null;
+type BusinessIdeaCanvasWheelZoomState = {
+  projectId: string;
+  viewport: BusinessIdeaCanvasViewport;
+  frameId: number | null;
+  commitTimerId: number | null;
 } | null;
 type BusinessIdeaCanvasClipboardState = {
   nodes: JsonCanvasNode[];
@@ -734,6 +747,7 @@ let businessIdeaCanvasConnectionDragState: BusinessIdeaCanvasConnectionDragState
 let businessIdeaCanvasSelectionDragState: BusinessIdeaCanvasSelectionDragState = null;
 let businessIdeaCanvasSelectionRect: BusinessIdeaCanvasSelectionRectState | null = null;
 let businessIdeaCanvasPanDragState: BusinessIdeaCanvasPanDragState = null;
+let businessIdeaCanvasWheelZoomState: BusinessIdeaCanvasWheelZoomState = null;
 let businessIdeaCanvasContextMenu: BusinessIdeaCanvasContextMenuState | null = null;
 let businessIdeaCanvasPalettePopover: BusinessIdeaCanvasPalettePopoverState | null = null;
 let businessIdeaCanvasPaletteEditor: BusinessIdeaCanvasPaletteEditorState | null = null;
@@ -1875,6 +1889,17 @@ function bindEvents(): void {
         button.dataset.selfEmploymentProjectId || "",
         "tasks",
         button.dataset.selfEmploymentItemId || ""
+      );
+      return;
+    }
+    if (action === "business-canvas-set-meta-field") {
+      updateBusinessIdeaCanvasMetaField(button.dataset.businessCanvasMetaField || "", button.dataset.businessCanvasMetaValue || "");
+      return;
+    }
+    if (action === "business-canvas-set-selected-node-field") {
+      updateBusinessIdeaCanvasSelectedNodeField(
+        button.dataset.businessCanvasSelectedNodeField || "",
+        button.dataset.businessCanvasSelectedNodeValue || ""
       );
       return;
     }
@@ -3313,6 +3338,7 @@ function addBusinessIdeaCanvasNode(): void {
 }
 
 function zoomBusinessIdeaCanvas(delta: number): void {
+  cancelBusinessIdeaCanvasWheelZoom();
   const projectId = state.selfEmployment.selectedProjectId;
   const viewportElement = document.querySelector<HTMLElement>(
     `[data-business-canvas-project-id="${cssEscape(projectId)}"] [data-business-canvas-viewport]`
@@ -3335,6 +3361,7 @@ function zoomBusinessIdeaCanvas(delta: number): void {
 }
 
 function resetBusinessIdeaCanvasView(): void {
+  cancelBusinessIdeaCanvasWheelZoom();
   updateBusinessIdeaCanvasProject(state.selfEmployment.selectedProjectId, (project) => ({
     ...project,
     businessIdeaCanvasMeta: {
@@ -3523,17 +3550,12 @@ function handleBusinessIdeaCanvasWheel(event: WheelEvent): void {
   const viewportPoint = project ? businessIdeaCanvasViewportPointFromEvent(event, projectId) : null;
   if (!project || !viewportPoint) return;
   event.preventDefault();
-  const delta = event.deltaY > 0 ? -0.08 : 0.08;
-  updateBusinessIdeaCanvasProject(projectId, (item) => {
-    const current = item.businessIdeaCanvasMeta.viewport;
-    return {
-      ...item,
-      businessIdeaCanvasMeta: {
-        ...item.businessIdeaCanvasMeta,
-        viewport: businessIdeaCanvasViewportForZoomAtPoint(current, viewportPoint, current.zoom + delta)
-      }
-    };
-  }, true);
+  const current = businessIdeaCanvasWheelZoomState?.projectId === projectId
+    ? businessIdeaCanvasWheelZoomState.viewport
+    : project.businessIdeaCanvasMeta.viewport;
+  const delta = event.deltaY > 0 ? -0.06 : 0.06;
+  const nextViewport = businessIdeaCanvasViewportForZoomAtPoint(current, viewportPoint, current.zoom + delta);
+  scheduleBusinessIdeaCanvasWheelZoom(projectId, nextViewport);
 }
 
 function handleBusinessIdeaCanvasKeyDown(event: KeyboardEvent): void {
@@ -3609,6 +3631,9 @@ function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
       startClientY: event.clientY,
       originalX: project.businessIdeaCanvasMeta.viewport.x,
       originalY: project.businessIdeaCanvasMeta.viewport.y,
+      previewX: project.businessIdeaCanvasMeta.viewport.x,
+      previewY: project.businessIdeaCanvasMeta.viewport.y,
+      frameId: null,
       moved: false
     };
     viewportElement.classList.add("panning");
@@ -3702,6 +3727,8 @@ function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
       startClientY: event.clientY,
       originalNodes,
       elements,
+      previewNodes: { ...originalNodes },
+      frameId: null,
       moved: false
     };
     nodeElement.setPointerCapture?.(event.pointerId);
@@ -3756,17 +3783,10 @@ function moveBusinessIdeaCanvasPointer(event: PointerEvent): void {
   }
   if (businessIdeaCanvasPanDragState && event.pointerId === businessIdeaCanvasPanDragState.pointerId) {
     const drag = businessIdeaCanvasPanDragState;
-    const nextX = drag.originalX + event.clientX - drag.startClientX;
-    const nextY = drag.originalY + event.clientY - drag.startClientY;
+    drag.previewX = drag.originalX + event.clientX - drag.startClientX;
+    drag.previewY = drag.originalY + event.clientY - drag.startClientY;
     drag.moved = drag.moved || Math.abs(event.clientX - drag.startClientX) > 3 || Math.abs(event.clientY - drag.startClientY) > 3;
-    const project = selfEmploymentProjectById(drag.projectId);
-    const content = document.querySelector<HTMLElement>(
-      `[data-business-canvas-project-id="${cssEscape(drag.projectId)}"] [data-business-canvas-content]`
-    );
-    if (project && content) {
-      const zoom = project.businessIdeaCanvasMeta.viewport.zoom || 1;
-      content.style.transform = `translate(${nextX}px, ${nextY}px) scale(${zoom})`;
-    }
+    scheduleBusinessIdeaCanvasPanFrame(drag);
     return;
   }
   if (businessIdeaCanvasSelectionDragState && event.pointerId === businessIdeaCanvasSelectionDragState.pointerId) {
@@ -3797,25 +3817,27 @@ function moveBusinessIdeaCanvasPointer(event: PointerEvent): void {
   if (drag.mode === "resize") {
     const nodeId = drag.nodeIds[0];
     const original = drag.originalNodes[nodeId];
-    const element = drag.elements[nodeId];
-    if (!original || !element) return;
+    if (!original) return;
     const size = clampBusinessIdeaCanvasNodeSize(
       snapBusinessIdeaCanvasValue(original.width + deltaX, project.businessIdeaCanvasMeta.grid),
       snapBusinessIdeaCanvasValue(original.height + deltaY, project.businessIdeaCanvasMeta.grid)
     );
-    element.style.width = `${size.width}px`;
-    element.style.height = `${size.height}px`;
+    drag.previewNodes = {
+      [nodeId]: { ...original, width: size.width, height: size.height }
+    };
+    scheduleBusinessIdeaCanvasDragFrame(drag);
     return;
   }
+  const previewNodes: Record<string, { x: number; y: number; width: number; height: number }> = {};
   for (const nodeId of drag.nodeIds) {
     const original = drag.originalNodes[nodeId];
-    const element = drag.elements[nodeId];
-    if (!original || !element) continue;
+    if (!original) continue;
     const x = snapBusinessIdeaCanvasValue(original.x + deltaX, project.businessIdeaCanvasMeta.grid);
     const y = snapBusinessIdeaCanvasValue(original.y + deltaY, project.businessIdeaCanvasMeta.grid);
-    element.style.left = `${x + BUSINESS_IDEA_CANVAS_ORIGIN}px`;
-    element.style.top = `${y + BUSINESS_IDEA_CANVAS_ORIGIN}px`;
+    previewNodes[nodeId] = { ...original, x, y };
   }
+  drag.previewNodes = previewNodes;
+  scheduleBusinessIdeaCanvasDragFrame(drag);
 }
 
 function finishBusinessIdeaCanvasPointer(event: PointerEvent): void {
@@ -3826,23 +3848,21 @@ function finishBusinessIdeaCanvasPointer(event: PointerEvent): void {
   if (businessIdeaCanvasPanDragState && event.pointerId === businessIdeaCanvasPanDragState.pointerId) {
     const drag = businessIdeaCanvasPanDragState;
     businessIdeaCanvasPanDragState = null;
+    if (drag.frameId !== null) window.cancelAnimationFrame(drag.frameId);
     const viewportElement = document.querySelector<HTMLElement>(
       `[data-business-canvas-project-id="${cssEscape(drag.projectId)}"] [data-business-canvas-viewport]`
     );
     viewportElement?.classList.remove("panning");
     viewportElement?.releasePointerCapture?.(event.pointerId);
-    if (!drag.moved) {
-      renderAll();
-      return;
-    }
+    if (!drag.moved) return;
     updateBusinessIdeaCanvasProject(drag.projectId, (project) => ({
       ...project,
       businessIdeaCanvasMeta: {
         ...project.businessIdeaCanvasMeta,
         viewport: {
           ...project.businessIdeaCanvasMeta.viewport,
-          x: Math.round(drag.originalX + event.clientX - drag.startClientX),
-          y: Math.round(drag.originalY + event.clientY - drag.startClientY)
+          x: Math.round(drag.previewX),
+          y: Math.round(drag.previewY)
         }
       }
     }), true);
@@ -3867,6 +3887,7 @@ function finishBusinessIdeaCanvasPointer(event: PointerEvent): void {
   if (!businessIdeaCanvasDragState || event.pointerId !== businessIdeaCanvasDragState.pointerId) return;
   const drag = businessIdeaCanvasDragState;
   const project = selfEmploymentProjectById(drag.projectId);
+  if (drag.frameId !== null) window.cancelAnimationFrame(drag.frameId);
   for (const element of Object.values(drag.elements)) {
     element.classList.remove("dragging");
     element.releasePointerCapture?.(event.pointerId);
@@ -3876,9 +3897,6 @@ function finishBusinessIdeaCanvasPointer(event: PointerEvent): void {
     renderAll();
     return;
   }
-  const zoom = project.businessIdeaCanvasMeta.viewport.zoom || 1;
-  const deltaX = (event.clientX - drag.startClientX) / zoom;
-  const deltaY = (event.clientY - drag.startClientY) / zoom;
   const draggedIds = new Set(drag.nodeIds);
   updateBusinessIdeaCanvasProject(drag.projectId, (item) => ({
     ...item,
@@ -3886,20 +3904,8 @@ function finishBusinessIdeaCanvasPointer(event: PointerEvent): void {
       ...item.businessIdeaCanvas,
       nodes: item.businessIdeaCanvas.nodes.map((node) => {
         if (!draggedIds.has(node.id)) return node;
-        const original = drag.originalNodes[node.id];
-        if (!original) return node;
-        if (drag.mode === "resize") {
-          const size = clampBusinessIdeaCanvasNodeSize(
-            snapBusinessIdeaCanvasValue(original.width + deltaX, item.businessIdeaCanvasMeta.grid),
-            snapBusinessIdeaCanvasValue(original.height + deltaY, item.businessIdeaCanvasMeta.grid)
-          );
-          return { ...node, width: size.width, height: size.height };
-        }
-        return {
-          ...node,
-          x: snapBusinessIdeaCanvasValue(original.x + deltaX, item.businessIdeaCanvasMeta.grid),
-          y: snapBusinessIdeaCanvasValue(original.y + deltaY, item.businessIdeaCanvasMeta.grid)
-        };
+        const preview = drag.previewNodes[node.id];
+        return preview ? { ...node, ...preview } : node;
       })
     }
   }), true);
@@ -4253,7 +4259,7 @@ function saveBusinessIdeaCanvasPaletteColor(): void {
     ...project,
     businessIdeaCanvasMeta: {
       ...project.businessIdeaCanvasMeta,
-      palette: [...project.businessIdeaCanvasMeta.palette, { id: createId(), name, color }]
+      palette: businessIdeaCanvasPaletteWithCustomColor(project.businessIdeaCanvasMeta.palette, { id: createId(), name, color })
     }
   }), true);
   businessIdeaCanvasPaletteEditor = null;
@@ -4322,6 +4328,183 @@ function updateBusinessIdeaCanvasProject(
   renderAfterUpdate = false
 ): void {
   updateSelfEmploymentProject(projectId, updater, renderAfterUpdate);
+}
+
+function cancelBusinessIdeaCanvasWheelZoom(): void {
+  if (!businessIdeaCanvasWheelZoomState) return;
+  if (businessIdeaCanvasWheelZoomState.frameId !== null) window.cancelAnimationFrame(businessIdeaCanvasWheelZoomState.frameId);
+  if (businessIdeaCanvasWheelZoomState.commitTimerId !== null) window.clearTimeout(businessIdeaCanvasWheelZoomState.commitTimerId);
+  businessIdeaCanvasWheelZoomState = null;
+}
+
+function scheduleBusinessIdeaCanvasWheelZoom(projectId: string, viewport: BusinessIdeaCanvasViewport): void {
+  if (businessIdeaCanvasWheelZoomState && businessIdeaCanvasWheelZoomState.projectId !== projectId) {
+    if (businessIdeaCanvasWheelZoomState.frameId !== null) window.cancelAnimationFrame(businessIdeaCanvasWheelZoomState.frameId);
+    if (businessIdeaCanvasWheelZoomState.commitTimerId !== null) window.clearTimeout(businessIdeaCanvasWheelZoomState.commitTimerId);
+    businessIdeaCanvasWheelZoomState = null;
+  }
+  if (!businessIdeaCanvasWheelZoomState) {
+    businessIdeaCanvasWheelZoomState = { projectId, viewport, frameId: null, commitTimerId: null };
+  }
+  businessIdeaCanvasWheelZoomState.viewport = viewport;
+  if (businessIdeaCanvasWheelZoomState.frameId === null) {
+    businessIdeaCanvasWheelZoomState.frameId = window.requestAnimationFrame(() => {
+      const zoomState = businessIdeaCanvasWheelZoomState;
+      if (!zoomState || zoomState.projectId !== projectId) return;
+      zoomState.frameId = null;
+      applyBusinessIdeaCanvasViewportTransform(projectId, zoomState.viewport);
+    });
+  }
+  if (businessIdeaCanvasWheelZoomState.commitTimerId !== null) {
+    window.clearTimeout(businessIdeaCanvasWheelZoomState.commitTimerId);
+  }
+  businessIdeaCanvasWheelZoomState.commitTimerId = window.setTimeout(() => commitBusinessIdeaCanvasWheelZoom(projectId), 140);
+}
+
+function commitBusinessIdeaCanvasWheelZoom(projectId: string): void {
+  const zoomState = businessIdeaCanvasWheelZoomState;
+  if (!zoomState || zoomState.projectId !== projectId) return;
+  if (zoomState.frameId !== null) window.cancelAnimationFrame(zoomState.frameId);
+  if (zoomState.commitTimerId !== null) window.clearTimeout(zoomState.commitTimerId);
+  const viewport = zoomState.viewport;
+  businessIdeaCanvasWheelZoomState = null;
+  updateBusinessIdeaCanvasProject(projectId, (project) => ({
+    ...project,
+    businessIdeaCanvasMeta: {
+      ...project.businessIdeaCanvasMeta,
+      viewport
+    }
+  }), true);
+}
+
+function scheduleBusinessIdeaCanvasPanFrame(drag: NonNullable<BusinessIdeaCanvasPanDragState>): void {
+  if (drag.frameId !== null) return;
+  drag.frameId = window.requestAnimationFrame(() => {
+    const activeDrag = businessIdeaCanvasPanDragState;
+    if (!activeDrag || activeDrag.projectId !== drag.projectId || activeDrag.pointerId !== drag.pointerId) return;
+    activeDrag.frameId = null;
+    const project = selfEmploymentProjectById(activeDrag.projectId);
+    if (!project) return;
+    applyBusinessIdeaCanvasViewportTransform(activeDrag.projectId, {
+      ...project.businessIdeaCanvasMeta.viewport,
+      x: Math.round(activeDrag.previewX),
+      y: Math.round(activeDrag.previewY)
+    });
+  });
+}
+
+function scheduleBusinessIdeaCanvasDragFrame(drag: NonNullable<BusinessIdeaCanvasDragState>): void {
+  if (drag.frameId !== null) return;
+  drag.frameId = window.requestAnimationFrame(() => {
+    const activeDrag = businessIdeaCanvasDragState;
+    if (!activeDrag || activeDrag.projectId !== drag.projectId || activeDrag.pointerId !== drag.pointerId) return;
+    activeDrag.frameId = null;
+    const project = selfEmploymentProjectById(activeDrag.projectId);
+    if (!project) return;
+    applyBusinessIdeaCanvasDragPreview(project, activeDrag);
+  });
+}
+
+function applyBusinessIdeaCanvasViewportTransform(projectId: string, viewport: BusinessIdeaCanvasViewport): void {
+  const content = document.querySelector<HTMLElement>(
+    `[data-business-canvas-project-id="${cssEscape(projectId)}"] [data-business-canvas-content]`
+  );
+  if (!content) return;
+  content.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`;
+}
+
+function applyBusinessIdeaCanvasDragPreview(
+  project: SelfEmploymentProject,
+  drag: NonNullable<BusinessIdeaCanvasDragState>
+): void {
+  for (const [nodeId, preview] of Object.entries(drag.previewNodes)) {
+    const element = drag.elements[nodeId];
+    if (!element) continue;
+    element.style.left = `${preview.x + BUSINESS_IDEA_CANVAS_ORIGIN}px`;
+    element.style.top = `${preview.y + BUSINESS_IDEA_CANVAS_ORIGIN}px`;
+    element.style.width = `${preview.width}px`;
+    element.style.height = `${preview.height}px`;
+  }
+  updateBusinessIdeaCanvasLiveEdges(project, drag.previewNodes);
+}
+
+function updateBusinessIdeaCanvasLiveEdges(
+  project: SelfEmploymentProject,
+  previewNodes: Record<string, { x: number; y: number; width: number; height: number }>
+): void {
+  const previewIds = new Set(Object.keys(previewNodes));
+  const nodesById = new Map(project.businessIdeaCanvas.nodes.map((node) => [node.id, node]));
+  for (const edge of project.businessIdeaCanvas.edges) {
+    if (!previewIds.has(edge.fromNode) && !previewIds.has(edge.toNode)) continue;
+    const fromBase = nodesById.get(edge.fromNode);
+    const toBase = nodesById.get(edge.toNode);
+    if (!fromBase || !toBase) continue;
+    const fromNode = { ...fromBase, ...(previewNodes[fromBase.id] ?? {}) } as JsonCanvasNode;
+    const toNode = { ...toBase, ...(previewNodes[toBase.id] ?? {}) } as JsonCanvasNode;
+    const geometry = businessIdeaCanvasLiveEdgeGeometry(edge, fromNode, toNode);
+    const edgeGroup = document.querySelector<SVGGElement>(
+      `[data-business-canvas-project-id="${cssEscape(project.id)}"] [data-business-canvas-edge-id="${cssEscape(edge.id)}"]`
+    );
+    const hit = edgeGroup?.querySelector<SVGPathElement>(".business-canvas-edge-hit");
+    const line = edgeGroup?.querySelector<SVGPathElement>(".business-canvas-edge-line");
+    const label = edgeGroup?.querySelector<SVGTextElement>(".business-canvas-edge-label");
+    const branch = edgeGroup?.querySelector<SVGCircleElement>(".business-canvas-edge-branch");
+    hit?.setAttribute("d", geometry.path);
+    line?.setAttribute("d", geometry.path);
+    label?.setAttribute("x", String(geometry.mid.x));
+    label?.setAttribute("y", String(geometry.mid.y - 8));
+    branch?.setAttribute("cx", String(geometry.mid.x));
+    branch?.setAttribute("cy", String(geometry.mid.y));
+    if (branch) {
+      branch.dataset.businessCanvasBranchX = String(geometry.mid.x - BUSINESS_IDEA_CANVAS_ORIGIN);
+      branch.dataset.businessCanvasBranchY = String(geometry.mid.y - BUSINESS_IDEA_CANVAS_ORIGIN);
+    }
+  }
+}
+
+function businessIdeaCanvasLiveEdgeGeometry(
+  edge: JsonCanvasEdge,
+  fromNode: JsonCanvasNode,
+  toNode: JsonCanvasNode
+): { path: string; mid: { x: number; y: number } } {
+  const fromSide = edge.fromSide ?? "right";
+  const toSide = edge.toSide ?? "left";
+  const from = businessIdeaCanvasSvgPoint(canvasAnchorPoint(fromNode, fromSide));
+  const to = businessIdeaCanvasSvgPoint(canvasAnchorPoint(toNode, toSide));
+  return {
+    path: businessIdeaCanvasLiveEdgePath(from, to, fromSide, toSide),
+    mid: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
+  };
+}
+
+function businessIdeaCanvasSvgPoint(point: { x: number; y: number }): { x: number; y: number } {
+  return {
+    x: point.x + BUSINESS_IDEA_CANVAS_ORIGIN,
+    y: point.y + BUSINESS_IDEA_CANVAS_ORIGIN
+  };
+}
+
+function businessIdeaCanvasLiveEdgePath(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  fromSide: JsonCanvasSide,
+  toSide: JsonCanvasSide
+): string {
+  const distance = Math.max(80, Math.min(220, Math.abs(to.x - from.x) * 0.45 + Math.abs(to.y - from.y) * 0.25));
+  const fromControl = businessIdeaCanvasLiveControlPoint(from, fromSide, distance);
+  const toControl = businessIdeaCanvasLiveControlPoint(to, toSide, distance);
+  return `M ${from.x} ${from.y} C ${fromControl.x} ${fromControl.y}, ${toControl.x} ${toControl.y}, ${to.x} ${to.y}`;
+}
+
+function businessIdeaCanvasLiveControlPoint(
+  point: { x: number; y: number },
+  side: JsonCanvasSide,
+  distance: number
+): { x: number; y: number } {
+  if (side === "top") return { x: point.x, y: point.y - distance };
+  if (side === "right") return { x: point.x + distance, y: point.y };
+  if (side === "bottom") return { x: point.x, y: point.y + distance };
+  return { x: point.x - distance, y: point.y };
 }
 
 function businessIdeaCanvasPointFromEvent(event: PointerEvent | MouseEvent, project: SelfEmploymentProject): { x: number; y: number } {

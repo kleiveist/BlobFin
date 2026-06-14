@@ -28,8 +28,10 @@ export const BUSINESS_IDEA_CANVAS_DEFAULT_VIEWPORT: BusinessIdeaCanvasViewport =
 
 const DEFAULT_LABELS: BusinessIdeaCanvasLabel[] = [
   { id: "idea", name: "Idee", color: "1" },
+  { id: "knowledge", name: "Wissen", color: "3" },
   { id: "implementation", name: "Umsetzung", color: "2" },
-  { id: "knowledge", name: "Wissen", color: "3" }
+  { id: "start", name: "Start", color: "4" },
+  { id: "active", name: "Aktiv", color: "5" }
 ];
 
 const DEFAULT_PALETTE: BusinessIdeaCanvasPaletteColor[] = [
@@ -41,13 +43,12 @@ const DEFAULT_PALETTE: BusinessIdeaCanvasPaletteColor[] = [
   { id: "palette-6", name: "Violett", color: "6" }
 ];
 
-const DEFAULT_PHASES: BusinessIdeaCanvasPhase[] = [
-  { id: "phase-1", name: "Ideen sammeln", order: 1, startDate: null },
-  { id: "phase-2", name: "Wissen pruefen", order: 2, startDate: null },
-  { id: "phase-3", name: "Umsetzung planen", order: 3, startDate: null },
-  { id: "phase-4", name: "Start vorbereiten", order: 4, startDate: null },
-  { id: "phase-5", name: "Aktiv testen", order: 5, startDate: null }
-];
+const DEFAULT_PHASES: BusinessIdeaCanvasPhase[] = Array.from({ length: MAX_PHASES }, (_, index) => ({
+  id: `phase-${index + 1}`,
+  name: `Phase ${index + 1}`,
+  order: index + 1,
+  startDate: null
+}));
 
 const SHAPES: BusinessIdeaCanvasShape[] = ["rounded-rectangle", "rectangle", "ellipse", "diamond"];
 const SIDES: JsonCanvasSide[] = ["top", "right", "bottom", "left"];
@@ -86,7 +87,15 @@ export interface BusinessIdeaCanvasGanttRow {
   phaseId: string;
   phaseName: string;
   count: number;
+  ratio: number;
+  phaseColor: string;
   segments: BusinessIdeaCanvasGanttSegment[];
+}
+
+export interface BusinessIdeaCanvasPaletteRows {
+  standard: BusinessIdeaCanvasPaletteColor[];
+  custom: BusinessIdeaCanvasPaletteColor[];
+  visibleCustom: BusinessIdeaCanvasPaletteColor[];
 }
 
 interface LegacyBusinessIdeaFields {
@@ -291,7 +300,8 @@ export function businessIdeaCanvasGanttRows(
 ): BusinessIdeaCanvasGanttRow[] {
   const labelsById = new Map(meta.labels.map((label) => [label.id, label]));
   const phases = [...meta.phases].sort((a, b) => a.order - b.order).slice(0, MAX_PHASES);
-  return phases.map((phase) => {
+  const totalCards = businessIdeaCanvasCardNodes(canvas).length;
+  return phases.map((phase, index) => {
     const counts = new Map<string, number>();
     let total = 0;
     for (const node of canvas.nodes) {
@@ -308,15 +318,46 @@ export function businessIdeaCanvasGanttRows(
         labelName: label.name,
         color: label.color,
         count,
-        ratio: total > 0 ? count / total : 0
+        ratio: totalCards > 0 ? count / totalCards : 0
       };
     });
-    return { phaseId: phase.id, phaseName: phase.name, count: total, segments };
+    return {
+      phaseId: phase.id,
+      phaseName: phase.name,
+      count: total,
+      ratio: totalCards > 0 ? total / totalCards : 0,
+      phaseColor: businessIdeaCanvasPhaseColor(index),
+      segments
+    };
   });
 }
 
 export function businessIdeaCanvasCardNodes(canvas: BusinessIdeaCanvas): JsonCanvasNode[] {
   return canvas.nodes.filter((node) => node.type !== "group");
+}
+
+export function businessIdeaCanvasPaletteRows(palette: BusinessIdeaCanvasPaletteColor[]): BusinessIdeaCanvasPaletteRows {
+  const normalized = normalizePalette(palette, DEFAULT_PALETTE);
+  const standardIds = new Set(DEFAULT_PALETTE.map((color) => color.id));
+  const standard = DEFAULT_PALETTE.map((color) => ({ ...color }));
+  const custom = normalized.filter((color) => !standardIds.has(color.id)).map((color) => ({ ...color }));
+  return {
+    standard,
+    custom,
+    visibleCustom: custom.slice(0, standard.length)
+  };
+}
+
+export function businessIdeaCanvasPaletteWithCustomColor(
+  palette: BusinessIdeaCanvasPaletteColor[],
+  color: BusinessIdeaCanvasPaletteColor
+): BusinessIdeaCanvasPaletteColor[] {
+  const rows = businessIdeaCanvasPaletteRows(palette);
+  return [
+    ...rows.standard.map((item) => ({ ...item })),
+    { ...color },
+    ...rows.custom.map((item) => ({ ...item }))
+  ];
 }
 
 export function businessIdeaCanvasBoundsForNodes(
@@ -532,7 +573,15 @@ function normalizeLabels(value: unknown, fallback: BusinessIdeaCanvasLabel[]): B
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0)
     : [];
-  return labels.length ? labels : fallback.map((label) => ({ ...label }));
+  const source = labels.length ? labels : fallback;
+  const byId = new Map(source.map((label) => [label.id, label]));
+  const defaultIds = new Set(DEFAULT_LABELS.map((label) => label.id));
+  const canonical = DEFAULT_LABELS.map((label) => ({
+    ...label,
+    color: byId.get(label.id)?.color ?? label.color
+  }));
+  const custom = source.filter((label) => !defaultIds.has(label.id)).map((label) => ({ ...label }));
+  return [...canonical, ...custom];
 }
 
 function normalizePhases(value: unknown, fallback: BusinessIdeaCanvasPhase[]): BusinessIdeaCanvasPhase[] {
@@ -548,7 +597,12 @@ function normalizePhases(value: unknown, fallback: BusinessIdeaCanvasPhase[]): B
         .filter((item) => item.id.length > 0 && item.name.length > 0)
         .slice(0, MAX_PHASES)
     : [];
-  return phases.length ? phases : fallback.map((phase) => ({ ...phase }));
+  const source = phases.length ? phases : fallback;
+  const byId = new Map(source.map((phase) => [phase.id, phase]));
+  return DEFAULT_PHASES.map((phase) => ({
+    ...phase,
+    startDate: byId.get(phase.id)?.startDate ?? phase.startDate
+  }));
 }
 
 function normalizeNodeMeta(
@@ -582,7 +636,10 @@ function normalizePalette(value: unknown, fallback: BusinessIdeaCanvasPaletteCol
           return true;
         })
     : [];
-  return (palette.length ? palette : fallback).map((color) => ({ ...color }));
+  const source = palette.length ? palette : fallback;
+  const standardIds = new Set(DEFAULT_PALETTE.map((color) => color.id));
+  const custom = source.filter((color) => !standardIds.has(color.id));
+  return [...DEFAULT_PALETTE, ...custom].map((color) => ({ ...color }));
 }
 
 function normalizeGroupMeta(
@@ -680,6 +737,10 @@ function finiteNumber(value: unknown, fallback: number): number {
 
 function distanceSquared(a: BusinessIdeaCanvasPoint, b: BusinessIdeaCanvasPoint): number {
   return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+}
+
+function businessIdeaCanvasPhaseColor(index: number): string {
+  return ["#6366f1", "#0891b2", "#f97316", "#16a34a", "#ef4444", "#7c3aed"][index % 6] ?? "#6366f1";
 }
 
 function normalizeRect(rect: BusinessIdeaCanvasRect): BusinessIdeaCanvasRect {

@@ -140,8 +140,9 @@ describe("storage", () => {
     );
     expect(state.selfEmployment.projects[0].businessIdeaCanvas.nodes.length).toBeGreaterThan(0);
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.phases.map((phase) => phase.name)).toContain(
-      "Ideen sammeln"
+      "Phase 1"
     );
+    expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.phases).toHaveLength(10);
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.palette.length).toBeGreaterThan(0);
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.groupMeta).toEqual({});
     expect(state.selfEmployment.selectedProjectId).toBe(state.selfEmployment.projects[0].id);

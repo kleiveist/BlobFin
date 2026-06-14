@@ -8,12 +8,15 @@ import {
   businessIdeaCanvasDirectionFromEdge,
   businessIdeaCanvasGanttRows,
   businessIdeaCanvasNodeText,
+  businessIdeaCanvasPaletteRows,
   canvasAnchorPoint
 } from "../domain/businessIdeaCanvas";
 import { escapeHtml, intNumber } from "../lib/format";
 import type {
   BusinessIdeaCanvasEdgeDirection,
   BusinessIdeaCanvasMeta,
+  BusinessIdeaCanvasPaletteColor,
+  BusinessIdeaCanvasShape,
   JsonCanvasEdge,
   JsonCanvasNode,
   JsonCanvasSide,
@@ -72,6 +75,13 @@ export interface BusinessIdeaCanvasRenderState {
   clipboardAvailable: boolean;
 }
 
+const BUSINESS_CANVAS_SHAPE_OPTIONS: Array<{ id: BusinessIdeaCanvasShape; icon: string; label: string }> = [
+  { id: "rectangle", icon: "▢", label: "Rechteck" },
+  { id: "rounded-rectangle", icon: "▣", label: "Abgerundet" },
+  { id: "ellipse", icon: "⬭", label: "Ellipse" },
+  { id: "diamond", icon: "◆", label: "Raute" }
+];
+
 export function renderBusinessIdeaCanvasEditor(
   project: SelfEmploymentProject,
   renderState: BusinessIdeaCanvasRenderState
@@ -129,18 +139,18 @@ function renderBusinessIdeaCanvasTopToolbar(project: SelfEmploymentProject, rend
         <button class="button mini secondary" type="button" data-action="business-canvas-reset-view">Reset</button>
       </div>
       <div class="business-canvas-topbar-group">
-        <label class="business-canvas-compact-field">
+        <div class="business-canvas-compact-field">
           <span>Label</span>
-          <select data-business-canvas-meta-field="activeLabelId">
-            ${meta.labels.map((label) => option(label.id, label.name, meta.activeLabelId)).join("")}
-          </select>
-        </label>
-        <label class="business-canvas-compact-field">
+          <div class="business-canvas-chip-group business-canvas-label-chip-group" role="group" aria-label="Aktives Label">
+            ${renderLabelButtons(meta.labels, meta.activeLabelId, "meta", "activeLabelId")}
+          </div>
+        </div>
+        <div class="business-canvas-compact-field">
           <span>Phase</span>
-          <select data-business-canvas-meta-field="activePhaseId">
-            ${orderedPhases(meta).map((phase) => option(phase.id, phase.name, meta.activePhaseId)).join("")}
-          </select>
-        </label>
+          <div class="business-canvas-chip-group business-canvas-phase-chip-group" role="group" aria-label="Aktive Phase">
+            ${renderPhaseButtons(orderedPhases(meta), meta.activePhaseId, "meta", "activePhaseId")}
+          </div>
+        </div>
         <label class="business-canvas-toggle">
           <input type="checkbox" data-business-canvas-grid-field="snap" ${meta.grid.snap ? "checked" : ""} />
           <span>Snap</span>
@@ -247,7 +257,9 @@ function renderBusinessIdeaCanvasNode(
           ? `<div class="business-canvas-group-title">${escapeHtml(text)}</div>`
           : `<div class="business-canvas-node-badges">
               <span>${escapeHtml(label?.name ?? "Idee")}</span>
-              <span>${escapeHtml(phase?.name ?? "Phase")}</span>
+              <span class="business-canvas-phase-badge" title="${escapeHtml(phase?.name ?? "Phase 1")}">${escapeHtml(
+                phaseBadgeLabel(phase?.order ?? 1)
+              )}</span>
             </div>
             <div
               class="business-canvas-node-text"
@@ -315,18 +327,15 @@ function renderBusinessIdeaCanvasNodeToolbar(
   return `
     <div class="business-canvas-node-toolbar" style="left:${left}px;top:${top}px;" data-business-canvas-node-toolbar>
       ${renderPaletteButton([selectedNode.id], selectedNode.color)}
-      <select aria-label="Form" data-business-canvas-selected-node-field="shape">
-        ${option("rounded-rectangle", "Abgerundet", nodeMeta?.shape ?? "rounded-rectangle")}
-        ${option("rectangle", "Rechteck", nodeMeta?.shape ?? "rounded-rectangle")}
-        ${option("ellipse", "Ellipse", nodeMeta?.shape ?? "rounded-rectangle")}
-        ${option("diamond", "Raute", nodeMeta?.shape ?? "rounded-rectangle")}
-      </select>
-      <select aria-label="Label" data-business-canvas-selected-node-field="labelId">
-        ${meta.labels.map((label) => option(label.id, label.name, nodeMeta?.labelId ?? meta.activeLabelId)).join("")}
-      </select>
-      <select aria-label="Phase" data-business-canvas-selected-node-field="phaseId">
-        ${orderedPhases(meta).map((phase) => option(phase.id, phase.name, nodeMeta?.phaseId ?? meta.activePhaseId)).join("")}
-      </select>
+      <div class="business-canvas-icon-segment" role="group" aria-label="Form">
+        ${renderShapeButtons(nodeMeta?.shape ?? "rounded-rectangle")}
+      </div>
+      <div class="business-canvas-chip-group business-canvas-label-chip-group" role="group" aria-label="Label">
+        ${renderLabelButtons(meta.labels, nodeMeta?.labelId ?? meta.activeLabelId, "node", "labelId")}
+      </div>
+      <div class="business-canvas-chip-group business-canvas-phase-chip-group" role="group" aria-label="Phase">
+        ${renderPhaseButtons(orderedPhases(meta), nodeMeta?.phaseId ?? meta.activePhaseId, "node", "phaseId")}
+      </div>
       <button class="icon-button" type="button" data-action="business-canvas-start-connect-node" title="Verbindung starten" aria-label="Verbindung starten">+</button>
       <button class="icon-button" type="button" data-action="business-canvas-copy-selection" title="Kopieren" aria-label="Kopieren">C</button>
       <button class="icon-button" type="button" data-action="business-canvas-duplicate-node" title="Duplizieren" aria-label="Duplizieren">::</button>
@@ -357,6 +366,84 @@ function renderBusinessIdeaCanvasMultiToolbar(
       <button class="icon-button danger" type="button" data-action="business-canvas-delete-node" title="Loeschen" aria-label="Loeschen">x</button>
     </div>
   `;
+}
+
+function renderShapeButtons(selectedShape: BusinessIdeaCanvasShape): string {
+  return BUSINESS_CANVAS_SHAPE_OPTIONS.map(
+    (shape) => `
+      <button
+        class="business-canvas-icon-choice${shape.id === selectedShape ? " active" : ""}"
+        type="button"
+        data-action="business-canvas-set-selected-node-field"
+        data-business-canvas-selected-node-field="shape"
+        data-business-canvas-selected-node-value="${escapeHtml(shape.id)}"
+        title="${escapeHtml(shape.label)}"
+        aria-label="${escapeHtml(shape.label)}"
+        aria-pressed="${shape.id === selectedShape}"
+      >${escapeHtml(shape.icon)}</button>
+    `
+  ).join("");
+}
+
+function renderLabelButtons(
+  labels: BusinessIdeaCanvasMeta["labels"],
+  selectedLabelId: string,
+  target: "meta" | "node",
+  field: "activeLabelId" | "labelId"
+): string {
+  return labels
+    .map((label) => {
+      const selected = label.id === selectedLabelId;
+      return `
+        <button
+          class="business-canvas-label-chip ${businessIdeaColorClass(label.color)}${selected ? " active" : ""}"
+          type="button"
+          data-action="${target === "meta" ? "business-canvas-set-meta-field" : "business-canvas-set-selected-node-field"}"
+          ${
+            target === "meta"
+              ? `data-business-canvas-meta-field="${escapeHtml(field)}" data-business-canvas-meta-value="${escapeHtml(label.id)}"`
+              : `data-business-canvas-selected-node-field="${escapeHtml(field)}" data-business-canvas-selected-node-value="${escapeHtml(label.id)}"`
+          }
+          title="${escapeHtml(label.name)}"
+          aria-label="${escapeHtml(label.name)}"
+          aria-pressed="${selected}"
+          style="${businessIdeaColorStyle(label.color)}"
+        >
+          <span class="business-canvas-label-dot" aria-hidden="true"></span>
+          <span>${escapeHtml(label.name)}</span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function renderPhaseButtons(
+  phases: BusinessIdeaCanvasMeta["phases"],
+  selectedPhaseId: string,
+  target: "meta" | "node",
+  field: "activePhaseId" | "phaseId"
+): string {
+  return phases
+    .map((phase) => {
+      const selected = phase.id === selectedPhaseId;
+      const label = phaseBadgeLabel(phase.order);
+      return `
+        <button
+          class="business-canvas-phase-badge-button${selected ? " active" : ""}"
+          type="button"
+          data-action="${target === "meta" ? "business-canvas-set-meta-field" : "business-canvas-set-selected-node-field"}"
+          ${
+            target === "meta"
+              ? `data-business-canvas-meta-field="${escapeHtml(field)}" data-business-canvas-meta-value="${escapeHtml(phase.id)}"`
+              : `data-business-canvas-selected-node-field="${escapeHtml(field)}" data-business-canvas-selected-node-value="${escapeHtml(phase.id)}"`
+          }
+          title="${escapeHtml(phase.name)}"
+          aria-label="${escapeHtml(phase.name)}"
+          aria-pressed="${selected}"
+        >${escapeHtml(label)}</button>
+      `;
+    })
+    .join("");
 }
 
 function renderPaletteButton(nodeIds: string[], color: string | undefined): string {
@@ -427,53 +514,94 @@ function renderBusinessIdeaCanvasContextMenu(project: SelfEmploymentProject, ren
       ${
         isSelection
           ? `
-            <button type="button" data-action="business-canvas-copy-selection">Auswahl kopieren</button>
-            <button type="button" data-action="business-canvas-create-group">Gruppe erstellen</button>
-            <button type="button" data-action="business-canvas-open-palette">Farbe aendern</button>
-            <button type="button" data-action="business-canvas-delete-node">Auswahl loeschen</button>
+            ${renderContextMenuButton("business-canvas-copy-selection", "⧉", "Auswahl kopieren")}
+            ${renderContextMenuButton("business-canvas-create-group", "▦", "Gruppe erstellen")}
+            ${renderContextMenuButton("business-canvas-open-palette", "🎨", "Farbe aendern")}
+            ${renderContextMenuButton("business-canvas-delete-node", "🗑", "Auswahl loeschen", "", true)}
           `
           : isNode
             ? `
-              <button type="button" data-action="business-canvas-edit-node" data-business-canvas-node-id="${escapeHtml(menu.nodeId ?? "")}">Bearbeiten</button>
-              <button type="button" data-action="business-canvas-copy-selection">Kopieren</button>
-              <button type="button" data-action="business-canvas-open-palette">Farbe aendern</button>
-              <button type="button" data-action="business-canvas-delete-node">Loeschen</button>
+              ${renderContextMenuButton(
+                "business-canvas-edit-node",
+                "✎",
+                "Bearbeiten",
+                `data-business-canvas-node-id="${escapeHtml(menu.nodeId ?? "")}"`
+              )}
+              ${renderContextMenuButton("business-canvas-copy-selection", "⧉", "Kopieren")}
+              ${renderContextMenuButton("business-canvas-open-palette", "🎨", "Farbe aendern")}
+              ${renderContextMenuButton("business-canvas-delete-node", "🗑", "Loeschen", "", true)}
             `
             : `
-              <button type="button" data-action="business-canvas-context-add-node" data-business-canvas-x="${menu.canvasX}" data-business-canvas-y="${menu.canvasY}">Neue Karte</button>
-              <button type="button" data-action="business-canvas-context-add-group" data-business-canvas-x="${menu.canvasX}" data-business-canvas-y="${menu.canvasY}">Neue Gruppe</button>
-              <button type="button" data-action="business-canvas-paste-selection" data-business-canvas-x="${menu.canvasX}" data-business-canvas-y="${menu.canvasY}" ${renderState.clipboardAvailable ? "" : "disabled"}>Einfuegen</button>
+              ${renderContextMenuButton(
+                "business-canvas-context-add-node",
+                "＋",
+                "Neue Karte",
+                `data-business-canvas-x="${menu.canvasX}" data-business-canvas-y="${menu.canvasY}"`
+              )}
+              ${renderContextMenuButton(
+                "business-canvas-context-add-group",
+                "▦",
+                "Neue Gruppe",
+                `data-business-canvas-x="${menu.canvasX}" data-business-canvas-y="${menu.canvasY}"`
+              )}
+              ${renderContextMenuButton(
+                "business-canvas-paste-selection",
+                "⧉",
+                "Einfuegen",
+                `data-business-canvas-x="${menu.canvasX}" data-business-canvas-y="${menu.canvasY}" ${renderState.clipboardAvailable ? "" : "disabled"}`
+              )}
             `
       }
     </div>
   `;
 }
 
+function renderContextMenuButton(action: string, icon: string, label: string, attributes = "", danger = false): string {
+  return `
+    <button class="${danger ? "danger" : ""}" type="button" data-action="${escapeHtml(action)}" ${attributes}>
+      <span class="business-canvas-context-menu-icon" aria-hidden="true">${escapeHtml(icon)}</span>
+      <span>${escapeHtml(label)}</span>
+    </button>
+  `;
+}
+
 function renderBusinessIdeaCanvasPalettePopover(project: SelfEmploymentProject, renderState: BusinessIdeaCanvasRenderState): string {
   const popover = renderState.palettePopover;
   if (!popover || popover.projectId !== project.id) return "";
+  const palette = businessIdeaCanvasPaletteRows(project.businessIdeaCanvasMeta.palette);
   return `
     <div class="business-canvas-palette-popover" style="left:${popover.x}px;top:${popover.y}px;" data-business-canvas-palette-popover>
-      <div class="business-canvas-palette-row">
-        ${project.businessIdeaCanvasMeta.palette
-          .map(
-            (item) => `
-              <button
-                class="business-canvas-palette-swatch ${businessIdeaColorClass(item.color)}"
-                type="button"
-                data-action="business-canvas-apply-palette-color"
-                data-business-canvas-color="${escapeHtml(item.color)}"
-                title="${escapeHtml(item.name)}"
-                aria-label="${escapeHtml(item.name)}"
-                style="${businessIdeaColorStyle(item.color)}"
-              ></button>
-            `
-          )
-          .join("")}
+      <div class="business-canvas-palette-row business-canvas-palette-row-standard" data-business-canvas-palette-row="standard">
+        ${renderPaletteSwatches(palette.standard)}
       </div>
+      ${
+        palette.visibleCustom.length
+          ? `<div class="business-canvas-palette-row business-canvas-palette-row-custom" data-business-canvas-palette-row="custom">
+              ${renderPaletteSwatches(palette.visibleCustom)}
+            </div>`
+          : ""
+      }
       <button class="button mini secondary" type="button" data-action="business-canvas-open-palette-editor">Palette bearbeiten</button>
     </div>
   `;
+}
+
+function renderPaletteSwatches(colors: BusinessIdeaCanvasPaletteColor[]): string {
+  return colors
+    .map(
+      (item) => `
+        <button
+          class="business-canvas-palette-swatch ${businessIdeaColorClass(item.color)}"
+          type="button"
+          data-action="business-canvas-apply-palette-color"
+          data-business-canvas-color="${escapeHtml(item.color)}"
+          title="${escapeHtml(item.name)}"
+          aria-label="${escapeHtml(item.name)}"
+          style="${businessIdeaColorStyle(item.color)}"
+        ></button>
+      `
+    )
+    .join("");
 }
 
 function renderBusinessIdeaCanvasPaletteEditor(renderState: BusinessIdeaCanvasRenderState): string {
@@ -515,17 +643,11 @@ function renderBusinessIdeaCanvasGantt(project: SelfEmploymentProject): string {
                 <div class="business-canvas-gantt-bar">
                   ${
                     row.count
-                      ? row.segments
-                          .map(
-                            (segment) => `
-                              <span
-                                class="business-canvas-gantt-segment ${businessIdeaColorClass(segment.color)}"
-                                style="width:${Math.max(6, segment.ratio * 100)}%;${businessIdeaColorStyle(segment.color)}"
-                                title="${escapeHtml(`${segment.labelName}: ${segment.count}`)}"
-                              ></span>
-                            `
-                          )
-                          .join("")
+                      ? `<span
+                          class="business-canvas-gantt-fill"
+                          style="width:${Math.max(0, row.ratio * 100)}%;--business-canvas-gantt-color:${escapeHtml(row.phaseColor)};"
+                          title="${escapeHtml(`${row.phaseName}: ${row.count}`)}"
+                        ></span>`
                       : `<span class="business-canvas-gantt-empty"></span>`
                   }
                 </div>
@@ -545,6 +667,11 @@ function option(value: string, label: string, selectedValue: string): string {
 
 function orderedPhases(meta: BusinessIdeaCanvasMeta): BusinessIdeaCanvasMeta["phases"] {
   return [...meta.phases].sort((a, b) => a.order - b.order);
+}
+
+function phaseBadgeLabel(order: number): string {
+  const normalized = Number.isFinite(order) && order > 0 ? Math.round(order) : 1;
+  return String(normalized);
 }
 
 function toSvgPoint(point: { x: number; y: number }): { x: number; y: number } {

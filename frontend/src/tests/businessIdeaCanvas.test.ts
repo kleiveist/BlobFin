@@ -6,6 +6,8 @@ import {
   businessIdeaCanvasEndsForDirection,
   businessIdeaCanvasGanttRows,
   businessIdeaCanvasNodesInsideRect,
+  businessIdeaCanvasPaletteRows,
+  businessIdeaCanvasPaletteWithCustomColor,
   businessIdeaCanvasViewportForZoomAtPoint,
   createBusinessIdeaCanvasGroupMeta,
   createBusinessIdeaCanvasGroupNode,
@@ -30,7 +32,25 @@ describe("business idea canvas", () => {
     expect(defaults.businessIdeaCanvas.nodes).toHaveLength(4);
     expect(defaults.businessIdeaCanvas.edges).toHaveLength(3);
     expect(defaults.businessIdeaCanvas.nodes[0]).toMatchObject({ type: "text", text: "Beratung" });
-    expect(defaults.businessIdeaCanvasMeta.labels.map((label) => label.name)).toEqual(["Idee", "Umsetzung", "Wissen"]);
+    expect(defaults.businessIdeaCanvasMeta.labels.map((label) => label.name)).toEqual([
+      "Idee",
+      "Wissen",
+      "Umsetzung",
+      "Start",
+      "Aktiv"
+    ]);
+    expect(defaults.businessIdeaCanvasMeta.phases.map((phase) => phase.name)).toEqual([
+      "Phase 1",
+      "Phase 2",
+      "Phase 3",
+      "Phase 4",
+      "Phase 5",
+      "Phase 6",
+      "Phase 7",
+      "Phase 8",
+      "Phase 9",
+      "Phase 10"
+    ]);
     expect(defaults.businessIdeaCanvasMeta.palette.length).toBeGreaterThan(0);
     expect(defaults.businessIdeaCanvasMeta.groupMeta).toEqual({});
   });
@@ -144,8 +164,48 @@ describe("business idea canvas", () => {
     const phaseTwo = rows.find((row) => row.phaseId === "phase-2");
 
     expect(phaseOne?.count).toBe(1);
+    expect(phaseOne?.ratio).toBe(0.25);
     expect(phaseOne?.segments[0]).toMatchObject({ labelId: "idea", count: 1 });
     expect(phaseTwo?.count).toBe(2);
+    expect(phaseTwo?.ratio).toBe(0.5);
+  });
+
+  it("scales gantt bars by cards in phase relative to all cards", () => {
+    const defaults = defaultBusinessIdeaCanvasForProject("project-gantt");
+    const nodes = Array.from({ length: 6 }, (_, index) => ({
+      id: `node-${index + 1}`,
+      type: "text" as const,
+      text: `Node ${index + 1}`,
+      x: index * 20,
+      y: 0,
+      width: 120,
+      height: 80
+    }));
+    const meta = normalizeBusinessIdeaCanvasMeta(
+      {
+        nodeMeta: Object.fromEntries(
+          nodes.map((node, index) => [
+            node.id,
+            {
+              labelId: "idea",
+              phaseId: index < 5 ? "phase-1" : "phase-2",
+              shape: "rounded-rectangle"
+            }
+          ])
+        )
+      },
+      { nodes: [...nodes, { id: "group", type: "group", label: "Gruppe", x: 0, y: 0, width: 300, height: 160 }], edges: [] },
+      defaults.businessIdeaCanvasMeta
+    );
+
+    const rows = businessIdeaCanvasGanttRows(
+      { nodes: [...nodes, { id: "group", type: "group", label: "Gruppe", x: 0, y: 0, width: 300, height: 160 }], edges: [] },
+      meta
+    );
+
+    expect(rows.find((row) => row.phaseId === "phase-1")).toMatchObject({ count: 5, ratio: 5 / 6 });
+    expect(rows.find((row) => row.phaseId === "phase-2")).toMatchObject({ count: 1, ratio: 1 / 6 });
+    expect(rows.find((row) => row.phaseId === "phase-3")).toMatchObject({ count: 0, ratio: 0 });
   });
 
   it("creates group nodes from a selection and keeps membership in sidecar metadata", () => {
@@ -182,6 +242,72 @@ describe("business idea canvas", () => {
     expect(viewport.zoom).toBe(1.5);
     expect((200 - viewport.x) / viewport.zoom).toBe(200);
     expect((120 - viewport.y) / viewport.zoom).toBe(120);
+  });
+
+  it("normalizes legacy labels and phases to compact canonical values", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [{ id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }],
+      edges: []
+    });
+    const meta = normalizeBusinessIdeaCanvasMeta(
+      {
+        labels: [
+          { id: "idea", name: "Ideensammlung", color: "1" },
+          { id: "custom", name: "Eigen", color: "#123456" }
+        ],
+        phases: [
+          { id: "phase-1", name: "Ideensammlung", order: 1, startDate: "2026-01-01" },
+          { id: "phase-2", name: "Wissenspruefung", order: 2, startDate: null }
+        ],
+        nodeMeta: {
+          a: { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" }
+        }
+      },
+      canvas
+    );
+
+    expect(meta.labels.map((label) => label.name).slice(0, 5)).toEqual(["Idee", "Wissen", "Umsetzung", "Start", "Aktiv"]);
+    expect(meta.labels.map((label) => label.name)).toContain("Eigen");
+    expect(meta.phases).toHaveLength(10);
+    expect(meta.phases.map((phase) => phase.name)).toEqual([
+      "Phase 1",
+      "Phase 2",
+      "Phase 3",
+      "Phase 4",
+      "Phase 5",
+      "Phase 6",
+      "Phase 7",
+      "Phase 8",
+      "Phase 9",
+      "Phase 10"
+    ]);
+    expect(meta.phases[0].startDate).toBe("2026-01-01");
+  });
+
+  it("keeps standard palette first and shows newest custom colors compactly", () => {
+    const defaults = defaultBusinessIdeaCanvasForProject("project-palette");
+    const customColors = Array.from({ length: 7 }, (_, index) => ({
+      id: `custom-${index + 1}`,
+      name: `Custom ${index + 1}`,
+      color: `#12345${index}`
+    }));
+    const palette = customColors.reduce(
+      (current, color) => businessIdeaCanvasPaletteWithCustomColor(current, color),
+      defaults.businessIdeaCanvasMeta.palette
+    );
+    const rows = businessIdeaCanvasPaletteRows(palette);
+
+    expect(rows.standard).toHaveLength(6);
+    expect(rows.visibleCustom).toHaveLength(6);
+    expect(rows.visibleCustom.map((color) => color.id)).toEqual([
+      "custom-7",
+      "custom-6",
+      "custom-5",
+      "custom-4",
+      "custom-3",
+      "custom-2"
+    ]);
+    expect(rows.custom.map((color) => color.id)).toContain("custom-1");
   });
 
   it("normalizes legacy meta with palette and group metadata defaults", () => {
