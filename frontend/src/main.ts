@@ -29,6 +29,13 @@ import {
   snapBusinessIdeaCanvasValue
 } from "./domain/businessIdeaCanvas";
 import {
+  buildSelfEmploymentProjectGantt,
+  normalizeSelfEmploymentGanttPlan,
+  normalizedGanttLabelId,
+  orderedGanttLabels,
+  type SelfEmploymentGanttSummary
+} from "./domain/selfEmploymentGantt";
+import {
   buildCombinedWealthSeries,
   combinedWealthHorizonYears,
   type CombinedWealthDepotProjection
@@ -238,6 +245,9 @@ import type {
   RealEstatePaymentSourceKind,
   ReservePosition,
   SelfEmploymentFeasibility,
+  SelfEmploymentGanttCardPlan,
+  SelfEmploymentGanttPhase,
+  SelfEmploymentGanttStartMode,
   SelfEmploymentInvoice,
   SelfEmploymentProject,
   SelfEmploymentProjectStatus,
@@ -759,6 +769,10 @@ let businessIdeaCanvasPaletteEditor: BusinessIdeaCanvasPaletteEditorState | null
 let businessIdeaCanvasClipboard: BusinessIdeaCanvasClipboardState = null;
 let businessIdeaCanvasSpacePressed = false;
 let businessIdeaCanvasLastDragEndAt = 0;
+let selfEmploymentGanttEditor:
+  | { projectId: string; type: "phase"; phaseId: string }
+  | { projectId: string; type: "card"; cardId: string }
+  | null = null;
 let incomeStampPlannerDialog: {
   stampId: string | null;
   date: string;
@@ -1241,6 +1255,28 @@ function bindEvents(): void {
       return;
     }
 
+    const ganttInput = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+    if (ganttInput?.dataset.selfEmploymentGanttPhaseField && ganttInput.dataset.selfEmploymentProjectId && ganttInput.dataset.selfEmploymentGanttPhaseId) {
+      updateSelfEmploymentGanttPhaseField(
+        ganttInput.dataset.selfEmploymentProjectId,
+        ganttInput.dataset.selfEmploymentGanttPhaseId,
+        ganttInput.dataset.selfEmploymentGanttPhaseField,
+        selfEmploymentControlValue(ganttInput),
+        false
+      );
+      return;
+    }
+    if (ganttInput?.dataset.selfEmploymentGanttCardField && ganttInput.dataset.selfEmploymentProjectId && ganttInput.dataset.selfEmploymentGanttCardId) {
+      updateSelfEmploymentGanttCardField(
+        ganttInput.dataset.selfEmploymentProjectId,
+        ganttInput.dataset.selfEmploymentGanttCardId,
+        ganttInput.dataset.selfEmploymentGanttCardField,
+        selfEmploymentControlValue(ganttInput),
+        false
+      );
+      return;
+    }
+
     const target = formControl(event.target);
     if (!target) return;
 
@@ -1322,6 +1358,28 @@ function bindEvents(): void {
 
     if (target.dataset.incomeStampPlannerField) {
       updateIncomeStampPlannerDialogDraft(target.dataset.incomeStampPlannerField, target.value);
+      return;
+    }
+
+    if (target.dataset.selfEmploymentGanttPhaseField && target.dataset.selfEmploymentProjectId && target.dataset.selfEmploymentGanttPhaseId) {
+      updateSelfEmploymentGanttPhaseField(
+        target.dataset.selfEmploymentProjectId,
+        target.dataset.selfEmploymentGanttPhaseId,
+        target.dataset.selfEmploymentGanttPhaseField,
+        selfEmploymentControlValue(target),
+        true
+      );
+      return;
+    }
+
+    if (target.dataset.selfEmploymentGanttCardField && target.dataset.selfEmploymentProjectId && target.dataset.selfEmploymentGanttCardId) {
+      updateSelfEmploymentGanttCardField(
+        target.dataset.selfEmploymentProjectId,
+        target.dataset.selfEmploymentGanttCardId,
+        target.dataset.selfEmploymentGanttCardField,
+        selfEmploymentControlValue(target),
+        true
+      );
       return;
     }
 
@@ -1915,6 +1973,29 @@ function bindEvents(): void {
         "tasks",
         button.dataset.selfEmploymentItemId || ""
       );
+      return;
+    }
+    if (action === "self-employment-gantt-open-phase") {
+      selfEmploymentGanttEditor = {
+        projectId: button.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        type: "phase",
+        phaseId: button.dataset.selfEmploymentGanttPhaseId || ""
+      };
+      renderAll();
+      return;
+    }
+    if (action === "self-employment-gantt-open-card") {
+      selfEmploymentGanttEditor = {
+        projectId: button.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        type: "card",
+        cardId: button.dataset.selfEmploymentGanttCardId || ""
+      };
+      renderAll();
+      return;
+    }
+    if (action === "self-employment-gantt-close-editor") {
+      selfEmploymentGanttEditor = null;
+      renderAll();
       return;
     }
     if (action === "business-canvas-set-meta-field") {
@@ -3135,25 +3216,7 @@ function selfEmploymentRoadmapPanel(
     return renderBusinessIdeaCanvasEditor(project, businessIdeaCanvasRenderState(project.id));
   }
   if (areaId === "planning") {
-    return `
-      <div class="self-employment-edit-grid">
-        ${selfEmploymentTextareaField(project, "projectGoal", "Projektziel", project.projectGoal)}
-        ${selfEmploymentTextField(project, "startDate", "Startdatum", project.startDate, "date")}
-        ${selfEmploymentNumberField(project, "plannedDurationWeeks", "Laufzeit in Wochen", project.plannedDurationWeeks, 0, 520, 1)}
-        ${selfEmploymentSelectField(project, "status", "Status", project.status, [
-          ["idea", "Idee"],
-          ["review", "In Pruefung"],
-          ["preparation", "Vorbereitung"],
-          ["active", "Aktiv"],
-          ["paused", "Pausiert"],
-          ["completed", "Abgeschlossen"],
-          ["discarded", "Verworfen"]
-        ])}
-        ${selfEmploymentListTextareaField(project, "milestones", "Meilensteine", project.milestones)}
-        ${selfEmploymentListTextareaField(project, "nextSteps", "Naechste Schritte", project.nextSteps)}
-        ${selfEmploymentTextareaField(project, "dependencies", "Abhaengigkeiten", project.dependencies)}
-      </div>
-    `;
+    return renderSelfEmploymentProjectGantt(project);
   }
   if (areaId === "contacts") return selfEmploymentContactsEditor(project);
   if (areaId === "invoices") return selfEmploymentInvoicesEditor(project);
@@ -3204,6 +3267,377 @@ function selfEmploymentRoadmapPanel(
       ${selfEmploymentReadOnlyField("Bewertung", evaluation.reasons.join(" "))}
     </div>
   `;
+}
+
+function renderSelfEmploymentProjectGantt(project: SelfEmploymentProject): string {
+  const summary = buildSelfEmploymentProjectGantt(project);
+  const cardCount = project.businessIdeaCanvas.nodes.filter((node) => node.type !== "group").length;
+  const activeRows = summary.rows.filter((row) => row.enabled && row.scheduledHours > 0).length;
+  return `
+    <div class="self-employment-project-gantt">
+      <div class="self-employment-project-gantt-summary">
+        <span><b>${escapeHtml(hoursLabel(summary.totalScheduledHours))}</b> geplant</span>
+        <span><b>${escapeHtml(intNumber(cardCount))}</b> Karten</span>
+        <span><b>${escapeHtml(hoursLabel(summary.projectSpanHours))}</b> Projektspanne</span>
+        <span><b>${escapeHtml(intNumber(activeRows))}</b> aktive Phasen</span>
+      </div>
+      <div class="self-employment-project-gantt-head" aria-hidden="true">
+        <span>Phase</span>
+        <span>Stunden</span>
+        <span>Projekt-Gantt</span>
+      </div>
+      <div class="self-employment-project-gantt-rows">
+        ${summary.rows.map((row) => renderSelfEmploymentProjectGanttRow(project, row)).join("")}
+      </div>
+      ${renderSelfEmploymentGanttEditor(project, summary)}
+    </div>
+  `;
+}
+
+function renderSelfEmploymentProjectGanttRow(project: SelfEmploymentProject, row: SelfEmploymentGanttSummary["rows"][number]): string {
+  const phaseNumber = selfEmploymentGanttPhaseNumber(row.phaseId);
+  const labelSegments = row.labels
+    .filter((label) => row.enabled && label.totalHours > 0)
+    .map((label) => renderSelfEmploymentProjectGanttLabel(project, label))
+    .join("");
+  const emptyState = row.enabled ? "Keine Karten in dieser Phase" : "Phase inaktiv";
+  const startLabel = row.startMode === "after_previous_label"
+    ? `ab ${selfEmploymentGanttLabelName(project, row.triggerLabelId)}`
+    : (row.startDate ? `Start ${row.startDate}` : "manueller Start");
+  return `
+    <section class="self-employment-project-gantt-row${row.enabled ? "" : " disabled"}">
+      <button
+        class="self-employment-project-gantt-phase"
+        type="button"
+        data-action="self-employment-gantt-open-phase"
+        data-self-employment-project-id="${escapeHtml(project.id)}"
+        data-self-employment-gantt-phase-id="${escapeHtml(row.phaseId)}"
+      >
+        <span class="self-employment-project-gantt-phase-badge">${escapeHtml(phaseNumber)}</span>
+        <span>
+          <strong>${escapeHtml(row.phaseName)}</strong>
+          <small>${escapeHtml(startLabel)}</small>
+        </span>
+      </button>
+      <span class="self-employment-project-gantt-hours">
+        <strong>${escapeHtml(hoursLabel(row.cardHours))}</strong>
+        <small>${row.enabled ? "aktiv" : "inaktiv"}</small>
+      </span>
+      <div class="self-employment-project-gantt-track" aria-label="${escapeHtml(`${row.phaseName}: ${hoursLabel(row.cardHours)}`)}">
+        ${labelSegments || `<span class="self-employment-project-gantt-empty">${escapeHtml(emptyState)}</span>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderSelfEmploymentProjectGanttLabel(
+  project: SelfEmploymentProject,
+  label: SelfEmploymentGanttSummary["rows"][number]["labels"][number]
+): string {
+  const left = selfEmploymentGanttPercent(label.startPercent);
+  const width = selfEmploymentGanttPercent(label.widthPercent);
+  const cards = label.cards
+    .map((card) => {
+      const cardWidth = selfEmploymentGanttPercent(card.widthPercent);
+      return `
+        <button
+          class="self-employment-project-gantt-card"
+          type="button"
+          style="flex-basis: ${cardWidth}%;"
+          data-action="self-employment-gantt-open-card"
+          data-self-employment-project-id="${escapeHtml(project.id)}"
+          data-self-employment-gantt-card-id="${escapeHtml(card.cardId)}"
+          title="${escapeHtml(`${card.title} · ${hoursLabel(card.timeBudgetHours)}`)}"
+        >
+          <span>${escapeHtml(card.title)}</span>
+          <small>${escapeHtml(hoursLabel(card.timeBudgetHours))}</small>
+        </button>
+      `;
+    })
+    .join("");
+  return `
+    <div
+      class="self-employment-project-gantt-label"
+      style="left: ${left}%; width: ${width}%; --self-employment-gantt-color: ${escapeHtml(selfEmploymentGanttColor(label.color))};"
+      title="${escapeHtml(`${label.labelName}: ${hoursLabel(label.totalHours)}`)}"
+    >
+      <div class="self-employment-project-gantt-label-head">
+        <span>${escapeHtml(label.labelName)}</span>
+        <strong>${escapeHtml(hoursLabel(label.totalHours))}</strong>
+      </div>
+      <div class="self-employment-project-gantt-cards">
+        ${cards}
+      </div>
+    </div>
+  `;
+}
+
+function renderSelfEmploymentGanttEditor(project: SelfEmploymentProject, summary: SelfEmploymentGanttSummary): string {
+  if (selfEmploymentGanttEditor?.projectId !== project.id) return "";
+  if (selfEmploymentGanttEditor.type === "phase") {
+    return renderSelfEmploymentGanttPhasePopover(project, summary, selfEmploymentGanttEditor.phaseId);
+  }
+  return renderSelfEmploymentGanttCardPopover(project, selfEmploymentGanttEditor.cardId);
+}
+
+function renderSelfEmploymentGanttPhasePopover(
+  project: SelfEmploymentProject,
+  summary: SelfEmploymentGanttSummary,
+  phaseId: string
+): string {
+  const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+  const phase = gantt.phases.find((item) => item.phaseId === phaseId);
+  const row = summary.rows.find((item) => item.phaseId === phaseId);
+  if (!phase || !row) return "";
+  const phaseOptions: Array<[string, string]> = [["", "Keine"], ...selfEmploymentGanttPhaseOptions(project, phase.phaseId)];
+  const labelOptions = orderedGanttLabels(project.businessIdeaCanvasMeta).map((label) => [label.id, label.name] as [string, string]);
+  return `
+    <div class="self-employment-gantt-popover self-employment-gantt-phase-popover" role="dialog" aria-label="${escapeHtml(`${row.phaseName} planen`)}">
+      <header>
+        <strong>${escapeHtml(row.phaseName)}</strong>
+        <button class="icon-button" type="button" data-action="self-employment-gantt-close-editor" aria-label="Gantt-Editor schliessen">x</button>
+      </header>
+      <div class="self-employment-gantt-popover-summary">
+        <span>${escapeHtml(hoursLabel(row.cardHours))} Kartenzeit</span>
+        <span>${escapeHtml(hoursLabel(row.scheduledHours))} geplant</span>
+      </div>
+      <label class="field self-employment-gantt-check">
+        <span>Aktiv</span>
+        <input
+          type="checkbox"
+          ${phase.enabled ? "checked" : ""}
+          data-self-employment-project-id="${escapeHtml(project.id)}"
+          data-self-employment-gantt-phase-id="${escapeHtml(phase.phaseId)}"
+          data-self-employment-gantt-phase-field="enabled"
+        />
+      </label>
+      ${selfEmploymentGanttPhaseTextField(project.id, phase, "startDate", "Startdatum", phase.startDate ?? "", "date")}
+      ${selfEmploymentGanttPhaseSelectField(project.id, phase, "startMode", "Startmodus", phase.startMode, [
+        ["manual", "Manuell"],
+        ["after_previous_label", "Nach Label der Vorphase"]
+      ])}
+      ${selfEmploymentGanttPhaseSelectField(
+        project.id,
+        phase,
+        "triggerPreviousPhaseId",
+        "Vorgaengerphase",
+        phase.triggerPreviousPhaseId ?? "",
+        phaseOptions
+      )}
+      ${selfEmploymentGanttPhaseSelectField(project.id, phase, "triggerLabelId", "Start ab Label", phase.triggerLabelId ?? "goal", labelOptions)}
+      ${selfEmploymentGanttPhaseNumberField(project.id, phase, "defaultTimeBudgetHours", "Default-Stunden je Karte", phase.defaultTimeBudgetHours)}
+    </div>
+  `;
+}
+
+function renderSelfEmploymentGanttCardPopover(project: SelfEmploymentProject, cardId: string): string {
+  const node = project.businessIdeaCanvas.nodes.find((item) => item.id === cardId && item.type !== "group");
+  if (!node) return "";
+  const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+  const plan = gantt.cardPlans.find((item) => item.cardId === cardId);
+  if (!plan) return "";
+  const nodeMeta = project.businessIdeaCanvasMeta.nodeMeta[cardId] ?? {
+    labelId: project.businessIdeaCanvasMeta.activeLabelId,
+    phaseId: project.businessIdeaCanvasMeta.activePhaseId,
+    shape: "rounded-rectangle" as BusinessIdeaCanvasShape
+  };
+  const labelOptions = orderedGanttLabels(project.businessIdeaCanvasMeta).map((label) => [label.id, label.name] as [string, string]);
+  const phaseOptions = selfEmploymentGanttPhaseOptions(project);
+  return `
+    <div class="self-employment-gantt-popover self-employment-gantt-card-popover" role="dialog" aria-label="${escapeHtml(`${selfEmploymentGanttNodeTitle(node)} planen`)}">
+      <header>
+        <strong>${escapeHtml(selfEmploymentGanttNodeTitle(node))}</strong>
+        <button class="icon-button" type="button" data-action="self-employment-gantt-close-editor" aria-label="Gantt-Editor schliessen">x</button>
+      </header>
+      ${selfEmploymentGanttCardNumberField(project.id, plan, "timeBudgetHours", "Stundenbudget", plan.timeBudgetHours)}
+      ${selfEmploymentGanttCardTextField(project.id, plan, "startDate", "Startdatum", plan.startDate ?? "", "date")}
+      ${selfEmploymentGanttCardSelectField(project.id, plan.cardId, "labelId", "Label", normalizedGanttLabelId(nodeMeta.labelId), labelOptions)}
+      ${selfEmploymentGanttCardSelectField(project.id, plan.cardId, "phaseId", "Phase", nodeMeta.phaseId, phaseOptions)}
+      <label class="field self-employment-edit-field wide">
+        <span>Notiz</span>
+        <textarea
+          rows="3"
+          data-self-employment-project-id="${escapeHtml(project.id)}"
+          data-self-employment-gantt-card-id="${escapeHtml(plan.cardId)}"
+          data-self-employment-gantt-card-field="note"
+        >${escapeHtml(plan.note)}</textarea>
+      </label>
+    </div>
+  `;
+}
+
+function selfEmploymentGanttPhaseTextField(
+  projectId: string,
+  phase: SelfEmploymentGanttPhase,
+  field: keyof SelfEmploymentGanttPhase,
+  label: string,
+  value: string,
+  type = "text"
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <input
+        type="${escapeHtml(type)}"
+        value="${escapeHtml(value)}"
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-phase-id="${escapeHtml(phase.phaseId)}"
+        data-self-employment-gantt-phase-field="${escapeHtml(field)}"
+      />
+    </label>
+  `;
+}
+
+function selfEmploymentGanttPhaseNumberField(
+  projectId: string,
+  phase: SelfEmploymentGanttPhase,
+  field: keyof SelfEmploymentGanttPhase,
+  label: string,
+  value: number
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <input
+        type="number"
+        min="0"
+        max="100000"
+        step="0.25"
+        value="${escapeHtml(value)}"
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-phase-id="${escapeHtml(phase.phaseId)}"
+        data-self-employment-gantt-phase-field="${escapeHtml(field)}"
+      />
+    </label>
+  `;
+}
+
+function selfEmploymentGanttPhaseSelectField(
+  projectId: string,
+  phase: SelfEmploymentGanttPhase,
+  field: keyof SelfEmploymentGanttPhase,
+  label: string,
+  value: string,
+  options: Array<[string, string]>
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <select
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-phase-id="${escapeHtml(phase.phaseId)}"
+        data-self-employment-gantt-phase-field="${escapeHtml(field)}"
+      >
+        ${options.map(([optionValue, optionLabel]) => selfEmploymentOption(optionValue, optionLabel, value)).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function selfEmploymentGanttCardTextField(
+  projectId: string,
+  plan: SelfEmploymentGanttCardPlan,
+  field: keyof SelfEmploymentGanttCardPlan,
+  label: string,
+  value: string,
+  type = "text"
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <input
+        type="${escapeHtml(type)}"
+        value="${escapeHtml(value)}"
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-card-id="${escapeHtml(plan.cardId)}"
+        data-self-employment-gantt-card-field="${escapeHtml(field)}"
+      />
+    </label>
+  `;
+}
+
+function selfEmploymentGanttCardNumberField(
+  projectId: string,
+  plan: SelfEmploymentGanttCardPlan,
+  field: keyof SelfEmploymentGanttCardPlan,
+  label: string,
+  value: number
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <input
+        type="number"
+        min="0"
+        max="100000"
+        step="0.25"
+        value="${escapeHtml(value)}"
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-card-id="${escapeHtml(plan.cardId)}"
+        data-self-employment-gantt-card-field="${escapeHtml(field)}"
+      />
+    </label>
+  `;
+}
+
+function selfEmploymentGanttCardSelectField(
+  projectId: string,
+  cardId: string,
+  field: "labelId" | "phaseId",
+  label: string,
+  value: string,
+  options: Array<[string, string]>
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <select
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+        data-self-employment-gantt-card-field="${escapeHtml(field)}"
+      >
+        ${options.map(([optionValue, optionLabel]) => selfEmploymentOption(optionValue, optionLabel, value)).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function selfEmploymentGanttPhaseOptions(project: SelfEmploymentProject, excludedPhaseId?: string): Array<[string, string]> {
+  return [...project.businessIdeaCanvasMeta.phases]
+    .sort((a, b) => a.order - b.order)
+    .filter((phase) => phase.id !== excludedPhaseId)
+    .map((phase) => [phase.id, phase.name] as [string, string]);
+}
+
+function selfEmploymentGanttLabelName(project: SelfEmploymentProject, labelId: string | null): string {
+  const normalized = normalizedGanttLabelId(labelId || "goal");
+  return orderedGanttLabels(project.businessIdeaCanvasMeta).find((label) => label.id === normalized)?.name ?? "Ziel";
+}
+
+function selfEmploymentGanttNodeTitle(node: JsonCanvasNode): string {
+  if (typeof node.text === "string" && node.text.trim()) return node.text.trim().split("\n")[0] ?? "Karte";
+  if (typeof node.label === "string" && node.label.trim()) return node.label.trim();
+  return "Karte";
+}
+
+function selfEmploymentGanttPhaseNumber(phaseId: string): string {
+  const match = /^phase-(\d+)$/.exec(phaseId);
+  return match?.[1] ?? phaseId;
+}
+
+function selfEmploymentGanttPercent(value: number): string {
+  return String(Math.round(clamp(value, 0, 100) * 1000) / 1000);
+}
+
+function selfEmploymentGanttColor(color: string): string {
+  if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
+  if (color === "1") return "var(--danger)";
+  if (color === "2") return "var(--gold)";
+  if (color === "3") return "#eab308";
+  if (color === "4") return "var(--accent)";
+  if (color === "5") return "#2563eb";
+  if (color === "6") return "#7c3aed";
+  return "var(--accent)";
 }
 
 function businessIdeaCanvasRenderState(projectId: string): BusinessIdeaCanvasRenderState {
@@ -3475,6 +3909,9 @@ function deleteBusinessIdeaCanvasSelectedNode(): void {
   businessIdeaCanvasArmedConnection = null;
   businessIdeaCanvasContextMenu = null;
   businessIdeaCanvasPalettePopover = null;
+  if (selfEmploymentGanttEditor?.type === "card" && selectedIds.has(selfEmploymentGanttEditor.cardId)) {
+    selfEmploymentGanttEditor = null;
+  }
 }
 
 function deleteBusinessIdeaCanvasSelectedEdge(): void {
@@ -4488,7 +4925,17 @@ function updateBusinessIdeaCanvasProject(
   updater: (project: SelfEmploymentProject) => SelfEmploymentProject,
   renderAfterUpdate = false
 ): void {
-  updateSelfEmploymentProject(projectId, updater, renderAfterUpdate);
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      const nextProject = updater(project);
+      return {
+        ...nextProject,
+        gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, nextProject.businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
+      };
+    },
+    renderAfterUpdate
+  );
 }
 
 function cancelBusinessIdeaCanvasWheelZoom(): void {
@@ -5210,6 +5657,7 @@ function normalizeSelfEmploymentSelection(): void {
 
 function selectSelfEmploymentProject(projectId: string): void {
   if (!state.selfEmployment.projects.some((project) => project.id === projectId)) return;
+  selfEmploymentGanttEditor = null;
   state.selfEmployment = {
     ...state.selfEmployment,
     selectedProjectId: projectId
@@ -5254,7 +5702,8 @@ function addSelfEmploymentProject(): void {
     monthlyRevenueExpected: 0,
     monthlyRunningCosts: 0,
     oneTimeCosts: 0,
-    monthlyWorkHours: 16
+    monthlyWorkHours: 16,
+    gantt: normalizeSelfEmploymentGanttPlan({}, canvasDefaults.businessIdeaCanvas, canvasDefaults.businessIdeaCanvasMeta)
   };
   state.selfEmployment = {
     ...state.selfEmployment,
@@ -5268,6 +5717,7 @@ function addSelfEmploymentProject(): void {
 function selectSelfEmploymentRoadmapArea(rawAreaId: string): void {
   const selectedRoadmapAreaId = selfEmploymentRoadmapAreaIdFromValue(rawAreaId);
   if (!selectedRoadmapAreaId) return;
+  selfEmploymentGanttEditor = null;
   state.selfEmployment = {
     ...state.selfEmployment,
     selectedRoadmapAreaId
@@ -5371,6 +5821,7 @@ function deleteSelfEmploymentProject(projectId: string): void {
     state.selfEmployment.selectedProjectId === projectId ? projects[0]?.id ?? "" : state.selfEmployment.selectedProjectId;
   if (selfEmploymentLabelPickerProjectId === projectId) selfEmploymentLabelPickerProjectId = null;
   if (selfEmploymentIconPicker?.projectId === projectId) selfEmploymentIconPicker = null;
+  if (selfEmploymentGanttEditor?.projectId === projectId) selfEmploymentGanttEditor = null;
   state.selfEmployment = {
     ...state.selfEmployment,
     selectedProjectId,
@@ -5479,6 +5930,116 @@ function updateSelfEmploymentProjectListField(
       if (field === "linkedHabits") return { ...project, linkedHabits: items };
       if (field === "blockingHabits") return { ...project, blockingHabits: items };
       return project;
+    },
+    renderAfterUpdate
+  );
+}
+
+function updateSelfEmploymentGanttPhaseField(
+  projectId: string,
+  phaseId: string,
+  field: string,
+  rawValue: string | boolean,
+  renderAfterUpdate: boolean
+): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+      const phaseIds = new Set(project.businessIdeaCanvasMeta.phases.map((phase) => phase.id));
+      const labelIds = new Set(orderedGanttLabels(project.businessIdeaCanvasMeta).map((label) => label.id));
+      const phases = gantt.phases.map((phase) => {
+        if (phase.phaseId !== phaseId) return phase;
+        const value = String(rawValue);
+        if (field === "enabled") return { ...phase, enabled: Boolean(rawValue) };
+        if (field === "startDate") return { ...phase, startDate: value.trim() || null };
+        if (field === "startMode") {
+          const startMode: SelfEmploymentGanttStartMode = value === "after_previous_label" ? "after_previous_label" : "manual";
+          return { ...phase, startMode };
+        }
+        if (field === "triggerPreviousPhaseId") {
+          return { ...phase, triggerPreviousPhaseId: value.trim() ? (phaseIds.has(value) ? value : phase.triggerPreviousPhaseId) : null };
+        }
+        if (field === "triggerLabelId") {
+          const labelId = normalizedGanttLabelId(value);
+          return { ...phase, triggerLabelId: labelIds.has(labelId) ? labelId : phase.triggerLabelId };
+        }
+        if (field === "defaultTimeBudgetHours") {
+          return {
+            ...phase,
+            defaultTimeBudgetHours: selfEmploymentNumberValue(value, phase.defaultTimeBudgetHours, 0, 100000)
+          };
+        }
+        return phase;
+      });
+      const nextProject = { ...project, gantt: { ...gantt, phases } };
+      return {
+        ...nextProject,
+        gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, nextProject.businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
+      };
+    },
+    renderAfterUpdate
+  );
+}
+
+function updateSelfEmploymentGanttCardField(
+  projectId: string,
+  cardId: string,
+  field: string,
+  rawValue: string | boolean,
+  renderAfterUpdate: boolean
+): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      const node = project.businessIdeaCanvas.nodes.find((item) => item.id === cardId && item.type !== "group");
+      if (!node) return project;
+      const value = String(rawValue);
+      if (field === "labelId" || field === "phaseId") {
+        const labelIds = new Set(orderedGanttLabels(project.businessIdeaCanvasMeta).map((label) => label.id));
+        const phaseIds = new Set(project.businessIdeaCanvasMeta.phases.map((phase) => phase.id));
+        const currentMeta = project.businessIdeaCanvasMeta.nodeMeta[cardId] ?? {
+          labelId: project.businessIdeaCanvasMeta.activeLabelId,
+          phaseId: project.businessIdeaCanvasMeta.activePhaseId,
+          shape: "rounded-rectangle" as BusinessIdeaCanvasShape
+        };
+        const nextMeta = {
+          ...currentMeta,
+          ...(field === "labelId" && labelIds.has(normalizedGanttLabelId(value))
+            ? { labelId: normalizedGanttLabelId(value) }
+            : {}),
+          ...(field === "phaseId" && phaseIds.has(value) ? { phaseId: value } : {})
+        };
+        const nextProject = {
+          ...project,
+          businessIdeaCanvasMeta: {
+            ...project.businessIdeaCanvasMeta,
+            nodeMeta: {
+              ...project.businessIdeaCanvasMeta.nodeMeta,
+              [cardId]: nextMeta
+            }
+          }
+        };
+        return {
+          ...nextProject,
+          gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, nextProject.businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
+        };
+      }
+      const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+      const cardPlans = gantt.cardPlans.map((plan) => {
+        if (plan.cardId !== cardId) return plan;
+        if (field === "timeBudgetHours") {
+          return { ...plan, timeBudgetHours: selfEmploymentNumberValue(value, plan.timeBudgetHours, 0, 100000) };
+        }
+        if (field === "startDate") return { ...plan, startDate: value.trim() || null };
+        if (field === "note") return { ...plan, note: value };
+        return plan;
+      });
+      const nextProject = { ...project, gantt: { ...gantt, cardPlans } };
+      return {
+        ...nextProject,
+        gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, nextProject.businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
+      };
     },
     renderAfterUpdate
   );
@@ -5680,6 +6241,10 @@ function selfEmploymentRoadmapAreaIdFromValue(value: unknown): SelfEmploymentRoa
 function selfEmploymentNumberValue(rawValue: string, fallback: number, min: number, max: number): number {
   const parsed = Number(String(rawValue).replace(",", "."));
   return Number.isFinite(parsed) ? clamp(parsed, min, max) : fallback;
+}
+
+function selfEmploymentControlValue(target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): string | boolean {
+  return target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value;
 }
 
 function selfEmploymentTextToList(rawValue: string): string[] {

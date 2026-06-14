@@ -22,6 +22,7 @@ import {
   incomePlanningAverageSleepHours
 } from "../domain/incomePlanning";
 import { defaultBusinessIdeaCanvasForProject } from "../domain/businessIdeaCanvas";
+import { defaultSelfEmploymentGanttPlan } from "../domain/selfEmploymentGantt";
 
 export const MONTHS = [
   "Januar",
@@ -505,7 +506,8 @@ export function defaultSelfEmploymentState(): SelfEmploymentState {
             status: "in_progress"
           }
         ],
-        ...exampleCanvas
+        ...exampleCanvas,
+        gantt: defaultSelfEmploymentGanttPlan(exampleCanvas.businessIdeaCanvas, exampleCanvas.businessIdeaCanvasMeta)
       }
     ]
   };

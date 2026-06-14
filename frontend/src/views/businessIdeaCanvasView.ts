@@ -149,7 +149,6 @@ function renderBusinessIdeaCanvasTopToolbar(project: SelfEmploymentProject, rend
         <button class="button mini secondary" type="button" data-action="business-canvas-paste-selection" ${renderState.clipboardAvailable ? "" : "disabled"}>Einfuegen</button>
         <button class="button mini secondary" type="button" data-action="business-canvas-zoom-out" aria-label="Verkleinern">-</button>
         <button class="button mini secondary" type="button" data-action="business-canvas-zoom-in" aria-label="Vergroessern">+</button>
-        <button class="button mini secondary" type="button" data-action="business-canvas-reset-view">Reset</button>
       </div>
       <div class="business-canvas-topbar-group">
         <div class="business-canvas-compact-field">

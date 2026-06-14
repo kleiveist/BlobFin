@@ -98,6 +98,7 @@ export type JsonCanvasColor = string;
 export type JsonCanvasNodeType = "text" | "file" | "link" | "group";
 export type BusinessIdeaCanvasShape = "rounded-rectangle" | "rectangle" | "ellipse" | "diamond";
 export type BusinessIdeaCanvasEdgeDirection = "none" | "forward" | "backward" | "both";
+export type SelfEmploymentGanttStartMode = "manual" | "after_previous_label";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -372,6 +373,28 @@ export interface BusinessIdeaCanvasMeta {
   nodeMeta: Record<string, BusinessIdeaCanvasNodeMeta>;
 }
 
+export interface SelfEmploymentGanttPhase {
+  phaseId: string;
+  enabled: boolean;
+  startDate: string | null;
+  startMode: SelfEmploymentGanttStartMode;
+  triggerPreviousPhaseId: string | null;
+  triggerLabelId: string | null;
+  defaultTimeBudgetHours: number;
+}
+
+export interface SelfEmploymentGanttCardPlan {
+  cardId: string;
+  timeBudgetHours: number;
+  startDate: string | null;
+  note: string;
+}
+
+export interface SelfEmploymentGanttPlan {
+  phases: SelfEmploymentGanttPhase[];
+  cardPlans: SelfEmploymentGanttCardPlan[];
+}
+
 export interface SelfEmploymentProject {
   id: string;
   name: string;
@@ -409,6 +432,7 @@ export interface SelfEmploymentProject {
   businessIdeaCanvas: BusinessIdeaCanvas;
   businessIdeaCanvasFile: string;
   businessIdeaCanvasMeta: BusinessIdeaCanvasMeta;
+  gantt: SelfEmploymentGanttPlan;
 }
 
 export interface SelfEmploymentState {

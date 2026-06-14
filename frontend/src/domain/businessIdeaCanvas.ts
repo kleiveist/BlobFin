@@ -29,9 +29,9 @@ export const BUSINESS_IDEA_CANVAS_DEFAULT_VIEWPORT: BusinessIdeaCanvasViewport =
 const DEFAULT_LABELS: BusinessIdeaCanvasLabel[] = [
   { id: "idea", name: "Idee", color: "1" },
   { id: "knowledge", name: "Wissen", color: "3" },
-  { id: "implementation", name: "Umsetzung", color: "2" },
   { id: "start", name: "Start", color: "4" },
-  { id: "active", name: "Aktiv", color: "5" }
+  { id: "implementation", name: "Umsetzung", color: "2" },
+  { id: "goal", name: "Ziel", color: "5" }
 ];
 
 const DEFAULT_PALETTE: BusinessIdeaCanvasPaletteColor[] = [
@@ -39,7 +39,7 @@ const DEFAULT_PALETTE: BusinessIdeaCanvasPaletteColor[] = [
   { id: "palette-2", name: "Gold", color: "2" },
   { id: "palette-3", name: "Gelb", color: "3" },
   { id: "palette-4", name: "Akzent", color: "4" },
-  { id: "palette-5", name: "Cyan", color: "5" },
+  { id: "palette-5", name: "Blau", color: "5" },
   { id: "palette-6", name: "Violett", color: "6" }
 ];
 
@@ -197,7 +197,8 @@ export function normalizeBusinessIdeaCanvasMeta(
   const phases = normalizePhases(source.phases, fallback.phases);
   const fallbackLabelId = labels[0]?.id ?? "idea";
   const fallbackPhaseId = phases[0]?.id ?? "phase-1";
-  const activeLabelId = labels.some((label) => label.id === source.activeLabelId) ? String(source.activeLabelId) : fallbackLabelId;
+  const sourceActiveLabelId = normalizeBusinessIdeaCanvasLabelId(source.activeLabelId);
+  const activeLabelId = labels.some((label) => label.id === sourceActiveLabelId) ? sourceActiveLabelId : fallbackLabelId;
   const activePhaseId = phases.some((phase) => phase.id === source.activePhaseId) ? String(source.activePhaseId) : fallbackPhaseId;
   const palette = normalizePalette(source.palette, fallback.palette ?? DEFAULT_PALETTE);
   const rawMeta = isRecord(source.nodeMeta) ? source.nodeMeta : {};
@@ -567,20 +568,23 @@ function normalizeLabels(value: unknown, fallback: BusinessIdeaCanvasLabel[]): B
     ? value
         .filter(isRecord)
         .map((item) => ({
-          id: String(item.id || "").trim(),
+          id: normalizeBusinessIdeaCanvasLabelId(item.id),
           name: String(item.name || "").trim(),
           color: String(item.color || "1")
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0)
     : [];
   const source = labels.length ? labels : fallback;
-  const byId = new Map(source.map((label) => [label.id, label]));
-  const defaultIds = new Set(DEFAULT_LABELS.map((label) => label.id));
+  const byId = new Map(source.map((label) => [normalizeBusinessIdeaCanvasLabelId(label.id), label]));
+  const defaultIds = new Set([...DEFAULT_LABELS.map((label) => label.id), "active"]);
   const canonical = DEFAULT_LABELS.map((label) => ({
     ...label,
     color: byId.get(label.id)?.color ?? label.color
   }));
-  const custom = source.filter((label) => !defaultIds.has(label.id)).map((label) => ({ ...label }));
+  const custom = source
+    .map((label) => ({ ...label, id: normalizeBusinessIdeaCanvasLabelId(label.id) }))
+    .filter((label) => !defaultIds.has(label.id))
+    .map((label) => ({ ...label }));
   return [...canonical, ...custom];
 }
 
@@ -612,12 +616,18 @@ function normalizeNodeMeta(
   fallback: BusinessIdeaCanvasNodeMeta
 ): BusinessIdeaCanvasNodeMeta {
   const source = isRecord(value) ? value : {};
-  const labelId = labels.some((label) => label.id === source.labelId) ? String(source.labelId) : fallback.labelId;
+  const sourceLabelId = normalizeBusinessIdeaCanvasLabelId(source.labelId);
+  const labelId = labels.some((label) => label.id === sourceLabelId) ? sourceLabelId : fallback.labelId;
   const phaseId = phases.some((phase) => phase.id === source.phaseId) ? String(source.phaseId) : fallback.phaseId;
   const shape = SHAPES.includes(source.shape as BusinessIdeaCanvasShape)
     ? (source.shape as BusinessIdeaCanvasShape)
     : fallback.shape;
   return { labelId, phaseId, shape };
+}
+
+function normalizeBusinessIdeaCanvasLabelId(value: unknown): string {
+  const labelId = String(value ?? "").trim();
+  return labelId === "active" ? "goal" : labelId;
 }
 
 function normalizePalette(value: unknown, fallback: BusinessIdeaCanvasPaletteColor[]): BusinessIdeaCanvasPaletteColor[] {

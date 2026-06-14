@@ -171,6 +171,15 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain('"Kennzahlen"');
     expect(mainSource).toContain("renderBusinessIdeaCanvasEditor");
     expect(mainSource).toContain("businessIdeaCanvasRenderState");
+    expect(mainSource).toContain("renderSelfEmploymentProjectGantt");
+    expect(mainSource).toContain("self-employment-project-gantt");
+    expect(mainSource).toContain("self-employment-gantt-phase-popover");
+    expect(mainSource).toContain("self-employment-gantt-card-popover");
+    expect(mainSource).toContain("data-self-employment-gantt-phase-field");
+    expect(mainSource).toContain("data-self-employment-gantt-card-field");
+    expect(mainSource).toContain("timeBudgetHours");
+    expect(mainSource).not.toContain('selfEmploymentTextareaField(project, "projectGoal"');
+    expect(mainSource).not.toContain('selfEmploymentNumberField(project, "plannedDurationWeeks"');
     expect(businessCanvasViewSource).toContain('data-action="business-canvas-add-node"');
     expect(businessCanvasViewSource).toContain("business-canvas-context-menu");
     expect(businessCanvasViewSource).toContain("business-canvas-multi-toolbar");

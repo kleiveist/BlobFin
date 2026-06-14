@@ -145,6 +145,9 @@ describe("storage", () => {
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.phases).toHaveLength(10);
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.palette.length).toBeGreaterThan(0);
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.groupMeta).toEqual({});
+    expect(state.selfEmployment.projects[0].gantt.cardPlans).toHaveLength(
+      state.selfEmployment.projects[0].businessIdeaCanvas.nodes.filter((node) => node.type !== "group").length
+    );
     expect(state.selfEmployment.selectedProjectId).toBe(state.selfEmployment.projects[0].id);
     expect(state.selfEmployment.selectedRoadmapAreaId).toBe("idea");
   });
@@ -179,6 +182,46 @@ describe("storage", () => {
     expect(project.businessIdeaCanvasMeta.nodeMeta[project.businessIdeaCanvas.nodes[0].id].labelId).toBe("idea");
     expect(project.businessIdeaCanvasMeta.palette.length).toBeGreaterThan(0);
     expect(project.businessIdeaCanvasMeta.groupMeta).toEqual({});
+    expect(project.gantt.cardPlans.length).toBeGreaterThan(0);
+  });
+
+  it("roundtrips self employment project gantt state", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const cardId = state.selfEmployment.projects[0].businessIdeaCanvas.nodes[0].id;
+    state.selfEmployment.projects[0].gantt = {
+      ...state.selfEmployment.projects[0].gantt,
+      phases: state.selfEmployment.projects[0].gantt.phases.map((phase) =>
+        phase.phaseId === "phase-2"
+          ? {
+              ...phase,
+              startMode: "after_previous_label",
+              triggerPreviousPhaseId: "phase-1",
+              triggerLabelId: "goal",
+              defaultTimeBudgetHours: 2
+            }
+          : phase
+      ),
+      cardPlans: state.selfEmployment.projects[0].gantt.cardPlans.map((plan) =>
+        plan.cardId === cardId ? { ...plan, timeBudgetHours: 3.5, startDate: "2026-07-01", note: "Wichtig" } : plan
+      )
+    };
+
+    saveState(state, storage);
+    const loaded = loadState(storage);
+    const loadedProject = loaded.selfEmployment.projects[0];
+
+    expect(loadedProject.gantt.phases.find((phase) => phase.phaseId === "phase-2")).toMatchObject({
+      startMode: "after_previous_label",
+      triggerPreviousPhaseId: "phase-1",
+      triggerLabelId: "goal",
+      defaultTimeBudgetHours: 2
+    });
+    expect(loadedProject.gantt.cardPlans.find((plan) => plan.cardId === cardId)).toMatchObject({
+      timeBudgetHours: 3.5,
+      startDate: "2026-07-01",
+      note: "Wichtig"
+    });
   });
 
   it("adds missing income planning defaults to saved app state", () => {

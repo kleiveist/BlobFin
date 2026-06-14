@@ -1,4 +1,5 @@
 import { defaultAppState } from "../../data/defaults";
+import { serializeBusinessIdeaCanvas } from "../../domain/businessIdeaCanvas";
 import type { AppState, IncomePlanningState, IncomeTrackerState } from "../../types";
 import type { VaultDataFiles } from "./vaultTypes";
 
@@ -62,7 +63,13 @@ export function serializeVaultState(state: AppState): VaultDataFiles {
       calendarStamps: state.incomePlanning.calendarStamps,
       plannedStamps: state.incomePlanning.plannedStamps
     },
-    selfEmploymentState: state.selfEmployment
+    selfEmploymentState: state.selfEmployment,
+    selfEmploymentCanvasFiles: Object.fromEntries(
+      state.selfEmployment.projects.map((project) => [
+        project.businessIdeaCanvasFile,
+        serializeBusinessIdeaCanvas(project.businessIdeaCanvas)
+      ])
+    )
   };
 }
 

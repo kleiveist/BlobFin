@@ -44,6 +44,7 @@ import {
   normalizeBusinessIdeaCanvas,
   normalizeBusinessIdeaCanvasMeta
 } from "../domain/businessIdeaCanvas";
+import { normalizeSelfEmploymentGanttPlan } from "../domain/selfEmploymentGantt";
 import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
 import { STATUTORY_PENSION_DEDUCTION_PERCENT_MAX } from "../domain/statutoryPension";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
@@ -1136,6 +1137,7 @@ function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentProject |
     businessIdeaCanvas,
     legacyCanvas.businessIdeaCanvasMeta
   );
+  const gantt = normalizeSelfEmploymentGanttPlan(value.gantt, businessIdeaCanvas, businessIdeaCanvasMeta);
   return {
     id,
     name: String(value.name || "Neues Projekt"),
@@ -1181,7 +1183,8 @@ function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentProject |
       typeof value.businessIdeaCanvasFile === "string" && isSafeSelfEmploymentCanvasPath(value.businessIdeaCanvasFile.trim())
         ? value.businessIdeaCanvasFile.trim()
         : businessIdeaCanvasFilePath(id),
-    businessIdeaCanvasMeta
+    businessIdeaCanvasMeta,
+    gantt
   };
 }
 

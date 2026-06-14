@@ -65,7 +65,14 @@ describe("vault serializer", () => {
     };
     state.positionTableView.savings.selectedLabels = ["tag"];
 
-    const loaded = normalizeStoredState(deserializeVaultState(serializeVaultState(state)));
+    state.selfEmployment.projects[0].gantt.cardPlans[0] = {
+      ...state.selfEmployment.projects[0].gantt.cardPlans[0],
+      timeBudgetHours: 4,
+      note: "Nur Sidecar"
+    };
+    const serialized = serializeVaultState(state);
+    const serializedCanvas = serialized.selfEmploymentCanvasFiles?.[state.selfEmployment.projects[0].businessIdeaCanvasFile];
+    const loaded = normalizeStoredState(deserializeVaultState(serialized));
 
     expect(loaded.ui.activeSection).toBe("combined_wealth");
     expect(loaded.ui.settingsVaultExpanded).toBe(true);
@@ -83,6 +90,10 @@ describe("vault serializer", () => {
       color: "5",
       status: "open"
     });
+    expect(loaded.selfEmployment.projects[0].gantt.cardPlans[0]).toMatchObject({ timeBudgetHours: 4, note: "Nur Sidecar" });
+    expect(serializedCanvas).toBeDefined();
+    expect(JSON.stringify(serializedCanvas)).not.toContain("gantt");
+    expect(JSON.stringify(serializedCanvas)).not.toContain("timeBudgetHours");
     expect(loaded.positionTableView.savings.selectedLabels).toEqual(["tag"]);
   });
 

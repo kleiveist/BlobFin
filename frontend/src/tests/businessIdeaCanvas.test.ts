@@ -35,9 +35,9 @@ describe("business idea canvas", () => {
     expect(defaults.businessIdeaCanvasMeta.labels.map((label) => label.name)).toEqual([
       "Idee",
       "Wissen",
-      "Umsetzung",
       "Start",
-      "Aktiv"
+      "Umsetzung",
+      "Ziel"
     ]);
     expect(defaults.businessIdeaCanvasMeta.phases.map((phase) => phase.name)).toEqual([
       "Phase 1",
@@ -266,7 +266,7 @@ describe("business idea canvas", () => {
       canvas
     );
 
-    expect(meta.labels.map((label) => label.name).slice(0, 5)).toEqual(["Idee", "Wissen", "Umsetzung", "Start", "Aktiv"]);
+    expect(meta.labels.map((label) => label.name).slice(0, 5)).toEqual(["Idee", "Wissen", "Start", "Umsetzung", "Ziel"]);
     expect(meta.labels.map((label) => label.name)).toContain("Eigen");
     expect(meta.phases).toHaveLength(10);
     expect(meta.phases.map((phase) => phase.name)).toEqual([
