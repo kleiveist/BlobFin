@@ -38,6 +38,12 @@ import {
   isIncomePlanningWeekScenarioId,
   isIncomePlanningWeekday
 } from "../domain/incomePlanning";
+import {
+  businessIdeaCanvasFilePath,
+  defaultBusinessIdeaCanvasForProject,
+  normalizeBusinessIdeaCanvas,
+  normalizeBusinessIdeaCanvasMeta
+} from "../domain/businessIdeaCanvas";
 import { normalizeIncomeTaxRuleLabel } from "../domain/incomeTaxRules";
 import { STATUTORY_PENSION_DEDUCTION_PERCENT_MAX } from "../domain/statutoryPension";
 import { defaultPositionIconForPosition, normalizePositionIcon } from "./positionIcons";
@@ -1117,8 +1123,21 @@ function normalizeSelfEmploymentState(value: unknown): SelfEmploymentState {
 function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentProject | null {
   if (!isRecord(value)) return null;
   const fallback = defaultSelfEmploymentState().projects[0];
+  const id = String(value.id || createId());
+  const legacyCanvas = defaultBusinessIdeaCanvasForProject(id, {
+    idea: String(value.idea ?? ""),
+    problem: String(value.problem ?? ""),
+    targetGroup: String(value.targetGroup ?? ""),
+    revenueModel: String(value.revenueModel ?? "")
+  });
+  const businessIdeaCanvas = normalizeBusinessIdeaCanvas(value.businessIdeaCanvas, legacyCanvas.businessIdeaCanvas);
+  const businessIdeaCanvasMeta = normalizeBusinessIdeaCanvasMeta(
+    value.businessIdeaCanvasMeta,
+    businessIdeaCanvas,
+    legacyCanvas.businessIdeaCanvasMeta
+  );
   return {
-    id: String(value.id || createId()),
+    id,
     name: String(value.name || "Neues Projekt"),
     icon: normalizePositionIcon(value.icon, fallback.icon),
     labels: stringArrayOrDefault(value.labels, []),
@@ -1156,8 +1175,24 @@ function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentProject |
       : [],
     tasks: Array.isArray(value.tasks)
       ? value.tasks.map(normalizeSelfEmploymentTask).filter((task): task is SelfEmploymentTask => task !== null)
-      : []
+      : [],
+    businessIdeaCanvas,
+    businessIdeaCanvasFile:
+      typeof value.businessIdeaCanvasFile === "string" && isSafeSelfEmploymentCanvasPath(value.businessIdeaCanvasFile.trim())
+        ? value.businessIdeaCanvasFile.trim()
+        : businessIdeaCanvasFilePath(id),
+    businessIdeaCanvasMeta
   };
+}
+
+function isSafeSelfEmploymentCanvasPath(value: string): boolean {
+  return (
+    value.endsWith(".canvas") &&
+    !value.startsWith("/") &&
+    !value.startsWith("\\") &&
+    !value.includes("..") &&
+    value.startsWith("planning/projects/")
+  );
 }
 
 function normalizeSelfEmploymentContact(value: unknown): SelfEmploymentContact | null {

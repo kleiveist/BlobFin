@@ -1,8 +1,10 @@
 /// <reference types="vite/client" />
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import mainSource from "../main.ts?raw";
+import businessCanvasViewSource from "../views/businessIdeaCanvasView.ts?raw";
 import { renderAppShell } from "../views/templates";
 import {
   paidLoanCostForYear,
@@ -24,6 +26,8 @@ const additionalBreakdown = {
   netGain: 0,
   totalAdditionalRepayment: 0
 };
+
+const stylesSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 
 const realEstateYear: RealEstateFinancingYear = {
   year: 2026,
@@ -165,6 +169,16 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain("SELF_EMPLOYMENT_ROADMAP_AREAS");
     expect(mainSource).toContain('"Geschaeftsidee"');
     expect(mainSource).toContain('"Kennzahlen"');
+    expect(mainSource).toContain("renderBusinessIdeaCanvasEditor");
+    expect(mainSource).toContain("businessIdeaCanvasRenderState");
+    expect(businessCanvasViewSource).toContain('data-action="business-canvas-add-node"');
+    expect(businessCanvasViewSource).toContain("business-canvas-context-menu");
+    expect(businessCanvasViewSource).toContain("business-canvas-multi-toolbar");
+    expect(businessCanvasViewSource).toContain("business-canvas-selection-rect");
+    expect(businessCanvasViewSource).toContain("business-canvas-palette-popover");
+    expect(businessCanvasViewSource).toContain("business-canvas-gantt");
+    expect(stylesSource).toContain("height: clamp(460px, calc(100vh - 260px), 760px)");
+    expect(stylesSource).toContain("overflow: hidden");
     expect(mainSource).toContain("data-self-employment-field");
     expect(mainSource).toContain("evaluateSelfEmploymentProject");
     expect(mainSource).toContain("selfEmploymentEvaluationContext");

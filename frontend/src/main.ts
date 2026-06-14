@@ -12,6 +12,22 @@ import {
 } from "./data/defaults";
 import { buildAssetProjection, payoutStartAge as calculatePayoutStartAge } from "./domain/assetProjection";
 import {
+  BUSINESS_IDEA_CANVAS_DEFAULT_VIEWPORT,
+  BUSINESS_IDEA_CANVAS_ORIGIN,
+  businessIdeaCanvasBoundsForNodes,
+  businessIdeaCanvasEndsForDirection,
+  businessIdeaCanvasNodesInsideRect,
+  businessIdeaCanvasViewportForZoomAtPoint,
+  canvasAnchorPoint,
+  clampBusinessIdeaCanvasNodeSize,
+  createBusinessIdeaCanvasGroupMeta,
+  createBusinessIdeaCanvasGroupNode,
+  defaultBusinessIdeaCanvasForProject,
+  nearestBusinessIdeaCanvasEndpointForEdge,
+  nearestBusinessIdeaCanvasNodeSide,
+  snapBusinessIdeaCanvasValue
+} from "./domain/businessIdeaCanvas";
+import {
   buildCombinedWealthSeries,
   combinedWealthHorizonYears,
   type CombinedWealthDepotProjection
@@ -170,6 +186,9 @@ import type {
   AppState,
   AssetProjection,
   AssetProjectionPoint,
+  BusinessIdeaCanvasEdgeDirection,
+  BusinessIdeaCanvasNodeMeta,
+  BusinessIdeaCanvasShape,
   CareerMilestone,
   CareerMilestoneImpact,
   CombinedWealthDepotKey,
@@ -201,6 +220,9 @@ import type {
   IncomeYearEntrySource,
   InvestmentDepotKey,
   InvestmentSettings,
+  JsonCanvasEdge,
+  JsonCanvasNode,
+  JsonCanvasSide,
   PlanningAccount,
   PlanningSettings,
   PlanningYearSelection,
@@ -244,6 +266,15 @@ import {
   renderStatutoryPensionTaxPopupHtml,
   renderStatutoryPensionYearPopupHtml
 } from "./views/statutoryPensionView";
+import {
+  renderBusinessIdeaCanvasEditor,
+  type BusinessIdeaCanvasRenderState,
+  type BusinessIdeaCanvasLineMenuState,
+  type BusinessIdeaCanvasSelectionRectState,
+  type BusinessIdeaCanvasContextMenuState,
+  type BusinessIdeaCanvasPalettePopoverState,
+  type BusinessIdeaCanvasPaletteEditorState
+} from "./views/businessIdeaCanvasView";
 
 const root = requireRootElement();
 const depotAssetProjectionCache = new Map<string, AssetProjection>();
@@ -607,6 +638,51 @@ type IncomeStampPlannerStampDragState = {
   element: HTMLElement;
   moved: boolean;
 } | null;
+type BusinessIdeaCanvasDragState = {
+  projectId: string;
+  nodeIds: string[];
+  mode: "move" | "resize";
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  originalNodes: Record<string, { x: number; y: number; width: number; height: number }>;
+  elements: Record<string, HTMLElement>;
+  moved: boolean;
+} | null;
+type BusinessIdeaCanvasConnectionDragState = {
+  projectId: string;
+  pointerId: number;
+  fromNodeId: string;
+  fromSide: JsonCanvasSide;
+  startClientX: number;
+  startClientY: number;
+  startPoint: { x: number; y: number };
+  lineMenuPoint: { x: number; y: number } | null;
+  lineMenuEdgeId: string | null;
+  moved: boolean;
+} | null;
+type BusinessIdeaCanvasSelectionDragState = {
+  projectId: string;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startPoint: { x: number; y: number };
+  currentPoint: { x: number; y: number };
+  moved: boolean;
+} | null;
+type BusinessIdeaCanvasPanDragState = {
+  projectId: string;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  originalX: number;
+  originalY: number;
+  moved: boolean;
+} | null;
+type BusinessIdeaCanvasClipboardState = {
+  nodes: JsonCanvasNode[];
+  nodeMeta: Record<string, BusinessIdeaCanvasNodeMeta>;
+} | null;
 
 let investmentAccountContextId: string | null = null;
 let state = defaultAppState();
@@ -648,6 +724,21 @@ let incomePlanningWeekCursor = incomeStampPlannerWeekStart(new Date());
 let incomeStampPlannerMonthCursor = incomeStampPlannerMonthStart(new Date());
 let incomeStampPlannerStampDragState: IncomeStampPlannerStampDragState = null;
 let incomeStampPlannerSuppressNextClick = false;
+let businessIdeaCanvasSelectedNodeIds: { projectId: string; nodeIds: string[] } | null = null;
+let businessIdeaCanvasSelectedEdge: { projectId: string; edgeId: string } | null = null;
+let businessIdeaCanvasEditingNode: { projectId: string; nodeId: string } | null = null;
+let businessIdeaCanvasArmedConnection: { projectId: string; nodeId: string; side: JsonCanvasSide } | null = null;
+let businessIdeaCanvasLineMenu: BusinessIdeaCanvasLineMenuState | null = null;
+let businessIdeaCanvasDragState: BusinessIdeaCanvasDragState = null;
+let businessIdeaCanvasConnectionDragState: BusinessIdeaCanvasConnectionDragState = null;
+let businessIdeaCanvasSelectionDragState: BusinessIdeaCanvasSelectionDragState = null;
+let businessIdeaCanvasSelectionRect: BusinessIdeaCanvasSelectionRectState | null = null;
+let businessIdeaCanvasPanDragState: BusinessIdeaCanvasPanDragState = null;
+let businessIdeaCanvasContextMenu: BusinessIdeaCanvasContextMenuState | null = null;
+let businessIdeaCanvasPalettePopover: BusinessIdeaCanvasPalettePopoverState | null = null;
+let businessIdeaCanvasPaletteEditor: BusinessIdeaCanvasPaletteEditorState | null = null;
+let businessIdeaCanvasClipboard: BusinessIdeaCanvasClipboardState = null;
+let businessIdeaCanvasSpacePressed = false;
 let incomeStampPlannerDialog: {
   stampId: string | null;
   date: string;
@@ -1108,6 +1199,20 @@ function updateModuleVisibility(): void {
 
 function bindEvents(): void {
   root.addEventListener("input", (event) => {
+    const canvasTextTarget = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-business-canvas-node-text]");
+    if (canvasTextTarget?.dataset.businessCanvasNodeText) {
+      updateBusinessIdeaCanvasNodeText(canvasTextTarget.dataset.businessCanvasNodeText, canvasTextTarget.textContent ?? "");
+      return;
+    }
+
+    const canvasPaletteTarget = (event.target as HTMLElement | null)?.closest<HTMLInputElement>(
+      "[data-business-canvas-palette-field]"
+    );
+    if (canvasPaletteTarget?.dataset.businessCanvasPaletteField) {
+      updateBusinessIdeaCanvasPaletteDraft(canvasPaletteTarget.dataset.businessCanvasPaletteField, canvasPaletteTarget.value);
+      return;
+    }
+
     const target = formControl(event.target);
     if (!target) return;
 
@@ -1258,6 +1363,29 @@ function bindEvents(): void {
   root.addEventListener("change", (event) => {
     const target = formControl(event.target);
     if (!target) return;
+
+    if (target.dataset.businessCanvasMetaField) {
+      updateBusinessIdeaCanvasMetaField(target.dataset.businessCanvasMetaField, target.value);
+      return;
+    }
+
+    if (target.dataset.businessCanvasGridField) {
+      updateBusinessIdeaCanvasGridField(
+        target.dataset.businessCanvasGridField,
+        target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value
+      );
+      return;
+    }
+
+    if (target.dataset.businessCanvasSelectedNodeField) {
+      updateBusinessIdeaCanvasSelectedNodeField(target.dataset.businessCanvasSelectedNodeField, target.value);
+      return;
+    }
+
+    if (target.dataset.businessCanvasSelectedEdgeField) {
+      updateBusinessIdeaCanvasSelectedEdgeField(target.dataset.businessCanvasSelectedEdgeField, target.value);
+      return;
+    }
 
     if (target.dataset.positionFilterDraft) {
       updatePositionFilterDraft(target.dataset.positionFilterDraft as keyof PositionFilterDraft, target.value);
@@ -1750,6 +1878,108 @@ function bindEvents(): void {
       );
       return;
     }
+    if (action === "business-canvas-add-node") {
+      addBusinessIdeaCanvasNode();
+      return;
+    }
+    if (action === "business-canvas-zoom-in") {
+      zoomBusinessIdeaCanvas(0.1);
+      return;
+    }
+    if (action === "business-canvas-zoom-out") {
+      zoomBusinessIdeaCanvas(-0.1);
+      return;
+    }
+    if (action === "business-canvas-reset-view") {
+      resetBusinessIdeaCanvasView();
+      return;
+    }
+    if (action === "business-canvas-start-connect-node") {
+      armBusinessIdeaCanvasConnection();
+      return;
+    }
+    if (action === "business-canvas-duplicate-node") {
+      duplicateBusinessIdeaCanvasSelectedNode();
+      return;
+    }
+    if (action === "business-canvas-delete-node") {
+      deleteBusinessIdeaCanvasSelectedNode();
+      return;
+    }
+    if (action === "business-canvas-delete-edge") {
+      deleteBusinessIdeaCanvasSelectedEdge();
+      return;
+    }
+    if (action === "business-canvas-add-node-from-line") {
+      addBusinessIdeaCanvasNodeFromLine(button.dataset.businessCanvasEdgeId || "");
+      return;
+    }
+    if (action === "business-canvas-context-add-node") {
+      const projectId = state.selfEmployment.selectedProjectId;
+      const project = selfEmploymentProjectById(projectId);
+      if (!project) return;
+      const node = createBusinessIdeaCanvasTextNode(
+        project,
+        { x: numberValue(button.dataset.businessCanvasX), y: numberValue(button.dataset.businessCanvasY) },
+        "Neue Karte"
+      );
+      businessIdeaCanvasContextMenu = null;
+      insertBusinessIdeaCanvasNode(projectId, node, true);
+      return;
+    }
+    if (action === "business-canvas-context-add-group") {
+      businessIdeaCanvasContextMenu = null;
+      addBusinessIdeaCanvasGroupAtPoint({ x: numberValue(button.dataset.businessCanvasX), y: numberValue(button.dataset.businessCanvasY) });
+      return;
+    }
+    if (action === "business-canvas-copy-selection") {
+      copyBusinessIdeaCanvasSelection();
+      return;
+    }
+    if (action === "business-canvas-paste-selection") {
+      const hasPoint = button.dataset.businessCanvasX !== undefined && button.dataset.businessCanvasY !== undefined;
+      pasteBusinessIdeaCanvasClipboard(
+        hasPoint ? { x: numberValue(button.dataset.businessCanvasX), y: numberValue(button.dataset.businessCanvasY) } : undefined
+      );
+      return;
+    }
+    if (action === "business-canvas-create-group") {
+      createBusinessIdeaCanvasGroupFromSelection();
+      return;
+    }
+    if (action === "business-canvas-open-palette") {
+      openBusinessIdeaCanvasPalette(button);
+      return;
+    }
+    if (action === "business-canvas-apply-palette-color") {
+      applyBusinessIdeaCanvasPaletteColor(button.dataset.businessCanvasColor || "1");
+      return;
+    }
+    if (action === "business-canvas-open-palette-editor") {
+      openBusinessIdeaCanvasPaletteEditor();
+      return;
+    }
+    if (action === "business-canvas-save-palette-color") {
+      saveBusinessIdeaCanvasPaletteColor();
+      return;
+    }
+    if (action === "business-canvas-close-palette-editor") {
+      businessIdeaCanvasPaletteEditor = null;
+      renderAll();
+      return;
+    }
+    if (action === "business-canvas-edit-node") {
+      editBusinessIdeaCanvasNode(button.dataset.businessCanvasNodeId || "");
+      return;
+    }
+    if (action === "business-canvas-align-left") {
+      alignBusinessIdeaCanvasSelection("left");
+      return;
+    }
+    if (action === "business-canvas-align-top") {
+      alignBusinessIdeaCanvasSelection("top");
+      return;
+    }
     if (action === "toggle-position-filter") togglePositionFilterPopup();
     if (action === "close-position-filter") hidePositionFilterPopup();
     if (action === "toggle-position-label-filter") togglePositionLabelFilter(button.dataset.positionLabel || "");
@@ -2069,10 +2299,17 @@ function bindEvents(): void {
   });
 
   root.addEventListener("dragend", clearDragState);
+  root.addEventListener("dblclick", handleBusinessIdeaCanvasDoubleClick);
+  root.addEventListener("contextmenu", handleBusinessIdeaCanvasContextMenu);
+  root.addEventListener("pointerdown", startBusinessIdeaCanvasPointer);
+  root.addEventListener("wheel", handleBusinessIdeaCanvasWheel, { passive: false });
   root.addEventListener("pointerdown", startIncomePlanningCalendarDrag);
+  window.addEventListener("pointermove", moveBusinessIdeaCanvasPointer);
+  window.addEventListener("pointerup", finishBusinessIdeaCanvasPointer);
   window.addEventListener("pointermove", moveIncomePlanningCalendarDrag);
   window.addEventListener("pointerup", finishIncomePlanningCalendarDrag);
   window.addEventListener("keydown", (event) => {
+    handleBusinessIdeaCanvasKeyDown(event);
     if (event.key === "Escape") {
       hideThemeSettings();
       hideInvestmentChartPopup();
@@ -2094,6 +2331,7 @@ function bindEvents(): void {
       hideIncomeMilestoneTypePicker();
     }
   });
+  window.addEventListener("keyup", handleBusinessIdeaCanvasKeyUp);
   window.addEventListener("popstate", () => {
     const section = sectionFromLocationHash() ?? "home";
     setActiveSection(section, { updateHistory: false });
@@ -2831,20 +3069,7 @@ function selfEmploymentRoadmapPanel(
 ): string {
   const { project } = evaluation;
   if (areaId === "idea") {
-    return `
-      <div class="self-employment-edit-grid">
-        ${selfEmploymentTextField(project, "idea", "Idee", project.idea)}
-        ${selfEmploymentTextareaField(project, "problem", "Problem", project.problem)}
-        ${selfEmploymentTextField(project, "targetGroup", "Zielgruppe", project.targetGroup)}
-        ${selfEmploymentTextField(project, "revenueModel", "Einnahmemodell", project.revenueModel)}
-        ${selfEmploymentSelectField(project, "risk", "Risiko", project.risk, [
-          ["low", "Niedrig"],
-          ["medium", "Mittel"],
-          ["high", "Hoch"]
-        ])}
-        ${selfEmploymentTextareaField(project, "motivation", "Motivation", project.motivation)}
-      </div>
-    `;
+    return renderBusinessIdeaCanvasEditor(project, businessIdeaCanvasRenderState(project.id));
   }
   if (areaId === "planning") {
     return `
@@ -2916,6 +3141,1250 @@ function selfEmploymentRoadmapPanel(
       ${selfEmploymentReadOnlyField("Bewertung", evaluation.reasons.join(" "))}
     </div>
   `;
+}
+
+function businessIdeaCanvasRenderState(projectId: string): BusinessIdeaCanvasRenderState {
+  return {
+    selectedNodeIds: businessIdeaCanvasSelectedNodeIds?.projectId === projectId ? businessIdeaCanvasSelectedNodeIds.nodeIds : [],
+    selectedEdgeId: businessIdeaCanvasSelectedEdge?.projectId === projectId ? businessIdeaCanvasSelectedEdge.edgeId : null,
+    editingNodeId: businessIdeaCanvasEditingNode?.projectId === projectId ? businessIdeaCanvasEditingNode.nodeId : null,
+    armedNodeId: businessIdeaCanvasArmedConnection?.projectId === projectId ? businessIdeaCanvasArmedConnection.nodeId : null,
+    lineMenu: businessIdeaCanvasLineMenu?.projectId === projectId ? businessIdeaCanvasLineMenu : null,
+    selectionRect: businessIdeaCanvasSelectionRect?.projectId === projectId ? businessIdeaCanvasSelectionRect : null,
+    contextMenu: businessIdeaCanvasContextMenu?.projectId === projectId ? businessIdeaCanvasContextMenu : null,
+    palettePopover: businessIdeaCanvasPalettePopover?.projectId === projectId ? businessIdeaCanvasPalettePopover : null,
+    paletteEditor: businessIdeaCanvasPaletteEditor?.projectId === projectId ? businessIdeaCanvasPaletteEditor : null,
+    clipboardAvailable: Boolean(businessIdeaCanvasClipboard?.nodes.length)
+  };
+}
+
+function businessIdeaCanvasSelectedIds(projectId: string): string[] {
+  return businessIdeaCanvasSelectedNodeIds?.projectId === projectId ? businessIdeaCanvasSelectedNodeIds.nodeIds : [];
+}
+
+function selectBusinessIdeaCanvasNodes(projectId: string, nodeIds: string[]): void {
+  const uniqueIds = Array.from(new Set(nodeIds.filter(Boolean)));
+  businessIdeaCanvasSelectedNodeIds = uniqueIds.length ? { projectId, nodeIds: uniqueIds } : null;
+  businessIdeaCanvasSelectedEdge = null;
+  businessIdeaCanvasContextMenu = null;
+}
+
+function clearBusinessIdeaCanvasSelection(): void {
+  businessIdeaCanvasSelectedNodeIds = null;
+  businessIdeaCanvasSelectedEdge = null;
+  businessIdeaCanvasEditingNode = null;
+  businessIdeaCanvasArmedConnection = null;
+  businessIdeaCanvasLineMenu = null;
+}
+
+function closeBusinessIdeaCanvasOverlays(): void {
+  businessIdeaCanvasContextMenu = null;
+  businessIdeaCanvasPalettePopover = null;
+  businessIdeaCanvasPaletteEditor = null;
+}
+
+function updateBusinessIdeaCanvasNodeText(nodeId: string, text: string): void {
+  const projectId = businessIdeaCanvasEditingNode?.projectId ?? state.selfEmployment.selectedProjectId;
+  updateBusinessIdeaCanvasProject(projectId, (project) => ({
+    ...project,
+    idea: project.businessIdeaCanvas.nodes[0]?.id === nodeId ? text : project.idea,
+    businessIdeaCanvas: {
+      ...project.businessIdeaCanvas,
+      nodes: project.businessIdeaCanvas.nodes.map((node) =>
+        node.id === nodeId && node.type === "text" ? { ...node, text } : node
+      )
+    }
+  }));
+}
+
+function updateBusinessIdeaCanvasMetaField(field: string, value: string): void {
+  const projectId = state.selfEmployment.selectedProjectId;
+  updateBusinessIdeaCanvasProject(projectId, (project) => {
+    if (field !== "activeLabelId" && field !== "activePhaseId") return project;
+    return {
+      ...project,
+      businessIdeaCanvasMeta: {
+        ...project.businessIdeaCanvasMeta,
+        [field]: value
+      }
+    };
+  }, true);
+}
+
+function updateBusinessIdeaCanvasGridField(field: string, value: string | boolean): void {
+  const projectId = state.selfEmployment.selectedProjectId;
+  updateBusinessIdeaCanvasProject(projectId, (project) => {
+    if (field !== "snap") return project;
+    return {
+      ...project,
+      businessIdeaCanvasMeta: {
+        ...project.businessIdeaCanvasMeta,
+        grid: {
+          ...project.businessIdeaCanvasMeta.grid,
+          snap: Boolean(value)
+        }
+      }
+    };
+  }, true);
+}
+
+function updateBusinessIdeaCanvasSelectedNodeField(field: string, value: string): void {
+  const selection = businessIdeaCanvasSelectedNodeIds;
+  if (!selection?.nodeIds.length) return;
+  const selectedIds = new Set(selection.nodeIds);
+  updateBusinessIdeaCanvasProject(selection.projectId, (project) => {
+    const selectedNodes = project.businessIdeaCanvas.nodes.filter((node) => selectedIds.has(node.id));
+    if (!selectedNodes.length) return project;
+    if (field === "color") {
+      const nextGroupMeta = { ...project.businessIdeaCanvasMeta.groupMeta };
+      for (const node of selectedNodes) {
+        if (node.type === "group" && nextGroupMeta[node.id]) {
+          nextGroupMeta[node.id] = { ...nextGroupMeta[node.id], color: value };
+        }
+      }
+      return {
+        ...project,
+        businessIdeaCanvas: {
+          ...project.businessIdeaCanvas,
+          nodes: project.businessIdeaCanvas.nodes.map((node) => (selectedIds.has(node.id) ? { ...node, color: value } : node))
+        },
+        businessIdeaCanvasMeta: {
+          ...project.businessIdeaCanvasMeta,
+          groupMeta: nextGroupMeta
+        }
+      };
+    }
+    if (field === "shape" || field === "labelId" || field === "phaseId") {
+      const nextNodeMeta = { ...project.businessIdeaCanvasMeta.nodeMeta };
+      for (const node of selectedNodes) {
+        if (node.type === "group") continue;
+        const currentMeta = nextNodeMeta[node.id] ?? {
+          labelId: project.businessIdeaCanvasMeta.activeLabelId,
+          phaseId: project.businessIdeaCanvasMeta.activePhaseId,
+          shape: "rounded-rectangle"
+        };
+        nextNodeMeta[node.id] =
+          field === "shape"
+            ? { ...currentMeta, shape: value as BusinessIdeaCanvasShape }
+            : field === "labelId"
+              ? { ...currentMeta, labelId: value }
+              : { ...currentMeta, phaseId: value };
+      }
+      return {
+        ...project,
+        businessIdeaCanvasMeta: {
+          ...project.businessIdeaCanvasMeta,
+          nodeMeta: nextNodeMeta
+        }
+      };
+    }
+    return project;
+  }, true);
+}
+
+function updateBusinessIdeaCanvasSelectedEdgeField(field: string, value: string): void {
+  const selection = businessIdeaCanvasSelectedEdge;
+  if (!selection) return;
+  updateBusinessIdeaCanvasProject(selection.projectId, (project) => ({
+    ...project,
+    businessIdeaCanvas: {
+      ...project.businessIdeaCanvas,
+      edges: project.businessIdeaCanvas.edges.map((edge) => {
+        if (edge.id !== selection.edgeId) return edge;
+        if (field === "label") return { ...edge, label: value.trim() };
+        if (field === "direction") {
+          const direction: BusinessIdeaCanvasEdgeDirection =
+            value === "none" || value === "backward" || value === "both" || value === "forward" ? value : "forward";
+          const ends = businessIdeaCanvasEndsForDirection(direction);
+          return { ...edge, fromEnd: ends.fromEnd, toEnd: ends.toEnd };
+        }
+        return edge;
+      })
+    }
+  }), true);
+}
+
+function addBusinessIdeaCanvasNode(): void {
+  const projectId = state.selfEmployment.selectedProjectId;
+  const project = selfEmploymentProjectById(projectId);
+  if (!project) return;
+  const node = createBusinessIdeaCanvasTextNode(project, businessIdeaCanvasVisibleTopLeft(project), "Neue Karte");
+  insertBusinessIdeaCanvasNode(projectId, node, true);
+}
+
+function zoomBusinessIdeaCanvas(delta: number): void {
+  const projectId = state.selfEmployment.selectedProjectId;
+  const viewportElement = document.querySelector<HTMLElement>(
+    `[data-business-canvas-project-id="${cssEscape(projectId)}"] [data-business-canvas-viewport]`
+  );
+  const rect = viewportElement?.getBoundingClientRect();
+  updateBusinessIdeaCanvasProject(projectId, (project) => {
+    const viewport = project.businessIdeaCanvasMeta.viewport;
+    const nextZoom = Math.min(2, Math.max(0.4, Number((viewport.zoom + delta).toFixed(2))));
+    const nextViewport = rect
+      ? businessIdeaCanvasViewportForZoomAtPoint(viewport, { x: rect.width / 2, y: rect.height / 2 }, nextZoom)
+      : { ...viewport, zoom: nextZoom };
+    return {
+      ...project,
+      businessIdeaCanvasMeta: {
+        ...project.businessIdeaCanvasMeta,
+        viewport: nextViewport
+      }
+    };
+  }, true);
+}
+
+function resetBusinessIdeaCanvasView(): void {
+  updateBusinessIdeaCanvasProject(state.selfEmployment.selectedProjectId, (project) => ({
+    ...project,
+    businessIdeaCanvasMeta: {
+      ...project.businessIdeaCanvasMeta,
+      viewport: { ...BUSINESS_IDEA_CANVAS_DEFAULT_VIEWPORT }
+    }
+  }), true);
+}
+
+function armBusinessIdeaCanvasConnection(): void {
+  const selection = businessIdeaCanvasSelectedNodeIds;
+  if (!selection?.nodeIds.length) return;
+  const project = selfEmploymentProjectById(selection.projectId);
+  const nodeId = selection.nodeIds[0];
+  const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === nodeId);
+  if (!node || node.type === "group") return;
+  businessIdeaCanvasArmedConnection = { projectId: selection.projectId, nodeId, side: "right" };
+  businessIdeaCanvasLineMenu = null;
+  renderAll();
+}
+
+function duplicateBusinessIdeaCanvasSelectedNode(): void {
+  if (copyBusinessIdeaCanvasSelection()) pasteBusinessIdeaCanvasClipboard();
+}
+
+function deleteBusinessIdeaCanvasSelectedNode(): void {
+  const selection = businessIdeaCanvasSelectedNodeIds;
+  if (!selection?.nodeIds.length) return;
+  const selectedIds = new Set(selection.nodeIds);
+  updateBusinessIdeaCanvasProject(selection.projectId, (project) => {
+    const nextNodeMeta = { ...project.businessIdeaCanvasMeta.nodeMeta };
+    const nextGroupMeta = { ...project.businessIdeaCanvasMeta.groupMeta };
+    for (const nodeId of selectedIds) {
+      delete nextNodeMeta[nodeId];
+      delete nextGroupMeta[nodeId];
+    }
+    for (const [groupId, groupMeta] of Object.entries(nextGroupMeta)) {
+      nextGroupMeta[groupId] = {
+        ...groupMeta,
+        nodeIds: groupMeta.nodeIds.filter((nodeId) => !selectedIds.has(nodeId))
+      };
+    }
+    return {
+      ...project,
+      businessIdeaCanvas: {
+        ...project.businessIdeaCanvas,
+        nodes: project.businessIdeaCanvas.nodes.filter((node) => !selectedIds.has(node.id)),
+        edges: project.businessIdeaCanvas.edges.filter(
+          (edge) => !selectedIds.has(edge.fromNode) && !selectedIds.has(edge.toNode)
+        )
+      },
+      businessIdeaCanvasMeta: {
+        ...project.businessIdeaCanvasMeta,
+        nodeMeta: nextNodeMeta,
+        groupMeta: nextGroupMeta
+      }
+    };
+  }, true);
+  businessIdeaCanvasSelectedNodeIds = null;
+  businessIdeaCanvasEditingNode = null;
+  businessIdeaCanvasArmedConnection = null;
+  businessIdeaCanvasContextMenu = null;
+  businessIdeaCanvasPalettePopover = null;
+}
+
+function deleteBusinessIdeaCanvasSelectedEdge(): void {
+  const selection = businessIdeaCanvasSelectedEdge;
+  if (!selection) return;
+  updateBusinessIdeaCanvasProject(selection.projectId, (project) => ({
+    ...project,
+    businessIdeaCanvas: {
+      ...project.businessIdeaCanvas,
+      edges: project.businessIdeaCanvas.edges.filter((edge) => edge.id !== selection.edgeId)
+    }
+  }), true);
+  businessIdeaCanvasSelectedEdge = null;
+}
+
+function addBusinessIdeaCanvasNodeFromLine(edgeId: string): void {
+  const lineMenu = businessIdeaCanvasLineMenu;
+  if (!lineMenu || lineMenu.edgeId !== edgeId) return;
+  const project = selfEmploymentProjectById(lineMenu.projectId);
+  const edge = project?.businessIdeaCanvas.edges.find((item) => item.id === edgeId);
+  if (!project || !edge) return;
+  const endpoint = nearestBusinessIdeaCanvasEndpointForEdge(project.businessIdeaCanvas, edge, lineMenu);
+  if (!endpoint) return;
+  const node = createBusinessIdeaCanvasTextNode(project, { x: lineMenu.x + 70, y: lineMenu.y + 70 }, "Neue Karte");
+  businessIdeaCanvasSelectedNodeIds = { projectId: project.id, nodeIds: [node.id] };
+  updateBusinessIdeaCanvasProject(project.id, (item) => ({
+    ...insertBusinessIdeaCanvasNodeIntoProject(item, node),
+    businessIdeaCanvas: {
+      ...item.businessIdeaCanvas,
+      nodes: [...item.businessIdeaCanvas.nodes, node],
+      edges: [
+        ...item.businessIdeaCanvas.edges,
+        createBusinessIdeaCanvasEdge(endpoint.nodeId, endpoint.side, node.id, "left", "forward")
+      ]
+    }
+  }), true);
+  businessIdeaCanvasLineMenu = null;
+}
+
+function handleBusinessIdeaCanvasDoubleClick(event: MouseEvent): void {
+  const nodeElement = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-business-canvas-node-id]");
+  if (!nodeElement?.dataset.businessCanvasNodeId) return;
+  const projectId = nodeElement.closest<HTMLElement>("[data-business-canvas-project-id]")?.dataset.businessCanvasProjectId;
+  if (!projectId) return;
+  businessIdeaCanvasSelectedNodeIds = { projectId, nodeIds: [nodeElement.dataset.businessCanvasNodeId] };
+  businessIdeaCanvasSelectedEdge = null;
+  businessIdeaCanvasEditingNode = { projectId, nodeId: nodeElement.dataset.businessCanvasNodeId };
+  businessIdeaCanvasLineMenu = null;
+  renderAll();
+  window.setTimeout(() => {
+    const editor = document.querySelector<HTMLElement>(
+      `[data-business-canvas-node-text="${cssEscape(nodeElement.dataset.businessCanvasNodeId ?? "")}"]`
+    );
+    editor?.focus();
+  }, 0);
+}
+
+function editBusinessIdeaCanvasNode(nodeId: string): void {
+  const projectId = businessIdeaCanvasSelectedNodeIds?.projectId ?? state.selfEmployment.selectedProjectId;
+  const project = selfEmploymentProjectById(projectId);
+  const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === nodeId);
+  if (!project || !node || node.type !== "text") return;
+  businessIdeaCanvasSelectedNodeIds = { projectId, nodeIds: [nodeId] };
+  businessIdeaCanvasSelectedEdge = null;
+  businessIdeaCanvasEditingNode = { projectId, nodeId };
+  closeBusinessIdeaCanvasOverlays();
+  renderAll();
+  window.setTimeout(() => {
+    const editor = document.querySelector<HTMLElement>(
+      `[data-business-canvas-node-text="${cssEscape(nodeId)}"]`
+    );
+    editor?.focus();
+  }, 0);
+}
+
+function handleBusinessIdeaCanvasContextMenu(event: MouseEvent): void {
+  const target = event.target as HTMLElement | null;
+  const editor = target?.closest<HTMLElement>(".business-canvas-editor");
+  if (!editor) return;
+  if (!target?.closest("[data-business-canvas-viewport]")) return;
+  const projectId = editor.dataset.businessCanvasProjectId;
+  const project = projectId ? selfEmploymentProjectById(projectId) : null;
+  if (!projectId || !project) return;
+  event.preventDefault();
+  const point = businessIdeaCanvasPointFromEvent(event, project);
+  const nodeElement = target?.closest<HTMLElement>("[data-business-canvas-node-id]");
+  const selectedIds = businessIdeaCanvasSelectedIds(projectId);
+  if (nodeElement?.dataset.businessCanvasNodeId) {
+    const nodeId = nodeElement.dataset.businessCanvasNodeId;
+    const isMultiSelection = selectedIds.length >= 2 && selectedIds.includes(nodeId);
+    if (!isMultiSelection) selectBusinessIdeaCanvasNodes(projectId, [nodeId]);
+    businessIdeaCanvasContextMenu = {
+      projectId,
+      mode: isMultiSelection ? "selection" : "node",
+      nodeId,
+      x: event.clientX,
+      y: event.clientY,
+      canvasX: point.x,
+      canvasY: point.y
+    };
+  } else {
+    businessIdeaCanvasContextMenu = {
+      projectId,
+      mode: "canvas",
+      x: event.clientX,
+      y: event.clientY,
+      canvasX: point.x,
+      canvasY: point.y
+    };
+    businessIdeaCanvasSelectedEdge = null;
+  }
+  businessIdeaCanvasPalettePopover = null;
+  renderAll();
+}
+
+function handleBusinessIdeaCanvasWheel(event: WheelEvent): void {
+  if (!event.ctrlKey) return;
+  const target = event.target as HTMLElement | null;
+  const viewport = target?.closest<HTMLElement>("[data-business-canvas-viewport]");
+  const projectId = viewport?.closest<HTMLElement>("[data-business-canvas-project-id]")?.dataset.businessCanvasProjectId;
+  if (!viewport || !projectId) return;
+  const project = selfEmploymentProjectById(projectId);
+  const viewportPoint = project ? businessIdeaCanvasViewportPointFromEvent(event, projectId) : null;
+  if (!project || !viewportPoint) return;
+  event.preventDefault();
+  const delta = event.deltaY > 0 ? -0.08 : 0.08;
+  updateBusinessIdeaCanvasProject(projectId, (item) => {
+    const current = item.businessIdeaCanvasMeta.viewport;
+    return {
+      ...item,
+      businessIdeaCanvasMeta: {
+        ...item.businessIdeaCanvasMeta,
+        viewport: businessIdeaCanvasViewportForZoomAtPoint(current, viewportPoint, current.zoom + delta)
+      }
+    };
+  }, true);
+}
+
+function handleBusinessIdeaCanvasKeyDown(event: KeyboardEvent): void {
+  if (event.code === "Space" && !isBusinessIdeaCanvasEditableFocus()) {
+    businessIdeaCanvasSpacePressed = true;
+    if (document.querySelector(".business-canvas-viewport:hover")) event.preventDefault();
+  }
+  if (isBusinessIdeaCanvasEditableFocus()) return;
+  const hasCanvasFocus = Boolean(document.querySelector(".business-canvas-editor"));
+  if (!hasCanvasFocus) return;
+  const usesModifier = event.ctrlKey || event.metaKey;
+  if (usesModifier && event.key.toLowerCase() === "c" && businessIdeaCanvasSelectedNodeIds?.nodeIds.length) {
+    event.preventDefault();
+    copyBusinessIdeaCanvasSelection();
+    return;
+  }
+  if (usesModifier && event.key.toLowerCase() === "v" && businessIdeaCanvasClipboard?.nodes.length) {
+    event.preventDefault();
+    pasteBusinessIdeaCanvasClipboard();
+    return;
+  }
+  if ((event.key === "Delete" || event.key === "Backspace") && businessIdeaCanvasSelectedNodeIds?.nodeIds.length) {
+    event.preventDefault();
+    deleteBusinessIdeaCanvasSelectedNode();
+    return;
+  }
+  if (event.key === "Escape") {
+    businessIdeaCanvasSelectionDragState = null;
+    businessIdeaCanvasSelectionRect = null;
+    businessIdeaCanvasContextMenu = null;
+    businessIdeaCanvasPalettePopover = null;
+    businessIdeaCanvasPaletteEditor = null;
+    businessIdeaCanvasArmedConnection = null;
+    businessIdeaCanvasLineMenu = null;
+    businessIdeaCanvasEditingNode = null;
+    renderAll();
+  }
+}
+
+function handleBusinessIdeaCanvasKeyUp(event: KeyboardEvent): void {
+  if (event.code === "Space") businessIdeaCanvasSpacePressed = false;
+}
+
+function isBusinessIdeaCanvasEditableFocus(): boolean {
+  const active = document.activeElement as HTMLElement | null;
+  if (!active) return false;
+  const tagName = active.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select" || active.isContentEditable;
+}
+
+function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
+  const target = event.target as HTMLElement | null;
+  if (!target?.closest(".business-canvas-editor")) return;
+  const isCanvasControl = Boolean(
+    target.closest(
+      "[contenteditable='true'], [data-business-canvas-node-toolbar], [data-business-canvas-multi-toolbar], .business-canvas-topbar, [data-business-canvas-edge-toolbar], .business-canvas-line-menu, [data-business-canvas-context-menu], [data-business-canvas-palette-popover], [data-business-canvas-palette-editor]"
+    )
+  );
+  if (isCanvasControl) return;
+
+  const projectId = target.closest<HTMLElement>("[data-business-canvas-project-id]")?.dataset.businessCanvasProjectId;
+  if (!projectId) return;
+  const project = selfEmploymentProjectById(projectId);
+  if (!project) return;
+
+  const viewportElement = target.closest<HTMLElement>("[data-business-canvas-viewport]");
+  if ((event.button === 1 || (event.button === 0 && businessIdeaCanvasSpacePressed)) && viewportElement) {
+    event.preventDefault();
+    businessIdeaCanvasPanDragState = {
+      projectId,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      originalX: project.businessIdeaCanvasMeta.viewport.x,
+      originalY: project.businessIdeaCanvasMeta.viewport.y,
+      moved: false
+    };
+    viewportElement.classList.add("panning");
+    viewportElement.setPointerCapture?.(event.pointerId);
+    closeBusinessIdeaCanvasOverlays();
+    return;
+  }
+
+  if (event.button !== 0) return;
+
+  const branch = target.closest<SVGCircleElement>("[data-business-canvas-edge-branch]");
+  if (branch?.dataset.businessCanvasEdgeBranch) {
+    startBusinessIdeaCanvasBranchDrag(event, projectId, branch);
+    return;
+  }
+
+  const anchor = target.closest<HTMLElement>("[data-business-canvas-anchor]");
+  if (anchor?.dataset.businessCanvasAnchorNodeId && anchor.dataset.businessCanvasAnchor) {
+    const node = selfEmploymentProjectById(projectId)?.businessIdeaCanvas.nodes.find(
+      (item) => item.id === anchor.dataset.businessCanvasAnchorNodeId
+    );
+    if (!node) return;
+    event.preventDefault();
+    businessIdeaCanvasConnectionDragState = {
+      projectId,
+      pointerId: event.pointerId,
+      fromNodeId: node.id,
+      fromSide: anchor.dataset.businessCanvasAnchor as JsonCanvasSide,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startPoint: canvasAnchorPoint(node, anchor.dataset.businessCanvasAnchor as JsonCanvasSide),
+      lineMenuPoint: null,
+      lineMenuEdgeId: null,
+      moved: false
+    };
+    anchor.setPointerCapture?.(event.pointerId);
+    return;
+  }
+
+  const resizeHandle = target.closest<HTMLElement>("[data-business-canvas-resize]");
+  const nodeElement = target.closest<HTMLElement>("[data-business-canvas-node-id]");
+  if (nodeElement?.dataset.businessCanvasNodeId) {
+    const nodeId = nodeElement.dataset.businessCanvasNodeId;
+    const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === nodeId);
+    if (!project || !node) return;
+    if (businessIdeaCanvasArmedConnection && businessIdeaCanvasArmedConnection.projectId === projectId && !resizeHandle) {
+      connectBusinessIdeaCanvasArmedNode(project, node, businessIdeaCanvasPointFromEvent(event, project));
+      return;
+    }
+    event.preventDefault();
+    const currentSelection = businessIdeaCanvasSelectedIds(projectId);
+    if ((event.shiftKey || event.metaKey) && !resizeHandle) {
+      const nextSelection = currentSelection.includes(nodeId)
+        ? currentSelection.filter((item) => item !== nodeId)
+        : [...currentSelection, nodeId];
+      selectBusinessIdeaCanvasNodes(projectId, nextSelection);
+      businessIdeaCanvasEditingNode = null;
+      businessIdeaCanvasLineMenu = null;
+      renderAll();
+      return;
+    }
+    const dragNodeIds =
+      resizeHandle || !currentSelection.includes(nodeId) ? [nodeId] : currentSelection.filter((item) => Boolean(item));
+    selectBusinessIdeaCanvasNodes(projectId, dragNodeIds);
+    businessIdeaCanvasSelectedEdge = null;
+    businessIdeaCanvasLineMenu = null;
+    businessIdeaCanvasPalettePopover = null;
+    businessIdeaCanvasContextMenu = null;
+    const originalNodes: Record<string, { x: number; y: number; width: number; height: number }> = {};
+    const elements: Record<string, HTMLElement> = {};
+    for (const item of project.businessIdeaCanvas.nodes) {
+      if (!dragNodeIds.includes(item.id)) continue;
+      originalNodes[item.id] = { x: item.x, y: item.y, width: item.width, height: item.height };
+      const element =
+        item.id === nodeId
+          ? nodeElement
+          : document.querySelector<HTMLElement>(
+              `[data-business-canvas-project-id="${cssEscape(projectId)}"] [data-business-canvas-node-id="${cssEscape(item.id)}"]`
+            );
+      if (element) {
+        elements[item.id] = element;
+        element.classList.add("dragging");
+      }
+    }
+    businessIdeaCanvasDragState = {
+      projectId,
+      nodeIds: dragNodeIds,
+      mode: resizeHandle ? "resize" : "move",
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      originalNodes,
+      elements,
+      moved: false
+    };
+    nodeElement.setPointerCapture?.(event.pointerId);
+    return;
+  }
+
+  const edgeHit = target.closest<SVGElement>("[data-business-canvas-edge-hit], [data-business-canvas-edge-label]");
+  const edgeId = edgeHit?.dataset.businessCanvasEdgeHit || edgeHit?.dataset.businessCanvasEdgeLabel;
+  if (edgeId) {
+    event.preventDefault();
+    businessIdeaCanvasSelectedNodeIds = null;
+    businessIdeaCanvasEditingNode = null;
+    businessIdeaCanvasSelectedEdge = { projectId, edgeId };
+    businessIdeaCanvasLineMenu = null;
+    closeBusinessIdeaCanvasOverlays();
+    if (edgeHit?.dataset.businessCanvasEdgeLabel) editBusinessIdeaCanvasEdgeLabel(projectId, edgeId);
+    renderAll();
+    return;
+  }
+
+  if (viewportElement) {
+    event.preventDefault();
+    const startPoint = businessIdeaCanvasPointFromEvent(event, project);
+    businessIdeaCanvasSelectionDragState = {
+      projectId,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startPoint,
+      currentPoint: startPoint,
+      moved: false
+    };
+    businessIdeaCanvasSelectionRect = { projectId, x: startPoint.x, y: startPoint.y, width: 0, height: 0 };
+    businessIdeaCanvasSelectedNodeIds = null;
+    businessIdeaCanvasSelectedEdge = null;
+    businessIdeaCanvasEditingNode = null;
+    businessIdeaCanvasArmedConnection = null;
+    businessIdeaCanvasLineMenu = null;
+    closeBusinessIdeaCanvasOverlays();
+    viewportElement.setPointerCapture?.(event.pointerId);
+    renderAll();
+  }
+}
+
+function moveBusinessIdeaCanvasPointer(event: PointerEvent): void {
+  if (businessIdeaCanvasConnectionDragState && event.pointerId === businessIdeaCanvasConnectionDragState.pointerId) {
+    businessIdeaCanvasConnectionDragState.moved =
+      businessIdeaCanvasConnectionDragState.moved ||
+      Math.abs(event.clientX - businessIdeaCanvasConnectionDragState.startClientX) > 3 ||
+      Math.abs(event.clientY - businessIdeaCanvasConnectionDragState.startClientY) > 3;
+    return;
+  }
+  if (businessIdeaCanvasPanDragState && event.pointerId === businessIdeaCanvasPanDragState.pointerId) {
+    const drag = businessIdeaCanvasPanDragState;
+    const nextX = drag.originalX + event.clientX - drag.startClientX;
+    const nextY = drag.originalY + event.clientY - drag.startClientY;
+    drag.moved = drag.moved || Math.abs(event.clientX - drag.startClientX) > 3 || Math.abs(event.clientY - drag.startClientY) > 3;
+    const project = selfEmploymentProjectById(drag.projectId);
+    const content = document.querySelector<HTMLElement>(
+      `[data-business-canvas-project-id="${cssEscape(drag.projectId)}"] [data-business-canvas-content]`
+    );
+    if (project && content) {
+      const zoom = project.businessIdeaCanvasMeta.viewport.zoom || 1;
+      content.style.transform = `translate(${nextX}px, ${nextY}px) scale(${zoom})`;
+    }
+    return;
+  }
+  if (businessIdeaCanvasSelectionDragState && event.pointerId === businessIdeaCanvasSelectionDragState.pointerId) {
+    const drag = businessIdeaCanvasSelectionDragState;
+    const project = selfEmploymentProjectById(drag.projectId);
+    if (!project) return;
+    const currentPoint = businessIdeaCanvasPointFromEvent(event, project);
+    drag.currentPoint = currentPoint;
+    drag.moved = drag.moved || Math.abs(event.clientX - drag.startClientX) > 3 || Math.abs(event.clientY - drag.startClientY) > 3;
+    businessIdeaCanvasSelectionRect = {
+      projectId: drag.projectId,
+      x: drag.startPoint.x,
+      y: drag.startPoint.y,
+      width: currentPoint.x - drag.startPoint.x,
+      height: currentPoint.y - drag.startPoint.y
+    };
+    updateBusinessIdeaCanvasSelectionRectElement();
+    return;
+  }
+  if (!businessIdeaCanvasDragState || event.pointerId !== businessIdeaCanvasDragState.pointerId) return;
+  const drag = businessIdeaCanvasDragState;
+  const project = selfEmploymentProjectById(drag.projectId);
+  if (!project) return;
+  const zoom = project.businessIdeaCanvasMeta.viewport.zoom || 1;
+  const deltaX = (event.clientX - drag.startClientX) / zoom;
+  const deltaY = (event.clientY - drag.startClientY) / zoom;
+  drag.moved = drag.moved || Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3;
+  if (drag.mode === "resize") {
+    const nodeId = drag.nodeIds[0];
+    const original = drag.originalNodes[nodeId];
+    const element = drag.elements[nodeId];
+    if (!original || !element) return;
+    const size = clampBusinessIdeaCanvasNodeSize(
+      snapBusinessIdeaCanvasValue(original.width + deltaX, project.businessIdeaCanvasMeta.grid),
+      snapBusinessIdeaCanvasValue(original.height + deltaY, project.businessIdeaCanvasMeta.grid)
+    );
+    element.style.width = `${size.width}px`;
+    element.style.height = `${size.height}px`;
+    return;
+  }
+  for (const nodeId of drag.nodeIds) {
+    const original = drag.originalNodes[nodeId];
+    const element = drag.elements[nodeId];
+    if (!original || !element) continue;
+    const x = snapBusinessIdeaCanvasValue(original.x + deltaX, project.businessIdeaCanvasMeta.grid);
+    const y = snapBusinessIdeaCanvasValue(original.y + deltaY, project.businessIdeaCanvasMeta.grid);
+    element.style.left = `${x + BUSINESS_IDEA_CANVAS_ORIGIN}px`;
+    element.style.top = `${y + BUSINESS_IDEA_CANVAS_ORIGIN}px`;
+  }
+}
+
+function finishBusinessIdeaCanvasPointer(event: PointerEvent): void {
+  if (businessIdeaCanvasConnectionDragState && event.pointerId === businessIdeaCanvasConnectionDragState.pointerId) {
+    finishBusinessIdeaCanvasConnectionDrag(event);
+    return;
+  }
+  if (businessIdeaCanvasPanDragState && event.pointerId === businessIdeaCanvasPanDragState.pointerId) {
+    const drag = businessIdeaCanvasPanDragState;
+    businessIdeaCanvasPanDragState = null;
+    const viewportElement = document.querySelector<HTMLElement>(
+      `[data-business-canvas-project-id="${cssEscape(drag.projectId)}"] [data-business-canvas-viewport]`
+    );
+    viewportElement?.classList.remove("panning");
+    viewportElement?.releasePointerCapture?.(event.pointerId);
+    if (!drag.moved) {
+      renderAll();
+      return;
+    }
+    updateBusinessIdeaCanvasProject(drag.projectId, (project) => ({
+      ...project,
+      businessIdeaCanvasMeta: {
+        ...project.businessIdeaCanvasMeta,
+        viewport: {
+          ...project.businessIdeaCanvasMeta.viewport,
+          x: Math.round(drag.originalX + event.clientX - drag.startClientX),
+          y: Math.round(drag.originalY + event.clientY - drag.startClientY)
+        }
+      }
+    }), true);
+    return;
+  }
+  if (businessIdeaCanvasSelectionDragState && event.pointerId === businessIdeaCanvasSelectionDragState.pointerId) {
+    const drag = businessIdeaCanvasSelectionDragState;
+    businessIdeaCanvasSelectionDragState = null;
+    const rect = businessIdeaCanvasSelectionRect;
+    businessIdeaCanvasSelectionRect = null;
+    const project = selfEmploymentProjectById(drag.projectId);
+    if (!project || !rect || !drag.moved) {
+      clearBusinessIdeaCanvasSelection();
+      renderAll();
+      return;
+    }
+    const nodeIds = businessIdeaCanvasNodesInsideRect(project.businessIdeaCanvas, rect);
+    selectBusinessIdeaCanvasNodes(drag.projectId, nodeIds);
+    renderAll();
+    return;
+  }
+  if (!businessIdeaCanvasDragState || event.pointerId !== businessIdeaCanvasDragState.pointerId) return;
+  const drag = businessIdeaCanvasDragState;
+  const project = selfEmploymentProjectById(drag.projectId);
+  for (const element of Object.values(drag.elements)) {
+    element.classList.remove("dragging");
+    element.releasePointerCapture?.(event.pointerId);
+  }
+  businessIdeaCanvasDragState = null;
+  if (!project || !drag.moved) {
+    renderAll();
+    return;
+  }
+  const zoom = project.businessIdeaCanvasMeta.viewport.zoom || 1;
+  const deltaX = (event.clientX - drag.startClientX) / zoom;
+  const deltaY = (event.clientY - drag.startClientY) / zoom;
+  const draggedIds = new Set(drag.nodeIds);
+  updateBusinessIdeaCanvasProject(drag.projectId, (item) => ({
+    ...item,
+    businessIdeaCanvas: {
+      ...item.businessIdeaCanvas,
+      nodes: item.businessIdeaCanvas.nodes.map((node) => {
+        if (!draggedIds.has(node.id)) return node;
+        const original = drag.originalNodes[node.id];
+        if (!original) return node;
+        if (drag.mode === "resize") {
+          const size = clampBusinessIdeaCanvasNodeSize(
+            snapBusinessIdeaCanvasValue(original.width + deltaX, item.businessIdeaCanvasMeta.grid),
+            snapBusinessIdeaCanvasValue(original.height + deltaY, item.businessIdeaCanvasMeta.grid)
+          );
+          return { ...node, width: size.width, height: size.height };
+        }
+        return {
+          ...node,
+          x: snapBusinessIdeaCanvasValue(original.x + deltaX, item.businessIdeaCanvasMeta.grid),
+          y: snapBusinessIdeaCanvasValue(original.y + deltaY, item.businessIdeaCanvasMeta.grid)
+        };
+      })
+    }
+  }), true);
+}
+
+function startBusinessIdeaCanvasBranchDrag(event: PointerEvent, projectId: string, branch: SVGCircleElement): void {
+  const project = selfEmploymentProjectById(projectId);
+  const edgeId = branch.dataset.businessCanvasEdgeBranch || "";
+  const edge = project?.businessIdeaCanvas.edges.find((item) => item.id === edgeId);
+  if (!project || !edge) return;
+  const point = {
+    x: numberValue(branch.dataset.businessCanvasBranchX),
+    y: numberValue(branch.dataset.businessCanvasBranchY)
+  };
+  const endpoint = nearestBusinessIdeaCanvasEndpointForEdge(project.businessIdeaCanvas, edge, point);
+  if (!endpoint) return;
+  event.preventDefault();
+  businessIdeaCanvasConnectionDragState = {
+    projectId,
+    pointerId: event.pointerId,
+    fromNodeId: endpoint.nodeId,
+    fromSide: endpoint.side,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    startPoint: point,
+    lineMenuPoint: point,
+    lineMenuEdgeId: edgeId,
+    moved: false
+  };
+  businessIdeaCanvasLineMenu = null;
+  branch.setPointerCapture?.(event.pointerId);
+}
+
+function finishBusinessIdeaCanvasConnectionDrag(event: PointerEvent): void {
+  const drag = businessIdeaCanvasConnectionDragState;
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  businessIdeaCanvasConnectionDragState = null;
+  const target = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+  const targetNodeElement = target?.closest<HTMLElement>("[data-business-canvas-node-id]");
+  const targetNodeId = targetNodeElement?.dataset.businessCanvasNodeId;
+  const project = selfEmploymentProjectById(drag.projectId);
+  if (!project) return;
+  if (!drag.moved && drag.lineMenuPoint) {
+    businessIdeaCanvasLineMenu = { projectId: drag.projectId, edgeId: drag.lineMenuEdgeId ?? "", ...drag.lineMenuPoint };
+    renderAll();
+    return;
+  }
+  const targetNode = targetNodeId ? project.businessIdeaCanvas.nodes.find((node) => node.id === targetNodeId) : null;
+  if (!targetNode || targetNode.type === "group" || targetNode.id === drag.fromNodeId) {
+    renderAll();
+    return;
+  }
+  const point = businessIdeaCanvasPointFromEvent(event, project);
+  const toSide = nearestBusinessIdeaCanvasNodeSide(targetNode, point);
+  addBusinessIdeaCanvasEdge(project.id, drag.fromNodeId, drag.fromSide, targetNode.id, toSide, "forward");
+}
+
+function connectBusinessIdeaCanvasArmedNode(project: SelfEmploymentProject, targetNode: JsonCanvasNode, point: { x: number; y: number }): void {
+  const armed = businessIdeaCanvasArmedConnection;
+  if (!armed || armed.projectId !== project.id || targetNode.type === "group" || armed.nodeId === targetNode.id) return;
+  addBusinessIdeaCanvasEdge(project.id, armed.nodeId, armed.side, targetNode.id, nearestBusinessIdeaCanvasNodeSide(targetNode, point), "forward");
+  businessIdeaCanvasArmedConnection = null;
+}
+
+function editBusinessIdeaCanvasEdgeLabel(projectId: string, edgeId: string): void {
+  const project = selfEmploymentProjectById(projectId);
+  const edge = project?.businessIdeaCanvas.edges.find((item) => item.id === edgeId);
+  if (!project || !edge) return;
+  const label = window.prompt("Verbindungslabel", edge.label ?? "");
+  if (label === null) return;
+  updateBusinessIdeaCanvasProject(projectId, (item) => ({
+    ...item,
+    businessIdeaCanvas: {
+      ...item.businessIdeaCanvas,
+      edges: item.businessIdeaCanvas.edges.map((canvasEdge) =>
+        canvasEdge.id === edgeId ? { ...canvasEdge, label: label.trim() } : canvasEdge
+      )
+    }
+  }), true);
+}
+
+function insertBusinessIdeaCanvasNode(projectId: string, node: JsonCanvasNode, renderAfterUpdate: boolean): void {
+  businessIdeaCanvasSelectedNodeIds = { projectId, nodeIds: [node.id] };
+  businessIdeaCanvasSelectedEdge = null;
+  updateBusinessIdeaCanvasProject(projectId, (project) => insertBusinessIdeaCanvasNodeIntoProject(project, node), renderAfterUpdate);
+}
+
+function insertBusinessIdeaCanvasNodeIntoProject(project: SelfEmploymentProject, node: JsonCanvasNode): SelfEmploymentProject {
+  return {
+    ...project,
+    businessIdeaCanvas: {
+      ...project.businessIdeaCanvas,
+      nodes: [...project.businessIdeaCanvas.nodes, node]
+    },
+    businessIdeaCanvasMeta: {
+      ...project.businessIdeaCanvasMeta,
+      nodeMeta: {
+        ...project.businessIdeaCanvasMeta.nodeMeta,
+        [node.id]: {
+          labelId: project.businessIdeaCanvasMeta.activeLabelId,
+          phaseId: project.businessIdeaCanvasMeta.activePhaseId,
+          shape: "rounded-rectangle"
+        }
+      }
+    }
+  };
+}
+
+function addBusinessIdeaCanvasGroupAtPoint(point: { x: number; y: number }): void {
+  const projectId = state.selfEmployment.selectedProjectId;
+  const project = selfEmploymentProjectById(projectId);
+  if (!project) return;
+  const groupId = createId();
+  const groupNode: JsonCanvasNode = {
+    id: groupId,
+    type: "group",
+    label: "Neue Gruppe",
+    x: snapBusinessIdeaCanvasValue(point.x, project.businessIdeaCanvasMeta.grid),
+    y: snapBusinessIdeaCanvasValue(point.y, project.businessIdeaCanvasMeta.grid),
+    width: 320,
+    height: 220,
+    color: "4"
+  };
+  businessIdeaCanvasSelectedNodeIds = { projectId, nodeIds: [groupId] };
+  businessIdeaCanvasSelectedEdge = null;
+  updateBusinessIdeaCanvasProject(projectId, (item) => ({
+    ...item,
+    businessIdeaCanvas: {
+      ...item.businessIdeaCanvas,
+      nodes: [...item.businessIdeaCanvas.nodes, groupNode]
+    },
+    businessIdeaCanvasMeta: {
+      ...item.businessIdeaCanvasMeta,
+      groupMeta: {
+        ...item.businessIdeaCanvasMeta.groupMeta,
+        [groupId]: { nodeIds: [], name: "Neue Gruppe", color: "4" }
+      }
+    }
+  }), true);
+}
+
+function createBusinessIdeaCanvasGroupFromSelection(): void {
+  const selection = businessIdeaCanvasSelectedNodeIds;
+  if (!selection?.nodeIds.length) return;
+  const project = selfEmploymentProjectById(selection.projectId);
+  if (!project) return;
+  const selectedIds = new Set(selection.nodeIds);
+  const nodes = project.businessIdeaCanvas.nodes.filter((node) => node.type !== "group" && selectedIds.has(node.id));
+  if (nodes.length < 2) return;
+  const groupId = createId();
+  const groupName = `Gruppe ${Object.keys(project.businessIdeaCanvasMeta.groupMeta).length + 1}`;
+  const groupNode = createBusinessIdeaCanvasGroupNode(groupId, nodes, groupName, "4");
+  if (!groupNode) return;
+  businessIdeaCanvasSelectedNodeIds = { projectId: project.id, nodeIds: [groupId] };
+  updateBusinessIdeaCanvasProject(project.id, (item) => ({
+    ...item,
+    businessIdeaCanvas: {
+      ...item.businessIdeaCanvas,
+      nodes: [...item.businessIdeaCanvas.nodes, groupNode]
+    },
+    businessIdeaCanvasMeta: {
+      ...item.businessIdeaCanvasMeta,
+      groupMeta: {
+        ...item.businessIdeaCanvasMeta.groupMeta,
+        [groupId]: createBusinessIdeaCanvasGroupMeta(groupNode, nodes.map((node) => node.id), groupName)
+      }
+    }
+  }), true);
+}
+
+function copyBusinessIdeaCanvasSelection(): boolean {
+  const selection = businessIdeaCanvasSelectedNodeIds;
+  if (!selection?.nodeIds.length) return false;
+  const project = selfEmploymentProjectById(selection.projectId);
+  if (!project) return false;
+  const selectedIds = new Set(selection.nodeIds);
+  const nodes = project.businessIdeaCanvas.nodes
+    .filter((node) => node.type !== "group" && selectedIds.has(node.id))
+    .map((node) => ({ ...node }));
+  if (!nodes.length) {
+    businessIdeaCanvasClipboard = null;
+    businessIdeaCanvasContextMenu = null;
+    renderAll();
+    return false;
+  }
+  const nodeMeta: Record<string, BusinessIdeaCanvasNodeMeta> = {};
+  for (const node of nodes) {
+    nodeMeta[node.id] = {
+      ...(project.businessIdeaCanvasMeta.nodeMeta[node.id] ?? {
+        labelId: project.businessIdeaCanvasMeta.activeLabelId,
+        phaseId: project.businessIdeaCanvasMeta.activePhaseId,
+        shape: "rounded-rectangle"
+      })
+    };
+  }
+  businessIdeaCanvasClipboard = { nodes, nodeMeta };
+  businessIdeaCanvasContextMenu = null;
+  renderAll();
+  return true;
+}
+
+function pasteBusinessIdeaCanvasClipboard(point?: { x: number; y: number }): void {
+  const projectId = state.selfEmployment.selectedProjectId;
+  const project = selfEmploymentProjectById(projectId);
+  if (!project || !businessIdeaCanvasClipboard?.nodes.length) return;
+  const bounds = businessIdeaCanvasBoundsForNodes(businessIdeaCanvasClipboard.nodes);
+  const offsetX = point && bounds ? point.x - bounds.x : 24;
+  const offsetY = point && bounds ? point.y - bounds.y : 24;
+  const idMap = new Map<string, string>();
+  const nodes = businessIdeaCanvasClipboard.nodes.map((node) => {
+    const id = createId();
+    idMap.set(node.id, id);
+    return {
+      ...node,
+      id,
+      x: snapBusinessIdeaCanvasValue(node.x + offsetX, project.businessIdeaCanvasMeta.grid),
+      y: snapBusinessIdeaCanvasValue(node.y + offsetY, project.businessIdeaCanvasMeta.grid)
+    };
+  });
+  const nextNodeMeta: Record<string, BusinessIdeaCanvasNodeMeta> = {};
+  for (const node of businessIdeaCanvasClipboard.nodes) {
+    const id = idMap.get(node.id);
+    if (!id) continue;
+    nextNodeMeta[id] = {
+      ...(businessIdeaCanvasClipboard.nodeMeta[node.id] ?? {
+        labelId: project.businessIdeaCanvasMeta.activeLabelId,
+        phaseId: project.businessIdeaCanvasMeta.activePhaseId,
+        shape: "rounded-rectangle"
+      })
+    };
+  }
+  businessIdeaCanvasSelectedNodeIds = { projectId, nodeIds: nodes.map((node) => node.id) };
+  businessIdeaCanvasSelectedEdge = null;
+  businessIdeaCanvasContextMenu = null;
+  businessIdeaCanvasPalettePopover = null;
+  updateBusinessIdeaCanvasProject(projectId, (item) => ({
+    ...item,
+    businessIdeaCanvas: {
+      ...item.businessIdeaCanvas,
+      nodes: [...item.businessIdeaCanvas.nodes, ...nodes]
+    },
+    businessIdeaCanvasMeta: {
+      ...item.businessIdeaCanvasMeta,
+      nodeMeta: {
+        ...item.businessIdeaCanvasMeta.nodeMeta,
+        ...nextNodeMeta
+      }
+    }
+  }), true);
+}
+
+function alignBusinessIdeaCanvasSelection(axis: "left" | "top"): void {
+  const selection = businessIdeaCanvasSelectedNodeIds;
+  if (!selection?.nodeIds.length) return;
+  const project = selfEmploymentProjectById(selection.projectId);
+  if (!project) return;
+  const selectedIds = new Set(selection.nodeIds);
+  const nodes = project.businessIdeaCanvas.nodes.filter((node) => selectedIds.has(node.id));
+  if (nodes.length < 2) return;
+  const value = axis === "left" ? Math.min(...nodes.map((node) => node.x)) : Math.min(...nodes.map((node) => node.y));
+  updateBusinessIdeaCanvasProject(selection.projectId, (item) => ({
+    ...item,
+    businessIdeaCanvas: {
+      ...item.businessIdeaCanvas,
+      nodes: item.businessIdeaCanvas.nodes.map((node) =>
+        selectedIds.has(node.id) ? { ...node, ...(axis === "left" ? { x: value } : { y: value }) } : node
+      )
+    }
+  }), true);
+}
+
+function openBusinessIdeaCanvasPalette(button: HTMLElement): void {
+  const projectId = button.closest<HTMLElement>("[data-business-canvas-project-id]")?.dataset.businessCanvasProjectId;
+  if (!projectId) return;
+  const idsFromButton = (button.dataset.businessCanvasPaletteNodeIds || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const targetNodeIds = idsFromButton.length ? idsFromButton : businessIdeaCanvasSelectedIds(projectId);
+  if (!targetNodeIds.length) return;
+  const rect = button.getBoundingClientRect();
+  businessIdeaCanvasPalettePopover = {
+    projectId,
+    targetNodeIds,
+    x: Math.round(rect.left),
+    y: Math.round(rect.bottom + 6)
+  };
+  businessIdeaCanvasContextMenu = null;
+  renderAll();
+}
+
+function applyBusinessIdeaCanvasPaletteColor(color: string): void {
+  const popover = businessIdeaCanvasPalettePopover;
+  const projectId = popover?.projectId ?? state.selfEmployment.selectedProjectId;
+  const targetNodeIds = popover?.targetNodeIds.length ? popover.targetNodeIds : businessIdeaCanvasSelectedIds(projectId);
+  if (!targetNodeIds.length) return;
+  const selectedIds = new Set(targetNodeIds);
+  updateBusinessIdeaCanvasProject(projectId, (project) => {
+    const nextGroupMeta = { ...project.businessIdeaCanvasMeta.groupMeta };
+    for (const node of project.businessIdeaCanvas.nodes) {
+      if (node.type === "group" && selectedIds.has(node.id) && nextGroupMeta[node.id]) {
+        nextGroupMeta[node.id] = { ...nextGroupMeta[node.id], color };
+      }
+    }
+    return {
+      ...project,
+      businessIdeaCanvas: {
+        ...project.businessIdeaCanvas,
+        nodes: project.businessIdeaCanvas.nodes.map((node) => (selectedIds.has(node.id) ? { ...node, color } : node))
+      },
+      businessIdeaCanvasMeta: {
+        ...project.businessIdeaCanvasMeta,
+        groupMeta: nextGroupMeta
+      }
+    };
+  }, true);
+  businessIdeaCanvasPalettePopover = null;
+}
+
+function openBusinessIdeaCanvasPaletteEditor(): void {
+  const projectId = businessIdeaCanvasPalettePopover?.projectId ?? state.selfEmployment.selectedProjectId;
+  businessIdeaCanvasPaletteEditor = {
+    projectId,
+    name: "Neue Farbe",
+    color: "#64748b"
+  };
+  renderAll();
+}
+
+function updateBusinessIdeaCanvasPaletteDraft(field: string, value: string): void {
+  if (!businessIdeaCanvasPaletteEditor) return;
+  if (field !== "name" && field !== "color") return;
+  businessIdeaCanvasPaletteEditor = {
+    ...businessIdeaCanvasPaletteEditor,
+    [field]: value,
+    error: undefined
+  };
+}
+
+function saveBusinessIdeaCanvasPaletteColor(): void {
+  const editor = businessIdeaCanvasPaletteEditor;
+  if (!editor) return;
+  const name = editor.name.trim();
+  const color = editor.color.trim();
+  if (!name || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+    businessIdeaCanvasPaletteEditor = { ...editor, error: "Name und Hex-Farbe werden benoetigt." };
+    renderAll();
+    return;
+  }
+  updateBusinessIdeaCanvasProject(editor.projectId, (project) => ({
+    ...project,
+    businessIdeaCanvasMeta: {
+      ...project.businessIdeaCanvasMeta,
+      palette: [...project.businessIdeaCanvasMeta.palette, { id: createId(), name, color }]
+    }
+  }), true);
+  businessIdeaCanvasPaletteEditor = null;
+}
+
+function addBusinessIdeaCanvasEdge(
+  projectId: string,
+  fromNode: string,
+  fromSide: JsonCanvasSide,
+  toNode: string,
+  toSide: JsonCanvasSide,
+  direction: BusinessIdeaCanvasEdgeDirection
+): void {
+  updateBusinessIdeaCanvasProject(projectId, (project) => ({
+    ...project,
+    businessIdeaCanvas: {
+      ...project.businessIdeaCanvas,
+      edges: [
+        ...project.businessIdeaCanvas.edges,
+        createBusinessIdeaCanvasEdge(fromNode, fromSide, toNode, toSide, direction)
+      ]
+    }
+  }), true);
+}
+
+function createBusinessIdeaCanvasEdge(
+  fromNode: string,
+  fromSide: JsonCanvasSide,
+  toNode: string,
+  toSide: JsonCanvasSide,
+  direction: BusinessIdeaCanvasEdgeDirection
+): JsonCanvasEdge {
+  const ends = businessIdeaCanvasEndsForDirection(direction);
+  return {
+    id: createId(),
+    fromNode,
+    fromSide,
+    fromEnd: ends.fromEnd,
+    toNode,
+    toSide,
+    toEnd: ends.toEnd,
+    label: ""
+  };
+}
+
+function createBusinessIdeaCanvasTextNode(
+  project: SelfEmploymentProject,
+  point: { x: number; y: number },
+  text: string
+): JsonCanvasNode {
+  return {
+    id: createId(),
+    type: "text",
+    text,
+    x: snapBusinessIdeaCanvasValue(point.x, project.businessIdeaCanvasMeta.grid),
+    y: snapBusinessIdeaCanvasValue(point.y, project.businessIdeaCanvasMeta.grid),
+    width: 240,
+    height: 110,
+    color: project.businessIdeaCanvasMeta.labels.find((label) => label.id === project.businessIdeaCanvasMeta.activeLabelId)?.color ?? "1"
+  };
+}
+
+function updateBusinessIdeaCanvasProject(
+  projectId: string,
+  updater: (project: SelfEmploymentProject) => SelfEmploymentProject,
+  renderAfterUpdate = false
+): void {
+  updateSelfEmploymentProject(projectId, updater, renderAfterUpdate);
+}
+
+function businessIdeaCanvasPointFromEvent(event: PointerEvent | MouseEvent, project: SelfEmploymentProject): { x: number; y: number } {
+  const content = document.querySelector<HTMLElement>(
+    `[data-business-canvas-project-id="${cssEscape(project.id)}"] [data-business-canvas-content]`
+  );
+  const rect = content?.getBoundingClientRect();
+  const zoom = project.businessIdeaCanvasMeta.viewport.zoom || 1;
+  if (!rect) return { x: 0, y: 0 };
+  return {
+    x: (event.clientX - rect.left) / zoom - BUSINESS_IDEA_CANVAS_ORIGIN,
+    y: (event.clientY - rect.top) / zoom - BUSINESS_IDEA_CANVAS_ORIGIN
+  };
+}
+
+function businessIdeaCanvasViewportPointFromEvent(event: WheelEvent, projectId: string): { x: number; y: number } | null {
+  const viewport = document.querySelector<HTMLElement>(
+    `[data-business-canvas-project-id="${cssEscape(projectId)}"] [data-business-canvas-viewport]`
+  );
+  const rect = viewport?.getBoundingClientRect();
+  if (!rect) return null;
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
+function businessIdeaCanvasVisibleTopLeft(project: SelfEmploymentProject): { x: number; y: number } {
+  return businessIdeaCanvasPointFromViewportPoint(project, { x: 32, y: 32 });
+}
+
+function businessIdeaCanvasPointFromViewportPoint(
+  project: SelfEmploymentProject,
+  point: { x: number; y: number }
+): { x: number; y: number } {
+  const viewport = project.businessIdeaCanvasMeta.viewport;
+  const zoom = viewport.zoom || 1;
+  return {
+    x: snapBusinessIdeaCanvasValue((point.x - viewport.x) / zoom - BUSINESS_IDEA_CANVAS_ORIGIN, project.businessIdeaCanvasMeta.grid),
+    y: snapBusinessIdeaCanvasValue((point.y - viewport.y) / zoom - BUSINESS_IDEA_CANVAS_ORIGIN, project.businessIdeaCanvasMeta.grid)
+  };
+}
+
+function updateBusinessIdeaCanvasSelectionRectElement(): void {
+  const rect = businessIdeaCanvasSelectionRect;
+  if (!rect) return;
+  const element = document.querySelector<HTMLElement>(
+    `[data-business-canvas-project-id="${cssEscape(rect.projectId)}"] [data-business-canvas-selection-rect]`
+  );
+  if (!element) {
+    renderAll();
+    return;
+  }
+  const left = rect.width < 0 ? rect.x + rect.width : rect.x;
+  const top = rect.height < 0 ? rect.y + rect.height : rect.y;
+  element.style.left = `${left + BUSINESS_IDEA_CANVAS_ORIGIN}px`;
+  element.style.top = `${top + BUSINESS_IDEA_CANVAS_ORIGIN}px`;
+  element.style.width = `${Math.abs(rect.width)}px`;
+  element.style.height = `${Math.abs(rect.height)}px`;
+}
+
+function selfEmploymentProjectById(projectId: string): SelfEmploymentProject | null {
+  return state.selfEmployment.projects.find((project) => project.id === projectId) ?? null;
 }
 
 function selfEmploymentTextField(
@@ -3256,8 +4725,10 @@ function selectSelfEmploymentProject(projectId: string): void {
 function addSelfEmploymentProject(): void {
   const index = state.selfEmployment.projects.length + 1;
   const id = createId();
+  const canvasDefaults = defaultBusinessIdeaCanvasForProject(id, { idea: "Neue Geschaeftsidee" });
   const project: SelfEmploymentProject = {
     ...defaultSelfEmploymentState().projects[0],
+    ...canvasDefaults,
     id,
     name: `Projekt ${intNumber(index)}`,
     labels: [],

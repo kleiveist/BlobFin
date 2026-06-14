@@ -44,6 +44,25 @@ describe("vault serializer", () => {
     state.settings.interestRatePercent = 3.25;
     state.incomePlanning.habits[0] = { ...state.incomePlanning.habits[0], name: "Training" };
     state.selfEmployment.projects[0] = { ...state.selfEmployment.projects[0], name: "Vault-Projekt" };
+    state.selfEmployment.projects[0].businessIdeaCanvas = {
+      ...state.selfEmployment.projects[0].businessIdeaCanvas,
+      nodes: [
+        ...state.selfEmployment.projects[0].businessIdeaCanvas.nodes,
+        { id: "group-1", type: "group", label: "Planung", x: -40, y: -40, width: 500, height: 260, color: "5" }
+      ]
+    };
+    state.selfEmployment.projects[0].businessIdeaCanvasMeta = {
+      ...state.selfEmployment.projects[0].businessIdeaCanvasMeta,
+      palette: [...state.selfEmployment.projects[0].businessIdeaCanvasMeta.palette, { id: "custom", name: "Custom", color: "#123456" }],
+      groupMeta: {
+        "group-1": {
+          nodeIds: [state.selfEmployment.projects[0].businessIdeaCanvas.nodes[0].id],
+          name: "Planung",
+          color: "5",
+          status: "open"
+        }
+      }
+    };
     state.positionTableView.savings.selectedLabels = ["tag"];
 
     const loaded = normalizeStoredState(deserializeVaultState(serializeVaultState(state)));
@@ -53,7 +72,41 @@ describe("vault serializer", () => {
     expect(loaded.settings.interestRatePercent).toBe(3.25);
     expect(loaded.incomePlanning.habits[0].name).toBe("Training");
     expect(loaded.selfEmployment.projects[0].name).toBe("Vault-Projekt");
+    expect(loaded.selfEmployment.projects[0].businessIdeaCanvasMeta.palette).toContainEqual({
+      id: "custom",
+      name: "Custom",
+      color: "#123456"
+    });
+    expect(loaded.selfEmployment.projects[0].businessIdeaCanvasMeta.groupMeta["group-1"]).toMatchObject({
+      nodeIds: [state.selfEmployment.projects[0].businessIdeaCanvas.nodes[0].id],
+      name: "Planung",
+      color: "5",
+      status: "open"
+    });
     expect(loaded.positionTableView.savings.selectedLabels).toEqual(["tag"]);
+  });
+
+  it("prefers external .canvas files over the embedded self employment fallback", () => {
+    const state = defaultAppState();
+    const project = state.selfEmployment.projects[0];
+    const externalCanvas = {
+      nodes: [{ id: "external-node", type: "text", text: "Aus Canvas-Datei", x: 0, y: 0, width: 240, height: 120 }],
+      edges: []
+    };
+
+    const loaded = normalizeStoredState(
+      deserializeVaultState({
+        selfEmploymentState: state.selfEmployment,
+        selfEmploymentCanvasFiles: {
+          [project.businessIdeaCanvasFile]: externalCanvas
+        }
+      })
+    );
+
+    expect(loaded.selfEmployment.projects[0].businessIdeaCanvas.nodes[0]).toMatchObject({
+      id: "external-node",
+      text: "Aus Canvas-Datei"
+    });
   });
 
   it("falls back to defaults for missing optional vault files", () => {

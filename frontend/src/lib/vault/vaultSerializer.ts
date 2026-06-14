@@ -80,6 +80,10 @@ export function deserializeVaultState(files: VaultDataFiles): AppState {
   const timeHabitsFile = record(files.timeHabits);
   const timeWeekScenariosFile = record(files.timeWeekScenarios);
   const timeStampPlannerFile = record(files.timeStampPlanner);
+  const selfEmploymentStateFile = withExternalSelfEmploymentCanvases(
+    files.selfEmploymentState,
+    files.selfEmploymentCanvasFiles
+  );
 
   const incomeTracker: IncomeTrackerState = {
     ...fallback.incomeTracker,
@@ -116,8 +120,8 @@ export function deserializeVaultState(files: VaultDataFiles): AppState {
       : fallback.statutoryPension,
     incomeTracker,
     incomePlanning,
-    selfEmployment: isRecord(files.selfEmploymentState)
-      ? (files.selfEmploymentState as unknown as AppState["selfEmployment"])
+    selfEmployment: isRecord(selfEmploymentStateFile)
+      ? (selfEmploymentStateFile as unknown as AppState["selfEmployment"])
       : fallback.selfEmployment,
     planningAccounts: arrayOr(planningAccountsFile.planningAccounts, fallback.planningAccounts),
     positions: arrayOr(planningPositionsFile.positions, fallback.positions),
@@ -137,6 +141,18 @@ export function deserializeVaultState(files: VaultDataFiles): AppState {
 
 function record(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
+}
+
+function withExternalSelfEmploymentCanvases(value: unknown, canvasFiles: unknown): unknown {
+  if (!isRecord(value) || !isRecord(canvasFiles) || !Array.isArray(value.projects)) return value;
+  return {
+    ...value,
+    projects: value.projects.map((project) => {
+      if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") return project;
+      const externalCanvas = canvasFiles[project.businessIdeaCanvasFile];
+      return externalCanvas === undefined ? project : { ...project, businessIdeaCanvas: externalCanvas };
+    })
+  };
 }
 
 function arrayOr<T>(value: unknown, fallback: T[]): T[] {

@@ -21,6 +21,7 @@ import {
   buildIncomePlanningWorkBlock,
   incomePlanningAverageSleepHours
 } from "../domain/incomePlanning";
+import { defaultBusinessIdeaCanvasForProject } from "../domain/businessIdeaCanvas";
 
 export const MONTHS = [
   "Januar",
@@ -425,6 +426,12 @@ export function defaultIncomePlanningState(): IncomePlanningState {
 }
 
 export function defaultSelfEmploymentState(): SelfEmploymentState {
+  const exampleCanvas = defaultBusinessIdeaCanvasForProject("self-project-example", {
+    idea: "Nebenprojekt Beratung",
+    problem: "Kleine Selbststaendige brauchen einfache Finanz- und Prozessstruktur.",
+    targetGroup: "kleine Selbststaendige",
+    revenueModel: "Stundenhonorar"
+  });
   return {
     selectedProjectId: "self-project-example",
     selectedRoadmapAreaId: "idea",
@@ -497,7 +504,8 @@ export function defaultSelfEmploymentState(): SelfEmploymentState {
             estimatedHours: 2,
             status: "in_progress"
           }
-        ]
+        ],
+        ...exampleCanvas
       }
     ]
   };

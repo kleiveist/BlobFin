@@ -92,6 +92,12 @@ export type SelfEmploymentRoadmapAreaId =
   | "budget"
   | "profit"
   | "metrics";
+export type JsonCanvasSide = "top" | "right" | "bottom" | "left";
+export type JsonCanvasEnd = "none" | "arrow";
+export type JsonCanvasColor = string;
+export type JsonCanvasNodeType = "text" | "file" | "link" | "group";
+export type BusinessIdeaCanvasShape = "rounded-rectangle" | "rectangle" | "ellipse" | "diamond";
+export type BusinessIdeaCanvasEdgeDirection = "none" | "forward" | "backward" | "both";
 export type RepaymentSourceToggleKey =
   | "useWithdrawalGainAsRepayment"
   | "useDepotSavingsRateAsRepayment"
@@ -257,6 +263,115 @@ export interface SelfEmploymentTask {
   status: SelfEmploymentTaskStatus;
 }
 
+export interface JsonCanvasBaseNode {
+  id: string;
+  type: JsonCanvasNodeType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color?: JsonCanvasColor;
+}
+
+export interface JsonCanvasTextNode extends JsonCanvasBaseNode {
+  type: "text";
+  text: string;
+}
+
+export interface JsonCanvasFileNode extends JsonCanvasBaseNode {
+  type: "file";
+  file: string;
+  subpath?: string;
+}
+
+export interface JsonCanvasLinkNode extends JsonCanvasBaseNode {
+  type: "link";
+  url: string;
+}
+
+export interface JsonCanvasGroupNode extends JsonCanvasBaseNode {
+  type: "group";
+  label?: string;
+  background?: string;
+  backgroundStyle?: "cover" | "ratio" | "repeat";
+}
+
+export type JsonCanvasNode = JsonCanvasTextNode | JsonCanvasFileNode | JsonCanvasLinkNode | JsonCanvasGroupNode;
+
+export interface JsonCanvasEdge {
+  id: string;
+  fromNode: string;
+  fromSide?: JsonCanvasSide;
+  fromEnd?: JsonCanvasEnd;
+  toNode: string;
+  toSide?: JsonCanvasSide;
+  toEnd?: JsonCanvasEnd;
+  color?: JsonCanvasColor;
+  label?: string;
+}
+
+export interface BusinessIdeaCanvas {
+  nodes: JsonCanvasNode[];
+  edges: JsonCanvasEdge[];
+}
+
+export interface BusinessIdeaCanvasViewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+export interface BusinessIdeaCanvasGrid {
+  size: number;
+  snap: boolean;
+  alignToObjects: boolean;
+}
+
+export interface BusinessIdeaCanvasLabel {
+  id: string;
+  name: string;
+  color: JsonCanvasColor;
+}
+
+export interface BusinessIdeaCanvasPhase {
+  id: string;
+  name: string;
+  order: number;
+  startDate: string | null;
+}
+
+export interface BusinessIdeaCanvasNodeMeta {
+  labelId: string;
+  phaseId: string;
+  shape: BusinessIdeaCanvasShape;
+}
+
+export interface BusinessIdeaCanvasPaletteColor {
+  id: string;
+  name: string;
+  color: JsonCanvasColor;
+}
+
+export interface BusinessIdeaCanvasGroupMeta {
+  nodeIds: string[];
+  name: string;
+  color: JsonCanvasColor;
+  status?: string;
+  topic?: string;
+}
+
+export interface BusinessIdeaCanvasMeta {
+  viewport: BusinessIdeaCanvasViewport;
+  grid: BusinessIdeaCanvasGrid;
+  labels: BusinessIdeaCanvasLabel[];
+  phases: BusinessIdeaCanvasPhase[];
+  activeLabelId: string;
+  activePhaseId: string;
+  palette: BusinessIdeaCanvasPaletteColor[];
+  groupMeta: Record<string, BusinessIdeaCanvasGroupMeta>;
+  nodeMeta: Record<string, BusinessIdeaCanvasNodeMeta>;
+}
+
 export interface SelfEmploymentProject {
   id: string;
   name: string;
@@ -291,6 +406,9 @@ export interface SelfEmploymentProject {
   contacts: SelfEmploymentContact[];
   invoices: SelfEmploymentInvoice[];
   tasks: SelfEmploymentTask[];
+  businessIdeaCanvas: BusinessIdeaCanvas;
+  businessIdeaCanvasFile: string;
+  businessIdeaCanvasMeta: BusinessIdeaCanvasMeta;
 }
 
 export interface SelfEmploymentState {

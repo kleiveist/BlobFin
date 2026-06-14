@@ -135,6 +135,15 @@ describe("storage", () => {
     expect(state.selfEmployment.projects).toHaveLength(1);
     expect(state.selfEmployment.projects[0].labels).toContain("Beratung");
     expect(state.selfEmployment.projects[0].name).toBe("Beispielprojekt");
+    expect(state.selfEmployment.projects[0].businessIdeaCanvasFile).toBe(
+      "planning/projects/self-project-example/canvas-geschaeftsidee.canvas"
+    );
+    expect(state.selfEmployment.projects[0].businessIdeaCanvas.nodes.length).toBeGreaterThan(0);
+    expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.phases.map((phase) => phase.name)).toContain(
+      "Ideen sammeln"
+    );
+    expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.palette.length).toBeGreaterThan(0);
+    expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.groupMeta).toEqual({});
     expect(state.selfEmployment.selectedProjectId).toBe(state.selfEmployment.projects[0].id);
     expect(state.selfEmployment.selectedRoadmapAreaId).toBe("idea");
   });
@@ -150,6 +159,25 @@ describe("storage", () => {
 
     expect(loaded.selfEmployment.selectedRoadmapAreaId).toBe("idea");
     expect(loaded.selfEmployment.projects[0].icon).toBe("briefcase");
+  });
+
+  it("migrates legacy self employment projects to a business idea canvas", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState() as any;
+    delete state.selfEmployment.projects[0].businessIdeaCanvas;
+    delete state.selfEmployment.projects[0].businessIdeaCanvasFile;
+    delete state.selfEmployment.projects[0].businessIdeaCanvasMeta;
+    state.selfEmployment.projects[0].idea = "Legacy Idee";
+    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const loaded = loadState(storage);
+    const project = loaded.selfEmployment.projects[0];
+
+    expect(project.businessIdeaCanvasFile.endsWith(".canvas")).toBe(true);
+    expect(project.businessIdeaCanvas.nodes[0]).toMatchObject({ type: "text", text: "Legacy Idee" });
+    expect(project.businessIdeaCanvasMeta.nodeMeta[project.businessIdeaCanvas.nodes[0].id].labelId).toBe("idea");
+    expect(project.businessIdeaCanvasMeta.palette.length).toBeGreaterThan(0);
+    expect(project.businessIdeaCanvasMeta.groupMeta).toEqual({});
   });
 
   it("adds missing income planning defaults to saved app state", () => {

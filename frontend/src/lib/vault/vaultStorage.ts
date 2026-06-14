@@ -1,4 +1,5 @@
 import type { AppState } from "../../types";
+import { parseBusinessIdeaCanvasFile, serializeBusinessIdeaCanvas } from "../../domain/businessIdeaCanvas";
 import { createVaultManifest, updateVaultManifestTimestamp } from "./vaultManifest";
 import { migrateVaultManifest } from "./vaultMigration";
 import { deserializeVaultState, serializeVaultState } from "./vaultSerializer";
@@ -48,6 +49,7 @@ export async function readVault(rootPath: string): Promise<VaultReadResult> {
     if (!contents) continue;
     dataFiles[key] = parseJson(contents, manifest.dataFiles[key]);
   }
+  dataFiles.selfEmploymentCanvasFiles = await readSelfEmploymentCanvasFiles(rootPath, dataFiles.selfEmploymentState);
 
   return { manifest, dataFiles };
 }
@@ -61,6 +63,12 @@ export async function writeVaultState(rootPath: string, state: AppState): Promis
 
   for (const key of VAULT_DATA_FILE_KEYS) {
     await writeJsonFile(vaultDataFilePath(rootPath, manifest, key), dataFiles[key] ?? null);
+  }
+  for (const project of state.selfEmployment.projects) {
+    await writeJsonFile(
+      joinVaultPath(profilePath(rootPath), project.businessIdeaCanvasFile),
+      serializeBusinessIdeaCanvas(project.businessIdeaCanvas)
+    );
   }
   await writeJsonFile(manifestPath(rootPath), manifest);
 
@@ -78,6 +86,14 @@ export async function createVaultSnapshot(rootPath: string): Promise<VaultSnapsh
     await copyTextFileIfExists(
       vaultDataFilePath(rootPath, manifest, key),
       joinVaultPath(backupPath, manifest.dataFiles[key])
+    );
+  }
+  const dataFiles = await readVault(rootPath);
+  const canvasFiles = dataFiles.dataFiles.selfEmploymentCanvasFiles ?? {};
+  for (const relativePath of Object.keys(canvasFiles)) {
+    await copyTextFileIfExists(
+      joinVaultPath(profilePath(rootPath), relativePath),
+      joinVaultPath(backupPath, relativePath)
     );
   }
 
@@ -124,6 +140,23 @@ async function readExistingManifest(rootPath: string): Promise<VaultManifest | n
   }
 }
 
+async function readSelfEmploymentCanvasFiles(
+  rootPath: string,
+  selfEmploymentState: unknown
+): Promise<Record<string, unknown>> {
+  if (!isRecord(selfEmploymentState) || !Array.isArray(selfEmploymentState.projects)) return {};
+  const canvasFiles: Record<string, unknown> = {};
+  for (const project of selfEmploymentState.projects) {
+    if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") continue;
+    const relativePath = project.businessIdeaCanvasFile;
+    if (!isSafeRelativeCanvasPath(relativePath)) continue;
+    const contents = await readTextFile(joinVaultPath(profilePath(rootPath), relativePath));
+    if (!contents) continue;
+    canvasFiles[relativePath] = parseBusinessIdeaCanvasFile(parseJson(contents, relativePath), relativePath);
+  }
+  return canvasFiles;
+}
+
 function vaultDataFilePath(rootPath: string, manifest: VaultManifest, key: keyof VaultManifest["dataFiles"]): string {
   return joinVaultPath(profilePath(rootPath), manifest.dataFiles[key]);
 }
@@ -165,4 +198,18 @@ async function invokeCommand<T = void>(command: string, args: Record<string, unk
 
 function timestampFolderName(value: string): string {
   return value.replace(/[:.]/g, "-").replace("T", "_").replace("Z", "");
+}
+
+function isSafeRelativeCanvasPath(value: string): boolean {
+  return (
+    value.endsWith(".canvas") &&
+    value.startsWith("planning/projects/") &&
+    !value.startsWith("/") &&
+    !value.startsWith("\\") &&
+    !value.includes("..")
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

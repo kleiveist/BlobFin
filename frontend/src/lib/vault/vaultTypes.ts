@@ -33,7 +33,9 @@ export type VaultDataFileKey =
   | "timeStampPlanner"
   | "selfEmploymentState";
 
-export type VaultDataFiles = Partial<Record<VaultDataFileKey, unknown>>;
+export interface VaultDataFiles extends Partial<Record<VaultDataFileKey, unknown>> {
+  selfEmploymentCanvasFiles?: Record<string, unknown>;
+}
 
 export interface VaultManifest {
   app: typeof VAULT_APP_NAME;
