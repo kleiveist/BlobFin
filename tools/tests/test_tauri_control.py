@@ -402,6 +402,55 @@ def test_tauri_linux_build_uses_appimage_fallback_when_before_build_succeeded_th
     assert fallback == [False]
 
 
+def test_tauri_appimage_linuxdeploy_detection_accepts_user_failure_tail() -> None:
+    output = """
+       - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+       Compiling blobfin v0.1.0 (/home/kleif/Projects/BlobFin/src-tauri)
+       Finished `release` profile [optimized] target(s) in 25.29s
+       Built application at: /home/kleif/Projects/BlobFin/src-tauri/target/release/BlobFin
+       Bundling BlobFin_0.1.0_amd64.AppImage
+       failed to bundle project `failed to run linuxdeploy`
+       Error failed to bundle project `failed to run linuxdeploy`
+    """
+
+    result = common.CommandResult(command=[], cwd=paths.ROOT, returncode=1, stderr=output)
+
+    assert appimage.is_linuxdeploy_failure(result) is True
+
+
+def test_tauri_linux_build_accepts_fresh_appimage_when_linuxdeploy_returns_failure(monkeypatch) -> None:
+    fallback: list[bool] = []
+    output = """
+       - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+       Running beforeBuildCommand `cd ../frontend && npm run build`
+       Finished `release` profile [optimized] target(s) in 25.29s
+       Bundling BlobFin_0.1.0_amd64.AppImage
+       failed to bundle project `failed to run linuxdeploy`
+       Error failed to bundle project `failed to run linuxdeploy`
+    """
+
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda *args, **kwargs: True)
+    monkeypatch.setattr(appimage, "_appimage_snapshot", lambda: {})
+    monkeypatch.setattr(
+        appimage,
+        "_fresh_appimage_from_snapshot",
+        lambda snapshot: paths.ROOT / "src-tauri/target/release/bundle/appimage/BlobFin_0.1.0_amd64.AppImage",
+    )
+    monkeypatch.setattr(
+        common,
+        "run_command",
+        lambda command, **kwargs: common.CommandResult(command=command, cwd=paths.ROOT, returncode=1, stderr=output),
+    )
+    monkeypatch.setattr(appimage, "package_existing_appdir", lambda dry_run=False: fallback.append(dry_run) or 0)
+    monkeypatch.setattr(common, "print_build_artifacts", lambda: None)
+
+    code = control.main(["tauri", "build", "--target", "linux", "--bundles", "appimage"])
+
+    assert code == 0
+    assert fallback == []
+
+
 def test_tauri_linux_build_does_not_use_appimage_fallback_for_frontend_build_failure(monkeypatch) -> None:
     fallback: list[bool] = []
 
@@ -472,6 +521,45 @@ def test_tauri_build_appimage_shortcut_packages_appdir_on_linuxdeploy_failure(mo
 
     assert code == 0
     assert fallback == [False]
+    assert installed == [False]
+
+
+def test_tauri_build_appimage_shortcut_installs_fresh_appimage_when_linuxdeploy_returns_failure(monkeypatch) -> None:
+    fallback: list[bool] = []
+    installed: list[bool] = []
+    output = """
+       Bundling BlobFin_0.1.0_amd64.AppImage
+       failed to bundle project `failed to run linuxdeploy`
+       Error failed to bundle project `failed to run linuxdeploy`
+    """
+
+    monkeypatch.setattr(common, "host_os", lambda: "linux")
+    monkeypatch.setattr(common, "frontend_dependencies_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_prerequisites_ready", lambda: True)
+    monkeypatch.setattr(appimage, "_appimage_snapshot", lambda: {})
+    monkeypatch.setattr(
+        appimage,
+        "_fresh_appimage_from_snapshot",
+        lambda snapshot: paths.ROOT / "src-tauri/target/release/bundle/appimage/BlobFin_0.1.0_amd64.AppImage",
+    )
+    monkeypatch.setattr(
+        common,
+        "run_command",
+        lambda command, **kwargs: common.CommandResult(
+            command=command,
+            cwd=paths.ROOT,
+            returncode=1,
+            stderr=output,
+        ),
+    )
+    monkeypatch.setattr(appimage, "package_existing_appdir", lambda dry_run=False: fallback.append(dry_run) or 0)
+    monkeypatch.setattr(appimage, "install_latest", lambda dry_run=False: installed.append(dry_run) or 0)
+    monkeypatch.setattr(common, "print_build_artifacts", lambda: None)
+
+    code = control.main(["tauri", "build", "--appimage"])
+
+    assert code == 0
+    assert fallback == []
     assert installed == [False]
 
 

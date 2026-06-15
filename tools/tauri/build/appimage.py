@@ -51,19 +51,31 @@ def main(args: argparse.Namespace) -> int:
 
     command = common.tauri_cli_command("build", "--bundles", "appimage")
     common.print_build_plan("linux-appimage", command, dry_run=dry_run, bundles="appimage")
+    appimage_snapshot = _appimage_snapshot()
     result = common.run_command(command, cwd=paths.ROOT, dry_run=dry_run, env=appimage_build_env())
-    code = common.print_result(result, "Linux AppImage build completed", "Linux AppImage build failed")
+    code = result.returncode
     if code != 0:
         if not is_linuxdeploy_failure(result):
+            common.print_result(result, "Linux AppImage build completed", "Linux AppImage build failed")
             logger.fail(
                 "AppImage fallback skipped: Tauri failed before linuxdeploy. "
                 "Fix the build error above; no AppDir/AppImage fallback was installed."
             )
             return code
-        fallback_code = package_existing_appdir(dry_run=dry_run)
-        if fallback_code != 0:
-            return code
-        logger.warn("Tauri linuxdeploy failed, but AppImage was packaged from the generated AppDir.")
+        fresh_appimage = _fresh_appimage_from_snapshot(appimage_snapshot)
+        if fresh_appimage is not None:
+            logger.warn(
+                "Tauri linuxdeploy failed, but it produced "
+                f"{fresh_appimage.name}; continuing with that AppImage."
+            )
+        else:
+            fallback_code = package_existing_appdir(dry_run=dry_run)
+            if fallback_code != 0:
+                common.print_result(result, "Linux AppImage build completed", "Linux AppImage build failed")
+                return code
+            logger.warn("Tauri linuxdeploy failed, but AppImage was packaged from the generated AppDir.")
+    else:
+        common.print_result(result, "Linux AppImage build completed", "Linux AppImage build failed")
 
     if dry_run:
         _print_install_plan()
@@ -132,6 +144,42 @@ def package_existing_appdir(*, dry_run: bool = False) -> int:
 
     _normalize_fallback_appimage_name()
     return 0
+
+
+def _appimage_snapshot() -> dict[Path, tuple[int, int]]:
+    appimage_dir = _appimage_dir()
+    if not appimage_dir.is_dir():
+        return {}
+    snapshot: dict[Path, tuple[int, int]] = {}
+    for path in _collect_files(appimage_dir, APPIMAGE_PATTERNS):
+        try:
+            stat_result = path.stat()
+        except OSError:
+            continue
+        snapshot[path] = (stat_result.st_mtime_ns, stat_result.st_size)
+    return snapshot
+
+
+def _fresh_appimage_from_snapshot(snapshot: dict[Path, tuple[int, int]]) -> Path | None:
+    appimage_dir = _appimage_dir()
+    if not appimage_dir.is_dir():
+        return None
+
+    changed: list[Path] = []
+    for path in _collect_files(appimage_dir, APPIMAGE_PATTERNS):
+        try:
+            stat_result = path.stat()
+        except OSError:
+            continue
+        if snapshot.get(path) != (stat_result.st_mtime_ns, stat_result.st_size):
+            changed.append(path)
+
+    if not changed:
+        return None
+
+    preferred = [path for path in changed if NAME_PREFERENCE_TOKEN in _normalize_name(path.name)]
+    pool = preferred if preferred else changed
+    return max(pool, key=lambda path: (path.stat().st_mtime_ns, path.name.lower()))
 
 
 def _appimage_prerequisites_ready(

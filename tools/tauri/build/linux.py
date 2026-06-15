@@ -30,9 +30,19 @@ def main(args: argparse.Namespace) -> int:
     command = common.tauri_cli_command("build", "--bundles", bundles)
     common.print_build_plan("linux", command, dry_run=dry_run, bundles=bundles)
     env = appimage.appimage_build_env() if _bundles_include_appimage(bundles) else None
+    appimage_snapshot = appimage._appimage_snapshot() if _bundles_include_appimage(bundles) else {}
     result = common.run_command(command, cwd=paths.ROOT, dry_run=dry_run, env=env)
     if result.returncode != 0 and _bundles_include_appimage(bundles) and not dry_run:
         if appimage.is_linuxdeploy_failure(result):
+            fresh_appimage = appimage._fresh_appimage_from_snapshot(appimage_snapshot)
+            if fresh_appimage is not None:
+                logger.warn(
+                    "Tauri linuxdeploy failed, but it produced "
+                    f"{fresh_appimage.name}; continuing with that AppImage."
+                )
+                logger.ok("Linux Tauri build completed")
+                common.print_build_artifacts()
+                return 0
             fallback_code = appimage.package_existing_appdir()
             if fallback_code == 0:
                 logger.warn("Tauri linuxdeploy failed, but AppImage was packaged from the generated AppDir.")
