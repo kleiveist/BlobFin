@@ -771,8 +771,8 @@ let businessIdeaCanvasClipboard: BusinessIdeaCanvasClipboardState = null;
 let businessIdeaCanvasSpacePressed = false;
 let businessIdeaCanvasLastDragEndAt = 0;
 let selfEmploymentGanttEditor:
-  | { projectId: string; type: "phase"; phaseId: string }
-  | { projectId: string; type: "card"; cardId: string }
+  | { projectId: string; type: "phase"; phaseId: string; top: number; left: number }
+  | { projectId: string; type: "card"; cardId: string; top: number; left: number }
   | null = null;
 let incomeStampPlannerDialog: {
   stampId: string | null;
@@ -1801,11 +1801,23 @@ function bindEvents(): void {
       if (!target?.closest("#baseDataPopup")) {
         hideBaseDataPopup();
       }
+      if (selfEmploymentGanttEditor && !target?.closest("[data-self-employment-gantt-popover]")) {
+        closeSelfEmploymentGanttEditor();
+      }
       return;
     }
 
     event.preventDefault();
     const action = button.dataset.action;
+    if (
+      selfEmploymentGanttEditor &&
+      action !== "self-employment-gantt-open-phase" &&
+      action !== "self-employment-gantt-open-card" &&
+      action !== "self-employment-gantt-close-editor" &&
+      !button.closest("[data-self-employment-gantt-popover]")
+    ) {
+      closeSelfEmploymentGanttEditor();
+    }
     if (action !== "open-position-icon-picker" && action !== "select-position-icon") {
       hidePositionIconPicker();
     }
@@ -1984,27 +1996,23 @@ function bindEvents(): void {
       );
       return;
     }
+    if (action === "self-employment-toggle-gantt-phase-filter") {
+      toggleSelfEmploymentGanttPhaseFilter(
+        button.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+        button.dataset.selfEmploymentGanttPhaseId || ""
+      );
+      return;
+    }
     if (action === "self-employment-gantt-open-phase") {
-      selfEmploymentGanttEditor = {
-        projectId: button.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
-        type: "phase",
-        phaseId: button.dataset.selfEmploymentGanttPhaseId || ""
-      };
-      renderAll();
+      openSelfEmploymentGanttPhaseEditor(button);
       return;
     }
     if (action === "self-employment-gantt-open-card") {
-      selfEmploymentGanttEditor = {
-        projectId: button.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
-        type: "card",
-        cardId: button.dataset.selfEmploymentGanttCardId || ""
-      };
-      renderAll();
+      openSelfEmploymentGanttCardEditor(button);
       return;
     }
     if (action === "self-employment-gantt-close-editor") {
-      selfEmploymentGanttEditor = null;
-      renderAll();
+      closeSelfEmploymentGanttEditor();
       return;
     }
     if (action === "business-canvas-set-meta-field") {
@@ -2482,6 +2490,7 @@ function bindEvents(): void {
       closeIncomePlanningDialog();
       hideIncomeYearLabelPicker();
       hideIncomeMilestoneTypePicker();
+      closeSelfEmploymentGanttEditor();
     }
   });
   window.addEventListener("keyup", handleBusinessIdeaCanvasKeyUp);
@@ -3185,12 +3194,43 @@ function selfEmploymentProjectDetails(evaluation: SelfEmploymentProjectEvaluatio
       ${selfEmploymentRoadmap(selectedArea)}
       <article class="self-employment-roadmap-panel">
         <header>
-          ${positionIconSvg(activeArea.icon, "position-icon-svg self-employment-roadmap-panel-icon")}
-          <h3>${escapeHtml(activeArea.title)}</h3>
+          <div class="self-employment-roadmap-panel-title">
+            ${positionIconSvg(activeArea.icon, "position-icon-svg self-employment-roadmap-panel-icon")}
+            <h3>${escapeHtml(activeArea.title)}</h3>
+          </div>
+          ${selectedArea === "planning" ? renderSelfEmploymentGanttPhaseFilter(project) : ""}
         </header>
         ${selfEmploymentRoadmapPanel(selectedArea, evaluation)}
       </article>
     </section>
+  `;
+}
+
+function renderSelfEmploymentGanttPhaseFilter(project: SelfEmploymentProject): string {
+  const phases = [...project.businessIdeaCanvasMeta.phases].sort((a, b) => a.order - b.order);
+  if (phases.length === 0) return "";
+  const selectedIds = new Set(selfEmploymentGanttPhaseFilterIds(project));
+  return `
+    <div class="self-employment-gantt-phase-filter" role="toolbar" aria-label="Gantt-Phasen filtern">
+      ${phases
+        .map((phase) => {
+          const active = selectedIds.has(phase.id);
+          const phaseNumber = selfEmploymentGanttPhaseNumber(phase.id);
+          return `
+            <button
+              class="self-employment-gantt-phase-filter-button${active ? " active" : ""}"
+              type="button"
+              data-action="self-employment-toggle-gantt-phase-filter"
+              data-self-employment-project-id="${escapeHtml(project.id)}"
+              data-self-employment-gantt-phase-id="${escapeHtml(phase.id)}"
+              aria-pressed="${active}"
+              aria-label="${escapeHtml(`${phase.name} ${active ? "ausblenden" : "anzeigen"}`)}"
+              title="${escapeHtml(phase.name)}"
+            >${escapeHtml(phaseNumber)}</button>
+          `;
+        })
+        .join("")}
+    </div>
   `;
 }
 
@@ -3278,8 +3318,94 @@ function selfEmploymentRoadmapPanel(
   `;
 }
 
+const SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX = 12;
+const SELF_EMPLOYMENT_GANTT_POPOVER_GAP_PX = 8;
+const SELF_EMPLOYMENT_GANTT_POPOVER_WIDTH_PX = 560;
+const SELF_EMPLOYMENT_GANTT_POPOVER_ESTIMATED_HEIGHT_PX = 420;
+
+function selfEmploymentGanttPopoverPosition(trigger: HTMLElement): { top: number; left: number } {
+  const rect = trigger.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || SELF_EMPLOYMENT_GANTT_POPOVER_WIDTH_PX;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || SELF_EMPLOYMENT_GANTT_POPOVER_ESTIMATED_HEIGHT_PX;
+  const popoverWidth = Math.min(
+    SELF_EMPLOYMENT_GANTT_POPOVER_WIDTH_PX,
+    Math.max(0, viewportWidth - SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX * 2)
+  );
+  const popoverHeight = Math.min(
+    SELF_EMPLOYMENT_GANTT_POPOVER_ESTIMATED_HEIGHT_PX,
+    Math.max(0, viewportHeight - SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX * 2)
+  );
+  const left = clamp(
+    Math.round(rect.left),
+    SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX,
+    Math.max(SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX, viewportWidth - popoverWidth - SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX)
+  );
+  const belowTop = Math.round(rect.bottom + SELF_EMPLOYMENT_GANTT_POPOVER_GAP_PX);
+  const aboveTop = Math.round(rect.top - popoverHeight - SELF_EMPLOYMENT_GANTT_POPOVER_GAP_PX);
+  const fitsBelow = belowTop + popoverHeight <= viewportHeight - SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX;
+  const maxTop = Math.max(SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX, viewportHeight - popoverHeight - SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX);
+  return {
+    top: clamp(fitsBelow ? belowTop : aboveTop, SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX, maxTop),
+    left
+  };
+}
+
+function openSelfEmploymentGanttPhaseEditor(button: HTMLButtonElement): void {
+  selfEmploymentGanttEditor = {
+    projectId: button.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+    type: "phase",
+    phaseId: button.dataset.selfEmploymentGanttPhaseId || "",
+    ...selfEmploymentGanttPopoverPosition(button)
+  };
+  renderAll();
+}
+
+function openSelfEmploymentGanttCardEditor(button: HTMLButtonElement): void {
+  selfEmploymentGanttEditor = {
+    projectId: button.dataset.selfEmploymentProjectId || state.selfEmployment.selectedProjectId,
+    type: "card",
+    cardId: button.dataset.selfEmploymentGanttCardId || "",
+    ...selfEmploymentGanttPopoverPosition(button)
+  };
+  renderAll();
+}
+
+function closeSelfEmploymentGanttEditor(): void {
+  if (!selfEmploymentGanttEditor) return;
+  selfEmploymentGanttEditor = null;
+  document.querySelector<HTMLElement>("[data-self-employment-gantt-popover]")?.remove();
+}
+
+function selfEmploymentGanttPhaseFilterIds(project: SelfEmploymentProject): string[] {
+  const selectedIds = new Set(project.ganttPhaseFilterIds);
+  return [...project.businessIdeaCanvasMeta.phases]
+    .sort((a, b) => a.order - b.order)
+    .map((phase) => phase.id)
+    .filter((phaseId) => selectedIds.has(phaseId));
+}
+
+function toggleSelfEmploymentGanttPhaseFilter(projectId: string, phaseId: string): void {
+  const project = selfEmploymentProjectById(projectId);
+  const phaseIds = project
+    ? [...project.businessIdeaCanvasMeta.phases].sort((a, b) => a.order - b.order).map((phase) => phase.id)
+    : [];
+  if (!project || !phaseIds.includes(phaseId)) return;
+  const selectedIds = new Set(selfEmploymentGanttPhaseFilterIds(project));
+  if (selectedIds.has(phaseId)) {
+    selectedIds.delete(phaseId);
+  } else {
+    selectedIds.add(phaseId);
+  }
+  const ganttPhaseFilterIds = phaseIds.filter((id) => selectedIds.has(id));
+  updateSelfEmploymentProject(projectId, (item) => ({ ...item, ganttPhaseFilterIds }), true);
+}
+
 function renderSelfEmploymentProjectGantt(project: SelfEmploymentProject): string {
   const summary = buildSelfEmploymentProjectGantt(project);
+  const selectedPhaseIds = selfEmploymentGanttPhaseFilterIds(project);
+  const visibleRows = selectedPhaseIds.length
+    ? summary.rows.filter((row) => selectedPhaseIds.includes(row.phaseId))
+    : summary.rows;
   const cardCount = project.businessIdeaCanvas.nodes.filter((node) => node.type !== "group").length;
   const activeRows = summary.rows.filter((row) => row.enabled && row.scheduledHours > 0).length;
   return `
@@ -3296,7 +3422,7 @@ function renderSelfEmploymentProjectGantt(project: SelfEmploymentProject): strin
         <span>Projekt-Gantt</span>
       </div>
       <div class="self-employment-project-gantt-rows">
-        ${summary.rows.map((row) => renderSelfEmploymentProjectGanttRow(project, row)).join("")}
+        ${visibleRows.map((row) => renderSelfEmploymentProjectGanttRow(project, row)).join("")}
       </div>
       ${renderSelfEmploymentGanttEditor(project, summary)}
     </div>
@@ -3383,16 +3509,20 @@ function renderSelfEmploymentProjectGanttLabel(
 
 function renderSelfEmploymentGanttEditor(project: SelfEmploymentProject, summary: SelfEmploymentGanttSummary): string {
   if (selfEmploymentGanttEditor?.projectId !== project.id) return "";
+  const positionAttributes = `style="left:${escapeHtml(selfEmploymentGanttEditor.left)}px;top:${escapeHtml(
+    selfEmploymentGanttEditor.top
+  )}px;" data-self-employment-gantt-popover`;
   if (selfEmploymentGanttEditor.type === "phase") {
-    return renderSelfEmploymentGanttPhasePopover(project, summary, selfEmploymentGanttEditor.phaseId);
+    return renderSelfEmploymentGanttPhasePopover(project, summary, selfEmploymentGanttEditor.phaseId, positionAttributes);
   }
-  return renderSelfEmploymentGanttCardPopover(project, selfEmploymentGanttEditor.cardId);
+  return renderSelfEmploymentGanttCardPopover(project, selfEmploymentGanttEditor.cardId, positionAttributes);
 }
 
 function renderSelfEmploymentGanttPhasePopover(
   project: SelfEmploymentProject,
   summary: SelfEmploymentGanttSummary,
-  phaseId: string
+  phaseId: string,
+  positionAttributes: string
 ): string {
   const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
   const phase = gantt.phases.find((item) => item.phaseId === phaseId);
@@ -3401,7 +3531,7 @@ function renderSelfEmploymentGanttPhasePopover(
   const phaseOptions: Array<[string, string]> = [["", "Keine"], ...selfEmploymentGanttPhaseOptions(project, phase.phaseId)];
   const labelOptions = orderedGanttLabels(project.businessIdeaCanvasMeta).map((label) => [label.id, label.name] as [string, string]);
   return `
-    <div class="self-employment-gantt-popover self-employment-gantt-phase-popover" role="dialog" aria-label="${escapeHtml(`${row.phaseName} planen`)}">
+    <div class="self-employment-gantt-popover self-employment-gantt-phase-popover" ${positionAttributes} role="dialog" aria-label="${escapeHtml(`${row.phaseName} planen`)}">
       <header>
         <strong>${escapeHtml(row.phaseName)}</strong>
         <button class="icon-button" type="button" data-action="self-employment-gantt-close-editor" aria-label="Gantt-Editor schliessen">x</button>
@@ -3439,7 +3569,7 @@ function renderSelfEmploymentGanttPhasePopover(
   `;
 }
 
-function renderSelfEmploymentGanttCardPopover(project: SelfEmploymentProject, cardId: string): string {
+function renderSelfEmploymentGanttCardPopover(project: SelfEmploymentProject, cardId: string, positionAttributes: string): string {
   const node = project.businessIdeaCanvas.nodes.find((item) => item.id === cardId && item.type !== "group");
   if (!node) return "";
   const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
@@ -3453,7 +3583,7 @@ function renderSelfEmploymentGanttCardPopover(project: SelfEmploymentProject, ca
   const labelOptions = orderedGanttLabels(project.businessIdeaCanvasMeta).map((label) => [label.id, label.name] as [string, string]);
   const phaseOptions = selfEmploymentGanttPhaseOptions(project);
   return `
-    <div class="self-employment-gantt-popover self-employment-gantt-card-popover" role="dialog" aria-label="${escapeHtml(`${selfEmploymentGanttNodeTitle(node)} planen`)}">
+    <div class="self-employment-gantt-popover self-employment-gantt-card-popover" ${positionAttributes} role="dialog" aria-label="${escapeHtml(`${selfEmploymentGanttNodeTitle(node)} planen`)}">
       <header>
         <strong>${escapeHtml(selfEmploymentGanttNodeTitle(node))}</strong>
         <button class="icon-button" type="button" data-action="self-employment-gantt-close-editor" aria-label="Gantt-Editor schliessen">x</button>
@@ -5677,7 +5807,8 @@ function addSelfEmploymentProject(): void {
     monthlyRunningCosts: 0,
     oneTimeCosts: 0,
     monthlyWorkHours: 16,
-    gantt: normalizeSelfEmploymentGanttPlan({}, canvasDefaults.businessIdeaCanvas, canvasDefaults.businessIdeaCanvasMeta)
+    gantt: normalizeSelfEmploymentGanttPlan({}, canvasDefaults.businessIdeaCanvas, canvasDefaults.businessIdeaCanvasMeta),
+    ganttPhaseFilterIds: []
   };
   state.selfEmployment = {
     ...state.selfEmployment,

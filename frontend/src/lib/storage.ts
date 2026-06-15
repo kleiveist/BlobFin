@@ -76,6 +76,7 @@ import type {
   AppSectionId,
   AppState,
   AppUiState,
+  BusinessIdeaCanvasMeta,
   CareerMilestone,
   CareerMilestoneImpact,
   CombinedWealthDepotKey,
@@ -1138,6 +1139,10 @@ function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentProject |
     legacyCanvas.businessIdeaCanvasMeta
   );
   const gantt = normalizeSelfEmploymentGanttPlan(value.gantt, businessIdeaCanvas, businessIdeaCanvasMeta);
+  const ganttPhaseFilterIds = normalizeSelfEmploymentGanttPhaseFilterIds(
+    value.ganttPhaseFilterIds,
+    businessIdeaCanvasMeta
+  );
   return {
     id,
     name: String(value.name || "Neues Projekt"),
@@ -1184,8 +1189,18 @@ function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentProject |
         ? value.businessIdeaCanvasFile.trim()
         : businessIdeaCanvasFilePath(id),
     businessIdeaCanvasMeta,
-    gantt
+    gantt,
+    ganttPhaseFilterIds
   };
+}
+
+function normalizeSelfEmploymentGanttPhaseFilterIds(value: unknown, meta: BusinessIdeaCanvasMeta): string[] {
+  if (!Array.isArray(value)) return [];
+  const selectedIds = new Set(value.map((item) => String(item)));
+  return [...meta.phases]
+    .sort((a, b) => a.order - b.order)
+    .map((phase) => phase.id)
+    .filter((phaseId) => selectedIds.has(phaseId));
 }
 
 function isSafeSelfEmploymentCanvasPath(value: string): boolean {

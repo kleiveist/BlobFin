@@ -148,6 +148,7 @@ describe("storage", () => {
     expect(state.selfEmployment.projects[0].gantt.cardPlans).toHaveLength(
       state.selfEmployment.projects[0].businessIdeaCanvas.nodes.filter((node) => node.type !== "group").length
     );
+    expect(state.selfEmployment.projects[0].ganttPhaseFilterIds).toEqual([]);
     expect(state.selfEmployment.selectedProjectId).toBe(state.selfEmployment.projects[0].id);
     expect(state.selfEmployment.selectedRoadmapAreaId).toBe("idea");
   });
@@ -189,6 +190,7 @@ describe("storage", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();
     const cardId = state.selfEmployment.projects[0].businessIdeaCanvas.nodes[0].id;
+    state.selfEmployment.projects[0].ganttPhaseFilterIds = ["phase-2", "missing-phase", "phase-1"];
     state.selfEmployment.projects[0].gantt = {
       ...state.selfEmployment.projects[0].gantt,
       phases: state.selfEmployment.projects[0].gantt.phases.map((phase) =>
@@ -222,6 +224,7 @@ describe("storage", () => {
       startDate: "2026-07-01",
       note: "Wichtig"
     });
+    expect(loadedProject.ganttPhaseFilterIds).toEqual(["phase-1", "phase-2"]);
   });
 
   it("adds missing income planning defaults to saved app state", () => {

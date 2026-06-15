@@ -507,7 +507,8 @@ export function defaultSelfEmploymentState(): SelfEmploymentState {
           }
         ],
         ...exampleCanvas,
-        gantt: defaultSelfEmploymentGanttPlan(exampleCanvas.businessIdeaCanvas, exampleCanvas.businessIdeaCanvasMeta)
+        gantt: defaultSelfEmploymentGanttPlan(exampleCanvas.businessIdeaCanvas, exampleCanvas.businessIdeaCanvasMeta),
+        ganttPhaseFilterIds: []
       }
     ]
   };

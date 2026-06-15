@@ -433,6 +433,7 @@ export interface SelfEmploymentProject {
   businessIdeaCanvasFile: string;
   businessIdeaCanvasMeta: BusinessIdeaCanvasMeta;
   gantt: SelfEmploymentGanttPlan;
+  ganttPhaseFilterIds: string[];
 }
 
 export interface SelfEmploymentState {
