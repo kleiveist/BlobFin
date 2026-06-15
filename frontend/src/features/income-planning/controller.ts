@@ -36,6 +36,7 @@ import {
   type IncomePlanningCalendarBackgroundEntry,
   type IncomePlanningDialogMode,
   type IncomePlanningDialogState,
+  type IncomePlanningDragState,
   type IncomePlanningOwnerType,
   type IncomePlanningSleepSlotGroup,
   type IncomeStampPlannerDateRange
@@ -355,6 +356,14 @@ function compareIncomePlanningPlannedStamps(first: IncomePlanningPlannedStamp, s
 export function incomePlanningModelForActiveWeek(): IncomePlanningModel {
   requireIncomePlanningHost();
   return buildIncomePlanningModel(host.getState().incomePlanning, { scenarioId: incomePlanningActiveWeekScenarioId() });
+}
+
+export function startIncomePlanningCurrentTimeTicker(): void {
+  requireIncomePlanningHost();
+  if (incomePlanningUiState.currentTimeTimerId !== null) return;
+  incomePlanningUiState.currentTimeTimerId = window.setInterval(() => {
+    if (incomePlanningIsCurrentWeek()) renderIncomePlanning();
+  }, 60_000);
 }
 
 function incomePlanningWeekScenarioOptions(): ReturnType<typeof incomePlanningWeekScenarioConfigs> {
@@ -912,10 +921,10 @@ function incomePlanningDonutGradient(segments: IncomePlanningTimeSegment[], tota
 }
 
 function renderIncomePlanningSources(): void {
-  const host = document.querySelector<HTMLDivElement>("#incomePlanningWorkBlocks");
-  if (!host) return;
+  const container = document.querySelector<HTMLDivElement>("#incomePlanningWorkBlocks");
+  if (!container) return;
   const model = incomePlanningModelForActiveWeek();
-  host.innerHTML = host.getState().incomePlanning.workBlocks.length
+  container.innerHTML = host.getState().incomePlanning.workBlocks.length
     ? host.getState().incomePlanning.workBlocks.map((workBlock) => incomePlanningWorkBlockRow(workBlock, model)).join("")
     : '<div class="chart-empty">Noch keine Arbeitszeit geplant.</div>';
 }
@@ -1009,13 +1018,13 @@ function incomePlanningSlotAddChip(ownerType: string, ownerId: string): string {
 }
 
 function renderIncomePlanningAssumptions(): void {
-  const host = document.querySelector<HTMLDivElement>("#incomePlanningAssumptions");
-  if (!host) return;
+  const container = document.querySelector<HTMLDivElement>("#incomePlanningAssumptions");
+  if (!container) return;
   const assumptions = host.getState().incomePlanning.assumptions;
   const sleepHours = incomePlanningAverageSleepHours(assumptions);
   const sleepWeekHours = hoursLabel(assumptions.sleepSlots.reduce((sum, slot) => sum + incomePlanningSleepSlotDurationMinutes(slot), 0) / 60);
   const sleepGroupCount = incomePlanningSleepSlotGroupsFromSlots(assumptions.sleepSlots).length;
-  host.innerHTML = `
+  container.innerHTML = `
     <article class="income-planning-block-card compact active">
       <div class="income-planning-compact-head">
         <div>
@@ -1030,9 +1039,9 @@ function renderIncomePlanningAssumptions(): void {
 }
 
 function renderIncomePlanningManualBlocks(): void {
-  const host = document.querySelector<HTMLDivElement>("#incomePlanningManualBlocks");
-  if (!host) return;
-  host.innerHTML = host.getState().incomePlanning.manualBlocks.length
+  const container = document.querySelector<HTMLDivElement>("#incomePlanningManualBlocks");
+  if (!container) return;
+  container.innerHTML = host.getState().incomePlanning.manualBlocks.length
     ? host.getState().incomePlanning.manualBlocks.map(incomePlanningManualBlockRow).join("")
     : '<div class="chart-empty">Noch keine privaten Zeitbloecke geplant.</div>';
 }
@@ -1063,9 +1072,9 @@ function incomePlanningManualBlockRow(block: IncomePlanningManualBlock): string 
 }
 
 function renderIncomePlanningHabits(): void {
-  const host = document.querySelector<HTMLDivElement>("#incomePlanningHabits");
-  if (!host) return;
-  host.innerHTML = host.getState().incomePlanning.habits.length
+  const container = document.querySelector<HTMLDivElement>("#incomePlanningHabits");
+  if (!container) return;
+  container.innerHTML = host.getState().incomePlanning.habits.length
     ? host.getState().incomePlanning.habits.map(incomePlanningHabitRow).join("")
     : '<div class="chart-empty">Noch keine Habits geplant.</div>';
 }
@@ -1095,10 +1104,10 @@ function incomePlanningHabitRow(habit: IncomePlanningHabit): string {
 }
 
 function renderIncomePlanningCalendarStamps(): void {
-  const host = document.querySelector<HTMLDivElement>("#incomePlanningCalendarStamps");
-  if (!host) return;
+  const container = document.querySelector<HTMLDivElement>("#incomePlanningCalendarStamps");
+  if (!container) return;
   const stamps = [...host.getState().incomePlanning.calendarStamps].sort(compareIncomePlanningCalendarStamps);
-  host.innerHTML = `
+  container.innerHTML = `
     <div class="income-planning-stamp-list-head">
       <strong>Stempel</strong>
       <span>${intNumber(stamps.length)} im Kalender</span>
@@ -1158,15 +1167,15 @@ function renderIncomePlanningCareerLife(model: IncomePlanningModel): void {
 }
 
 function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
-  const host = document.querySelector<HTMLDivElement>("#incomePlanningWeeklyPlanner");
-  if (!host) return;
+  const container = document.querySelector<HTMLDivElement>("#incomePlanningWeeklyPlanner");
+  if (!container) return;
   const graphicEntries = model.calendarEntries.filter((entry) => !entry.invalid);
   const backgroundEntries = incomePlanningCalendarBackgroundEntries();
   const flexibleCount = graphicEntries.filter((entry) => entry.flexible).length;
   const currentTime = incomePlanningIsCurrentWeek() ? incomePlanningCurrentTimeMarker() : null;
   const weekRange = incomePlanningActiveWeekRange();
   const scenario = incomePlanningWeekScenarioConfig(model.scenarioId, host.getState().incomePlanning.weekScenarios ?? []);
-  host.innerHTML = `
+  container.innerHTML = `
     <div class="income-planning-calendar" data-income-planning-calendar>
       <div class="income-planning-week-toolbar">
         <div class="income-planning-week-nav" role="group" aria-label="Kalenderwoche">
@@ -4020,4 +4029,3 @@ export function renderIncomePlanningStampMenu(): void {
   `;
   menu.hidden = false;
 }
-

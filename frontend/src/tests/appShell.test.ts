@@ -20,9 +20,11 @@ afterEach(() => {
 
 describe("app shell", () => {
   it("keeps main.ts as a bootstrap-only entry point", () => {
-    expect(mainSource).toContain('import "./styles/index.css";');
-    expect(mainSource).toContain('import { bootstrapApp } from "./app/bootstrap";');
-    expect(mainSource).toContain('void bootstrapApp("#app");');
+    expect(mainSource.split("\n").length).toBeLessThanOrEqual(50);
+    expect(mainSource).toContain('import("./styles/index.css")');
+    expect(mainSource).toContain('import("./app/bootstrap")');
+    expect(mainSource).toContain('bootstrapApp("#app")');
+    expect(mainSource).toContain("BlobFin bootstrap failed.");
     expect(mainSource).not.toContain("function bindEvents");
     expect(mainSource).not.toContain("function renderAll");
   });

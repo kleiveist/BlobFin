@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import mainSource from "../app/appController.ts?raw";
+import runtimeFeatureHostSource from "../features/runtime-host/controller.ts?raw";
 import businessCanvasControllerSource from "../features/self-employment/business-canvas/controller.ts?raw";
 import businessCanvasViewSource from "../features/self-employment/business-canvas/view.ts?raw";
 import selfEmploymentConfigSource from "../features/self-employment/config.ts?raw";
@@ -112,7 +113,8 @@ const combinedYear: CombinedWealthYear = {
 
 describe("follow-up ui rendering", () => {
   it("keeps extracted feature event branches out of appController", () => {
-    expect(mainSource.split("\n").length).toBeLessThanOrEqual(9000);
+    expect(mainSource.split("\n").length).toBeLessThanOrEqual(30);
+    expect(mainSource).toContain("startControllerRuntime");
     expect(mainSource).not.toContain('action === "business-canvas-');
     expect(mainSource).not.toContain('action === "self-employment-');
     expect(mainSource).not.toContain('action === "income-planning-');
@@ -123,6 +125,8 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).not.toContain('incomePlanningDialog');
     expect(mainSource).not.toContain('incomeStampPlannerDialog');
     expect(mainSource).not.toContain('selfEmploymentGanttEditor');
+    expect(mainSource).not.toContain("function renderAll");
+    expect(mainSource).not.toContain("function renderCalculations");
   });
 
   it("renders a visual landing page with the combined module entries", () => {
@@ -465,18 +469,18 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-action="show-reserve-chart"');
     expect(html).not.toContain('id="reserveChartPopup" class="reserve-chart-popup" role="dialog"');
     expect(html).not.toContain('id="reserveChartPopup" class="reserve-chart-popup" hidden');
-    expect(mainSource).toContain("function reservePieChart");
-    expect(mainSource).toContain('legend-dot blue"></i>Sparen');
-    expect(mainSource).toContain('key: "savings", value: totals.savings, color: "var(--reserve-chart-savings)"');
+    expect(runtimeFeatureHostSource).toContain("function reservePieChart");
+    expect(runtimeFeatureHostSource).toContain('legend-dot blue"></i>Sparen');
+    expect(runtimeFeatureHostSource).toContain('key: "savings", value: totals.savings, color: "var(--reserve-chart-savings)"');
     expect(stylesSource).toContain("--reserve-chart-savings: #2563eb");
     expect(stylesSource).toContain(".reserve-chart-legend .legend-dot.blue");
-    expect(mainSource).not.toContain("function reserveBarChart");
-    expect(mainSource).not.toContain("reserve-chart-summary");
-    expect(mainSource).not.toContain("reserve-chart-controls");
-    expect(mainSource).not.toContain("set-reserve-chart-category");
-    expect(mainSource).not.toContain("set-reserve-chart-scenario");
-    expect(mainSource).not.toContain("set-reserve-chart-style");
-    expect(mainSource).not.toContain("close-reserve-chart");
+    expect(runtimeFeatureHostSource).not.toContain("function reserveBarChart");
+    expect(runtimeFeatureHostSource).not.toContain("reserve-chart-summary");
+    expect(runtimeFeatureHostSource).not.toContain("reserve-chart-controls");
+    expect(runtimeFeatureHostSource).not.toContain("set-reserve-chart-category");
+    expect(runtimeFeatureHostSource).not.toContain("set-reserve-chart-scenario");
+    expect(runtimeFeatureHostSource).not.toContain("set-reserve-chart-style");
+    expect(runtimeFeatureHostSource).not.toContain("close-reserve-chart");
   });
 
   it("renders statutory pension as its own page outside combined wealth", () => {

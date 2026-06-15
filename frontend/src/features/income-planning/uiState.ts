@@ -134,7 +134,6 @@ export type IncomeStampPlannerStampDragState = {
   element: HTMLElement;
   moved: boolean;
 } | null;
-let investmentAccountContextId: string | null = null;
 
 export interface IncomePlanningUiState {
   dialog: IncomePlanningDialogState;

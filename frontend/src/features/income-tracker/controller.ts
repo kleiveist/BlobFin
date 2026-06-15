@@ -27,9 +27,9 @@ import {
   type IncomeTaxRuleResult
 } from "../../domain/incomeTaxRules";
 import { exportIncomePlanningCsv, incomePlanningFromCsvRows, parseCsv } from "../../lib/csv";
-import { clamp, escapeHtml, money, numberValue, percent } from "../../lib/format";
+import { clamp, escapeHtml, money, normalizeHeader, numberValue, percent } from "../../lib/format";
 import { positionIconSvg } from "../../lib/positionIcons";
-import type { AppState, CareerMilestone, CareerMilestoneImpact, IncomeEmploymentContext, IncomeMinijobType, IncomePerson, IncomeProjectionMode, IncomeResolvedSource, IncomeStudentEmploymentMode, IncomeTaxAdjustmentType, IncomeTaxDeductionField, IncomeTaxDeductionItems, IncomeTrackerSettings, IncomeYearEntry, IncomeYearEntrySource } from "../../types";
+import type { AppState, CareerMilestone, CareerMilestoneImpact, IncomeEmploymentContext, IncomeMinijobType, IncomePerson, IncomeProjectionMode, IncomeResolvedSource, IncomeStudentEmploymentMode, IncomeTaxAdjustmentType, IncomeTaxDeductionField, IncomeTaxDeductionItems, IncomeTrackerSettings, IncomeYearEntry, IncomeYearEntrySource, InvestmentDepotKey } from "../../types";
 import { closeIncomePlanningDialog, closeIncomeStampPlannerDialog } from "../income-planning";
 import {
   CAPITAL_GAINS_CHURCH_TAX_RATE_OPTIONS,
@@ -103,7 +103,37 @@ function incomeChartModel(): IncomeTrackerModel {
 }
 
 function incomeGeneralInflationRatePercent(): number {
-  return depotInvestmentSettings(activeInvestmentDepot()).inflationRatePercent;
+  const investment = host.getState().investment;
+  switch (activeIncomeTrackerInvestmentDepot()) {
+    case "retirement":
+      return investment.retirementInflationRatePercent;
+    case "child":
+      return investment.childInflationRatePercent;
+    case "standard":
+      return investment.inflationRatePercent;
+  }
+}
+
+function activeIncomeTrackerInvestmentDepot(): InvestmentDepotKey {
+  const depot = host.getState().investment.activeDepot;
+  return depot === "retirement" || depot === "child" ? depot : "standard";
+}
+
+function setSectionHidden(selector: string, hidden: boolean): void {
+  const element = document.querySelector<HTMLElement>(selector);
+  if (element) element.hidden = hidden;
+}
+
+function setText(id: string, value: string): void {
+  const element = document.getElementById(id);
+  if (element) element.textContent = value;
+}
+
+function setInputValue(selector: string, value: number | string | string[]): void {
+  for (const input of document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(selector)) {
+    if (input === document.activeElement) continue;
+    input.value = String(value);
+  }
 }
 
 function incomeTaxRuleForEntry(
@@ -351,11 +381,11 @@ function renderIncomeRows(): void {
 }
 
 function renderIncomeYearLabelFilters(): void {
-  const host = document.querySelector<HTMLDivElement>("#incomeYearLabelFilters");
-  if (!host) return;
+  const container = document.querySelector<HTMLDivElement>("#incomeYearLabelFilters");
+  if (!container) return;
   const selected = new Set(host.getState().incomeTracker.settings.selectedYearlyLabels.map(incomeYearLabel));
   const options = INCOME_YEAR_LABEL_OPTIONS;
-  host.innerHTML = `
+  container.innerHTML = `
     ${options
       .map((option) => {
         const active = selected.has(option.id);

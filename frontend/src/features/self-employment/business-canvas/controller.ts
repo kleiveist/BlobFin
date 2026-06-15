@@ -4,7 +4,6 @@ import {
   BUSINESS_IDEA_CANVAS_ORIGIN,
   businessIdeaCanvasBoundsForNodes,
   businessIdeaCanvasEndsForDirection,
-  businessIdeaCanvasNodeText,
   businessIdeaCanvasNodesInsideRect,
   businessIdeaCanvasPaletteWithCustomColor,
   businessIdeaCanvasViewportForZoomAtPoint,
