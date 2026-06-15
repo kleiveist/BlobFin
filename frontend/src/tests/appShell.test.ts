@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import mainSource from "../main.ts?raw";
 import stylesIndexSource from "../styles/index.css?raw";
 import { defaultAppState } from "../data/defaults";
+import { bindAppEvents } from "../app/events";
 import { appSectionIdFromValue, createAppRouter, sectionFromLocationHash } from "../app/router";
 import { createRenderScheduler, DEFAULT_RENDER_DEBOUNCE_MS } from "../app/renderScheduler";
 import { createAppStore } from "../app/store/appStore";
@@ -49,11 +50,67 @@ describe("app shell", () => {
       "income-planning",
       "income-stamp-planner",
       "self-employment",
+      "business-canvas",
       "real-estate",
       "statutory-pension",
       "combined-wealth"
     ]);
     expect(featureModules.flatMap((feature) => feature.sections ?? [])).toContain("combined_wealth");
+  });
+
+  it("dispatches feature events before host handlers and keeps wheel non-passive", () => {
+    const calls: string[] = [];
+    const listeners = new Map<string, { listener: EventListener; options?: AddEventListenerOptions }>();
+    const root = {
+      addEventListener: (type: string, listener: EventListener, options?: AddEventListenerOptions) => {
+        listeners.set(type, { listener, options });
+      },
+      removeEventListener: () => undefined
+    } as unknown as HTMLDivElement;
+    const context = {
+      root,
+      store: createAppStore(defaultAppState()),
+      router: createAppRouter(),
+      scheduler: createRenderScheduler(() => undefined)
+    };
+
+    const dispose = bindAppEvents(
+      context,
+      [
+        {
+          id: "first",
+          onClick: () => {
+            calls.push("feature:first");
+            return true;
+          },
+          onWindowKeyDown: () => {
+            calls.push("window:first");
+            return true;
+          }
+        },
+        {
+          id: "second",
+          onClick: () => {
+            calls.push("feature:second");
+          }
+        }
+      ],
+      {
+        onClick: () => {
+          calls.push("host");
+        },
+        onWindowKeyDown: () => {
+          calls.push("window:host");
+        }
+      }
+    );
+
+    listeners.get("click")?.listener(new Event("click"));
+    window.dispatchEvent(new Event("keydown"));
+
+    expect(calls).toEqual(["feature:first", "window:first"]);
+    expect(listeners.get("wheel")?.options).toMatchObject({ passive: false });
+    dispose();
   });
 
   it("pushes and replaces section history through the app router", () => {

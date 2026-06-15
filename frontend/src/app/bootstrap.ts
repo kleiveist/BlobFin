@@ -20,7 +20,7 @@ export async function bootstrapApp(rootSelector = "#app"): Promise<AppContext> {
   for (const feature of featureModules) {
     await feature.mount?.(context);
   }
-  await startAppController(context);
+  await startAppController(context, featureModules);
   return context;
 }
 

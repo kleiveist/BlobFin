@@ -10,8 +10,8 @@ import {
   businessIdeaCanvasNodeText,
   businessIdeaCanvasPaletteRows,
   canvasAnchorPoint
-} from "../domain/businessIdeaCanvas";
-import { escapeHtml, intNumber } from "../lib/format";
+} from "../../../domain/businessIdeaCanvas";
+import { escapeHtml, intNumber } from "../../../lib/format";
 import type {
   BusinessIdeaCanvasEdgeDirection,
   BusinessIdeaCanvasMeta,
@@ -21,7 +21,7 @@ import type {
   JsonCanvasNode,
   JsonCanvasSide,
   SelfEmploymentProject
-} from "../types";
+} from "../../../types";
 
 export interface BusinessIdeaCanvasLineMenuState {
   projectId: string;

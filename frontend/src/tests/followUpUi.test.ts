@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import mainSource from "../app/appController.ts?raw";
-import businessCanvasViewSource from "../views/businessIdeaCanvasView.ts?raw";
+import businessCanvasControllerSource from "../features/self-employment/business-canvas/controller.ts?raw";
+import businessCanvasViewSource from "../features/self-employment/business-canvas/view.ts?raw";
 import { renderAppShell } from "../views/templates";
 import {
   paidLoanCostForYear,
@@ -206,8 +207,12 @@ describe("follow-up ui rendering", () => {
     expect(mainSource.indexOf('"Aufgaben"')).toBeLessThan(mainSource.indexOf('"Zeitmanagement & Habits"'));
     expect(mainSource.indexOf('"Zeitmanagement & Habits"')).toBeLessThan(mainSource.indexOf('"Kundenkontakte"'));
     expect(mainSource.indexOf('"Kundenkontakte"')).toBeLessThan(mainSource.indexOf('"Angebote & Rechnungen"'));
-    expect(mainSource).toContain("renderBusinessIdeaCanvasEditor");
-    expect(mainSource).toContain("businessIdeaCanvasRenderState");
+    expect(mainSource).toContain("renderBusinessCanvas");
+    expect(mainSource).not.toContain('action === "business-canvas-');
+    expect(mainSource).not.toContain("businessIdeaCanvasSelectedEdge");
+    expect(mainSource).not.toContain("handleBusinessIdeaCanvas");
+    expect(businessCanvasControllerSource).toContain("renderBusinessIdeaCanvasEditor");
+    expect(businessCanvasControllerSource).toContain("businessIdeaCanvasRenderState");
     expect(mainSource).toContain("renderSelfEmploymentProjectGantt");
     expect(mainSource).toContain("self-employment-project-gantt");
     expect(mainSource).toContain("renderSelfEmploymentGanttPhaseFilter");
@@ -271,18 +276,18 @@ describe("follow-up ui rendering", () => {
     expect(stylesSource).toContain("business-canvas-edge-label-foreign");
     expect(stylesSource).toContain("business-canvas-connection-preview-line");
     expect(stylesSource).toContain("connection-target");
-    expect(mainSource).toContain("requestAnimationFrame");
-    expect(mainSource).toContain("scheduleBusinessIdeaCanvasWheelZoom");
-    expect(mainSource).toContain("updateBusinessIdeaCanvasLiveEdges");
-    expect(mainSource).toContain("scheduleBusinessIdeaCanvasConnectionPreview");
-    expect(mainSource).toContain("clearBusinessIdeaCanvasConnectionPreview");
-    expect(mainSource).toContain("commitBusinessIdeaCanvasEdgeLabelEdit");
-    expect(mainSource).toContain("cancelBusinessIdeaCanvasEdgeLabelEdit");
-    expect(mainSource).not.toContain('window.prompt("Verbindungslabel"');
-    expect(mainSource).toContain("closeBusinessIdeaCanvasDropdowns");
-    expect(mainSource).toContain("businessIdeaCanvasLastDragEndAt");
-    expect(mainSource).toContain("businessIdeaCanvasSelectedEdge");
-    expect(mainSource).toContain("deleteBusinessIdeaCanvasSelectedEdge();");
+    expect(businessCanvasControllerSource).toContain("requestAnimationFrame");
+    expect(businessCanvasControllerSource).toContain("scheduleBusinessIdeaCanvasWheelZoom");
+    expect(businessCanvasControllerSource).toContain("updateBusinessIdeaCanvasLiveEdges");
+    expect(businessCanvasControllerSource).toContain("scheduleBusinessIdeaCanvasConnectionPreview");
+    expect(businessCanvasControllerSource).toContain("clearBusinessIdeaCanvasConnectionPreview");
+    expect(businessCanvasControllerSource).toContain("commitBusinessIdeaCanvasEdgeLabelEdit");
+    expect(businessCanvasControllerSource).toContain("cancelBusinessIdeaCanvasEdgeLabelEdit");
+    expect(businessCanvasControllerSource).not.toContain('window.prompt("Verbindungslabel"');
+    expect(businessCanvasControllerSource).toContain("closeBusinessIdeaCanvasDropdowns");
+    expect(businessCanvasControllerSource).toContain("lastDragEndAt");
+    expect(businessCanvasControllerSource).toContain("selectedEdge");
+    expect(businessCanvasControllerSource).toContain("deleteBusinessIdeaCanvasSelectedEdge();");
     expect(mainSource).toContain("data-self-employment-field");
     expect(mainSource).toContain("evaluateSelfEmploymentProject");
     expect(mainSource).toContain("selfEmploymentEvaluationContext");

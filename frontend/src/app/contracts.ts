@@ -44,8 +44,18 @@ export interface FeatureModule {
   sections?: readonly AppSectionId[];
   mount?(context: AppContext): void | Promise<void>;
   render?(context: AppContext): void;
-  onInput?(event: Event, context: AppContext): boolean | void | Promise<boolean | void>;
-  onChange?(event: Event, context: AppContext): boolean | void | Promise<boolean | void>;
-  onClick?(event: MouseEvent, context: AppContext): boolean | void | Promise<boolean | void>;
+  onInput?(event: Event, context: AppContext): boolean | void;
+  onChange?(event: Event, context: AppContext): boolean | void;
+  onClick?(event: MouseEvent, context: AppContext): boolean | void;
+  onDblClick?(event: MouseEvent, context: AppContext): boolean | void;
+  onContextMenu?(event: MouseEvent, context: AppContext): boolean | void;
+  onPointerDown?(event: PointerEvent, context: AppContext): boolean | void;
+  onFocusOut?(event: FocusEvent, context: AppContext): boolean | void;
+  onWheel?(event: WheelEvent, context: AppContext): boolean | void;
+  onWindowPointerMove?(event: PointerEvent, context: AppContext): boolean | void;
+  onWindowPointerUp?(event: PointerEvent, context: AppContext): boolean | void;
+  onWindowKeyDown?(event: KeyboardEvent, context: AppContext): boolean | void;
+  onWindowKeyUp?(event: KeyboardEvent, context: AppContext): boolean | void;
+  closeOverlays?(context: AppContext): void;
   dispose?(context: AppContext): void;
 }
