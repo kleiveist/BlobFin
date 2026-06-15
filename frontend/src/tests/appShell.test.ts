@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import mainSource from "../main.ts?raw";
-import stylesIndexSource from "../styles/index.css?raw";
 import { defaultAppState } from "../data/defaults";
 import { bindAppEvents } from "../app/events";
 import { appSectionIdFromValue, createAppRouter, sectionFromLocationHash } from "../app/router";
@@ -11,6 +11,12 @@ import { createRenderScheduler, DEFAULT_RENDER_DEBOUNCE_MS } from "../app/render
 import { createAppStore } from "../app/store/appStore";
 import { featureModules } from "../features";
 import type { AppState } from "../types";
+
+const stylesIndexSource = readFileSync(new URL("../styles/index.css", import.meta.url), "utf8");
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("app shell", () => {
   it("keeps main.ts as a bootstrap-only entry point", () => {
@@ -59,6 +65,8 @@ describe("app shell", () => {
   });
 
   it("dispatches feature events before host handlers and keeps wheel non-passive", () => {
+    vi.stubGlobal("window", createWindowStub());
+
     const calls: string[] = [];
     const listeners = new Map<string, { listener: EventListener; options?: AddEventListenerOptions }>();
     const root = {
@@ -70,7 +78,7 @@ describe("app shell", () => {
     const context = {
       root,
       store: createAppStore(defaultAppState()),
-      router: createAppRouter(),
+      router: createAppRouter(createRouterWindowStub()),
       scheduler: createRenderScheduler(() => undefined)
     };
 
@@ -202,3 +210,24 @@ describe("app shell", () => {
     expect(persistedStates.map((state) => state.theme)).toEqual(["dark", "light"]);
   });
 });
+
+function createWindowStub(): Window {
+  const target = new EventTarget();
+  return {
+    addEventListener: target.addEventListener.bind(target),
+    removeEventListener: target.removeEventListener.bind(target),
+    dispatchEvent: target.dispatchEvent.bind(target)
+  } as Window;
+}
+
+function createRouterWindowStub() {
+  return {
+    location: { hash: "", pathname: "/", search: "" },
+    history: {
+      pushState: () => undefined,
+      replaceState: () => undefined
+    },
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined
+  };
+}
