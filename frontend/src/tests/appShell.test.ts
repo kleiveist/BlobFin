@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import mainSource from "../main.ts?raw";
+import stylesIndexSource from "../styles/index.css?raw";
 import { defaultAppState } from "../data/defaults";
 import { appSectionIdFromValue, createAppRouter, sectionFromLocationHash } from "../app/router";
 import { createRenderScheduler, DEFAULT_RENDER_DEBOUNCE_MS } from "../app/renderScheduler";
@@ -12,11 +13,19 @@ import type { AppState } from "../types";
 
 describe("app shell", () => {
   it("keeps main.ts as a bootstrap-only entry point", () => {
-    expect(mainSource).toContain('import "./styles.css";');
+    expect(mainSource).toContain('import "./styles/index.css";');
     expect(mainSource).toContain('import { bootstrapApp } from "./app/bootstrap";');
     expect(mainSource).toContain('void bootstrapApp("#app");');
     expect(mainSource).not.toContain("function bindEvents");
     expect(mainSource).not.toContain("function renderAll");
+  });
+
+  it("uses the split stylesheet entrypoint", () => {
+    expect(stylesIndexSource).toContain('@import "./tokens.css" layer(tokens);');
+    expect(stylesIndexSource).toContain('@import "./components/fields.css" layer(components);');
+    expect(stylesIndexSource).toContain('@import "../features/income-stamp-planner/styles.css" layer(features);');
+    expect(stylesIndexSource).toContain('@import "../features/self-employment/business-canvas/styles.css" layer(features);');
+    expect(stylesIndexSource).not.toContain("legacy");
   });
 
   it("normalizes current route section ids and aliases", () => {

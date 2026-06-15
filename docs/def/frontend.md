@@ -18,12 +18,14 @@ Dependencies are intentionally small. Runtime dependencies are currently empty; 
 
 ## Key Files
 
-- `frontend/src/main.ts`: application bootstrap, event delegation, rendering, state updates, storage writes, chart popup handling.
+- `frontend/src/main.ts`: minimal application entrypoint that imports styles and starts the app bootstrap.
+- `frontend/src/app/`: application shell, router, render scheduler, and store facade.
 - `frontend/src/types.ts`: central TypeScript state and result interfaces.
 - `frontend/src/data/defaults.ts`: default settings and default positions.
 - `frontend/src/views/templates.ts`: static HTML template functions for the app shell and controls.
 - `frontend/src/views/investmentChart.ts`: canvas chart drawing, bar hit areas, click handling.
-- `frontend/src/styles.css`: full application styling.
+- `frontend/src/styles/index.css`: stylesheet entrypoint importing tokens, base/layout/component styles, and feature styles.
+- `frontend/src/features/*/styles.css`: feature-owned styling.
 - `frontend/src/lib/storage.ts`: local storage persistence and legacy state normalization.
 - `frontend/src/lib/csv.ts`: CSV import/export helpers.
 - `frontend/src/lib/format.ts`: money, percent, labels, and numeric helpers.

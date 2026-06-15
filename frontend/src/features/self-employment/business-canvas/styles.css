@@ -1,0 +1,913 @@
+.business-canvas-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.business-canvas-topbar,
+.business-canvas-topbar-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.business-canvas-topbar {
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.business-canvas-compact-field,
+.business-canvas-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.business-canvas-compact-field select,
+.business-canvas-node-toolbar select,
+.business-canvas-edge-toolbar select,
+.business-canvas-edge-toolbar input {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 4px 7px;
+}
+
+.business-canvas-chip-group,
+.business-canvas-icon-segment {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.business-canvas-icon-choice,
+.business-canvas-label-chip,
+.business-canvas-phase-badge-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.business-canvas-icon-choice {
+  width: 30px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.business-canvas-label-chip {
+  gap: 4px;
+  padding: 4px 7px;
+}
+
+.business-canvas-label-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--business-canvas-custom-color);
+}
+
+.business-canvas-phase-badge-button {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 50%;
+  font-size: 0.86rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.business-canvas-icon-choice.active,
+.business-canvas-label-chip.active,
+.business-canvas-phase-badge-button.active {
+  border-color: var(--accent-strong);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.business-canvas-icon-choice:hover,
+.business-canvas-icon-choice:focus-visible,
+.business-canvas-label-chip:hover,
+.business-canvas-label-chip:focus-visible,
+.business-canvas-phase-badge-button:hover,
+.business-canvas-phase-badge-button:focus-visible {
+  border-color: var(--accent-strong);
+}
+
+.business-canvas-workbench {
+  display: grid;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 12px;
+  min-height: 0;
+  overflow: visible;
+}
+
+.business-canvas-viewport {
+  position: relative;
+  height: clamp(460px, calc(100vh - 260px), 760px);
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background:
+    linear-gradient(var(--row-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--row-border) 1px, transparent 1px),
+    var(--surface);
+  background-size: var(--grid-size) var(--grid-size);
+  cursor: grab;
+  touch-action: none;
+}
+
+.business-canvas-viewport.panning {
+  cursor: grabbing;
+}
+
+.business-canvas-content {
+  position: relative;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.business-canvas-edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.business-canvas-edge-group {
+  pointer-events: auto;
+}
+
+.business-canvas-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18;
+  cursor: pointer;
+}
+
+.business-canvas-edge-line {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.business-canvas-edge-line.business-canvas-edge-direction-none {
+  stroke-dasharray: 7 6;
+}
+
+.business-canvas-edge-group.selected .business-canvas-edge-line {
+  stroke: var(--accent-strong);
+  stroke-width: 3;
+}
+
+.business-canvas-edge-branch {
+  display: none;
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 3;
+  cursor: crosshair;
+}
+
+.business-canvas-edge-group:hover .business-canvas-edge-branch,
+.business-canvas-edge-group.selected .business-canvas-edge-branch {
+  display: block;
+}
+
+.business-canvas-edge-label {
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 5;
+  text-anchor: middle;
+  font-size: 13px;
+  font-weight: 850;
+  cursor: text;
+}
+
+.business-canvas-edge-label-foreign {
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.business-canvas-edge-label-button,
+.business-canvas-edge-label-input {
+  width: 100%;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.business-canvas-edge-label-button {
+  display: block;
+  overflow: hidden;
+  padding: 0 8px;
+  cursor: text;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.business-canvas-edge-label-button.empty {
+  color: var(--muted);
+}
+
+.business-canvas-edge-label-button:hover,
+.business-canvas-edge-label-button:focus-visible,
+.business-canvas-edge-label-input:focus {
+  border-color: var(--accent-strong);
+  background: var(--surface);
+  outline: 2px solid color-mix(in srgb, var(--accent-strong) 22%, transparent);
+  outline-offset: 1px;
+}
+
+.business-canvas-edge-label-input {
+  padding: 0 8px;
+}
+
+.business-canvas-connection-preview {
+  pointer-events: none;
+}
+
+.business-canvas-connection-preview-line {
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 2.5;
+  stroke-dasharray: 8 6;
+}
+
+.business-canvas-node {
+  position: absolute;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  overflow: visible;
+  border: 2px solid color-mix(in srgb, var(--business-canvas-custom-color, var(--accent)) 55%, var(--border));
+  background: color-mix(in srgb, var(--business-canvas-custom-color, var(--accent)) 16%, var(--surface));
+  color: var(--text);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.09);
+  cursor: grab;
+  padding: 10px;
+  user-select: none;
+  z-index: 4;
+}
+
+.business-canvas-node.dragging {
+  cursor: grabbing;
+  opacity: 0.88;
+  z-index: 12;
+}
+
+.business-canvas-node.selected {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 14px 30px rgba(15, 23, 42, 0.14);
+  z-index: 10;
+}
+
+.business-canvas-group-node {
+  align-content: start;
+  grid-template-rows: auto;
+  border-style: dashed;
+  background: color-mix(in srgb, var(--business-canvas-custom-color, var(--accent)) 9%, transparent);
+  box-shadow: none;
+  cursor: move;
+  z-index: 1;
+}
+
+.business-canvas-group-node.selected {
+  z-index: 2;
+}
+
+.business-canvas-group-title {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 4px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.business-canvas-node.armed {
+  outline: 3px dashed var(--gold);
+  outline-offset: 4px;
+}
+
+.business-canvas-node.connection-target {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 4px;
+}
+
+.business-canvas-node.connection-target .business-canvas-anchor,
+.business-canvas-node.selected .business-canvas-anchor,
+.business-canvas-node.armed .business-canvas-anchor {
+  width: 15px;
+  height: 15px;
+  border-color: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-strong) 22%, transparent);
+}
+
+.business-canvas-node.editing {
+  cursor: text;
+  user-select: text;
+}
+
+.business-canvas-shape-rounded-rectangle {
+  border-radius: 8px;
+}
+
+.business-canvas-shape-rectangle {
+  border-radius: 0;
+}
+
+.business-canvas-shape-ellipse {
+  border-radius: 999px;
+  padding: 16px 22px;
+}
+
+.business-canvas-shape-diamond {
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  padding: 24px 34px;
+}
+
+.business-canvas-color-1 {
+  --business-canvas-custom-color: var(--danger);
+}
+
+.business-canvas-color-2 {
+  --business-canvas-custom-color: var(--gold);
+}
+
+.business-canvas-color-3 {
+  --business-canvas-custom-color: #eab308;
+}
+
+.business-canvas-color-4 {
+  --business-canvas-custom-color: var(--accent);
+}
+
+.business-canvas-color-5 {
+  --business-canvas-custom-color: #2563eb;
+}
+
+.business-canvas-color-6 {
+  --business-canvas-custom-color: #7c3aed;
+}
+
+.business-canvas-node-badges {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.business-canvas-node-badges span {
+  overflow: hidden;
+  max-width: 48%;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 900;
+  padding: 3px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.business-canvas-node-badges .business-canvas-phase-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  max-width: none;
+  border-radius: 50%;
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.business-canvas-node-text {
+  align-self: center;
+  overflow: hidden;
+  outline: none;
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  font-weight: 850;
+  line-height: 1.25;
+  white-space: pre-wrap;
+}
+
+.business-canvas-node-text[contenteditable="true"] {
+  overflow: auto;
+  min-height: 42px;
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 6px;
+}
+
+.business-canvas-anchor {
+  position: absolute;
+  display: block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent-strong);
+  cursor: crosshair;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.82);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.business-canvas-node:hover .business-canvas-anchor,
+.business-canvas-node.selected .business-canvas-anchor,
+.business-canvas-node.armed .business-canvas-anchor,
+.business-canvas-node.connection-target .business-canvas-anchor {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.business-canvas-anchor.top {
+  top: -8px;
+  left: calc(50% - 6px);
+}
+
+.business-canvas-anchor.right {
+  top: calc(50% - 6px);
+  right: -8px;
+}
+
+.business-canvas-anchor.bottom {
+  bottom: -8px;
+  left: calc(50% - 6px);
+}
+
+.business-canvas-anchor.left {
+  top: calc(50% - 6px);
+  left: -8px;
+}
+
+.business-canvas-resize-handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--surface);
+  border-radius: 5px;
+  background: var(--accent);
+  cursor: nwse-resize;
+}
+
+.business-canvas-node-toolbar,
+.business-canvas-multi-toolbar,
+.business-canvas-edge-toolbar,
+.business-canvas-line-menu {
+  position: absolute;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+  padding: 7px;
+}
+
+.business-canvas-toolbar-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 110;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.business-canvas-toolbar-layer .business-canvas-node-toolbar,
+.business-canvas-toolbar-layer .business-canvas-multi-toolbar,
+.business-canvas-toolbar-layer .business-canvas-edge-toolbar {
+  pointer-events: auto;
+}
+
+.business-canvas-node-toolbar {
+  max-width: min(720px, calc(100vw - 32px));
+  flex-wrap: wrap;
+}
+
+.business-canvas-node-toolbar .icon-button,
+.business-canvas-multi-toolbar .icon-button,
+.business-canvas-edge-toolbar .icon-button,
+.business-canvas-line-menu .icon-button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.business-canvas-node-toolbar .icon-button:hover,
+.business-canvas-node-toolbar .icon-button:focus-visible,
+.business-canvas-multi-toolbar .icon-button:hover,
+.business-canvas-multi-toolbar .icon-button:focus-visible,
+.business-canvas-edge-toolbar .icon-button:hover,
+.business-canvas-edge-toolbar .icon-button:focus-visible,
+.business-canvas-line-menu .icon-button:hover,
+.business-canvas-line-menu .icon-button:focus-visible {
+  background: var(--surface-soft);
+  filter: none;
+}
+
+.business-canvas-node-toolbar .icon-button.danger,
+.business-canvas-multi-toolbar .icon-button.danger,
+.business-canvas-edge-toolbar .icon-button.danger,
+.business-canvas-line-menu .icon-button.danger {
+  border-color: color-mix(in srgb, var(--danger) 36%, var(--border));
+  background: transparent;
+  color: var(--danger);
+}
+
+.business-canvas-dropdown {
+  position: relative;
+}
+
+.business-canvas-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 34px;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+  list-style: none;
+  padding: 5px 8px;
+}
+
+.business-canvas-dropdown-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.business-canvas-dropdown[open] .business-canvas-dropdown-trigger,
+.business-canvas-dropdown-trigger:hover,
+.business-canvas-dropdown-trigger:focus-visible {
+  border-color: var(--accent-strong);
+  background: var(--surface-soft);
+}
+
+.business-canvas-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 140;
+  display: grid;
+  gap: 4px;
+  min-width: 156px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+  padding: 6px;
+}
+
+.business-canvas-dropdown-option {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 850;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.business-canvas-dropdown-option:hover,
+.business-canvas-dropdown-option:focus-visible,
+.business-canvas-dropdown-option.active {
+  background: var(--surface-soft);
+}
+
+.business-canvas-dropdown-option-icon {
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.business-canvas-label-trigger {
+  max-width: 128px;
+}
+
+.business-canvas-label-trigger span:last-child,
+.business-canvas-dropdown-option span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.business-canvas-phase-trigger {
+  padding: 0;
+}
+
+.business-canvas-phase-trigger .business-canvas-phase-badge-button {
+  border: 0;
+  background: transparent;
+}
+
+.business-canvas-phase-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.business-canvas-multi-toolbar strong {
+  min-width: 22px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.business-canvas-line-menu-action {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 132px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.business-canvas-line-menu-action:hover,
+.business-canvas-line-menu-action:focus-visible {
+  background: var(--surface-soft);
+}
+
+.business-canvas-selection-rect {
+  position: absolute;
+  z-index: 3;
+  border: 1px dashed var(--accent-strong);
+  background: rgba(14, 165, 233, 0.06);
+  pointer-events: none;
+}
+
+.business-canvas-color-button {
+  display: inline-grid;
+  place-items: center;
+}
+
+.business-canvas-color-dot,
+.business-canvas-palette-swatch {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid color-mix(in srgb, var(--business-canvas-custom-color, var(--accent)) 55%, var(--border));
+  border-radius: 50%;
+  background: var(--business-canvas-custom-color);
+}
+
+.business-canvas-context-menu,
+.business-canvas-palette-popover,
+.business-canvas-palette-editor {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  gap: 6px;
+  min-width: 160px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.2);
+  padding: 8px;
+}
+
+.business-canvas-context-menu button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.business-canvas-context-menu button.danger {
+  color: var(--danger);
+}
+
+.business-canvas-context-menu-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  color: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.business-canvas-context-menu button:hover,
+.business-canvas-context-menu button:focus-visible {
+  background: var(--surface-soft);
+}
+
+.business-canvas-palette-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.business-canvas-palette-row-custom {
+  padding-top: 6px;
+  border-top: 1px solid var(--row-border);
+}
+
+.business-canvas-palette-swatch {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.business-canvas-palette-editor {
+  top: 96px;
+  left: 50%;
+  width: min(320px, calc(100vw - 24px));
+  transform: translateX(-50%);
+}
+
+.business-canvas-palette-editor input {
+  min-height: 30px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 4px 7px;
+}
+
+.business-canvas-palette-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.business-canvas-palette-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.business-canvas-edge-toolbar input {
+  width: 130px;
+}
+
+.business-canvas-gantt {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.business-canvas-gantt-head,
+.business-canvas-gantt-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) minmax(110px, 1.5fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.business-canvas-gantt-head h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.business-canvas-gantt-head span,
+.business-canvas-gantt-phase,
+.business-canvas-gantt-row strong {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.business-canvas-gantt-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.business-canvas-gantt-bar {
+  display: flex;
+  width: 100%;
+  height: 16px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--row-border);
+}
+
+.business-canvas-gantt-fill {
+  min-width: 0;
+  background: color-mix(in srgb, var(--business-canvas-gantt-color) 72%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--business-canvas-gantt-color) 45%, transparent);
+}
+
+.business-canvas-gantt-empty {
+  width: 100%;
+  height: 2px;
+  align-self: center;
+  background: var(--row-border);
+}
+
+@media (max-width: 980px) {
+  .self-employment-project-gantt-head {
+    display: none;
+  }
+
+  .self-employment-project-gantt-row {
+    grid-template-columns: minmax(0, 1fr) 88px;
+  }
+
+  .self-employment-project-gantt-track {
+    grid-column: 1 / -1;
+  }
+
+  .business-canvas-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .business-canvas-viewport {
+    height: clamp(420px, 70vh, 620px);
+  }
+}
+

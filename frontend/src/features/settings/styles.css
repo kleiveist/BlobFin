@@ -1,0 +1,165 @@
+.app-settings {
+  position: relative;
+}
+
+.settings-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.settings-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.settings-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(320px, calc(100vw - 24px));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(31, 37, 40, 0.2);
+  color: var(--text);
+  padding: 12px;
+}
+
+:root[data-theme="dark"] .settings-popover {
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+
+.settings-popover[hidden] {
+  display: none;
+}
+
+.settings-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.theme-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.theme-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 9px 10px;
+  cursor: pointer;
+  font-weight: 850;
+  text-align: left;
+}
+
+.theme-option.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.theme-swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.theme-swatch.light {
+  background: linear-gradient(135deg, #fffdf8 0 50%, #d9ede7 50% 100%);
+}
+
+.theme-swatch.dark {
+  background: linear-gradient(135deg, #111614 0 50%, #46c49d 50% 100%);
+}
+
+.settings-danger-zone {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.settings-danger-zone .button {
+  width: 100%;
+}
+
+.settings-popover-subhead {
+  border-top: 1px solid var(--row-border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.settings-accordion-toggle {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-weight: 800;
+  justify-content: space-between;
+  padding: 9px 10px;
+  width: 100%;
+}
+
+.settings-accordion-content {
+  padding-top: 10px;
+}
+
+.vault-settings-panel {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.vault-action-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.vault-status-grid {
+  display: grid;
+  grid-template-columns: minmax(86px, auto) minmax(0, 1fr);
+  gap: 6px 10px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 9px 10px;
+  font-size: 0.78rem;
+}
+
+.vault-status-grid span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.vault-status-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+

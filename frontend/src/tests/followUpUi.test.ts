@@ -27,7 +27,35 @@ const additionalBreakdown = {
   totalAdditionalRepayment: 0
 };
 
-const stylesSource = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+const cssSourcePaths = [
+  "../styles/index.css",
+  "../styles/tokens.css",
+  "../styles/reset.css",
+  "../styles/base.css",
+  "../styles/layout.css",
+  "../styles/components/fields.css",
+  "../styles/components/buttons.css",
+  "../styles/components/popovers.css",
+  "../styles/components/details.css",
+  "../styles/utilities.css",
+  "../styles/responsive.css",
+  "../features/settings/styles.css",
+  "../features/planning/styles.css",
+  "../features/positions/styles.css",
+  "../features/investment/styles.css",
+  "../features/real-estate/styles.css",
+  "../features/statutory-pension/styles.css",
+  "../features/combined-wealth/styles.css",
+  "../features/income-tracker/styles.css",
+  "../features/income-planning/styles.css",
+  "../features/income-stamp-planner/styles.css",
+  "../features/self-employment/styles.css",
+  "../features/self-employment/business-canvas/styles.css"
+];
+
+const stylesSource = cssSourcePaths
+  .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
+  .join("\n");
 
 const realEstateYear: RealEstateFinancingYear = {
   year: 2026,

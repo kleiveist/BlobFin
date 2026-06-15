@@ -1,0 +1,817 @@
+.self-employment-dashboard {
+  display: grid;
+  gap: 16px;
+}
+
+.self-employment-hero,
+.self-employment-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.self-employment-hero h2,
+.self-employment-detail-head h2 {
+  margin: 4px 0 0;
+  font-size: 1.22rem;
+}
+
+.self-employment-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.self-employment-metrics,
+.self-employment-analysis,
+.self-employment-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.self-employment-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.self-employment-project-card {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-height: 176px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 12px;
+  text-align: left;
+}
+
+.self-employment-project-main {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.self-employment-project-card.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.self-employment-project-card.realistic {
+  background: var(--accent-soft);
+}
+
+.self-employment-project-card.borderline {
+  background: var(--gold-soft);
+}
+
+.self-employment-project-card.unrealistic {
+  background: var(--danger-soft);
+}
+
+.self-employment-project-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.self-employment-project-icon-button {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  cursor: pointer;
+  padding: 0;
+}
+
+.self-employment-project-icon-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.self-employment-project-icon-svg {
+  width: 22px;
+  height: 22px;
+}
+
+.self-employment-empty-card {
+  display: grid;
+  gap: 6px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 16px;
+}
+
+.self-employment-empty-card h3,
+.self-employment-empty-card p {
+  margin: 0;
+}
+
+.self-employment-project-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.self-employment-project-title strong {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.self-employment-project-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.self-employment-project-main > span:not(.self-employment-project-title):not(.self-employment-project-icon) {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.self-employment-project-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.self-employment-label-chip,
+.self-employment-label-option {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 3px 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.self-employment-label-chip.muted {
+  opacity: 0.72;
+}
+
+.self-employment-project-actions,
+.self-employment-label-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.self-employment-project-actions .button {
+  flex: 1 1 92px;
+}
+
+.self-employment-label-picker {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.self-employment-label-option {
+  cursor: pointer;
+}
+
+.self-employment-label-option.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.self-employment-roadmap {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(118px, 1fr));
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.self-employment-roadmap-step {
+  display: grid;
+  min-width: 118px;
+  min-height: 88px;
+  align-content: center;
+  justify-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.self-employment-roadmap-step:hover,
+.self-employment-roadmap-step.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.self-employment-roadmap-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.self-employment-roadmap-step span {
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.self-employment-roadmap-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 14px;
+}
+
+.self-employment-roadmap-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.self-employment-roadmap-panel-title {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.self-employment-roadmap-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.self-employment-roadmap-panel-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--accent-strong);
+}
+
+.self-employment-gantt-phase-filter {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.self-employment-gantt-phase-filter-button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 0;
+}
+
+.self-employment-gantt-phase-filter-button:hover,
+.self-employment-gantt-phase-filter-button:focus-visible {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  outline: 2px solid color-mix(in srgb, var(--accent-strong) 25%, transparent);
+  outline-offset: 2px;
+}
+
+.self-employment-gantt-phase-filter-button.active {
+  border-color: var(--accent-strong);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-strong) 18%, transparent);
+}
+
+@media (max-width: 640px) {
+  .self-employment-gantt-phase-filter {
+    width: 100%;
+  }
+}
+
+.self-employment-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.self-employment-edit-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.self-employment-edit-field.wide {
+  grid-column: 1 / -1;
+}
+
+.self-employment-edit-field textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.self-employment-readonly-field {
+  justify-content: start;
+  min-height: 70px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.self-employment-readonly-field strong {
+  overflow-wrap: anywhere;
+}
+
+.self-employment-project-gantt {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.self-employment-project-gantt-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.self-employment-project-gantt-summary span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 7px 9px;
+}
+
+.self-employment-project-gantt-summary b {
+  color: var(--text);
+}
+
+.self-employment-project-gantt-head,
+.self-employment-project-gantt-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) 86px minmax(260px, 2.2fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.self-employment-project-gantt-head {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.self-employment-project-gantt-rows {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.self-employment-project-gantt-row {
+  min-width: 0;
+}
+
+.self-employment-project-gantt-phase {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 54px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px;
+  text-align: left;
+}
+
+.self-employment-project-gantt-phase:hover,
+.self-employment-project-gantt-phase:focus-visible {
+  border-color: var(--accent-strong);
+  background: var(--surface-soft);
+}
+
+.self-employment-project-gantt-phase-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.self-employment-project-gantt-phase strong,
+.self-employment-project-gantt-phase small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.self-employment-project-gantt-phase small,
+.self-employment-project-gantt-hours small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.self-employment-project-gantt-hours {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  min-height: 54px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.self-employment-project-gantt-hours strong {
+  font-size: 0.86rem;
+}
+
+.self-employment-project-gantt-row.disabled {
+  opacity: 0.62;
+}
+
+.self-employment-project-gantt-track {
+  position: relative;
+  height: 58px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), var(--row-border) calc(10% - 1px), var(--row-border) 10%),
+    var(--surface);
+}
+
+.self-employment-project-gantt-label {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 4px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--self-employment-gantt-color) 74%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--self-employment-gantt-color) 42%, var(--border));
+}
+
+.self-employment-project-gantt-label-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 5px 6px 3px;
+  text-shadow: 0 1px 1px rgba(15, 23, 42, 0.24);
+}
+
+.self-employment-project-gantt-label-head span,
+.self-employment-project-gantt-label-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.self-employment-project-gantt-cards {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 4px 4px;
+}
+
+.self-employment-project-gantt-card {
+  min-width: 30px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, white 42%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 2px 4px;
+  text-align: left;
+}
+
+.self-employment-project-gantt-card:hover,
+.self-employment-project-gantt-card:focus-visible {
+  background: var(--surface);
+  outline: 2px solid color-mix(in srgb, var(--accent-strong) 35%, transparent);
+  outline-offset: -1px;
+}
+
+.self-employment-project-gantt-card span,
+.self-employment-project-gantt-card small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.self-employment-project-gantt-card span {
+  font-size: 0.67rem;
+  font-weight: 900;
+}
+
+.self-employment-project-gantt-card small {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 850;
+}
+
+.self-employment-project-gantt-empty {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  overflow: visible;
+  background: var(--row-border);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.self-employment-gantt-popover {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(72vh, calc(100vh - 24px));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+  overscroll-behavior: contain;
+  padding: 12px;
+}
+
+.self-employment-gantt-popover > header,
+.self-employment-gantt-popover-summary {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.self-employment-gantt-popover > header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.self-employment-gantt-popover-summary {
+  justify-content: flex-start;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.self-employment-gantt-check {
+  min-height: 70px;
+}
+
+.self-employment-gantt-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.self-employment-collection-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.self-employment-collection-head,
+.self-employment-collection-item > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.self-employment-collection-head span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.self-employment-collection-list {
+  display: grid;
+  gap: 10px;
+}
+
+.self-employment-collection-item {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.self-employment-empty-note {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.self-employment-chart-card,
+.self-employment-table-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.self-employment-chart-card h3,
+.self-employment-table-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.self-employment-donut {
+  width: 132px;
+  aspect-ratio: 1;
+  justify-self: center;
+  border: 10px solid var(--surface);
+  border-radius: 50%;
+}
+
+.self-employment-legend,
+.self-employment-feasibility-list {
+  display: grid;
+  gap: 7px;
+}
+
+.self-employment-legend span,
+.self-employment-feasibility-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.self-employment-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+
+.self-employment-legend i.realistic,
+.self-employment-feasibility-item.realistic span {
+  color: var(--accent-strong);
+}
+
+.self-employment-legend i.realistic {
+  background: var(--accent);
+}
+
+.self-employment-legend i.borderline {
+  background: var(--gold);
+}
+
+.self-employment-legend i.unrealistic {
+  background: var(--danger);
+}
+
+.self-employment-feasibility-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 9px;
+}
+
+.self-employment-feasibility-item.borderline span {
+  color: var(--gold);
+}
+
+.self-employment-feasibility-item.unrealistic span {
+  color: var(--danger);
+}
+
+.self-employment-bars {
+  display: grid;
+  gap: 9px;
+}
+
+.self-employment-bar-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(100px, 2fr) minmax(70px, auto);
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.self-employment-bar-row div {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--row-border);
+}
+
+.self-employment-bar-row i {
+  display: block;
+  height: 100%;
+  border-radius: 8px;
+  background: var(--accent);
+}
+
+.self-employment-table-card {
+  overflow-x: auto;
+}
+
+.self-employment-table-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.self-employment-table-card th,
+.self-employment-table-card td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 6px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.self-employment-detail {
+  display: grid;
+  gap: 12px;
+}
+

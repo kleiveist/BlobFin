@@ -5,7 +5,7 @@
 
 Diese Datei dokumentiert die aktuellen Design-Elemente aus:
 
-- `frontend/src/styles.css`
+- `frontend/src/styles/index.css`, `frontend/src/styles/` und `frontend/src/features/*/styles.css`
 - `frontend/src/views/templates.ts`
 - `frontend/src/main.ts`
 - `frontend/src/views/investmentChart.ts`

@@ -1,0 +1,354 @@
+.planning-year-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.planning-year-active-label {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.planning-year-navigation {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.planning-year-button {
+  flex: 0 0 auto;
+  min-width: 76px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 8px 11px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.planning-year-button.current {
+  border-color: var(--gold);
+  box-shadow: inset 0 -3px 0 var(--gold);
+  color: var(--text);
+}
+
+.planning-year-button.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.planning-year-button.active.current {
+  box-shadow: inset 0 -3px 0 var(--gold-soft);
+}
+
+.income-label-filter-row {
+  margin-bottom: 10px;
+}
+
+.result-table-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.result-column-switch {
+  min-height: 34px;
+}
+
+.result-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.result-panel {
+  position: relative;
+}
+
+.account-year-table-overview {
+  display: grid;
+  gap: 14px;
+}
+
+.account-year-table-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  padding: 14px;
+}
+
+.account-year-table-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.account-year-table-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-year-table-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.account-year-table-title h3 {
+  margin: 0;
+}
+
+.account-year-table-head p,
+.account-year-table-active-note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.account-year-table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 34px;
+}
+
+.account-year-table-badge {
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  text-transform: uppercase;
+}
+
+.account-year-table-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.account-year-table-metric {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.account-year-table-metric span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.account-year-table-metric strong {
+  font-size: 1rem;
+}
+
+.account-year-table-wrap {
+  background: var(--table-bg);
+}
+
+.reserve-chart-popup {
+  --reserve-chart-savings: #2563eb;
+  position: relative;
+  z-index: 7;
+  width: 100%;
+  overflow: visible;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px 12px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.reserve-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.reserve-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reserve-chart-legend .legend-dot.green {
+  background: var(--good);
+}
+
+.reserve-chart-legend .legend-dot.red {
+  background: var(--danger);
+}
+
+.reserve-chart-legend .legend-dot.orange {
+  background: var(--reserve);
+}
+
+.reserve-chart-legend .legend-dot.purple {
+  background: var(--accent);
+}
+
+.reserve-chart-legend .legend-dot.blue {
+  background: var(--reserve-chart-savings);
+}
+
+.reserve-chart-insight {
+  margin-top: 8px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.reserve-pie-layout {
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.reserve-pie {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: min(210px, 100%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.reserve-pie-center {
+  display: grid;
+  place-items: center;
+  width: 52%;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  padding: 10px;
+  text-align: center;
+}
+
+.reserve-pie-center span,
+.reserve-pie-center small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.reserve-pie-center strong {
+  font-size: 1rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.reserve-pie-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 6px;
+}
+
+.reserve-pie-field {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 7px 8px;
+  text-align: left;
+  cursor: default;
+}
+
+.reserve-pie-field span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.reserve-pie-field strong {
+  font-size: 0.92rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.reserve-pie-field small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+
+.account-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.planning-account-cards {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.planning-account-card {
+  align-items: flex-start;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+}
+
+.planning-account-card small {
+  color: var(--muted);
+}
+
+.planning-account-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.planning-account-summary {
+  color: var(--muted);
+  margin: 0;
+}
+
+.year-account-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 560px;
+}
+

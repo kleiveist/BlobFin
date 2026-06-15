@@ -1,0 +1,81 @@
+.include-item {
+  display: grid;
+  grid-template-columns: auto 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.include-icon {
+  color: var(--accent-strong);
+}
+
+.include-empty {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 12px;
+}
+
+.include-name,
+.include-amount {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.include-name {
+  color: var(--text);
+  font-weight: 850;
+}
+
+.include-amount {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.range-field {
+  grid-template-columns: minmax(150px, 220px) minmax(170px, 1fr) minmax(76px, auto);
+  align-items: center;
+  min-width: 0;
+  margin-bottom: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px 12px;
+}
+
+.range-field strong {
+  color: var(--gold);
+  text-align: right;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.detail-list {
+  border-top: 1px solid var(--border);
+}
+
+.detail-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding: 9px 0;
+}
+
+.detail-line span {
+  color: var(--muted);
+}
+
+.detail-line strong {
+  text-align: right;
+}
+

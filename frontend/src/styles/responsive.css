@@ -1,0 +1,438 @@
+@media (max-width: 1240px) {
+  .investment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1080px) {
+  .workspace-grid,
+  .investment-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar,
+  .app-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .position-filter-builder {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .app-header,
+  .app-main {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .field-grid,
+  .field-grid.wide,
+  .investment-input-grid,
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reserve-chart-popup {
+    width: 100%;
+    padding: 12px;
+  }
+
+  .result-header-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reserve-pie-layout,
+  .reserve-pie-details {
+    grid-template-columns: 1fr;
+  }
+
+  .range-field {
+    grid-template-columns: 1fr;
+  }
+
+  .button-row {
+    display: grid;
+  }
+
+  .position-filter-builder,
+  .position-table-view-row {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .position-view-count {
+    justify-self: start;
+  }
+
+  .investment-chart-header {
+    padding: 16px 16px 0;
+  }
+
+  #investmentChart,
+  #combinedInvestmentChart {
+    height: 460px;
+  }
+
+  .investment-legend {
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 16px 16px;
+  }
+
+  .retirement-depot-funding {
+    margin: 0 16px 16px;
+  }
+
+  .investment-statistics {
+    margin: 0 16px 16px;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1220px) {
+  .module-overview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .landing-main-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .income-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .income-tracker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .combined-module-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .income-analysis-layout,
+  .income-analysis-distribution-layout,
+  .income-analysis-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .income-analysis-distribution-detail {
+    min-height: 240px;
+  }
+}
+
+@media (max-width: 900px) {
+  .landing-hero {
+    min-height: 300px;
+    padding: 28px;
+  }
+
+  .landing-hero-copy {
+    min-height: 220px;
+  }
+
+  .landing-hero-graphic {
+    right: 18px;
+    width: 52%;
+    min-width: 300px;
+    opacity: 0.58;
+  }
+
+  .module-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .combined-module-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-year-table-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .real-estate-slider-grid.two-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .wealth-bar-row {
+    grid-template-columns: 56px 1fr;
+  }
+
+  .wealth-bar-value {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .wealth-vertical-chart {
+    grid-template-columns: 66px minmax(0, 1fr);
+  }
+
+  .wealth-plot {
+    gap: 2px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .wealth-column-button {
+    gap: 4px;
+    padding-left: 1px;
+    padding-right: 1px;
+  }
+
+  .wealth-column-track {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .combined-wealth-summary {
+    gap: 5px;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .combined-wealth-line-controls {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .combined-wealth-card .wealth-plot {
+    gap: 1px;
+    grid-template-columns: repeat(var(--wealth-chart-count, 1), minmax(12px, 1fr));
+    padding-left: 1px;
+    padding-right: 1px;
+  }
+
+  .combined-wealth-ticks {
+    gap: 1px;
+    grid-template-columns: repeat(var(--wealth-chart-count, 1), minmax(12px, 1fr));
+  }
+
+  .statutory-pension-head,
+  .statutory-pension-scenarios,
+  .statutory-pension-overlay-legend,
+  .statutory-pension-tax-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .income-chart-grid,
+  .income-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .income-tab-switch {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .landing-hero {
+    min-height: 360px;
+    padding: 84px 22px 22px;
+  }
+
+  .landing-hero-actions {
+    left: 22px;
+    right: 22px;
+  }
+
+  .landing-base-data-button {
+    width: 100%;
+  }
+
+  .base-data-popup {
+    left: 22px;
+    right: 22px;
+    top: 76px;
+    width: auto;
+    max-height: calc(100vh - 96px);
+  }
+
+  .landing-hero-copy h2 {
+    font-size: 2.15rem;
+  }
+
+  .landing-hero-graphic {
+    right: -64px;
+    bottom: 4px;
+    min-width: 330px;
+    opacity: 0.42;
+  }
+
+  .module-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .combined-single-selector.planning-account-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .combined-cash-account-selector.planning-account-cards {
+    display: flex;
+  }
+
+  .overview-card {
+    min-height: 0;
+  }
+
+  .module-topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .module-topbar-actions,
+  .module-topbar-actions .button {
+    width: 100%;
+  }
+
+  .account-year-table-card {
+    padding: 10px;
+  }
+
+  .account-year-table-actions,
+  .account-year-table-actions .button {
+    width: 100%;
+  }
+
+  .account-year-table-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .income-tab-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .income-planning-metric-grid,
+  .income-planning-time-block,
+  .income-planning-time-charts,
+  .income-planning-layout,
+  .income-planning-scenario-grid,
+  #incomePlanningWorkBlocks.income-planning-block-list,
+  #incomePlanningManualBlocks.income-planning-block-list,
+  .income-planning-habit-stamp-layout,
+  .income-planning-weekly-head,
+  .income-planning-week-toolbar,
+  .income-planning-week-scenario,
+  .income-planning-block-grid.work,
+  .income-planning-block-grid.manual,
+  .income-planning-block-grid.habit,
+  .income-planning-day-row {
+    grid-template-columns: 1fr;
+  }
+
+  .income-planning-time-chart {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .income-planning-time-chart-copy {
+    width: 100%;
+  }
+
+  .income-planning-source-row {
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+
+  .income-planning-card-head,
+  .income-planning-compact-head,
+  .income-planning-work-card-main,
+  .income-planning-dialog-section-head,
+  .income-stamp-planner-control-stack,
+  .income-planning-week-scenario-options,
+  .income-planning-career-item {
+    align-items: flex-start;
+    flex-direction: column;
+    grid-template-columns: 1fr;
+  }
+
+  .income-planning-week-nav,
+  .income-planning-week-scenario-options {
+    width: 100%;
+  }
+
+  .income-planning-week-scenario-button {
+    flex: 1 1 140px;
+  }
+
+  .income-planning-weekly-head p {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .income-planning-sleep-slot-row {
+    grid-template-columns: 1fr;
+  }
+
+  .income-planning-work-hours,
+  .income-planning-career-stats {
+    justify-items: start;
+  }
+
+  .income-planning-block-grid.habit {
+    overflow-x: visible;
+  }
+
+  .income-planning-calendar {
+    --calendar-axis-width: 50px;
+    --calendar-day-width: 118px;
+    --calendar-height: 660px;
+  }
+
+  .income-planning-calendar-body {
+    overflow-x: auto;
+  }
+
+  .income-stamp-planner-control-stack,
+  .income-stamp-planner-range {
+    justify-items: start;
+    width: 100%;
+  }
+
+  .income-stamp-planner-month-nav {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    width: 100%;
+  }
+
+  .income-stamp-planner-today-button {
+    grid-column: 1 / -1;
+  }
+
+  .income-stamp-planner-weekday-row,
+  .income-stamp-planner-week {
+    grid-template-columns: 72px repeat(7, 118px);
+    min-width: calc(72px + 7 * 118px + 6 * 7px);
+  }
+
+  .income-stamp-planner-day {
+    min-height: 132px;
+  }
+
+  .income-planning-dialog-grid,
+  .income-planning-dialog-grid.basis,
+  .income-planning-dialog-grid.single {
+    grid-template-columns: 1fr;
+  }
+
+  .income-planning-warning,
+  .income-planning-scenario-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .income-tax-adjustment-amount {
+    grid-template-columns: 1fr;
+  }
+
+  .income-tax-rule-panel,
+  .income-tax-context-controls,
+  .income-capital-tax-controls,
+  .income-capital-tax-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
