@@ -34,6 +34,7 @@ import {
   normalizeSelfEmploymentGanttPlan,
   normalizedGanttLabelId,
   orderedGanttLabels,
+  visibleSelfEmploymentGanttRows,
   type SelfEmploymentGanttSummary
 } from "./domain/selfEmploymentGantt";
 import {
@@ -3403,9 +3404,7 @@ function toggleSelfEmploymentGanttPhaseFilter(projectId: string, phaseId: string
 function renderSelfEmploymentProjectGantt(project: SelfEmploymentProject): string {
   const summary = buildSelfEmploymentProjectGantt(project);
   const selectedPhaseIds = selfEmploymentGanttPhaseFilterIds(project);
-  const visibleRows = selectedPhaseIds.length
-    ? summary.rows.filter((row) => selectedPhaseIds.includes(row.phaseId))
-    : summary.rows;
+  const visibleRows = visibleSelfEmploymentGanttRows(summary, selectedPhaseIds);
   const cardCount = project.businessIdeaCanvas.nodes.filter((node) => node.type !== "group").length;
   const activeRows = summary.rows.filter((row) => row.enabled && row.scheduledHours > 0).length;
   return `

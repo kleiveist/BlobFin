@@ -220,6 +220,39 @@ export function buildSelfEmploymentProjectGantt(project: SelfEmploymentProject):
   };
 }
 
+export function visibleSelfEmploymentGanttRows(
+  summary: SelfEmploymentGanttSummary,
+  selectedPhaseIds: string[]
+): SelfEmploymentGanttSummary["rows"] {
+  if (selectedPhaseIds.length === 0) return summary.rows;
+  const selectedIds = new Set(selectedPhaseIds);
+  const filteredRows = summary.rows.filter((row) => selectedIds.has(row.phaseId));
+  const visibleSpanHours = Math.max(1, filteredRows.reduce((sum, row) => sum + row.scheduledHours, 0));
+  let rowStartHour = 0;
+  return filteredRows.map((row) => {
+    const startHour = rowStartHour;
+    rowStartHour += row.scheduledHours;
+    let labelStartHour = startHour;
+    return {
+      ...row,
+      startHour,
+      endHour: startHour + row.scheduledHours,
+      startPercent: (startHour / visibleSpanHours) * 100,
+      widthPercent: (row.scheduledHours / visibleSpanHours) * 100,
+      labels: row.labels.map((label) => {
+        const labelStart = labelStartHour;
+        labelStartHour += row.enabled ? label.totalHours : 0;
+        return {
+          ...label,
+          startHour: labelStart,
+          startPercent: (labelStart / visibleSpanHours) * 100,
+          widthPercent: row.enabled ? (label.totalHours / visibleSpanHours) * 100 : 0
+        };
+      })
+    };
+  });
+}
+
 export function orderedGanttLabels(meta: BusinessIdeaCanvasMeta): BusinessIdeaCanvasLabel[] {
   const byId = new Map(meta.labels.map((label) => [normalizedGanttLabelId(label.id), label]));
   return CANONICAL_GANTT_LABELS.map((label) => ({

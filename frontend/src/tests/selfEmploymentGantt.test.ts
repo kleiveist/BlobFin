@@ -4,7 +4,8 @@ import { defaultAppState } from "../data/defaults";
 import {
   buildSelfEmploymentProjectGantt,
   normalizeSelfEmploymentGanttPlan,
-  orderedGanttLabels
+  orderedGanttLabels,
+  visibleSelfEmploymentGanttRows
 } from "../domain/selfEmploymentGantt";
 import { normalizeBusinessIdeaCanvasMeta, parseBusinessIdeaCanvasFile } from "../domain/businessIdeaCanvas";
 import type { SelfEmploymentProject } from "../types";
@@ -119,6 +120,45 @@ describe("self employment project gantt", () => {
     expect(phaseOne?.widthPercent).toBeCloseTo(100);
     expect(phaseTwo?.startHour).toBe(5);
     expect(phaseTwo?.widthPercent).toBeCloseTo(50);
+  });
+
+  it("compacts filtered visible phases into a local timeline", () => {
+    const project = projectWithCanvas({
+      nodes: [
+        { id: "p1", type: "text", text: "Phase 1", x: 0, y: 0, width: 100, height: 80 },
+        { id: "p2", type: "text", text: "Phase 2", x: 140, y: 0, width: 100, height: 80 },
+        { id: "p3", type: "text", text: "Phase 3", x: 280, y: 0, width: 100, height: 80 }
+      ],
+      nodeMeta: {
+        p1: { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" },
+        p2: { labelId: "idea", phaseId: "phase-2", shape: "rounded-rectangle" },
+        p3: { labelId: "idea", phaseId: "phase-3", shape: "rounded-rectangle" }
+      },
+      cardPlans: [
+        { cardId: "p1", timeBudgetHours: 2, startDate: null, note: "" },
+        { cardId: "p2", timeBudgetHours: 3, startDate: null, note: "" },
+        { cardId: "p3", timeBudgetHours: 5, startDate: null, note: "" }
+      ]
+    });
+
+    const summary = buildSelfEmploymentProjectGantt(project);
+    const unfilteredRows = visibleSelfEmploymentGanttRows(summary, []);
+    const phaseTwoOnlyRows = visibleSelfEmploymentGanttRows(summary, ["phase-2"]);
+    const phaseTwoAndThreeRows = visibleSelfEmploymentGanttRows(summary, ["phase-2", "phase-3"]);
+
+    expect(unfilteredRows).toBe(summary.rows);
+    expect(summary.projectSpanHours).toBe(10);
+    expect(phaseTwoOnlyRows).toHaveLength(1);
+    expect(phaseTwoOnlyRows[0].phaseId).toBe("phase-2");
+    expect(phaseTwoOnlyRows[0].startPercent).toBe(0);
+    expect(phaseTwoOnlyRows[0].widthPercent).toBe(100);
+    expect(phaseTwoOnlyRows[0].labels.find((label) => label.labelId === "idea")?.startPercent).toBe(0);
+    expect(phaseTwoOnlyRows[0].labels.find((label) => label.labelId === "idea")?.widthPercent).toBe(100);
+    expect(phaseTwoAndThreeRows.map((row) => row.phaseId)).toEqual(["phase-2", "phase-3"]);
+    expect(phaseTwoAndThreeRows[0].startPercent).toBe(0);
+    expect(phaseTwoAndThreeRows[0].widthPercent).toBeCloseTo(37.5);
+    expect(phaseTwoAndThreeRows[1].startPercent).toBeCloseTo(37.5);
+    expect(phaseTwoAndThreeRows[1].widthPercent).toBeCloseTo(62.5);
   });
 
   it("prunes stale card plans during normalization", () => {

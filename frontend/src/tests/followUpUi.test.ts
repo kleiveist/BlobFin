@@ -177,7 +177,7 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain("self-employment-roadmap-panel-title");
     expect(mainSource).toContain("self-employment-toggle-gantt-phase-filter");
     expect(mainSource).toContain("ganttPhaseFilterIds");
-    expect(mainSource).toContain("const visibleRows = selectedPhaseIds.length");
+    expect(mainSource).toContain("visibleSelfEmploymentGanttRows");
     expect(mainSource).toContain("data-self-employment-gantt-popover");
     expect(mainSource).toContain("self-employment-gantt-phase-popover");
     expect(mainSource).toContain("self-employment-gantt-card-popover");
