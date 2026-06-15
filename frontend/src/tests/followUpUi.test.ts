@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import mainSource from "../main.ts?raw";
+import mainSource from "../app/appController.ts?raw";
 import businessCanvasViewSource from "../views/businessIdeaCanvasView.ts?raw";
 import { renderAppShell } from "../views/templates";
 import {
