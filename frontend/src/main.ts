@@ -176,7 +176,7 @@ import {
   normalizePositionPlanningYear,
   planningYearOptions,
   positionPlanningYear,
-  positionsForPlanningYear,
+  positionsForPlanningYearWithMonthlySavingsCarryover,
   sanitizePlanningYearSelection
 } from "./lib/planningYears";
 import {
@@ -1079,13 +1079,21 @@ function activePlanningYearLabel(): string {
 }
 
 function activePlanningPositions(): ReservePosition[] {
-  return positionsForPlanningYear(state.positions, activePlanningYear());
+  return positionsForPlanningYearWithMonthlySavingsCarryover(
+    state.positions,
+    activePlanningYear(),
+    state.settings.year
+  );
 }
 
 function planningAccountForActiveYear(account: PlanningAccount): PlanningAccount {
   return {
     ...account,
-    yearlyRows: positionsForPlanningYear(account.yearlyRows, activePlanningYear())
+    yearlyRows: positionsForPlanningYearWithMonthlySavingsCarryover(
+      account.yearlyRows,
+      activePlanningYear(),
+      state.settings.year
+    )
   };
 }
 
@@ -15302,7 +15310,7 @@ function renderReserveChartPopup(summary: ReturnType<typeof calculateReserveSumm
       <span><i class="legend-dot green"></i>Einnahmen</span>
       <span><i class="legend-dot red"></i>Ausgaben</span>
       <span><i class="legend-dot orange"></i>Ruecklagen</span>
-      <span><i class="legend-dot purple"></i>Sparen</span>
+      <span><i class="legend-dot blue"></i>Sparen</span>
     </div>
     <div class="reserve-chart-insight">${escapeHtml(model.insight)}</div>
   `;
@@ -15377,7 +15385,7 @@ function reservePieSegments(totals: ReserveChartTotals): Array<{ key: string; va
   return [
     { key: "expense", value: totals.expense, color: "var(--danger)" },
     { key: "reserve", value: totals.reserve, color: "var(--reserve)" },
-    { key: "savings", value: totals.savings, color: "var(--accent)" },
+    { key: "savings", value: totals.savings, color: "var(--reserve-chart-savings)" },
     { key: "remaining", value: remaining, color: "var(--good)" },
     { key: "deficit", value: deficit, color: "var(--gold)" }
   ].filter((segment) => segment.value > 0.01);

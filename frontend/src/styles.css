@@ -813,6 +813,7 @@ button:focus-visible {
 }
 
 .reserve-chart-popup {
+  --reserve-chart-savings: #2563eb;
   position: relative;
   z-index: 7;
   width: 100%;
@@ -855,6 +856,10 @@ button:focus-visible {
 
 .reserve-chart-legend .legend-dot.purple {
   background: var(--accent);
+}
+
+.reserve-chart-legend .legend-dot.blue {
+  background: var(--reserve-chart-savings);
 }
 
 .reserve-chart-insight {

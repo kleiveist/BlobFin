@@ -35,3 +35,26 @@ export function positionsForPlanningYear(
 ): ReservePosition[] {
   return positions.filter((position) => positionPlanningYear(position) === selectedYear);
 }
+
+export function positionsForPlanningYearWithMonthlySavingsCarryover(
+  positions: ReservePosition[],
+  selectedYear: PlanningYearSelection,
+  startYear = defaultPlanningSettings().year
+): ReservePosition[] {
+  return positions.filter(
+    (position) =>
+      positionPlanningYear(position) === selectedYear ||
+      isMonthlySavingsCarryoverPosition(position, selectedYear, startYear)
+  );
+}
+
+function isMonthlySavingsCarryoverPosition(
+  position: ReservePosition,
+  selectedYear: PlanningYearSelection,
+  startYear: number
+): boolean {
+  if (selectedYear === null) return false;
+  if (position.type !== "savings" || position.payoutType !== "monthly") return false;
+  const firstYear = positionPlanningYear(position) ?? startYear;
+  return firstYear <= selectedYear;
+}

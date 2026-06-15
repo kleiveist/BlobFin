@@ -397,6 +397,10 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('id="reserveChartPopup" class="reserve-chart-popup" role="dialog"');
     expect(html).not.toContain('id="reserveChartPopup" class="reserve-chart-popup" hidden');
     expect(mainSource).toContain("function reservePieChart");
+    expect(mainSource).toContain('legend-dot blue"></i>Sparen');
+    expect(mainSource).toContain('key: "savings", value: totals.savings, color: "var(--reserve-chart-savings)"');
+    expect(stylesSource).toContain("--reserve-chart-savings: #2563eb");
+    expect(stylesSource).toContain(".reserve-chart-legend .legend-dot.blue");
     expect(mainSource).not.toContain("function reserveBarChart");
     expect(mainSource).not.toContain("reserve-chart-summary");
     expect(mainSource).not.toContain("reserve-chart-controls");

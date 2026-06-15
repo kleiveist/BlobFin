@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { planningYearOptions, positionsForPlanningYear, sanitizePlanningYearSelection } from "../lib/planningYears";
+import {
+  planningYearOptions,
+  positionsForPlanningYear,
+  positionsForPlanningYearWithMonthlySavingsCarryover,
+  sanitizePlanningYearSelection
+} from "../lib/planningYears";
 import type { ReservePosition } from "../types";
 
 describe("planning years", () => {
@@ -22,6 +27,50 @@ describe("planning years", () => {
     expect(positionsForPlanningYear(positions, null).map((item) => item.id)).toEqual(["start"]);
     expect(positionsForPlanningYear(positions, 2026).map((item) => item.id)).toEqual(["year-2026"]);
     expect(positionsForPlanningYear(positions, 2033).map((item) => item.id)).toEqual(["year-2033"]);
+  });
+
+  it("carries monthly savings positions into later concrete planning years", () => {
+    const positions = [
+      { ...position("start-savings", null), type: "savings" as const },
+      { ...position("future-savings", 2028), type: "savings" as const },
+      position("monthly-cost", 2026)
+    ];
+
+    expect(positionsForPlanningYearWithMonthlySavingsCarryover(positions, null, 2026).map((item) => item.id)).toEqual([
+      "start-savings"
+    ]);
+    expect(positionsForPlanningYearWithMonthlySavingsCarryover(positions, 2026, 2026).map((item) => item.id)).toEqual([
+      "start-savings",
+      "monthly-cost"
+    ]);
+    expect(positionsForPlanningYearWithMonthlySavingsCarryover(positions, 2027, 2026).map((item) => item.id)).toEqual([
+      "start-savings"
+    ]);
+    expect(positionsForPlanningYearWithMonthlySavingsCarryover(positions, 2028, 2026).map((item) => item.id)).toEqual([
+      "start-savings",
+      "future-savings"
+    ]);
+    expect(positionsForPlanningYearWithMonthlySavingsCarryover(positions, 2029, 2026).map((item) => item.id)).toEqual([
+      "start-savings",
+      "future-savings"
+    ]);
+  });
+
+  it("keeps monthly savings carryover scoped to savings with monthly rhythm", () => {
+    const positions = [
+      { ...position("savings-none", 2026, "none"), type: "savings" as const },
+      { ...position("savings-yearly", 2026, "yearly"), type: "savings" as const },
+      { ...position("savings-once", 2026, "once", 2026), type: "savings" as const },
+      position("monthly-expense", 2026, "monthly")
+    ];
+
+    expect(positionsForPlanningYearWithMonthlySavingsCarryover(positions, 2026, 2026).map((item) => item.id)).toEqual([
+      "savings-none",
+      "savings-yearly",
+      "savings-once",
+      "monthly-expense"
+    ]);
+    expect(positionsForPlanningYearWithMonthlySavingsCarryover(positions, 2027, 2026).map((item) => item.id)).toEqual([]);
   });
 
   it("uses the payout year as planning year for one-time positions", () => {
