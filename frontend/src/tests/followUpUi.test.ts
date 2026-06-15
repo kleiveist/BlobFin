@@ -145,6 +145,9 @@ describe("follow-up ui rendering", () => {
     const selfEmploymentStart = html.indexOf('data-module-section="self_employment_dashboard"');
     const incomePlanningStart = html.indexOf('data-module-section="income_planning"', selfEmploymentStart);
     const selfEmploymentSection = html.slice(selfEmploymentStart, incomePlanningStart);
+    const heroActionsStart = mainSource.indexOf("self-employment-hero-actions");
+    const heroActionsEnd = mainSource.indexOf("</div>", heroActionsStart);
+    const heroActionsSource = mainSource.slice(heroActionsStart, heroActionsEnd);
 
     expect(selfEmploymentStart).toBeGreaterThanOrEqual(0);
     expect(incomePlanningStart).toBeGreaterThan(selfEmploymentStart);
@@ -158,6 +161,8 @@ describe("follow-up ui rendering", () => {
     expect(selfEmploymentSection).not.toContain('data-action="open-section-income_planning"');
     expect(selfEmploymentSection).not.toContain('data-action="open-section-planning_scenarios"');
     expect(mainSource).toContain("function renderSelfEmploymentDashboard");
+    expect(mainSource).toContain("self-employment-hero-actions");
+    expect(heroActionsSource).not.toContain('data-action="open-section-home"');
     expect(mainSource).toContain('data-action="self-employment-add-project"');
     expect(mainSource).toContain('data-action="self-employment-select-project"');
     expect(mainSource).toContain('data-action="self-employment-select-roadmap-area"');
@@ -169,6 +174,10 @@ describe("follow-up ui rendering", () => {
     expect(mainSource).toContain("SELF_EMPLOYMENT_ROADMAP_AREAS");
     expect(mainSource).toContain('"Geschaeftsidee"');
     expect(mainSource).toContain('"Kennzahlen"');
+    expect(mainSource.indexOf('"Projektplanung"')).toBeLessThan(mainSource.indexOf('"Aufgaben"'));
+    expect(mainSource.indexOf('"Aufgaben"')).toBeLessThan(mainSource.indexOf('"Zeitmanagement & Habits"'));
+    expect(mainSource.indexOf('"Zeitmanagement & Habits"')).toBeLessThan(mainSource.indexOf('"Kundenkontakte"'));
+    expect(mainSource.indexOf('"Kundenkontakte"')).toBeLessThan(mainSource.indexOf('"Angebote & Rechnungen"'));
     expect(mainSource).toContain("renderBusinessIdeaCanvasEditor");
     expect(mainSource).toContain("businessIdeaCanvasRenderState");
     expect(mainSource).toContain("renderSelfEmploymentProjectGantt");

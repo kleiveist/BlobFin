@@ -320,10 +320,10 @@ const SELF_EMPLOYMENT_ROADMAP_AREAS: Array<{
 }> = [
   { id: "idea", title: "Geschaeftsidee", icon: "pen" },
   { id: "planning", title: "Projektplanung", icon: "calendar" },
-  { id: "contacts", title: "Kundenkontakte", icon: "boardroom" },
-  { id: "invoices", title: "Angebote & Rechnungen", icon: "receipt" },
   { id: "tasks", title: "Aufgaben", icon: "stamp" },
   { id: "time", title: "Zeitmanagement & Habits", icon: "book" },
+  { id: "contacts", title: "Kundenkontakte", icon: "boardroom" },
+  { id: "invoices", title: "Angebote & Rechnungen", icon: "receipt" },
   { id: "budget", title: "Budget & Investitionen", icon: "investment" },
   { id: "profit", title: "Gewinnschaetzung", icon: "coins" },
   { id: "metrics", title: "Kennzahlen", icon: "wallet" }
@@ -2849,7 +2849,6 @@ function renderSelfEmploymentDashboard(): void {
     <section class="self-employment-hero">
       <h2>Selbststaendigkeits-Dashboard</h2>
       <div class="self-employment-hero-actions">
-        <button class="button secondary" type="button" data-action="open-section-home">Startseite</button>
         <button class="button" type="button" data-action="self-employment-add-project">Projekt anlegen</button>
       </div>
     </section>
