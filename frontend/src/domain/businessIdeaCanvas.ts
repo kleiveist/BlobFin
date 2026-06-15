@@ -661,9 +661,10 @@ function normalizeGroupMeta(
   const cardIds = new Set(businessIdeaCanvasCardNodes(canvas).map((node) => node.id));
   const groupMeta: Record<string, BusinessIdeaCanvasGroupMeta> = {};
   for (const groupNode of canvas.nodes.filter((node) => node.type === "group")) {
+    const sourceItem = source[groupNode.id];
     const fallbackItem = fallback[groupNode.id] as unknown;
-    const item: Record<string, unknown> = isRecord(source[groupNode.id])
-      ? source[groupNode.id]
+    const item: Record<string, unknown> = isRecord(sourceItem)
+      ? sourceItem
       : isRecord(fallbackItem)
         ? fallbackItem
         : {};

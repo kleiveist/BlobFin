@@ -16,6 +16,7 @@ import {
   BUSINESS_IDEA_CANVAS_ORIGIN,
   businessIdeaCanvasBoundsForNodes,
   businessIdeaCanvasEndsForDirection,
+  businessIdeaCanvasNodeText,
   businessIdeaCanvasNodesInsideRect,
   businessIdeaCanvasPaletteWithCustomColor,
   businessIdeaCanvasViewportForZoomAtPoint,
@@ -3615,9 +3616,7 @@ function selfEmploymentGanttLabelName(project: SelfEmploymentProject, labelId: s
 }
 
 function selfEmploymentGanttNodeTitle(node: JsonCanvasNode): string {
-  if (typeof node.text === "string" && node.text.trim()) return node.text.trim().split("\n")[0] ?? "Karte";
-  if (typeof node.label === "string" && node.label.trim()) return node.label.trim();
-  return "Karte";
+  return businessIdeaCanvasNodeText(node).trim().split("\n")[0] || "Karte";
 }
 
 function selfEmploymentGanttPhaseNumber(phaseId: string): string {
@@ -5365,22 +5364,6 @@ function selfEmploymentNumberField(
   `;
 }
 
-function selfEmploymentTextareaField(
-  project: SelfEmploymentProject,
-  field: string,
-  label: string,
-  value: string
-): string {
-  return `
-    <label class="field self-employment-edit-field wide">
-      <span>${escapeHtml(label)}</span>
-      <textarea rows="3" data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-field="${escapeHtml(
-        field
-      )}">${escapeHtml(value)}</textarea>
-    </label>
-  `;
-}
-
 function selfEmploymentListTextareaField(
   project: SelfEmploymentProject,
   field: string,
@@ -5393,23 +5376,6 @@ function selfEmploymentListTextareaField(
       <textarea rows="3" data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-list-field="${escapeHtml(
         field
       )}">${escapeHtml(value.join("\n"))}</textarea>
-    </label>
-  `;
-}
-
-function selfEmploymentSelectField(
-  project: SelfEmploymentProject,
-  field: string,
-  label: string,
-  value: string,
-  options: Array<[string, string]>
-): string {
-  return `
-    <label class="field self-employment-edit-field">
-      <span>${escapeHtml(label)}</span>
-      <select data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-field="${escapeHtml(field)}">
-        ${options.map(([optionValue, optionLabel]) => selfEmploymentOption(optionValue, optionLabel, value)).join("")}
-      </select>
     </label>
   `;
 }
