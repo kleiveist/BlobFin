@@ -6,6 +6,11 @@ import { describe, expect, it } from "vitest";
 import mainSource from "../app/appController.ts?raw";
 import runtimeFeatureHostSource from "../features/runtime-host/controller.ts?raw";
 import businessCanvasControllerSource from "../features/self-employment/business-canvas/controller.ts?raw";
+import businessCanvasDragControllerSource from "../features/self-employment/business-canvas/dragController.ts?raw";
+import businessCanvasEdgeControllerSource from "../features/self-employment/business-canvas/edgeController.ts?raw";
+import businessCanvasNodeControllerSource from "../features/self-employment/business-canvas/nodeController.ts?raw";
+import businessCanvasOverlayControllerSource from "../features/self-employment/business-canvas/overlayController.ts?raw";
+import businessCanvasSelectionControllerSource from "../features/self-employment/business-canvas/selectionController.ts?raw";
 import businessCanvasViewportControllerSource from "../features/self-employment/business-canvas/viewportController.ts?raw";
 import businessCanvasViewSource from "../features/self-employment/business-canvas/view.ts?raw";
 import selfEmploymentConfigSource from "../features/self-employment/config.ts?raw";
@@ -70,7 +75,15 @@ const stylesSource = cssSourcePaths
   .join("\n");
 
 const selfEmploymentFeatureSource = [selfEmploymentControllerSource, selfEmploymentGanttControllerSource].join("\n");
-const businessCanvasFeatureSource = [businessCanvasControllerSource, businessCanvasViewportControllerSource].join("\n");
+const businessCanvasFeatureSource = [
+  businessCanvasControllerSource,
+  businessCanvasDragControllerSource,
+  businessCanvasEdgeControllerSource,
+  businessCanvasNodeControllerSource,
+  businessCanvasOverlayControllerSource,
+  businessCanvasSelectionControllerSource,
+  businessCanvasViewportControllerSource
+].join("\n");
 const incomePlanningFeatureSource = [
   incomePlanningControllerSource,
   incomePlanningCalendarDragControllerSource,

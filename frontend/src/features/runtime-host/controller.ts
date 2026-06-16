@@ -1,7 +1,6 @@
 import {
   createId,
   defaultAppState,
-  defaultCombinedWealthToggles,
   defaultIncomePlanningState,
   defaultIncomeTrackerState,
   defaultInvestmentSettings,
@@ -175,16 +174,52 @@ import {
 import { configureBusinessCanvasHost } from "../self-employment/business-canvas";
 import { INVESTMENT_DEPOTS } from "../investment/config";
 import { COMBINED_DEPOTS } from "../combined-wealth/config";
+import {
+  csvFileContents,
+  cssEscape,
+  downloadText,
+  ensureCsvExtension,
+  formControl,
+  isDeferredModelInput,
+  isTauriRuntime,
+  setDetailLineHidden,
+  setInputBounds,
+  setInputValue,
+  setRangeLabel,
+  setSectionHidden,
+  setText
+} from "./runtimeDom";
+import {
+  CHILD_DEPOT_DEFAULT_PAYOUT_AGE,
+  clampRetirementAge,
+  combineAssetProjections,
+  investmentMax,
+  investmentMaxForDepot,
+  investmentMin,
+  investmentMinForDepot,
+  payoutYearsForRetirementAge,
+  retirementAgeMaxForPayoutEndAge
+} from "./investmentRuntime";
+import {
+  normalizePlanningEndDate,
+  planningDateParts,
+  planningSettingNumberValue
+} from "./planningRuntime";
+import {
+  finiteIntegerInRange,
+  finiteNumber,
+  normalizePayoutType
+} from "./positionRuntime";
+import {
+  normalizeCombinedWealthState,
+  statutoryPensionScenarioIdFromValue
+} from "./stateRuntime";
 
 let root: HTMLDivElement;
 let appContext: AppContext;
 let renderScheduler: RenderScheduler;
 const depotAssetProjectionCache = new Map<string, AssetProjection>();
-const CHILD_DEPOT_MIN_PAYOUT_AGE = 18;
-const CHILD_DEPOT_DEFAULT_PAYOUT_AGE = 18;
-const CHILD_DEPOT_MAX_PAYOUT_AGE = 25;
 const MAX_REAL_ESTATE_PROJECTION_YEARS = 80;
-type NumericPlanningSetting = Exclude<keyof PlanningSettings, "endDate">;
 type NumericInvestmentSetting =
   | "birthYear"
   | "chartStartAge"
@@ -457,34 +492,6 @@ function sanitizeAppState(appState: AppState): AppState {
       ...incomeTracker,
       yearlyEntries: sanitizeIncomeYearEntriesWithTaxRules(incomeTracker.yearlyEntries)
     }
-  };
-}
-
-function normalizeCombinedWealthState(
-  combinedWealth: AppState["combinedWealth"] | undefined,
-  accountIds: string[],
-  fallbackAccountId: string
-): AppState["combinedWealth"] {
-  const fallback = defaultCombinedWealthToggles();
-  const source = combinedWealth ?? fallback;
-  const cashAccountId =
-    source.cashAccountId && accountIds.includes(source.cashAccountId) ? source.cashAccountId : fallbackAccountId;
-  const depotKeys = Array.from(
-    new Set(
-      (source.depotKeys?.length ? source.depotKeys : fallback.depotKeys).filter((key): key is CombinedWealthDepotKey =>
-        COMBINED_DEPOTS.some((depot) => depot.key === key)
-      )
-    )
-  );
-  return {
-    ...fallback,
-    ...source,
-    cashAccountId,
-    cashPositionIds: Array.from(new Set(source.cashPositionIds ?? fallback.cashPositionIds)),
-    depotKeys: depotKeys.length ? depotKeys : fallback.depotKeys,
-    statutoryPensionScenario: statutoryPensionScenarioIdFromValue(source.statutoryPensionScenario) ?? "base",
-    statutoryPensionMonthlyAmount: Math.max(0, Number(source.statutoryPensionMonthlyAmount) || 0),
-    statutoryPensionSavingsRatePercent: clamp(Number(source.statutoryPensionSavingsRatePercent) || 0, 0, 100)
   };
 }
 
@@ -4802,41 +4809,6 @@ function updatePlanningSetting(field: keyof PlanningSettings, value: string): vo
   };
 }
 
-function planningSettingNumberValue(field: NumericPlanningSetting, value: string): number {
-  const numericValue = clamp(numberValue(value), settingMin(field), settingMax(field));
-  return field === "year" ? Math.round(numericValue) : numericValue;
-}
-
-function normalizePlanningEndDate(value: unknown, minYear: number): string {
-  const fallbackYear = clamp(Math.round(minYear), settingMin("year"), 2200);
-  const parsed = planningDateParts(value);
-  if (!parsed) return `${fallbackYear}-12-31`;
-  if (parsed.year < fallbackYear) return `${fallbackYear}-12-31`;
-  const year = clamp(parsed.year, settingMin("year"), 2200);
-  return `${year}-${String(parsed.month).padStart(2, "0")}-${String(parsed.day).padStart(2, "0")}`;
-}
-
-function planningDateParts(value: unknown): { year: number; month: number; day: number } | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return { year: Math.round(value), month: 12, day: 31 };
-  }
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  const yearOnly = /^(\d{4})$/.exec(trimmed);
-  if (yearOnly) {
-    return { year: Number(yearOnly[1]), month: 12, day: 31 };
-  }
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (!Number.isFinite(year) || month < 1 || month > 12) return null;
-  const maxDay = new Date(year, month, 0).getDate();
-  if (day < 1 || day > maxDay) return null;
-  return { year, month, day };
-}
-
 function planningEndYear(): number {
   return planningDateParts(state.settings.endDate)?.year ?? state.settings.year;
 }
@@ -4879,18 +4851,6 @@ function currentSharedRetirementAge(): number {
   );
 }
 
-function clampRetirementAge(retirementAge: number, payoutEndAge: number): number {
-  return clamp(retirementAge, RETIREMENT_DEPOT_MIN_AGE, retirementAgeMaxForPayoutEndAge(payoutEndAge));
-}
-
-function retirementAgeMaxForPayoutEndAge(payoutEndAge: number): number {
-  return Math.max(RETIREMENT_DEPOT_MIN_AGE, Math.min(85, payoutEndAge - investmentMin("payoutYears")));
-}
-
-function payoutYearsForRetirementAge(payoutEndAge: number, retirementAge: number): number {
-  return clamp(payoutEndAge - retirementAge, investmentMin("payoutYears"), investmentMax("payoutYears"));
-}
-
 function isNumericInvestmentSetting(field: keyof InvestmentSettings): field is NumericInvestmentSetting {
   return inputInvestmentFields().includes(field as NumericInvestmentSetting);
 }
@@ -4917,16 +4877,6 @@ function numericInvestmentValue(field: NumericInvestmentSetting, value: string):
   const max = field === "birthYear" && depot === "child" ? state.settings.year : investmentMaxForDepot(field, depot);
   const nextValue = clamp(numberValue(value), min, max);
   return field === "retirementDepotChildren" || field === "childPayoutAge" ? Math.floor(nextValue) : nextValue;
-}
-
-function investmentMinForDepot(field: keyof InvestmentSettings, depot: InvestmentDepotKey): number {
-  if (field === "capitalGainsTaxPercent" && depot === "retirement") return 20;
-  return investmentMin(field);
-}
-
-function investmentMaxForDepot(field: keyof InvestmentSettings, depot: InvestmentDepotKey): number {
-  if (field === "capitalGainsTaxPercent" && depot === "retirement") return 45;
-  return investmentMax(field);
 }
 
 function childBirthYearMin(): number {
@@ -5311,27 +5261,6 @@ function sanitizePosition(position: ReservePosition, fallbackYear: number): Rese
   };
 }
 
-function normalizePayoutType(
-  value: ReservePosition["payoutType"],
-  flow: ReservePosition["flow"],
-  type: ReservePosition["type"]
-): ReservePosition["payoutType"] {
-  if (value === "monthly" || value === "yearly" || value === "once") return value;
-  if (value === "none" && flow === "income" && type === "incomeTemporary") return value;
-  if (value === "none" && flow === "expense") return value;
-  if (flow === "income" && type === "incomeYearly") return "yearly";
-  return "monthly";
-}
-
-function finiteIntegerInRange(value: unknown, min: number, max: number, fallback: number): number {
-  return Math.round(clamp(finiteNumber(value, fallback), min, max));
-}
-
-function finiteNumber(value: unknown, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function addPosition(): string {
   const cadence = activePositionCadence();
   const type = typeForPositionTableSelection(selectedPositionMode, cadence);
@@ -5672,35 +5601,6 @@ async function saveCsvWithNativeDialog(
   }
 }
 
-function isTauriRuntime(): boolean {
-  return Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
-}
-
-function csvFileContents(text: string): string {
-  const content = text.endsWith("\n") ? text : `${text}\n`;
-  return `\uFEFF${content}`;
-}
-
-function ensureCsvExtension(path: string): string {
-  return path.toLowerCase().endsWith(".csv") ? path : `${path}.csv`;
-}
-
-function downloadText(filename: string, contents: string, type = "text/csv;charset=utf-8"): void {
-  const blob = new Blob([contents], { type });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.rel = "noopener";
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  window.setTimeout(() => {
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  }, 1000);
-}
-
 function showExportStatus(message: string): void {
   const status = document.querySelector<HTMLSpanElement>("#exportStatus");
   if (!status) return;
@@ -5710,15 +5610,6 @@ function showExportStatus(message: string): void {
     status.textContent = "";
     exportStatusTimeoutId = undefined;
   }, 3500);
-}
-
-function formControl(target: EventTarget | null): HTMLInputElement | HTMLSelectElement | null {
-  if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) return target;
-  return null;
-}
-
-function isDeferredModelInput(target: HTMLInputElement | HTMLSelectElement): boolean {
-  return target instanceof HTMLInputElement && (target.type === "number" || target.type === "date");
 }
 
 function syncCommittedPlanningSettingInput(
@@ -5744,34 +5635,6 @@ function syncCommittedRetirementAgeInput(target: HTMLInputElement | HTMLSelectEl
   target.value = String(calculatePayoutStartAge(settings));
 }
 
-function setText(id: string, value: string): void {
-  const element = document.getElementById(id);
-  if (element) element.textContent = value;
-}
-
-function setRangeLabel(key: keyof InvestmentSettings, value: string): void {
-  setText(`${key}Value`, value);
-}
-
-function setInputValue(selector: string, value: number | string | string[]): void {
-  for (const input of document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(selector)) {
-    if (input === document.activeElement && isDeferredModelInput(input)) continue;
-    input.value = String(value);
-  }
-}
-
-function setInputBounds(selector: string, min: number, max: number): void {
-  const input = document.querySelector<HTMLInputElement>(selector);
-  if (!input) return;
-  input.min = String(min);
-  input.max = String(max);
-}
-
-function cssEscape(value: string): string {
-  const css = (globalThis as typeof globalThis & { CSS?: { escape?: (input: string) => string } }).CSS;
-  return typeof css?.escape === "function" ? css.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
-}
-
 function syncDepotScopedInvestmentFields(activeDepot: InvestmentDepotKey): void {
   for (const wrapper of document.querySelectorAll<HTMLElement>("[data-depot-scope]")) {
     const scopes = (wrapper.dataset.depotScope ?? "").split(/\s+/).filter(Boolean);
@@ -5783,16 +5646,6 @@ function syncDepotScopedInvestmentFields(activeDepot: InvestmentDepotKey): void 
       control.disabled = hidden || control.dataset.forceDisabled === "true";
     }
   }
-}
-
-function setSectionHidden(selector: string, hidden: boolean): void {
-  const element = document.querySelector<HTMLElement>(selector);
-  if (element) element.hidden = hidden;
-}
-
-function setDetailLineHidden(id: string, hidden: boolean): void {
-  const wrapper = document.getElementById(id)?.closest<HTMLElement>(".detail-line");
-  if (wrapper) wrapper.hidden = hidden;
 }
 
 function drawCurrentInvestmentChart(): void {
@@ -6065,11 +5918,6 @@ function hideStatutoryPensionTaxPopup(): void {
   host.hidden = true;
 }
 
-function statutoryPensionScenarioIdFromValue(value: string | undefined): StatutoryPensionScenarioId | null {
-  if (value === "pessimistic" || value === "base" || value === "optimistic") return value;
-  return null;
-}
-
 function pensionScenarioLabel(scenarioId: StatutoryPensionScenarioId): string {
   if (scenarioId === "pessimistic") return "Pessimistisch";
   if (scenarioId === "optimistic") return "Optimistisch";
@@ -6102,92 +5950,6 @@ function investmentSettingsWithGlobalEndDate(settings: InvestmentSettings): Inve
     retirementPayoutEndAge: payoutEndAge,
     payoutYears,
     retirementPayoutYears: payoutYears
-  };
-}
-
-function combineAssetProjections(standard: AssetProjection, retirement: AssetProjection): AssetProjection {
-  const pointsByAge = new Map<number, { standard?: AssetProjectionPoint; retirement?: AssetProjectionPoint }>();
-  for (const point of standard.points) {
-    pointsByAge.set(point.age, { ...(pointsByAge.get(point.age) ?? {}), standard: point });
-  }
-  for (const point of retirement.points) {
-    pointsByAge.set(point.age, { ...(pointsByAge.get(point.age) ?? {}), retirement: point });
-  }
-
-  const ages = Array.from(pointsByAge.keys()).sort((left, right) => left - right);
-  const points = ages.map((age) => {
-    const pair = pointsByAge.get(age) ?? {};
-    return sumProjectionPoint(age, pair.standard, pair.retirement);
-  });
-
-  return {
-    ...standard,
-    points,
-    monthlyRate: standard.monthlyRate + retirement.monthlyRate,
-    annualSavingsRate: standard.annualSavingsRate + retirement.annualSavingsRate,
-    retirementDepotEnabled: retirement.retirementDepotEnabled,
-    retirementDepotAllowanceEnabled: retirement.retirementDepotAllowanceEnabled,
-    retirementDepotAnnualOwnContribution: retirement.retirementDepotAnnualOwnContribution,
-    retirementDepotBaseAllowanceAnnual: retirement.retirementDepotBaseAllowanceAnnual,
-    retirementDepotChildAllowanceAnnual: retirement.retirementDepotChildAllowanceAnnual,
-    retirementDepotAllowanceAnnual: retirement.retirementDepotAllowanceAnnual,
-    retirementDepotAllowanceRatePercent: retirement.retirementDepotAllowanceRatePercent,
-    retirementDepotAnnualContributionWithAllowance: retirement.retirementDepotAnnualContributionWithAllowance,
-    retirementDepotChildren: retirement.retirementDepotChildren,
-    monthlyPension: standard.monthlyPension + retirement.monthlyPension,
-    realMonthlyPension: standard.realMonthlyPension + retirement.realMonthlyPension,
-    bequestReservePercent: Math.max(standard.bequestReservePercent, retirement.bequestReservePercent),
-    bequestReserveAtEnd: standard.bequestReserveAtEnd + retirement.bequestReserveAtEnd,
-    percentageWithdrawalMonthlyAtStart:
-      standard.percentageWithdrawalMonthlyAtStart + retirement.percentageWithdrawalMonthlyAtStart,
-    percentageWithdrawalAnnualAtStart:
-      standard.percentageWithdrawalAnnualAtStart + retirement.percentageWithdrawalAnnualAtStart,
-    withdrawalRemainingSavingsMonthlyAtStart:
-      standard.withdrawalRemainingSavingsMonthlyAtStart + retirement.withdrawalRemainingSavingsMonthlyAtStart,
-    withdrawalGainMonthlyAtStart: standard.withdrawalGainMonthlyAtStart + retirement.withdrawalGainMonthlyAtStart,
-    retirementAge: Math.max(standard.retirementAge, retirement.retirementAge),
-    endAge: Math.max(standard.endAge, retirement.endAge),
-    ageToday: Math.min(standard.ageToday, retirement.ageToday),
-    savingMonths: standard.savingMonths + retirement.savingMonths,
-    totalContribution: standard.totalContribution + retirement.totalContribution,
-    recurringContributionAtRetirement:
-      standard.recurringContributionAtRetirement + retirement.recurringContributionAtRetirement,
-    oneTimeContributionAtRetirement:
-      standard.oneTimeContributionAtRetirement + retirement.oneTimeContributionAtRetirement,
-    grossWealthAtRetirement: standard.grossWealthAtRetirement + retirement.grossWealthAtRetirement,
-    growthAtRetirement: standard.growthAtRetirement + retirement.growthAtRetirement,
-    taxAtRetirement: standard.taxAtRetirement + retirement.taxAtRetirement,
-    taxAtEnd: standard.taxAtEnd + retirement.taxAtEnd,
-    costBasisAtRetirement: standard.costBasisAtRetirement + retirement.costBasisAtRetirement,
-    allowanceAtRetirement: standard.allowanceAtRetirement + retirement.allowanceAtRetirement,
-    allowanceBasisAtRetirement: standard.allowanceBasisAtRetirement + retirement.allowanceBasisAtRetirement,
-    unrealizedTaxAtRetirement: standard.unrealizedTaxAtRetirement + retirement.unrealizedTaxAtRetirement,
-    netWealthAfterFullTaxAtRetirement:
-      standard.netWealthAfterFullTaxAtRetirement + retirement.netWealthAfterFullTaxAtRetirement,
-    inflationFactorAtRetirement: Math.max(standard.inflationFactorAtRetirement, retirement.inflationFactorAtRetirement),
-    wealthAtRetirement: standard.wealthAtRetirement + retirement.wealthAtRetirement,
-    realWealthAtRetirement: standard.realWealthAtRetirement + retirement.realWealthAtRetirement
-  };
-}
-
-function sumProjectionPoint(
-  age: number,
-  standard: AssetProjectionPoint | undefined,
-  retirement: AssetProjectionPoint | undefined
-): AssetProjectionPoint {
-  return {
-    age,
-    phase: standard?.phase === "payout" || retirement?.phase === "payout" ? "payout" : "saving",
-    grossBalance: (standard?.grossBalance ?? 0) + (retirement?.grossBalance ?? 0),
-    contribution: (standard?.contribution ?? 0) + (retirement?.contribution ?? 0),
-    costBasis: (standard?.costBasis ?? 0) + (retirement?.costBasis ?? 0),
-    allowance: (standard?.allowance ?? 0) + (retirement?.allowance ?? 0),
-    growth: (standard?.growth ?? 0) + (retirement?.growth ?? 0),
-    tax: (standard?.tax ?? 0) + (retirement?.tax ?? 0),
-    periodTax: (standard?.periodTax ?? 0) + (retirement?.periodTax ?? 0),
-    netBalance: (standard?.netBalance ?? 0) + (retirement?.netBalance ?? 0),
-    realNetBalance: (standard?.realNetBalance ?? 0) + (retirement?.realNetBalance ?? 0),
-    normalDepot: (standard?.normalDepot ?? 0) + (retirement?.normalDepot ?? 0)
   };
 }
 
@@ -6427,42 +6189,4 @@ function normalizeCombinedCashPositionIds(): void {
     ...state.combinedWealth,
     cashPositionIds
   };
-}
-
-function settingMin(field: keyof PlanningSettings): number {
-  if (field === "year") return 2000;
-  return 0;
-}
-
-function settingMax(field: keyof PlanningSettings): number {
-  if (field === "year") return 2100;
-  return Number.MAX_SAFE_INTEGER;
-}
-
-function investmentMin(field: keyof InvestmentSettings): number {
-  if (field === "chartStartAge") return 0;
-  if (field === "birthYear") return 1962;
-  if (field === "childPayoutAge") return CHILD_DEPOT_MIN_PAYOUT_AGE;
-  if (field === "payoutEndAge") return 70;
-  if (field === "percentageWithdrawalStartAge") return 0;
-  if (field === "retirementDepotChildren") return 0;
-  if (field === "payoutYears") return 1;
-  if (field === "inflationRatePercent") return 1;
-  return 0;
-}
-
-function investmentMax(field: keyof InvestmentSettings): number {
-  if (field === "chartStartAge") return 80;
-  if (field === "birthYear") return 2009;
-  if (field === "childPayoutAge") return CHILD_DEPOT_MAX_PAYOUT_AGE;
-  if (field === "payoutEndAge") return 110;
-  if (field === "percentageWithdrawalStartAge") return 110;
-  if (field === "percentageWithdrawalRatePercent") return 20;
-  if (field === "retirementDepotChildren") return 20;
-  if (field === "payoutYears") return 50;
-  if (field === "investmentReturnPercent") return 30;
-  if (field === "capitalGainsTaxPercent") return 50;
-  if (field === "inflationRatePercent") return 10;
-  if (field === "bequestReservePercent") return 50;
-  return Number.MAX_SAFE_INTEGER;
 }
