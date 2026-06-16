@@ -5,11 +5,8 @@ import {
   addSelfEmploymentInvoice,
   addSelfEmploymentProject,
   addSelfEmploymentTask,
-  closeSelfEmploymentGanttEditor,
   deleteSelfEmploymentProject,
   hideSelfEmploymentIconPicker,
-  openSelfEmploymentGanttCardEditor,
-  openSelfEmploymentGanttPhaseEditor,
   removeSelfEmploymentCollectionItem,
   renameSelfEmploymentProject,
   selectSelfEmploymentIcon,
@@ -17,7 +14,6 @@ import {
   selectSelfEmploymentRoadmapArea,
   selfEmploymentControlValue,
   showSelfEmploymentIconPicker,
-  toggleSelfEmploymentGanttPhaseFilter,
   toggleSelfEmploymentLabelPicker,
   toggleSelfEmploymentProjectLabel,
   updateSelfEmploymentCollectionItemField,
@@ -26,6 +22,12 @@ import {
   updateSelfEmploymentProjectField,
   updateSelfEmploymentProjectListField
 } from "./controller";
+import {
+  closeSelfEmploymentGanttEditor,
+  openSelfEmploymentGanttCardEditor,
+  openSelfEmploymentGanttPhaseEditor,
+  toggleSelfEmploymentGanttPhaseFilter
+} from "./ganttController";
 
 export function onSelfEmploymentInput(event: Event, context: AppContext): boolean | void {
   const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;

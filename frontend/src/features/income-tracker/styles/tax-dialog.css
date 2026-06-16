@@ -1,0 +1,466 @@
+.income-tax-dialog-backdrop {
+  position: fixed;
+  z-index: 45;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(31, 37, 40, 0.35);
+  padding: 16px;
+}
+
+.position-cost-dialog-backdrop {
+  position: fixed;
+  z-index: 45;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(31, 37, 40, 0.35);
+  padding: 16px;
+}
+
+:root[data-theme="dark"] .income-tax-dialog-backdrop {
+  background: rgba(0, 0, 0, 0.52);
+}
+
+.position-cost-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(680px, 100%);
+  max-height: min(720px, calc(100vh - 32px));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(31, 37, 40, 0.2);
+  padding: 12px;
+}
+
+:root[data-theme="dark"] .position-cost-dialog-backdrop {
+  background: rgba(0, 0, 0, 0.52);
+}
+
+.income-tax-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(760px, 100%);
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(31, 37, 40, 0.2);
+  padding: 12px;
+}
+
+.position-cost-table {
+  width: 100%;
+  min-width: 520px;
+}
+
+.position-cost-table th:first-child,
+.position-cost-table td:first-child {
+  text-align: left;
+}
+
+.position-cost-table th:last-child,
+.position-cost-table td:last-child {
+  width: 54px;
+  text-align: center;
+}
+
+.position-cost-name-input {
+  min-width: 260px;
+}
+
+.position-cost-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 10px;
+}
+
+.position-cost-summary span {
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.position-cost-summary strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.income-tax-dialog-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.income-tax-dialog-head div {
+  display: grid;
+  gap: 2px;
+}
+
+.income-tax-dialog-head strong {
+  font-size: 0.98rem;
+}
+
+.income-tax-dialog-head span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.income-tax-rule-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+  gap: 12px;
+  border: 1px solid var(--row-border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.income-tax-rule-panel.locked {
+  border-left-color: var(--muted);
+}
+
+.income-tax-rule-panel.partially_enabled {
+  border-left-color: var(--gold);
+}
+
+.income-tax-rule-main,
+.income-tax-rule-facts {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.income-tax-rule-main p,
+.income-tax-rule-facts span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 760;
+}
+
+.income-tax-rule-main strong {
+  font-size: 0.88rem;
+}
+
+.income-tax-rule-badge {
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.income-tax-context-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.income-tax-context-controls label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.income-tax-inline-checkbox {
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid var(--row-border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  padding: 7px 9px;
+}
+
+.income-tax-inline-checkbox input {
+  min-width: 0;
+}
+
+.income-capital-tax-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.income-capital-tax-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--row-border);
+  padding-bottom: 8px;
+}
+
+.income-capital-tax-head div {
+  display: grid;
+  gap: 3px;
+}
+
+.income-capital-tax-head strong {
+  color: var(--text);
+  font-weight: 950;
+}
+
+.income-capital-tax-head span,
+.income-capital-tax-controls small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 780;
+}
+
+.income-capital-tax-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, auto) minmax(130px, 160px);
+  gap: 10px;
+}
+
+.income-capital-tax-controls label {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.income-capital-tax-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.income-capital-tax-metric {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--row-border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  padding: 8px;
+}
+
+.income-capital-tax-metric span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.income-capital-tax-metric strong {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-tax-row-locked {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.income-tax-row-locked small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.income-tax-table th:first-child,
+.income-tax-table td:first-child {
+  width: 58px;
+}
+
+.income-tax-table th:last-child,
+.income-tax-table td:last-child {
+  width: 190px;
+}
+
+.income-tax-summary {
+  display: grid;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.income-tax-summary > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--row-border);
+}
+
+.income-tax-summary > div:last-child {
+  border-bottom: 0;
+}
+
+.income-tax-summary span {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.income-tax-summary strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.income-tax-summary .total {
+  background: var(--surface-muted);
+}
+
+.income-tax-adjustment {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--row-border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.income-tax-adjustment.locked {
+  background: var(--surface-muted);
+}
+
+.income-tax-adjustment > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.income-tax-adjustment strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.income-tax-adjustment span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.income-tax-adjustment-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.income-tax-adjustment-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.income-tax-adjustment-options input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.income-tax-adjustment-amount {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  align-items: center;
+  gap: 10px;
+}
+
+.income-table .numeric-cell,
+.income-status-table .numeric-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.income-insight-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.income-insight {
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 10px;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.income-insight.warning {
+  border-left-color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.income-insight.danger {
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.status-pill.warning {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.status-pill.realistic {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.status-pill.borderline {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.status-pill.unrealistic {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.status-pill.blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-pill.muted {
+  background: var(--surface-muted);
+  color: var(--muted);
+}

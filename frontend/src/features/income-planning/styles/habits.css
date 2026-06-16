@@ -1,0 +1,56 @@
+.income-planning-icon-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.income-planning-pause-toggle {
+  align-self: end;
+}
+
+.income-planning-dialog-actions {
+  justify-content: flex-end;
+}
+
+.income-planning-source-row {
+  display: grid;
+  grid-template-columns: minmax(78px, 0.4fr) minmax(150px, 0.85fr) minmax(150px, 0.95fr) minmax(72px, 0.4fr) minmax(86px, 0.48fr) minmax(92px, 0.52fr) minmax(82px, 0.46fr) minmax(86px, 0.48fr) minmax(78px, 0.44fr) repeat(3, minmax(82px, 0.46fr)) 44px;
+  gap: 8px;
+  align-items: end;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.income-planning-source-active {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.income-planning-source-row:not(.active) {
+  opacity: 0.68;
+}
+
+.income-planning-source-row .field {
+  min-width: 0;
+}
+
+.income-planning-source-row .field.compact {
+  min-width: 86px;
+}
+
+.income-planning-source-row .income-planning-label-button {
+  min-width: 0;
+  width: 100%;
+}
+
+.income-planning-source-row .income-planning-detail-field select,
+.income-planning-source-row .income-planning-detail-field input {
+  padding-right: 8px;
+  padding-left: 8px;
+}

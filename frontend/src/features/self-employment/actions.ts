@@ -8,7 +8,6 @@ export {
   selectSelfEmploymentIcon,
   selectSelfEmploymentProject,
   selectSelfEmploymentRoadmapArea,
-  toggleSelfEmploymentGanttPhaseFilter,
   toggleSelfEmploymentLabelPicker,
   toggleSelfEmploymentProjectLabel,
   updateSelfEmploymentCollectionItemField,
@@ -18,3 +17,4 @@ export {
   updateSelfEmploymentProjectField,
   updateSelfEmploymentProjectListField
 } from "./controller";
+export { toggleSelfEmploymentGanttPhaseFilter } from "./ganttController";

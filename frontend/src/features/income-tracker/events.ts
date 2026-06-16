@@ -6,26 +6,28 @@ import {
   exportIncomeCsv,
   exportIncomePdf,
   exportIncomePlanningCsvFile,
-  hideIncomeMilestoneTypePicker,
-  hideIncomeYearLabelPicker,
   importIncomeCsvFromFile,
   importIncomePlanningCsvFromFile,
   openIncomeAnalysisDialog,
   openIncomeTaxDialog,
   removeIncomeEntry,
-  selectIncomeMilestoneType,
-  selectIncomeYearLabel,
   setIncomeAnalysisChartType,
   setIncomeAnalysisDataView,
   setIncomeAnalysisYearFilter,
   setIncomeInputTab,
-  showIncomeMilestoneTypePicker,
-  showIncomeYearLabelPicker,
   toggleIncomeAnalysisLabel,
   toggleIncomeYearLabelFilter,
   updateIncomeEntry,
   updateIncomeSetting
 } from "./controller";
+import {
+  hideIncomeMilestoneTypePicker,
+  hideIncomeYearLabelPicker,
+  selectIncomeMilestoneType,
+  selectIncomeYearLabel,
+  showIncomeMilestoneTypePicker,
+  showIncomeYearLabelPicker
+} from "./labelPickerController";
 import type { IncomeAnalysisChartType, IncomeAnalysisDataView } from "./uiState";
 import type { IncomeTrackerSettings } from "./model";
 import { incomeTrackerUiState } from "./uiState";

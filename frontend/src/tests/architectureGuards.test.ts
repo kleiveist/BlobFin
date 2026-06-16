@@ -162,12 +162,12 @@ function resolveRelativeTsPath(fromPath: string, target: string): string {
 function exportedBindings(source: string): Set<string> {
   const names = new Set<string>();
   for (const pattern of [
-    /^export\s+(?:async\s+)?function\s+(\w+)/gm,
-    /^export\s+const\s+(\w+)/gm,
-    /^export\s+let\s+(\w+)/gm,
-    /^export\s+class\s+(\w+)/gm,
-    /^export\s+interface\s+(\w+)/gm,
-    /^export\s+type\s+(\w+)/gm
+    /\bexport\s+(?:async\s+)?function\s+(\w+)/g,
+    /\bexport\s+const\s+(\w+)/g,
+    /\bexport\s+let\s+(\w+)/g,
+    /\bexport\s+class\s+(\w+)/g,
+    /\bexport\s+interface\s+(\w+)/g,
+    /\bexport\s+type\s+(\w+)/g
   ]) {
     for (const match of source.matchAll(pattern)) names.add(match[1]);
   }

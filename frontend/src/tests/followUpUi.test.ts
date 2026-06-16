@@ -6,10 +6,17 @@ import { describe, expect, it } from "vitest";
 import mainSource from "../app/appController.ts?raw";
 import runtimeFeatureHostSource from "../features/runtime-host/controller.ts?raw";
 import businessCanvasControllerSource from "../features/self-employment/business-canvas/controller.ts?raw";
+import businessCanvasViewportControllerSource from "../features/self-employment/business-canvas/viewportController.ts?raw";
 import businessCanvasViewSource from "../features/self-employment/business-canvas/view.ts?raw";
 import selfEmploymentConfigSource from "../features/self-employment/config.ts?raw";
 import selfEmploymentControllerSource from "../features/self-employment/controller.ts?raw";
+import selfEmploymentGanttControllerSource from "../features/self-employment/ganttController.ts?raw";
 import incomePlanningControllerSource from "../features/income-planning/controller.ts?raw";
+import incomePlanningCalendarDragControllerSource from "../features/income-planning/calendarDragController.ts?raw";
+import incomePlanningRenderControllerSource from "../features/income-planning/renderController.ts?raw";
+import incomePlanningStampPlannerControllerSource from "../features/income-planning/stampPlannerController.ts?raw";
+import incomePlanningStampPopupControllerSource from "../features/income-planning/stampPopupController.ts?raw";
+import incomePlanningWeekScenarioControllerSource from "../features/income-planning/weekScenarioController.ts?raw";
 import { renderAppShell } from "../views/templates";
 import {
   paidLoanCostForYear,
@@ -61,6 +68,17 @@ const cssSourcePaths = [
 const stylesSource = cssSourcePaths
   .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
   .join("\n");
+
+const selfEmploymentFeatureSource = [selfEmploymentControllerSource, selfEmploymentGanttControllerSource].join("\n");
+const businessCanvasFeatureSource = [businessCanvasControllerSource, businessCanvasViewportControllerSource].join("\n");
+const incomePlanningFeatureSource = [
+  incomePlanningControllerSource,
+  incomePlanningCalendarDragControllerSource,
+  incomePlanningRenderControllerSource,
+  incomePlanningStampPlannerControllerSource,
+  incomePlanningStampPopupControllerSource,
+  incomePlanningWeekScenarioControllerSource
+].join("\n");
 
 const realEstateYear: RealEstateFinancingYear = {
   year: 2026,
@@ -195,9 +213,9 @@ describe("follow-up ui rendering", () => {
     const selfEmploymentStart = html.indexOf('data-module-section="self_employment_dashboard"');
     const incomePlanningStart = html.indexOf('data-module-section="income_planning"', selfEmploymentStart);
     const selfEmploymentSection = html.slice(selfEmploymentStart, incomePlanningStart);
-    const heroActionsStart = selfEmploymentControllerSource.indexOf("self-employment-hero-actions");
-    const heroActionsEnd = selfEmploymentControllerSource.indexOf("</div>", heroActionsStart);
-    const heroActionsSource = selfEmploymentControllerSource.slice(heroActionsStart, heroActionsEnd);
+    const heroActionsStart = selfEmploymentFeatureSource.indexOf("self-employment-hero-actions");
+    const heroActionsEnd = selfEmploymentFeatureSource.indexOf("</div>", heroActionsStart);
+    const heroActionsSource = selfEmploymentFeatureSource.slice(heroActionsStart, heroActionsEnd);
 
     expect(selfEmploymentStart).toBeGreaterThanOrEqual(0);
     expect(incomePlanningStart).toBeGreaterThan(selfEmploymentStart);
@@ -210,17 +228,17 @@ describe("follow-up ui rendering", () => {
     expect(selfEmploymentSection).toContain("Startseite");
     expect(selfEmploymentSection).not.toContain('data-action="open-section-income_planning"');
     expect(selfEmploymentSection).not.toContain('data-action="open-section-planning_scenarios"');
-    expect(selfEmploymentControllerSource).toContain("function renderSelfEmploymentDashboard");
-    expect(selfEmploymentControllerSource).toContain("self-employment-hero-actions");
+    expect(selfEmploymentFeatureSource).toContain("function renderSelfEmploymentDashboard");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-hero-actions");
     expect(heroActionsSource).not.toContain('data-action="open-section-home"');
-    expect(selfEmploymentControllerSource).toContain('data-action="self-employment-add-project"');
-    expect(selfEmploymentControllerSource).toContain('data-action="self-employment-select-project"');
-    expect(selfEmploymentControllerSource).toContain('data-action="self-employment-select-roadmap-area"');
-    expect(selfEmploymentControllerSource).toContain('data-action="self-employment-open-icon-picker"');
-    expect(selfEmploymentControllerSource).toContain('data-action="self-employment-select-icon"');
-    expect(selfEmploymentControllerSource).toContain('data-action="self-employment-rename-project"');
-    expect(selfEmploymentControllerSource).toContain('data-action="self-employment-delete-project"');
-    expect(selfEmploymentControllerSource).toContain('data-action="self-employment-toggle-label"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-add-project"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-select-project"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-select-roadmap-area"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-open-icon-picker"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-select-icon"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-rename-project"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-delete-project"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-toggle-label"');
     expect(selfEmploymentConfigSource).toContain("SELF_EMPLOYMENT_ROADMAP_AREAS");
     expect(selfEmploymentConfigSource).toContain('"Geschaeftsidee"');
     expect(selfEmploymentConfigSource).toContain('"Kennzahlen"');
@@ -228,31 +246,31 @@ describe("follow-up ui rendering", () => {
     expect(selfEmploymentConfigSource.indexOf('"Aufgaben"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Zeitmanagement & Habits"'));
     expect(selfEmploymentConfigSource.indexOf('"Zeitmanagement & Habits"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Kundenkontakte"'));
     expect(selfEmploymentConfigSource.indexOf('"Kundenkontakte"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Angebote & Rechnungen"'));
-    expect(selfEmploymentControllerSource).toContain("renderBusinessCanvas");
+    expect(selfEmploymentFeatureSource).toContain("renderBusinessCanvas");
     expect(mainSource).not.toContain('action === "business-canvas-');
     expect(mainSource).not.toContain("businessIdeaCanvasSelectedEdge");
     expect(mainSource).not.toContain("handleBusinessIdeaCanvas");
-    expect(businessCanvasControllerSource).toContain("renderBusinessIdeaCanvasEditor");
-    expect(businessCanvasControllerSource).toContain("businessIdeaCanvasRenderState");
-    expect(selfEmploymentControllerSource).toContain("renderSelfEmploymentProjectGantt");
-    expect(selfEmploymentControllerSource).toContain("self-employment-project-gantt");
-    expect(selfEmploymentControllerSource).toContain("renderSelfEmploymentGanttPhaseFilter");
-    expect(selfEmploymentControllerSource).toContain("self-employment-roadmap-panel-title");
-    expect(selfEmploymentControllerSource).toContain("self-employment-toggle-gantt-phase-filter");
-    expect(selfEmploymentControllerSource).toContain("ganttPhaseFilterIds");
-    expect(selfEmploymentControllerSource).toContain("visibleSelfEmploymentGanttRows");
-    expect(selfEmploymentControllerSource).toContain("data-self-employment-gantt-popover");
-    expect(selfEmploymentControllerSource).toContain("self-employment-gantt-phase-popover");
-    expect(selfEmploymentControllerSource).toContain("self-employment-gantt-card-popover");
-    expect(selfEmploymentControllerSource).toContain("selfEmploymentGanttPopoverPosition");
-    expect(selfEmploymentControllerSource).toContain("closeSelfEmploymentGanttEditor");
-    expect(selfEmploymentControllerSource).toContain("data-self-employment-gantt-phase-field");
-    expect(selfEmploymentControllerSource).toContain("data-self-employment-gantt-card-field");
-    expect(selfEmploymentControllerSource).toContain("timeBudgetHours");
+    expect(businessCanvasFeatureSource).toContain("renderBusinessIdeaCanvasEditor");
+    expect(businessCanvasFeatureSource).toContain("businessIdeaCanvasRenderState");
+    expect(selfEmploymentFeatureSource).toContain("renderSelfEmploymentProjectGantt");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-project-gantt");
+    expect(selfEmploymentFeatureSource).toContain("renderSelfEmploymentGanttPhaseFilter");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-roadmap-panel-title");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-toggle-gantt-phase-filter");
+    expect(selfEmploymentFeatureSource).toContain("ganttPhaseFilterIds");
+    expect(selfEmploymentFeatureSource).toContain("visibleSelfEmploymentGanttRows");
+    expect(selfEmploymentFeatureSource).toContain("data-self-employment-gantt-popover");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-gantt-phase-popover");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-gantt-card-popover");
+    expect(selfEmploymentFeatureSource).toContain("selfEmploymentGanttPopoverPosition");
+    expect(selfEmploymentFeatureSource).toContain("closeSelfEmploymentGanttEditor");
+    expect(selfEmploymentFeatureSource).toContain("data-self-employment-gantt-phase-field");
+    expect(selfEmploymentFeatureSource).toContain("data-self-employment-gantt-card-field");
+    expect(selfEmploymentFeatureSource).toContain("timeBudgetHours");
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button");
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button.active");
-    expect(selfEmploymentControllerSource).not.toContain('selfEmploymentTextareaField(project, "projectGoal"');
-    expect(selfEmploymentControllerSource).not.toContain('selfEmploymentNumberField(project, "plannedDurationWeeks"');
+    expect(selfEmploymentFeatureSource).not.toContain('selfEmploymentTextareaField(project, "projectGoal"');
+    expect(selfEmploymentFeatureSource).not.toContain('selfEmploymentNumberField(project, "plannedDurationWeeks"');
     expect(businessCanvasViewSource).toContain('data-action="business-canvas-add-node"');
     expect(businessCanvasViewSource).toContain("business-canvas-context-menu");
     expect(businessCanvasViewSource).toContain("business-canvas-multi-toolbar");
@@ -297,21 +315,21 @@ describe("follow-up ui rendering", () => {
     expect(stylesSource).toContain("business-canvas-edge-label-foreign");
     expect(stylesSource).toContain("business-canvas-connection-preview-line");
     expect(stylesSource).toContain("connection-target");
-    expect(businessCanvasControllerSource).toContain("requestAnimationFrame");
-    expect(businessCanvasControllerSource).toContain("scheduleBusinessIdeaCanvasWheelZoom");
-    expect(businessCanvasControllerSource).toContain("updateBusinessIdeaCanvasLiveEdges");
-    expect(businessCanvasControllerSource).toContain("scheduleBusinessIdeaCanvasConnectionPreview");
-    expect(businessCanvasControllerSource).toContain("clearBusinessIdeaCanvasConnectionPreview");
-    expect(businessCanvasControllerSource).toContain("commitBusinessIdeaCanvasEdgeLabelEdit");
-    expect(businessCanvasControllerSource).toContain("cancelBusinessIdeaCanvasEdgeLabelEdit");
-    expect(businessCanvasControllerSource).not.toContain('window.prompt("Verbindungslabel"');
-    expect(businessCanvasControllerSource).toContain("closeBusinessIdeaCanvasDropdowns");
-    expect(businessCanvasControllerSource).toContain("lastDragEndAt");
-    expect(businessCanvasControllerSource).toContain("selectedEdge");
-    expect(businessCanvasControllerSource).toContain("deleteBusinessIdeaCanvasSelectedEdge();");
-    expect(selfEmploymentControllerSource).toContain("data-self-employment-field");
-    expect(selfEmploymentControllerSource).toContain("evaluateSelfEmploymentProject");
-    expect(selfEmploymentControllerSource).toContain("selfEmploymentEvaluationContext");
+    expect(businessCanvasFeatureSource).toContain("requestAnimationFrame");
+    expect(businessCanvasFeatureSource).toContain("scheduleBusinessIdeaCanvasWheelZoom");
+    expect(businessCanvasFeatureSource).toContain("updateBusinessIdeaCanvasLiveEdges");
+    expect(businessCanvasFeatureSource).toContain("scheduleBusinessIdeaCanvasConnectionPreview");
+    expect(businessCanvasFeatureSource).toContain("clearBusinessIdeaCanvasConnectionPreview");
+    expect(businessCanvasFeatureSource).toContain("commitBusinessIdeaCanvasEdgeLabelEdit");
+    expect(businessCanvasFeatureSource).toContain("cancelBusinessIdeaCanvasEdgeLabelEdit");
+    expect(businessCanvasFeatureSource).not.toContain('window.prompt("Verbindungslabel"');
+    expect(businessCanvasFeatureSource).toContain("closeBusinessIdeaCanvasDropdowns");
+    expect(businessCanvasFeatureSource).toContain("lastDragEndAt");
+    expect(businessCanvasFeatureSource).toContain("selectedEdge");
+    expect(businessCanvasFeatureSource).toContain("deleteBusinessIdeaCanvasSelectedEdge();");
+    expect(selfEmploymentFeatureSource).toContain("data-self-employment-field");
+    expect(selfEmploymentFeatureSource).toContain("evaluateSelfEmploymentProject");
+    expect(selfEmploymentFeatureSource).toContain("selfEmploymentEvaluationContext");
   });
 
   it("renders the income planning dashboard as an independent page", () => {
@@ -361,24 +379,24 @@ describe("follow-up ui rendering", () => {
   });
 
   it("wires week scenario controls into the income planning calendar", () => {
-    expect(incomePlanningControllerSource).toContain("Wochenszenario");
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-prev-week"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-next-week"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-current-week"');
-    expect(incomePlanningControllerSource).toContain("select-income-planning-week-scenario-");
-    expect(incomePlanningControllerSource).toContain("function setIncomePlanningWeekScenario");
-    expect(incomePlanningControllerSource).toContain("weekScenarioAssignments");
-    expect(incomePlanningControllerSource).toContain("weekScenarios");
-    expect(incomePlanningControllerSource).toContain("return incomePlanningActiveWeekRange();");
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-open-week-scenario-dialog"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-save-week-scenario"');
-    expect(incomePlanningControllerSource).toContain("data-income-planning-dialog-scenario-id");
-    expect(incomePlanningControllerSource).toContain("data-income-planning-stamp-scenario-id");
-    expect(incomePlanningControllerSource).toContain("data-income-stamp-planner-scenario-id");
-    expect(incomePlanningControllerSource).not.toContain("Uni-Woche");
-    expect(incomePlanningControllerSource).not.toContain("Projekt-Woche");
-    expect(incomePlanningControllerSource).not.toContain("scenario_suggestion");
-    expect(incomePlanningControllerSource).not.toContain("data-income-planning-scenario-suggestion");
+    expect(incomePlanningFeatureSource).toContain("Wochenszenario");
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-prev-week"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-next-week"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-current-week"');
+    expect(incomePlanningFeatureSource).toContain("select-income-planning-week-scenario-");
+    expect(incomePlanningFeatureSource).toContain("function setIncomePlanningWeekScenario");
+    expect(incomePlanningFeatureSource).toContain("weekScenarioAssignments");
+    expect(incomePlanningFeatureSource).toContain("weekScenarios");
+    expect(incomePlanningFeatureSource).toContain("return incomePlanningActiveWeekRange();");
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-open-week-scenario-dialog"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-save-week-scenario"');
+    expect(incomePlanningFeatureSource).toContain("data-income-planning-dialog-scenario-id");
+    expect(incomePlanningFeatureSource).toContain("data-income-planning-stamp-scenario-id");
+    expect(incomePlanningFeatureSource).toContain("data-income-stamp-planner-scenario-id");
+    expect(incomePlanningFeatureSource).not.toContain("Uni-Woche");
+    expect(incomePlanningFeatureSource).not.toContain("Projekt-Woche");
+    expect(incomePlanningFeatureSource).not.toContain("scenario_suggestion");
+    expect(incomePlanningFeatureSource).not.toContain("data-income-planning-scenario-suggestion");
   });
 
   it("renders the stamp planner as an independent page", () => {
@@ -396,33 +414,33 @@ describe("follow-up ui rendering", () => {
   });
 
   it("keeps income planning header icon actions wired", () => {
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-save-dialog" aria-label="Zeitbudget speichern"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-delete-dialog-slot"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-save-stamp" aria-label="Stempel speichern"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-planning-delete-stamp"');
-    expect(incomePlanningControllerSource).toContain('data-income-planning-calendar-stamp="true"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-stamp-planner-save" aria-label="Geplanten Stempel speichern"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-stamp-planner-delete"');
-    expect(incomePlanningControllerSource).toContain('data-income-stamp-planner-calendar-stamp="true"');
-    expect(incomePlanningControllerSource).toContain('data-income-stamp-planner-stamp="true"');
-    expect(incomePlanningControllerSource).toContain('id="incomeStampPlannerMonthLabel"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-stamp-planner-prev-month"');
-    expect(incomePlanningControllerSource).toContain('data-action="income-stamp-planner-next-month"');
-    expect(incomePlanningControllerSource).not.toContain('data-action="income-stamp-planner-mode-');
-    expect(incomePlanningControllerSource).toContain("function showPreviousIncomeStampPlannerMonth");
-    expect(incomePlanningControllerSource).toContain("function showNextIncomeStampPlannerMonth");
-    expect(incomePlanningControllerSource).toContain("function incomeStampPlannerVisibleStamps");
-    expect(incomePlanningControllerSource).toContain("function startIncomePlanningStampCalendarDrag");
-    expect(incomePlanningControllerSource).toContain("function updateIncomePlanningStampAfterCalendarDrag");
-    expect(incomePlanningControllerSource).toContain("function startIncomePlanningPlannedStampCalendarDrag");
-    expect(incomePlanningControllerSource).toContain("function updateIncomePlanningPlannedStampAfterCalendarDrag");
-    expect(incomePlanningControllerSource).toContain("function startIncomeStampPlannerStampDrag");
-    expect(incomePlanningControllerSource).toContain("function updateIncomeStampPlannerStampAfterPlannerDrag");
-    expect(incomePlanningControllerSource).toContain("function incomePlanningPlannedStampsForCurrentWeek");
-    expect(incomePlanningControllerSource).toContain('class="income-planning-dialog-grid basis"');
-    expect(incomePlanningControllerSource).toContain("function incomePlanningSlotDialogFields");
-    expect(incomePlanningControllerSource).toContain('data-income-planning-dialog-field="slotNote"');
-    expect(incomePlanningControllerSource).toContain("function incomePlanningDialogCanDeleteSlot");
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-save-dialog" aria-label="Zeitbudget speichern"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-delete-dialog-slot"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-save-stamp" aria-label="Stempel speichern"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-planning-delete-stamp"');
+    expect(incomePlanningFeatureSource).toContain('data-income-planning-calendar-stamp="true"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-stamp-planner-save" aria-label="Geplanten Stempel speichern"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-stamp-planner-delete"');
+    expect(incomePlanningFeatureSource).toContain('data-income-stamp-planner-calendar-stamp="true"');
+    expect(incomePlanningFeatureSource).toContain('data-income-stamp-planner-stamp="true"');
+    expect(incomePlanningFeatureSource).toContain('id="incomeStampPlannerMonthLabel"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-stamp-planner-prev-month"');
+    expect(incomePlanningFeatureSource).toContain('data-action="income-stamp-planner-next-month"');
+    expect(incomePlanningFeatureSource).not.toContain('data-action="income-stamp-planner-mode-');
+    expect(incomePlanningFeatureSource).toContain("function showPreviousIncomeStampPlannerMonth");
+    expect(incomePlanningFeatureSource).toContain("function showNextIncomeStampPlannerMonth");
+    expect(incomePlanningFeatureSource).toContain("function incomeStampPlannerVisibleStamps");
+    expect(incomePlanningFeatureSource).toContain("function startIncomePlanningStampCalendarDrag");
+    expect(incomePlanningFeatureSource).toContain("function updateIncomePlanningStampAfterCalendarDrag");
+    expect(incomePlanningFeatureSource).toContain("function startIncomePlanningPlannedStampCalendarDrag");
+    expect(incomePlanningFeatureSource).toContain("function updateIncomePlanningPlannedStampAfterCalendarDrag");
+    expect(incomePlanningFeatureSource).toContain("function startIncomeStampPlannerStampDrag");
+    expect(incomePlanningFeatureSource).toContain("function updateIncomeStampPlannerStampAfterPlannerDrag");
+    expect(incomePlanningFeatureSource).toContain("function incomePlanningPlannedStampsForCurrentWeek");
+    expect(incomePlanningFeatureSource).toContain('class="income-planning-dialog-grid basis"');
+    expect(incomePlanningFeatureSource).toContain("function incomePlanningSlotDialogFields");
+    expect(incomePlanningFeatureSource).toContain('data-income-planning-dialog-field="slotNote"');
+    expect(incomePlanningFeatureSource).toContain("function incomePlanningDialogCanDeleteSlot");
   });
 
   it("structures income as one combined page with insights before status", () => {

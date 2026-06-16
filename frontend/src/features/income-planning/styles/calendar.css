@@ -1,0 +1,556 @@
+.income-planning-work-hours span,
+.income-planning-career-stats span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.income-planning-compact-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.income-planning-compact-head > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.income-planning-compact-head span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.income-planning-compact-head strong,
+.income-planning-compact-head small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-planning-compact-head strong {
+  font-size: 0.94rem;
+  font-weight: 950;
+}
+
+.income-planning-compact-head small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.income-planning-block-grid {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+}
+
+.income-planning-block-grid.work {
+  grid-template-columns: minmax(78px, 0.42fr) minmax(170px, 0.9fr) minmax(150px, 1fr) minmax(180px, 1.15fr) auto 44px;
+}
+
+.income-planning-block-grid.manual {
+  grid-template-columns: minmax(78px, 0.42fr) minmax(130px, 0.7fr) minmax(150px, 1fr) minmax(180px, 1.15fr) auto 44px;
+}
+
+.income-planning-block-grid.habit {
+  grid-template-columns:
+    minmax(78px, 0.36fr)
+    minmax(118px, 0.52fr)
+    minmax(140px, 0.72fr)
+    minmax(160px, 0.9fr)
+    minmax(130px, 0.7fr)
+    minmax(84px, 0.4fr)
+    minmax(92px, 0.42fr)
+    minmax(126px, 0.6fr)
+    minmax(140px, 0.72fr)
+    minmax(104px, 0.48fr)
+    minmax(104px, 0.48fr)
+    auto
+    44px;
+  overflow-x: auto;
+}
+
+.income-planning-block-grid .income-planning-label-button {
+  min-width: 0;
+  width: 100%;
+}
+
+.income-planning-description-field {
+  min-width: 160px;
+}
+
+.income-planning-slot-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.income-planning-slot-chip {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  gap: 5px;
+  align-items: center;
+  border: 1px solid var(--row-border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 5px 9px;
+}
+
+.income-planning-slot-chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.income-planning-slot-chip strong {
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.income-planning-slot-chip span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.income-planning-slot-chip small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.income-planning-slot-chip.flexible {
+  border-style: dashed;
+}
+
+.income-planning-slot-chip.add {
+  border-style: dashed;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.income-planning-slot-chip.add strong {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.income-planning-career-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--entry-color, rgba(46, 125, 88, 0.28));
+  border-radius: 8px;
+  background: var(--entry-bg, rgba(46, 125, 88, 0.08));
+  padding: 12px;
+}
+
+.income-planning-day-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.income-planning-day-card h4 {
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
+.income-planning-day-table {
+  display: grid;
+  gap: 4px;
+}
+
+.income-planning-day-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 0.42fr) minmax(0, 1fr) minmax(128px, 0.54fr);
+  gap: 8px;
+  align-items: center;
+  border-left: 4px solid var(--row-border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  padding: 7px 8px;
+  font-size: 0.82rem;
+}
+
+.income-planning-day-row.head {
+  border-left-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.income-planning-day-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-planning-day-row.type-career {
+  border-left-color: #2e7d58;
+}
+
+.income-planning-day-row.type-side_work {
+  border-left-color: #2f6fb0;
+}
+
+.income-planning-day-row.type-private_commitment {
+  border-left-color: #b8860b;
+}
+
+.income-planning-day-row.type-free_time {
+  border-left-color: #7d6bb3;
+}
+
+.income-planning-day-row.type-buffer {
+  border-left-color: #c76f4c;
+}
+
+.income-planning-day-row.type-good_habit {
+  border-left-color: #4e9f6d;
+}
+
+.income-planning-day-row.type-bad_habit {
+  border-left-color: #b94646;
+}
+
+.income-planning-day-row.type-replacement_habit {
+  border-left-color: #8f5aa8;
+}
+
+.income-planning-day-row.type-other_event {
+  border-left-color: #6f7785;
+}
+
+.income-planning-day-row.conflict {
+  box-shadow: inset 0 0 0 1px rgba(185, 70, 70, 0.55);
+}
+
+.income-planning-day-row.invalid {
+  background: rgba(185, 70, 70, 0.08);
+}
+
+.income-planning-calendar {
+  --calendar-axis-width: 58px;
+  --calendar-day-width: minmax(118px, 1fr);
+  --calendar-height: clamp(540px, 66vh, 640px);
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.income-planning-week-toolbar,
+.income-planning-week-scenario {
+  display: grid;
+  grid-template-columns: minmax(240px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.income-planning-week-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.income-planning-week-label,
+.income-planning-week-range,
+.income-planning-week-scenario > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.income-planning-week-label {
+  min-width: 132px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.income-planning-week-label span,
+.income-planning-week-range span,
+.income-planning-week-scenario span,
+.income-planning-week-scenario small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.income-planning-week-label strong,
+.income-planning-week-range strong,
+.income-planning-week-scenario strong {
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  font-weight: 950;
+}
+
+.income-planning-week-scenario {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.income-planning-week-scenario-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.income-planning-week-scenario-button {
+  display: inline-grid;
+  grid-template-columns: 18px minmax(0, auto);
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 6px 9px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.income-planning-week-scenario-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-planning-week-scenario-button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.income-planning-calendar-head {
+  display: grid;
+  grid-template-columns: var(--calendar-axis-width) repeat(7, var(--calendar-day-width));
+  gap: 0;
+  min-width: calc(58px + 7 * 118px);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.income-planning-calendar-body {
+  display: grid;
+  grid-template-columns: var(--calendar-axis-width) minmax(calc(7 * 118px), 1fr);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.income-planning-calendar-axis {
+  position: relative;
+  height: var(--calendar-height);
+  border-right: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.income-planning-calendar-axis span {
+  position: absolute;
+  right: 8px;
+  top: calc((var(--hour) / 24) * 100%);
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.income-planning-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, var(--calendar-day-width));
+  min-width: calc(7 * 118px);
+}
+
+.income-planning-calendar-day-column {
+  position: relative;
+  height: var(--calendar-height);
+  border-right: 1px solid var(--row-border);
+  background: var(--surface);
+  cursor: crosshair;
+}
+
+.income-planning-calendar-day-column:first-child {
+  border-left: 1px solid var(--row-border);
+}
+
+.income-planning-calendar-hour-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.income-planning-calendar-hour-lines i {
+  position: absolute;
+  right: 0;
+  left: 0;
+  top: calc((var(--hour) / 24) * 100%);
+  border-top: 1px solid var(--row-border);
+}
+
+.income-planning-calendar-block {
+  position: absolute;
+  right: 5px;
+  left: 5px;
+  top: var(--top);
+  min-height: 18px;
+  height: max(18px, var(--height));
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-left: 5px solid var(--row-border);
+  border-radius: 7px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: grab;
+  font: inherit;
+  padding: 5px 7px;
+  text-align: left;
+  touch-action: none;
+  z-index: 1;
+}
+
+.income-planning-calendar-background {
+  position: absolute;
+  right: 4px;
+  left: 4px;
+  top: var(--top);
+  min-height: 22px;
+  height: max(22px, var(--height));
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(79, 111, 159, 0.16);
+  border-left: 4px solid rgba(79, 111, 159, 0.28);
+  border-radius: 7px;
+  background: rgba(79, 111, 159, 0.07);
+  color: var(--text);
+  cursor: default;
+  padding: 5px 7px;
+  pointer-events: auto;
+  z-index: 0;
+}
+
+.income-planning-calendar-background.flexible {
+  border-left-color: var(--entry-color, rgba(47, 111, 176, 0.28));
+  border-style: dashed;
+  background: linear-gradient(135deg, var(--entry-bg, rgba(47, 111, 176, 0.08)), rgba(47, 111, 176, 0.02));
+}
+
+.income-planning-calendar-background.type-sleep {
+  border-color: rgba(79, 111, 159, 0.14);
+  border-left-color: rgba(79, 111, 159, 0.34);
+  background: rgba(79, 111, 159, 0.09);
+  cursor: grab;
+  touch-action: none;
+}
+
+.income-planning-calendar-background.type-sleep.flexible {
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, rgba(79, 111, 159, 0.11), rgba(79, 111, 159, 0.03));
+}
+
+.income-planning-calendar-background.type-sleep.dragging {
+  border-color: rgba(79, 111, 159, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  cursor: grabbing;
+  z-index: 2;
+}
+
+.income-planning-calendar-background.type-private_commitment {
+  border-left-color: var(--entry-color, rgba(184, 134, 11, 0.34));
+  background: var(--entry-bg, rgba(184, 134, 11, 0.08));
+}
+
+.income-planning-calendar-background.type-free_time {
+  border-left-color: var(--entry-color, rgba(125, 107, 179, 0.34));
+  background: var(--entry-bg, rgba(125, 107, 179, 0.08));
+}
+
+.income-planning-calendar-background.type-buffer {
+  border-left-color: var(--entry-color, rgba(199, 111, 76, 0.34));
+  background: var(--entry-bg, rgba(199, 111, 76, 0.08));
+}
+
+.income-planning-calendar-background strong,
+.income-planning-calendar-background small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.income-planning-calendar-background strong {
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.income-planning-calendar-background small {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 850;
+}
+
+.income-planning-calendar-block:hover,
+.income-planning-calendar-block.dragging {
+  border-color: var(--accent);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  z-index: 3;
+}
+
+.income-planning-calendar-block.dragging {
+  cursor: grabbing;
+}
+
+.income-planning-calendar-block.read-only {
+  cursor: default;
+  touch-action: auto;
+}
+
+.income-planning-calendar-block.read-only:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.income-planning-calendar-block.flexible {
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, var(--entry-bg, rgba(47, 111, 176, 0.13)), rgba(255, 255, 255, 0.02)),
+    var(--surface-soft);
+}

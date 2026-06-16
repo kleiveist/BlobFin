@@ -1,0 +1,66 @@
+.income-planning-source-row .income-planning-hours-field {
+  min-width: 72px;
+}
+
+.income-planning-source-row .income-planning-hours-field input {
+  min-width: 64px;
+}
+
+.income-planning-source-row .income-planning-income-field {
+  min-width: 86px;
+}
+
+.income-planning-source-row .income-planning-income-field input {
+  min-width: 78px;
+}
+
+.income-planning-source-row .income-planning-start-month-field {
+  min-width: 92px;
+}
+
+.income-planning-source-row .income-planning-start-year-field,
+.income-planning-source-row .income-planning-phase-field,
+.income-planning-source-row .income-planning-status-field,
+.income-planning-source-row .income-planning-level-field {
+  min-width: 78px;
+}
+
+.income-planning-source-name {
+  min-width: 150px;
+}
+
+.income-planning-source-name input {
+  min-width: 140px;
+}
+
+.income-planning-scenario {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.income-planning-scenario-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.income-planning-scenario-head span,
+.income-planning-scenario small {
+  color: var(--muted);
+}
+
+.income-planning-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.income-planning-scenario-grid ol {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}

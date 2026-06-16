@@ -6,7 +6,6 @@ import {
   addBusinessIdeaCanvasNodeFromLine,
   alignBusinessIdeaCanvasSelection,
   applyBusinessIdeaCanvasPaletteColor,
-  armBusinessIdeaCanvasConnection,
   closeBusinessIdeaCanvasDropdowns,
   closeBusinessIdeaCanvasOverlays,
   closeBusinessIdeaCanvasPaletteEditor,
@@ -28,7 +27,6 @@ import {
   openBusinessIdeaCanvasPalette,
   openBusinessIdeaCanvasPaletteEditor,
   pasteBusinessIdeaCanvasClipboard,
-  resetBusinessIdeaCanvasView,
   saveBusinessIdeaCanvasPaletteColor,
   startBusinessIdeaCanvasPointer,
   updateBusinessIdeaCanvasEdgeLabelDraft,
@@ -37,9 +35,13 @@ import {
   updateBusinessIdeaCanvasNodeText,
   updateBusinessIdeaCanvasPaletteDraft,
   updateBusinessIdeaCanvasSelectedEdgeField,
-  updateBusinessIdeaCanvasSelectedNodeField,
-  zoomBusinessIdeaCanvas
+  updateBusinessIdeaCanvasSelectedNodeField
 } from "./controller";
+import {
+  armBusinessIdeaCanvasConnection,
+  resetBusinessIdeaCanvasView,
+  zoomBusinessIdeaCanvas
+} from "./viewportController";
 
 export function handleBusinessCanvasInput(event: Event): boolean {
   const canvasTextTarget = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-business-canvas-node-text]");

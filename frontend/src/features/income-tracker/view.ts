@@ -1,5 +1,7 @@
 export {
-  renderIncomeMilestoneTypePicker,
-  renderIncomeTracker,
-  renderIncomeYearLabelPicker
+  renderIncomeTracker
 } from "./controller";
+export {
+  renderIncomeMilestoneTypePicker,
+  renderIncomeYearLabelPicker
+} from "./labelPickerController";
