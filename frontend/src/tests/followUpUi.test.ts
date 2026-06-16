@@ -15,9 +15,15 @@ import businessCanvasViewportControllerSource from "../features/self-employment/
 import businessCanvasViewSource from "../features/self-employment/business-canvas/view.ts?raw";
 import selfEmploymentConfigSource from "../features/self-employment/config.ts?raw";
 import selfEmploymentControllerSource from "../features/self-employment/controller.ts?raw";
+import selfEmploymentFeasibilityControllerSource from "../features/self-employment/feasibilityController.ts?raw";
 import selfEmploymentGanttControllerSource from "../features/self-employment/ganttController.ts?raw";
+import selfEmploymentRenderFeasibilitySource from "../features/self-employment/renderFeasibility.ts?raw";
+import selfEmploymentRenderProjectCardsSource from "../features/self-employment/renderProjectCards.ts?raw";
+import selfEmploymentRenderProjectDetailsSource from "../features/self-employment/renderProjectDetails.ts?raw";
 import incomePlanningControllerSource from "../features/income-planning/controller.ts?raw";
 import incomePlanningCalendarDragControllerSource from "../features/income-planning/calendarDragController.ts?raw";
+import incomePlanningDialogControllerSource from "../features/income-planning/dialogController.ts?raw";
+import incomePlanningSanitizerSource from "../features/income-planning/planningSanitizer.ts?raw";
 import incomePlanningRenderControllerSource from "../features/income-planning/renderController.ts?raw";
 import incomePlanningStampPlannerControllerSource from "../features/income-planning/stampPlannerController.ts?raw";
 import incomePlanningStampPopupControllerSource from "../features/income-planning/stampPopupController.ts?raw";
@@ -74,7 +80,14 @@ const stylesSource = cssSourcePaths
   .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
   .join("\n");
 
-const selfEmploymentFeatureSource = [selfEmploymentControllerSource, selfEmploymentGanttControllerSource].join("\n");
+const selfEmploymentFeatureSource = [
+  selfEmploymentControllerSource,
+  selfEmploymentFeasibilityControllerSource,
+  selfEmploymentGanttControllerSource,
+  selfEmploymentRenderFeasibilitySource,
+  selfEmploymentRenderProjectCardsSource,
+  selfEmploymentRenderProjectDetailsSource
+].join("\n");
 const businessCanvasFeatureSource = [
   businessCanvasControllerSource,
   businessCanvasDragControllerSource,
@@ -87,6 +100,8 @@ const businessCanvasFeatureSource = [
 const incomePlanningFeatureSource = [
   incomePlanningControllerSource,
   incomePlanningCalendarDragControllerSource,
+  incomePlanningDialogControllerSource,
+  incomePlanningSanitizerSource,
   incomePlanningRenderControllerSource,
   incomePlanningStampPlannerControllerSource,
   incomePlanningStampPopupControllerSource,
