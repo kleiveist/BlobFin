@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import mainSource from "../app/appController.ts?raw";
-import runtimeFeatureHostSource from "../features/runtime-host/controller.ts?raw";
+import runtimeRenderSource from "../features/runtime-host/renderRuntime.ts?raw";
 import businessCanvasControllerSource from "../features/self-employment/business-canvas/controller.ts?raw";
 import businessCanvasDragControllerSource from "../features/self-employment/business-canvas/dragController.ts?raw";
 import businessCanvasEdgeControllerSource from "../features/self-employment/business-canvas/edgeController.ts?raw";
@@ -515,18 +515,18 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-action="show-reserve-chart"');
     expect(html).not.toContain('id="reserveChartPopup" class="reserve-chart-popup" role="dialog"');
     expect(html).not.toContain('id="reserveChartPopup" class="reserve-chart-popup" hidden');
-    expect(runtimeFeatureHostSource).toContain("function reservePieChart");
-    expect(runtimeFeatureHostSource).toContain('legend-dot blue"></i>Sparen');
-    expect(runtimeFeatureHostSource).toContain('key: "savings", value: totals.savings, color: "var(--reserve-chart-savings)"');
+    expect(runtimeRenderSource).toContain("function reservePieChart");
+    expect(runtimeRenderSource).toContain('legend-dot blue"></i>Sparen');
+    expect(runtimeRenderSource).toContain('key: "savings", value: totals.savings, color: "var(--reserve-chart-savings)"');
     expect(stylesSource).toContain("--reserve-chart-savings: #2563eb");
     expect(stylesSource).toContain(".reserve-chart-legend .legend-dot.blue");
-    expect(runtimeFeatureHostSource).not.toContain("function reserveBarChart");
-    expect(runtimeFeatureHostSource).not.toContain("reserve-chart-summary");
-    expect(runtimeFeatureHostSource).not.toContain("reserve-chart-controls");
-    expect(runtimeFeatureHostSource).not.toContain("set-reserve-chart-category");
-    expect(runtimeFeatureHostSource).not.toContain("set-reserve-chart-scenario");
-    expect(runtimeFeatureHostSource).not.toContain("set-reserve-chart-style");
-    expect(runtimeFeatureHostSource).not.toContain("close-reserve-chart");
+    expect(runtimeRenderSource).not.toContain("function reserveBarChart");
+    expect(runtimeRenderSource).not.toContain("reserve-chart-summary");
+    expect(runtimeRenderSource).not.toContain("reserve-chart-controls");
+    expect(runtimeRenderSource).not.toContain("set-reserve-chart-category");
+    expect(runtimeRenderSource).not.toContain("set-reserve-chart-scenario");
+    expect(runtimeRenderSource).not.toContain("set-reserve-chart-style");
+    expect(runtimeRenderSource).not.toContain("close-reserve-chart");
   });
 
   it("renders statutory pension as its own page outside combined wealth", () => {

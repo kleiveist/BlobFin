@@ -7,6 +7,22 @@ const sourceModules = import.meta.glob("../**/*.ts", {
   import: "default",
   query: "?raw"
 }) as Record<string, string>;
+const tsxSourceModules = import.meta.glob("../**/*.tsx", {
+  eager: true,
+  import: "default",
+  query: "?raw"
+}) as Record<string, string>;
+const cssSourceModules = import.meta.glob("../**/*.css", {
+  eager: true,
+  import: "default",
+  query: "?raw"
+}) as Record<string, string>;
+const guardedSourceModules = {
+  ...sourceModules,
+  ...tsxSourceModules,
+  ...cssSourceModules
+};
+const MAX_SOURCE_FILE_LINES = 1600;
 
 const mainSource = sourceAt("../main.ts");
 const appControllerSource = sourceAt("../app/appController.ts");
@@ -35,6 +51,15 @@ const runtimeHostHelperNames = [
 ] as const;
 
 describe("architecture guards", () => {
+  it("keeps TypeScript and CSS source files below the maximum line count", () => {
+    const offenders = Object.entries(guardedSourceModules)
+      .map(([path, source]) => ({ path, lines: lineCount(source) }))
+      .filter(({ lines }) => lines > MAX_SOURCE_FILE_LINES)
+      .map(({ path, lines }) => `${path}: ${lines} lines`);
+
+    expect(offenders).toEqual([]);
+  });
+
   it("keeps app entrypoints as thin facades", () => {
     expect(lineCount(mainSource)).toBeLessThanOrEqual(50);
     expect(lineCount(appControllerSource)).toBeLessThanOrEqual(30);
