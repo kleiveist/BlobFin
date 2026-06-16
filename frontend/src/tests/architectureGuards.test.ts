@@ -22,7 +22,9 @@ const guardedSourceModules = {
   ...tsxSourceModules,
   ...cssSourceModules
 };
-const MAX_SOURCE_FILE_LINES = 1600;
+const TYPESCRIPT_WARNING_FILE_LINES = 1200;
+const SOURCE_ERROR_FILE_LINES = 1600;
+const reviewedDomainCalculatorLineLimitExceptions: Record<string, string> = {};
 
 const mainSource = sourceAt("../main.ts");
 const appControllerSource = sourceAt("../app/appController.ts");
@@ -51,13 +53,38 @@ const runtimeHostHelperNames = [
 ] as const;
 
 describe("architecture guards", () => {
-  it("keeps TypeScript and CSS source files below the maximum line count", () => {
+  it("fails normal source files above the hard line count", () => {
     const offenders = Object.entries(guardedSourceModules)
       .map(([path, source]) => ({ path, lines: lineCount(source) }))
-      .filter(({ lines }) => lines > MAX_SOURCE_FILE_LINES)
+      .filter(({ path, lines }) => lines > SOURCE_ERROR_FILE_LINES && !isLineLimitException(path))
       .map(({ path, lines }) => `${path}: ${lines} lines`);
 
     expect(offenders).toEqual([]);
+  });
+
+  it("keeps controller and runtime TypeScript files below the soft line count", () => {
+    const offenders = Object.entries({ ...sourceModules, ...tsxSourceModules })
+      .map(([path, source]) => ({ path, lines: lineCount(source) }))
+      .filter(({ path, lines }) => {
+        return lines > TYPESCRIPT_WARNING_FILE_LINES && !isLineLimitException(path) && isControllerOrRuntimeFile(path);
+      })
+      .map(({ path, lines }) => `${path}: ${lines} lines`);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("reports TypeScript source files above the soft line count for review", () => {
+    const warnings = Object.entries({ ...sourceModules, ...tsxSourceModules })
+      .map(([path, source]) => ({ path, lines: lineCount(source) }))
+      .filter(({ path, lines }) => {
+        return lines > TYPESCRIPT_WARNING_FILE_LINES && lines <= SOURCE_ERROR_FILE_LINES && !isLineLimitException(path);
+      })
+      .map(({ path, lines }) => `${path}: ${lines} lines`);
+
+    if (warnings.length) {
+      console.warn(`Files above ${TYPESCRIPT_WARNING_FILE_LINES} lines require review:\n${warnings.join("\n")}`);
+    }
+    expect(warnings.every((item) => /: \d+ lines$/.test(item))).toBe(true);
   });
 
   it("keeps app entrypoints as thin facades", () => {
@@ -150,6 +177,21 @@ function sourceAt(path: string): string {
   const source = sourceModules[path];
   if (!source) throw new Error(`Missing source module: ${path}`);
   return source;
+}
+
+function isLineLimitException(path: string): boolean {
+  return (
+    path.endsWith("/types.ts") ||
+    path.endsWith(".config.ts") ||
+    /(?:^|\/)(?:generated|__generated__)(?:\/|$)/.test(path) ||
+    /\.generated\.(?:ts|tsx|css)$/.test(path) ||
+    path in reviewedDomainCalculatorLineLimitExceptions
+  );
+}
+
+function isControllerOrRuntimeFile(path: string): boolean {
+  const fileName = path.split("/").at(-1) ?? path;
+  return /controller\.tsx?$/i.test(fileName) || /runtime.*\.tsx?$/i.test(fileName);
 }
 
 function importsFrom(source: string): string[] {

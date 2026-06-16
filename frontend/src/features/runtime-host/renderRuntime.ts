@@ -1,7 +1,7 @@
 import { calculatePlannedOutflowForSingleMonth, calculateReserveSummary } from "../../domain/reserveCalculator";
 import { calculateRealEstateFinancing } from "../../domain/realEstateCalculator";
 import { clamp, escapeHtml, intNumber, money, percent } from "../../lib/format";
-import { combineAssetProjections } from "./investmentRuntime";
+import { combineAssetProjections } from "./investmentProjectionRuntime";
 import { defaultInvestmentSettingsForNewAccount } from "../../data/defaults";
 import { renderAccountYearTableOverview } from "../../views/accountYearTables";
 import { runtimeApi, runtimeHost } from "./hostContext";

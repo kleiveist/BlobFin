@@ -22,6 +22,7 @@ import { configureCombinedWealthRuntime } from "./combinedWealthRuntime";
 import { configurePensionRuntime } from "./pensionRuntime";
 import { configurePlanningAccountsRuntime } from "./planningRuntime";
 import { configurePositionTableRuntime } from "./positionRuntime";
+import { configurePositionStateRuntime } from "./positionStateRuntime";
 import { configureInvestmentUiRuntime } from "./investmentRuntime";
 import { configureSettingsRuntime } from "./settingsRuntime";
 import { configureIncomeRuntime } from "./incomeRuntime";
@@ -65,6 +66,7 @@ export async function startAppController(context: AppContext, features: readonly
   configureCombinedWealthRuntime();
   configurePensionRuntime();
   configurePlanningAccountsRuntime();
+  configurePositionStateRuntime();
   configurePositionTableRuntime();
   configureInvestmentUiRuntime();
   configureSettingsRuntime();
