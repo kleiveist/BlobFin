@@ -16,6 +16,7 @@ export type {
   SelfEmploymentGanttPlan,
   SelfEmploymentGanttStartMode,
   SelfEmploymentGanttTodo,
+  SelfEmploymentGanttTodoEisenhowerQuadrant,
   SelfEmploymentGanttTodoStatus,
   SelfEmploymentProjectTimeSource,
   SelfEmploymentInvoice,

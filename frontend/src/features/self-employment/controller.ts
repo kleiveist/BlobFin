@@ -3,7 +3,8 @@ import { defaultBusinessIdeaCanvasForProject } from "../../domain/businessIdeaCa
 import {
   normalizeSelfEmploymentGanttPlan,
   normalizedGanttLabelId,
-  orderedGanttLabels
+  orderedGanttLabels,
+  selfEmploymentEisenhowerQuadrantFromValue
 } from "../../domain/selfEmploymentGantt";
 import { calculateReserveSummary } from "../../domain/reserveCalculator";
 import type { IncomePlanningModel } from "../../domain/incomePlanning";
@@ -13,6 +14,7 @@ import type {
   AppState,
   BusinessIdeaCanvasShape,
   PlanningSettings,
+  SelfEmploymentGanttTodoEisenhowerQuadrant,
   ReservePosition,
   SelfEmploymentGanttTodoStatus,
   SelfEmploymentGanttTodo,
@@ -571,7 +573,12 @@ export function updateSelfEmploymentGanttTodoField(
         const todos = plan.todos.map((todo) => {
           if (todo.id !== todoId) return todo;
           if (field === "title") return { ...todo, title: String(rawValue) };
-          if (field === "priority") return { ...todo, priority: selfEmploymentTaskPriorityFromValue(String(rawValue), todo.priority) };
+          if (field === "eisenhowerQuadrant") {
+            return {
+              ...todo,
+              eisenhowerQuadrant: selfEmploymentEisenhowerQuadrantFromValue(String(rawValue), todo.eisenhowerQuadrant)
+            };
+          }
           if (field === "completed") return selfEmploymentGanttTodoWithStatus(todo, rawValue === true || rawValue === "true" ? "done" : "planned");
           if (field === "status") return selfEmploymentGanttTodoWithStatus(todo, selfEmploymentGanttTodoStatusFromValue(String(rawValue), todo.status));
           return todo;
@@ -598,7 +605,7 @@ export function addSelfEmploymentGanttTodo(projectId: string, cardId: string, af
         const todo: SelfEmploymentGanttTodo = {
           id: createId(),
           title: "Neue Aufgabe",
-          priority: "medium",
+          eisenhowerQuadrant: "important_not_urgent",
           status: "planned",
           completed: false
         };
@@ -629,7 +636,13 @@ export function removeSelfEmploymentGanttTodo(projectId: string, cardId: string,
         const remaining = plan.todos.filter((todo) => todo.id !== todoId);
         const todos = remaining.length
           ? remaining
-          : [{ id: createId(), title: "Neue Aufgabe", priority: "medium" as const, status: "planned" as const, completed: false }];
+          : [{
+              id: createId(),
+              title: "Neue Aufgabe",
+              eisenhowerQuadrant: "important_not_urgent" as const,
+              status: "planned" as const,
+              completed: false
+            }];
         return { ...plan, todos, completed: todos.every((todo) => todo.completed) };
       });
       const nextProject = { ...project, gantt: { ...gantt, cardPlans } };
@@ -649,6 +662,15 @@ export function updateSelfEmploymentGanttTodoStatus(
   status: SelfEmploymentGanttTodoStatus
 ): void {
   updateSelfEmploymentGanttTodoField(projectId, cardId, todoId, "status", status, true);
+}
+
+export function updateSelfEmploymentGanttTodoEisenhowerQuadrant(
+  projectId: string,
+  cardId: string,
+  todoId: string,
+  quadrant: SelfEmploymentGanttTodoEisenhowerQuadrant
+): void {
+  updateSelfEmploymentGanttTodoField(projectId, cardId, todoId, "eisenhowerQuadrant", quadrant, true);
 }
 
 function selfEmploymentGanttTodoWithStatus(todo: SelfEmploymentGanttTodo, status: SelfEmploymentGanttTodoStatus): SelfEmploymentGanttTodo {

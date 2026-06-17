@@ -1,4 +1,5 @@
 import type { AppContext } from "../../app/contracts";
+import { selfEmploymentEisenhowerQuadrantFromValue } from "../../domain/selfEmploymentGantt";
 import { selfEmploymentUiState } from "./uiState";
 import {
   addSelfEmploymentContact,
@@ -21,6 +22,7 @@ import {
   updateSelfEmploymentCollectionItemField,
   updateSelfEmploymentGanttCardField,
   updateSelfEmploymentGanttPhaseField,
+  updateSelfEmploymentGanttTodoEisenhowerQuadrant,
   updateSelfEmploymentGanttTodoField,
   updateSelfEmploymentGanttTodoStatus,
   updateSelfEmploymentProjectField,
@@ -184,8 +186,22 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
   if (action === "self-employment-toggle-label") {
     toggleSelfEmploymentProjectLabel(button.dataset.selfEmploymentProjectId || "", button.dataset.selfEmploymentLabel || "");
   }
-  if (action === "self-employment-set-task-priority-filter") {
-    selfEmploymentUiState.taskPriorityFilter = selfEmploymentTaskPriorityFilterFromValue(button.dataset.selfEmploymentTaskPriorityFilter);
+  if (action === "self-employment-set-task-eisenhower-filter") {
+    selfEmploymentUiState.taskEisenhowerFilter = selfEmploymentTaskEisenhowerFilterFromValue(button.dataset.selfEmploymentTaskEisenhowerFilter);
+    context.scheduler.request();
+  }
+  if (action === "self-employment-toggle-kanban-phase-filter") {
+    selfEmploymentUiState.kanbanPhaseFilterIds = toggledSelfEmploymentFilterValues(
+      selfEmploymentUiState.kanbanPhaseFilterIds,
+      button.dataset.selfEmploymentKanbanPhaseId || ""
+    );
+    context.scheduler.request();
+  }
+  if (action === "self-employment-toggle-kanban-label-filter") {
+    selfEmploymentUiState.kanbanLabelFilterIds = toggledSelfEmploymentFilterValues(
+      selfEmploymentUiState.kanbanLabelFilterIds,
+      button.dataset.selfEmploymentKanbanLabelId || ""
+    );
     context.scheduler.request();
   }
   if (action === "self-employment-add-contact") addSelfEmploymentContact(button.dataset.selfEmploymentProjectId || "");
@@ -208,6 +224,14 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
       button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
       button.dataset.selfEmploymentGanttCardId || "",
       button.dataset.selfEmploymentGanttTodoId || ""
+    );
+  }
+  if (action === "self-employment-set-gantt-todo-eisenhower") {
+    updateSelfEmploymentGanttTodoEisenhowerQuadrant(
+      button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
+      button.dataset.selfEmploymentGanttCardId || "",
+      button.dataset.selfEmploymentGanttTodoId || "",
+      selfEmploymentEisenhowerQuadrantFromValue(button.dataset.selfEmploymentEisenhowerQuadrant)
     );
   }
   if (action === "self-employment-set-kanban-status") {
@@ -311,8 +335,13 @@ function isSelfEmploymentGanttAction(action: string | undefined): boolean {
   );
 }
 
-function selfEmploymentTaskPriorityFilterFromValue(value: unknown): typeof selfEmploymentUiState.taskPriorityFilter {
-  return value === "high" || value === "medium" || value === "low" ? value : "all";
+function selfEmploymentTaskEisenhowerFilterFromValue(value: unknown): typeof selfEmploymentUiState.taskEisenhowerFilter {
+  return value === "all" ? "all" : selfEmploymentEisenhowerQuadrantFromValue(value);
+}
+
+function toggledSelfEmploymentFilterValues(values: string[], value: string): string[] {
+  if (!value) return values;
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 }
 
 function selfEmploymentKanbanStatusFromValue(value: unknown): "planned" | "in_progress" | "done" {

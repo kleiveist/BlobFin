@@ -15,6 +15,7 @@ export {
   updateSelfEmploymentCollectionItemField,
   updateSelfEmploymentGanttCardField,
   updateSelfEmploymentGanttPhaseField,
+  updateSelfEmploymentGanttTodoEisenhowerQuadrant,
   updateSelfEmploymentGanttTodoField,
   updateSelfEmploymentGanttTodoStatus,
   updateSelfEmploymentProject,

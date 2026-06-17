@@ -3,7 +3,12 @@ import { positionIconSvg } from "../../lib/positionIcons";
 import type { SelfEmploymentProject, SelfEmploymentRoadmapAreaId } from "../../types";
 import type { IncomePlanningModel } from "../../domain/incomePlanning";
 import {
+  SELF_EMPLOYMENT_EISENHOWER_QUADRANTS,
   buildSelfEmploymentProjectWorkPlan,
+  orderedGanttLabels,
+  selfEmploymentEisenhowerQuadrantDetails,
+  selfEmploymentEisenhowerQuadrantRank,
+  selfEmploymentGanttLabelColor,
   type SelfEmploymentProjectWorkPlan,
   type SelfEmploymentProjectWorkPlanTask
 } from "../../domain/selfEmploymentGantt";
@@ -299,8 +304,7 @@ function selfEmploymentTasksDashboard(project: SelfEmploymentProject, workPlan: 
   const openTasks = workPlan.tasks.filter((task) => !task.completed);
   const doneTasks = workPlan.tasks.filter((task) => task.completed);
   const overdueTasks = openTasks.filter((task) => task.overdue);
-  const priorityFilter = selfEmploymentUiState.taskPriorityFilter;
-  const visibleTasks = priorityFilter === "all" ? workPlan.tasks : workPlan.tasks.filter((task) => task.priority === priorityFilter);
+  const visibleTasks = selfEmploymentFilteredKanbanTasks(workPlan.tasks);
   return `
     <div class="self-employment-task-dashboard">
       <div class="self-employment-dashboard-metrics">
@@ -310,11 +314,12 @@ function selfEmploymentTasksDashboard(project: SelfEmploymentProject, workPlan: 
         ${selfEmploymentDashboardMetric("Wochenkontingent", hoursLabel(workPlan.availableHoursPerWeek), workPlan.endDate ?? "kein Enddatum")}
       </div>
       ${workPlan.bottlenecks.length ? selfEmploymentBottlenecks(workPlan.bottlenecks) : ""}
-      ${selfEmploymentPriorityRosette(workPlan, priorityFilter)}
+      ${selfEmploymentEisenhowerMatrix(workPlan)}
+      ${selfEmploymentKanbanFilters(project, workPlan)}
       <section class="self-employment-dashboard-section self-employment-kanban-section">
         <header>
           <strong>Kanban Dashboard</strong>
-          <span>${escapeHtml(`${intNumber(visibleTasks.length)} sichtbare Todos`)}</span>
+          <span>${escapeHtml(`${intNumber(visibleTasks.length)} / ${intNumber(workPlan.tasks.length)} Todos`)}</span>
         </header>
         <div class="self-employment-kanban-board">
           ${selfEmploymentKanbanColumn(project, "planned", "Geplant", visibleTasks)}
@@ -426,44 +431,130 @@ function selfEmploymentBottlenecks(items: string[]): string {
   `;
 }
 
-function selfEmploymentPriorityRosette(
-  workPlan: SelfEmploymentProjectWorkPlan,
-  activeFilter: typeof selfEmploymentUiState.taskPriorityFilter
-): string {
-  const options: Array<{ value: typeof selfEmploymentUiState.taskPriorityFilter; label: string; className: string }> = [
-    { value: "all", label: "Alle", className: "all" },
-    { value: "high", label: "Hoch", className: "high" },
-    { value: "medium", label: "Mittel", className: "medium" },
-    { value: "low", label: "Niedrig", className: "low" }
-  ];
+function selfEmploymentEisenhowerMatrix(workPlan: SelfEmploymentProjectWorkPlan): string {
+  const activeFilter = selfEmploymentUiState.taskEisenhowerFilter;
+  const allActive = activeFilter === "all";
   return `
-    <section class="self-employment-dashboard-section self-employment-priority-panel">
+    <section class="self-employment-dashboard-section self-employment-eisenhower-panel">
       <header>
-        <strong>Aufgaben nach Prioritaet</strong>
+        <strong>Eisenhower-Modell</strong>
         <span>${escapeHtml(`${intNumber(workPlan.tasks.length)} Todos aus Karten`)}</span>
       </header>
-      <div class="self-employment-priority-rosette" role="toolbar" aria-label="Aufgaben nach Prioritaet filtern">
-        ${options
-          .map((option) => {
-            const count = option.value === "all" ? workPlan.tasks.length : workPlan.tasks.filter((task) => task.priority === option.value).length;
-            const active = activeFilter === option.value;
-            return `
-              <button
-                class="self-employment-priority-node ${option.className}${active ? " active" : ""}"
-                type="button"
-                data-action="self-employment-set-task-priority-filter"
-                data-self-employment-task-priority-filter="${escapeHtml(option.value)}"
-                aria-pressed="${active}"
-              >
-                <span>${escapeHtml(option.label)}</span>
-                <strong>${escapeHtml(intNumber(count))}</strong>
-              </button>
-            `;
-          })
-          .join("")}
+      <div class="self-employment-eisenhower-toolbar">
+        <button
+          class="self-employment-eisenhower-filter all${allActive ? " active" : ""}"
+          type="button"
+          data-action="self-employment-set-task-eisenhower-filter"
+          data-self-employment-task-eisenhower-filter="all"
+          aria-pressed="${allActive}"
+        >Alle</button>
+      </div>
+      <div class="self-employment-eisenhower-matrix" role="toolbar" aria-label="Eisenhower-Quadrant filtern">
+        ${SELF_EMPLOYMENT_EISENHOWER_QUADRANTS.map((quadrant) => {
+          const detail = selfEmploymentEisenhowerQuadrantDetails(quadrant);
+          const count = workPlan.tasks.filter((task) => task.eisenhowerQuadrant === quadrant).length;
+          const active = activeFilter === quadrant;
+          return `
+            <button
+              class="self-employment-eisenhower-node ${escapeHtml(quadrant)}${active ? " active" : ""}"
+              type="button"
+              data-action="self-employment-set-task-eisenhower-filter"
+              data-self-employment-task-eisenhower-filter="${escapeHtml(quadrant)}"
+              aria-pressed="${active}"
+            >
+              <span>${escapeHtml(detail.label)}</span>
+              <strong>${escapeHtml(intNumber(count))}</strong>
+              <small>${escapeHtml(detail.action)}</small>
+            </button>
+          `;
+        }).join("")}
       </div>
     </section>
   `;
+}
+
+function selfEmploymentKanbanFilters(project: SelfEmploymentProject, workPlan: SelfEmploymentProjectWorkPlan): string {
+  const phaseIds = new Set(workPlan.tasks.map((task) => task.phaseId));
+  const labelIds = new Set(workPlan.tasks.map((task) => task.labelId));
+  const phases = [...project.businessIdeaCanvasMeta.phases].sort((first, second) => first.order - second.order).filter((phase) => phaseIds.has(phase.id));
+  const labels = orderedGanttLabels(project.businessIdeaCanvasMeta).filter((label) => labelIds.has(label.id));
+  return `
+    <section class="self-employment-dashboard-section self-employment-kanban-filter-panel">
+      <header>
+        <strong>Kanban-Filter</strong>
+        <span>${escapeHtml(selfEmploymentKanbanFilterSummary(workPlan))}</span>
+      </header>
+      <div class="self-employment-kanban-filter-groups">
+        <div class="self-employment-kanban-filter-group">
+          <span>Phasen</span>
+          <div>
+            ${phases.map((phase) => selfEmploymentKanbanPhaseFilterButton(phase.id, phase.name, workPlan)).join("")}
+          </div>
+        </div>
+        <div class="self-employment-kanban-filter-group">
+          <span>Labels</span>
+          <div>
+            ${labels.map((label) => selfEmploymentKanbanLabelFilterButton(label.id, label.name, workPlan)).join("")}
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function selfEmploymentKanbanPhaseFilterButton(phaseId: string, phaseName: string, workPlan: SelfEmploymentProjectWorkPlan): string {
+  const active = selfEmploymentUiState.kanbanPhaseFilterIds.includes(phaseId);
+  const count = workPlan.tasks.filter((task) => task.phaseId === phaseId).length;
+  return `
+    <button
+      class="self-employment-kanban-filter-chip${active ? " active" : ""}"
+      type="button"
+      data-action="self-employment-toggle-kanban-phase-filter"
+      data-self-employment-kanban-phase-id="${escapeHtml(phaseId)}"
+      aria-pressed="${active}"
+    >${escapeHtml(`${phaseName} · ${intNumber(count)}`)}</button>
+  `;
+}
+
+function selfEmploymentKanbanLabelFilterButton(labelId: string, labelName: string, workPlan: SelfEmploymentProjectWorkPlan): string {
+  const active = selfEmploymentUiState.kanbanLabelFilterIds.includes(labelId);
+  const count = workPlan.tasks.filter((task) => task.labelId === labelId).length;
+  return `
+    <button
+      class="self-employment-kanban-filter-chip label${active ? " active" : ""}"
+      style="--self-employment-gantt-color:${escapeHtml(selfEmploymentGanttLabelColor(labelId))};"
+      type="button"
+      data-action="self-employment-toggle-kanban-label-filter"
+      data-self-employment-kanban-label-id="${escapeHtml(labelId)}"
+      aria-pressed="${active}"
+    >${escapeHtml(`${labelName} · ${intNumber(count)}`)}</button>
+  `;
+}
+
+function selfEmploymentKanbanFilterSummary(workPlan: SelfEmploymentProjectWorkPlan): string {
+  const availablePhaseIds = new Set(workPlan.tasks.map((task) => task.phaseId));
+  const availableLabelIds = new Set(workPlan.tasks.map((task) => task.labelId));
+  const phaseCount = selfEmploymentUiState.kanbanPhaseFilterIds.filter((id) => availablePhaseIds.has(id)).length;
+  const labelCount = selfEmploymentUiState.kanbanLabelFilterIds.filter((id) => availableLabelIds.has(id)).length;
+  const parts = [
+    selfEmploymentUiState.taskEisenhowerFilter === "all" ? "" : "Eisenhower",
+    phaseCount ? `${intNumber(phaseCount)} Phasen` : "",
+    labelCount ? `${intNumber(labelCount)} Labels` : ""
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "keine Filter";
+}
+
+function selfEmploymentFilteredKanbanTasks(tasks: SelfEmploymentProjectWorkPlanTask[]): SelfEmploymentProjectWorkPlanTask[] {
+  const availablePhaseIds = new Set(tasks.map((task) => task.phaseId));
+  const availableLabelIds = new Set(tasks.map((task) => task.labelId));
+  const phaseIds = new Set(selfEmploymentUiState.kanbanPhaseFilterIds.filter((id) => availablePhaseIds.has(id)));
+  const labelIds = new Set(selfEmploymentUiState.kanbanLabelFilterIds.filter((id) => availableLabelIds.has(id)));
+  return tasks.filter((task) => {
+    if (selfEmploymentUiState.taskEisenhowerFilter !== "all" && task.eisenhowerQuadrant !== selfEmploymentUiState.taskEisenhowerFilter) return false;
+    if (phaseIds.size && !phaseIds.has(task.phaseId)) return false;
+    if (labelIds.size && !labelIds.has(task.labelId)) return false;
+    return true;
+  });
 }
 
 function selfEmploymentKanbanColumn(
@@ -507,20 +598,48 @@ function selfEmploymentKanbanTaskCard(project: SelfEmploymentProject, task: Self
       data-self-employment-gantt-card-id="${escapeHtml(task.cardId)}"
       data-self-employment-gantt-todo-id="${escapeHtml(task.todoId)}"
       data-self-employment-kanban-status="${escapeHtml(task.status)}"
+      data-self-employment-kanban-phase-id="${escapeHtml(task.phaseId)}"
+      data-self-employment-kanban-label-id="${escapeHtml(task.labelId)}"
+      data-self-employment-eisenhower-quadrant="${escapeHtml(task.eisenhowerQuadrant)}"
     >
       <div class="self-employment-task-dashboard-item-head">
         <span class="self-employment-task-label">${escapeHtml(task.labelName)}</span>
-        <span class="self-employment-priority-pill ${escapeHtml(task.priority)}">${escapeHtml(selfEmploymentPriorityLabel(task.priority))}</span>
+        <span class="self-employment-eisenhower-badge ${escapeHtml(task.eisenhowerQuadrant)}">${escapeHtml(selfEmploymentEisenhowerQuadrantDetails(task.eisenhowerQuadrant).label)}</span>
       </div>
       <strong>${escapeHtml(task.title)}</strong>
       <small>${escapeHtml(`${hoursLabel(task.hours)} · ${task.plannedDate ? selfEmploymentDateLabel(task.plannedDate) : "ohne Tagesplan"}`)}</small>
-      <span>${escapeHtml(task.cardTitle)}</span>
+      <span>${escapeHtml(`${task.eisenhowerActionLabel} · ${task.cardTitle}`)}</span>
+      <div class="self-employment-eisenhower-card-actions" role="group" aria-label="Eisenhower-Quadrant setzen">
+        ${SELF_EMPLOYMENT_EISENHOWER_QUADRANTS.map((quadrant) => selfEmploymentKanbanEisenhowerButton(project, task, quadrant)).join("")}
+      </div>
       <div class="self-employment-kanban-card-actions" role="group" aria-label="Todo-Status setzen">
         ${selfEmploymentKanbanStatusButton(project, task, "planned", "Geplant")}
         ${selfEmploymentKanbanStatusButton(project, task, "in_progress", "In Arbeit")}
         ${selfEmploymentKanbanStatusButton(project, task, "done", "Erledigt")}
       </div>
     </article>
+  `;
+}
+
+function selfEmploymentKanbanEisenhowerButton(
+  project: SelfEmploymentProject,
+  task: SelfEmploymentProjectWorkPlanTask,
+  quadrant: SelfEmploymentProjectWorkPlanTask["eisenhowerQuadrant"]
+): string {
+  const detail = selfEmploymentEisenhowerQuadrantDetails(quadrant);
+  const active = task.eisenhowerQuadrant === quadrant;
+  return `
+    <button
+      class="self-employment-eisenhower-button ${escapeHtml(quadrant)}${active ? " active" : ""}"
+      type="button"
+      title="${escapeHtml(`${detail.label}: ${detail.action}`)}"
+      data-action="self-employment-set-gantt-todo-eisenhower"
+      data-self-employment-project-id="${escapeHtml(project.id)}"
+      data-self-employment-gantt-card-id="${escapeHtml(task.cardId)}"
+      data-self-employment-gantt-todo-id="${escapeHtml(task.todoId)}"
+      data-self-employment-eisenhower-quadrant="${escapeHtml(quadrant)}"
+      aria-pressed="${active}"
+    >${escapeHtml(detail.shortLabel)}</button>
   `;
 }
 
@@ -658,22 +777,15 @@ function selfEmploymentLabelProgressBar(label: SelfEmploymentProjectWorkPlan["la
 }
 
 function selfEmploymentSortKanbanTasks(tasks: SelfEmploymentProjectWorkPlanTask[]): SelfEmploymentProjectWorkPlanTask[] {
-  const priorityOrder: Record<SelfEmploymentProjectWorkPlanTask["priority"], number> = { high: 0, medium: 1, low: 2 };
   return [...tasks].sort((first, second) => {
+    const rankDiff = selfEmploymentEisenhowerQuadrantRank(first.eisenhowerQuadrant) - selfEmploymentEisenhowerQuadrantRank(second.eisenhowerQuadrant);
+    if (rankDiff !== 0) return rankDiff;
     if (first.status === "planned" && second.status === "planned") {
       if (first.plannedDate && second.plannedDate && first.plannedDate !== second.plannedDate) return first.plannedDate.localeCompare(second.plannedDate);
       if (first.plannedDate !== second.plannedDate) return first.plannedDate ? -1 : 1;
     }
-    const priorityDiff = priorityOrder[first.priority] - priorityOrder[second.priority];
-    if (priorityDiff !== 0) return priorityDiff;
     return first.title.localeCompare(second.title, "de");
   });
-}
-
-function selfEmploymentPriorityLabel(priority: SelfEmploymentProjectWorkPlanTask["priority"]): string {
-  if (priority === "high") return "Hoch";
-  if (priority === "low") return "Niedrig";
-  return "Mittel";
 }
 
 function selfEmploymentDateLabel(value: string): string {

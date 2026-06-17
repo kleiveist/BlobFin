@@ -81,6 +81,11 @@ export type SelfEmploymentFeasibility = "realistic" | "borderline" | "unrealisti
 export type SelfEmploymentTaskPriority = "low" | "medium" | "high";
 export type SelfEmploymentTaskStatus = "open" | "in_progress" | "done";
 export type SelfEmploymentGanttTodoStatus = "planned" | "in_progress" | "done";
+export type SelfEmploymentGanttTodoEisenhowerQuadrant =
+  | "important_urgent"
+  | "important_not_urgent"
+  | "not_important_urgent"
+  | "not_important_not_urgent";
 export type SelfEmploymentContactStatus = "lead" | "first_contact" | "offer_sent" | "customer" | "paused";
 export type SelfEmploymentInvoiceStatus = "offer_open" | "offer_accepted" | "invoice_created" | "paid";
 export type SelfEmploymentRoadmapAreaId =
@@ -268,7 +273,7 @@ export interface SelfEmploymentTask {
 export interface SelfEmploymentGanttTodo {
   id: string;
   title: string;
-  priority: SelfEmploymentTaskPriority;
+  eisenhowerQuadrant: SelfEmploymentGanttTodoEisenhowerQuadrant;
   status: SelfEmploymentGanttTodoStatus;
   completed: boolean;
 }

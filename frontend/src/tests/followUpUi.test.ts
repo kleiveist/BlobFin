@@ -303,7 +303,17 @@ describe("follow-up ui rendering", () => {
     expect(selfEmploymentFeatureSource).toContain("self-employment-kanban-column");
     expect(selfEmploymentFeatureSource).toContain('data-self-employment-kanban-card="true"');
     expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-set-kanban-status"');
-    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-set-task-priority-filter"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-set-task-eisenhower-filter"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-toggle-kanban-phase-filter"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-toggle-kanban-label-filter"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-set-gantt-todo-eisenhower"');
+    expect(selfEmploymentFeatureSource).toContain("self-employment-eisenhower-matrix");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-kanban-filter-chip");
+    expect(selfEmploymentFeatureSource).toContain("data-self-employment-kanban-phase-id");
+    expect(selfEmploymentFeatureSource).toContain("data-self-employment-kanban-label-id");
+    expect(selfEmploymentFeatureSource).toContain("data-self-employment-eisenhower-quadrant");
+    expect(selfEmploymentFeatureSource).toContain("SELF_EMPLOYMENT_EISENHOWER_QUADRANTS");
+    expect(selfEmploymentFeatureSource).not.toContain("Aufgaben nach Prioritaet");
     expect(selfEmploymentFeatureSource).toContain("onSelfEmploymentDragStart");
     expect(selfEmploymentFeatureSource).toContain("updateSelfEmploymentGanttTodoStatus");
     expect(selfEmploymentFeatureSource).toContain("self-employment-label-chart-grid");
@@ -314,7 +324,8 @@ describe("follow-up ui rendering", () => {
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button");
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button.active");
     expect(stylesSource).toContain(".self-employment-kanban-board");
-    expect(stylesSource).toContain(".self-employment-priority-rosette");
+    expect(stylesSource).toContain(".self-employment-eisenhower-matrix");
+    expect(stylesSource).toContain(".self-employment-kanban-filter-chip");
     expect(stylesSource).toContain(".self-employment-label-chart-grid");
     expect(stylesSource).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
     expect(selfEmploymentFeatureSource).not.toContain('selfEmploymentTextareaField(project, "projectGoal"');

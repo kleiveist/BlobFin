@@ -745,29 +745,6 @@
   font-weight: 900;
 }
 
-.self-employment-gantt-todo-priority {
-  width: auto;
-  min-width: 86px;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 900;
-}
-
-.self-employment-gantt-todo-priority.high {
-  border-color: #dc2626;
-  background: #fef2f2;
-}
-
-.self-employment-gantt-todo-priority.medium {
-  border-color: #eab308;
-  background: #fefce8;
-}
-
-.self-employment-gantt-todo-priority.low {
-  border-color: #16a34a;
-  background: #f0fdf4;
-}
-
 .self-employment-gantt-todo-row input[type="text"] {
   min-width: 0;
   width: 100%;
@@ -854,54 +831,111 @@
   gap: 6px;
 }
 
-.self-employment-priority-rosette {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(86px, 1fr));
-  gap: 10px;
+.self-employment-gantt-eisenhower-buttons,
+.self-employment-eisenhower-card-actions,
+.self-employment-kanban-card-actions,
+.self-employment-eisenhower-toolbar,
+.self-employment-kanban-filter-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.self-employment-priority-node {
-  display: grid;
-  place-items: center;
-  gap: 4px;
-  min-height: 92px;
+.self-employment-eisenhower-button,
+.self-employment-eisenhower-filter,
+.self-employment-kanban-filter-chip,
+.self-employment-kanban-status-button {
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--surface-soft);
+  padding: 5px 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
   cursor: pointer;
 }
 
-.self-employment-priority-node strong {
+.self-employment-eisenhower-button.active,
+.self-employment-eisenhower-filter.active,
+.self-employment-kanban-filter-chip.active,
+.self-employment-kanban-status-button.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--text);
+}
+
+.self-employment-eisenhower-button.important_urgent,
+.self-employment-eisenhower-node.important_urgent,
+.self-employment-eisenhower-badge.important_urgent {
+  border-color: #dc2626;
+}
+
+.self-employment-eisenhower-button.important_not_urgent,
+.self-employment-eisenhower-node.important_not_urgent,
+.self-employment-eisenhower-badge.important_not_urgent {
+  border-color: #2563eb;
+}
+
+.self-employment-eisenhower-button.not_important_urgent,
+.self-employment-eisenhower-node.not_important_urgent,
+.self-employment-eisenhower-badge.not_important_urgent {
+  border-color: #b87514;
+}
+
+.self-employment-eisenhower-button.not_important_not_urgent,
+.self-employment-eisenhower-node.not_important_not_urgent,
+.self-employment-eisenhower-badge.not_important_not_urgent {
+  border-color: #6f7785;
+}
+
+.self-employment-eisenhower-matrix {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.self-employment-eisenhower-node {
+  display: grid;
+  gap: 5px;
+  min-height: 112px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.self-employment-eisenhower-node strong {
   font-size: 1.25rem;
 }
 
-.self-employment-priority-node span {
+.self-employment-eisenhower-node span,
+.self-employment-kanban-filter-group > span {
   font-size: 0.78rem;
   font-weight: 900;
 }
 
-.self-employment-priority-node.all {
-  border-color: var(--accent);
+.self-employment-eisenhower-node small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
-.self-employment-priority-node.high {
-  border-color: #dc2626;
-  background: #fef2f2;
-}
-
-.self-employment-priority-node.medium {
-  border-color: #eab308;
-  background: #fefce8;
-}
-
-.self-employment-priority-node.low {
-  border-color: #16a34a;
-  background: #f0fdf4;
-}
-
-.self-employment-priority-node.active {
+.self-employment-eisenhower-node.active {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.self-employment-kanban-filter-groups,
+.self-employment-kanban-filter-group {
+  display: grid;
+  gap: 8px;
+}
+
+.self-employment-kanban-filter-chip.label.active {
+  border-color: var(--self-employment-gantt-color);
+  background: color-mix(in srgb, var(--self-employment-gantt-color) 14%, var(--surface));
 }
 
 .self-employment-kanban-board {
@@ -998,44 +1032,12 @@
   text-transform: uppercase;
 }
 
-.self-employment-priority-pill {
+.self-employment-eisenhower-badge {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 3px 7px;
   font-size: 0.72rem;
   font-weight: 950;
-}
-
-.self-employment-priority-pill.high {
-  border-color: #dc2626;
-  color: #991b1b;
-}
-
-.self-employment-priority-pill.medium {
-  border-color: #eab308;
-  color: #854d0e;
-}
-
-.self-employment-priority-pill.low {
-  border-color: #16a34a;
-  color: #166534;
-}
-
-.self-employment-kanban-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.self-employment-kanban-status-button {
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-soft);
-  padding: 5px 8px;
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 900;
-  cursor: pointer;
 }
 
 .self-employment-kanban-status-button.active {
@@ -1152,7 +1154,7 @@
 
 @media (max-width: 980px) {
   .self-employment-time-source-list,
-  .self-employment-priority-rosette {
+  .self-employment-eisenhower-matrix {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1171,7 +1173,7 @@
   }
 
   .self-employment-time-source-list,
-  .self-employment-priority-rosette,
+  .self-employment-eisenhower-matrix,
   .self-employment-label-time-row {
     grid-template-columns: 1fr;
   }

@@ -8,6 +8,7 @@ import type {
   IncomePlanningWeekday,
   JsonCanvasNode,
   SelfEmploymentGanttCardPlan,
+  SelfEmploymentGanttTodoEisenhowerQuadrant,
   SelfEmploymentGanttPhase,
   SelfEmploymentGanttPlan,
   SelfEmploymentGanttStartMode,
@@ -23,6 +24,49 @@ export const SELF_EMPLOYMENT_GANTT_LABEL_COLORS: Record<(typeof SELF_EMPLOYMENT_
   start: "#1f7a68",
   implementation: "#b87514",
   goal: "#2563eb"
+};
+export const SELF_EMPLOYMENT_EISENHOWER_QUADRANTS: SelfEmploymentGanttTodoEisenhowerQuadrant[] = [
+  "important_urgent",
+  "important_not_urgent",
+  "not_important_urgent",
+  "not_important_not_urgent"
+];
+
+const SELF_EMPLOYMENT_EISENHOWER_DETAILS: Record<
+  SelfEmploymentGanttTodoEisenhowerQuadrant,
+  { label: string; meaning: string; action: string; shortLabel: string }
+> = {
+  important_urgent: {
+    label: "Wichtig + dringend",
+    meaning: "Muss sofort passieren",
+    action: "Jetzt erledigen",
+    shortLabel: "Jetzt"
+  },
+  important_not_urgent: {
+    label: "Wichtig + nicht dringend",
+    meaning: "Strategisch relevant, aber planbar",
+    action: "Terminieren / einplanen",
+    shortLabel: "Planen"
+  },
+  not_important_urgent: {
+    label: "Nicht wichtig + dringend",
+    meaning: "Stoert oder kommt von aussen",
+    action: "Delegieren / begrenzen",
+    shortLabel: "Begrenzen"
+  },
+  not_important_not_urgent: {
+    label: "Nicht wichtig + nicht dringend",
+    meaning: "Kaum Nutzen, kein Zeitdruck",
+    action: "Loeschen / spaeter pruefen",
+    shortLabel: "Pruefen"
+  }
+};
+
+const SELF_EMPLOYMENT_EISENHOWER_RANK: Record<SelfEmploymentGanttTodoEisenhowerQuadrant, number> = {
+  important_urgent: 0,
+  important_not_urgent: 1,
+  not_important_urgent: 2,
+  not_important_not_urgent: 3
 };
 
 export type SelfEmploymentGanttLabelId = (typeof SELF_EMPLOYMENT_GANTT_LABEL_ORDER)[number];
@@ -82,7 +126,9 @@ export interface SelfEmploymentProjectWorkPlanTask {
   labelName: string;
   labelColor: string;
   title: string;
-  priority: SelfEmploymentGanttTodo["priority"];
+  eisenhowerQuadrant: SelfEmploymentGanttTodo["eisenhowerQuadrant"];
+  eisenhowerMeaningLabel: string;
+  eisenhowerActionLabel: string;
   status: SelfEmploymentGanttTodo["status"];
   completed: boolean;
   hours: number;
@@ -359,6 +405,36 @@ export function selfEmploymentGanttLabelColor(labelId: string): string {
   return "#6f7785";
 }
 
+export function selfEmploymentEisenhowerQuadrantDetails(quadrant: SelfEmploymentGanttTodoEisenhowerQuadrant): {
+  label: string;
+  meaning: string;
+  action: string;
+  shortLabel: string;
+} {
+  return SELF_EMPLOYMENT_EISENHOWER_DETAILS[quadrant];
+}
+
+export function selfEmploymentEisenhowerQuadrantRank(quadrant: SelfEmploymentGanttTodoEisenhowerQuadrant): number {
+  return SELF_EMPLOYMENT_EISENHOWER_RANK[quadrant];
+}
+
+export function selfEmploymentEisenhowerQuadrantFromValue(
+  value: unknown,
+  fallback: SelfEmploymentGanttTodoEisenhowerQuadrant = "important_not_urgent"
+): SelfEmploymentGanttTodoEisenhowerQuadrant {
+  return isSelfEmploymentEisenhowerQuadrant(value) ? value : fallback;
+}
+
+function selfEmploymentEisenhowerQuadrantFromLegacyPriority(value: unknown): SelfEmploymentGanttTodoEisenhowerQuadrant {
+  if (value === "high") return "important_urgent";
+  if (value === "low") return "not_important_not_urgent";
+  return "important_not_urgent";
+}
+
+function isSelfEmploymentEisenhowerQuadrant(value: unknown): value is SelfEmploymentGanttTodoEisenhowerQuadrant {
+  return typeof value === "string" && SELF_EMPLOYMENT_EISENHOWER_QUADRANTS.includes(value as SelfEmploymentGanttTodoEisenhowerQuadrant);
+}
+
 export function buildSelfEmploymentProjectWorkPlan(
   project: SelfEmploymentProject,
   incomePlanningModel: IncomePlanningModel,
@@ -402,7 +478,9 @@ export function buildSelfEmploymentProjectWorkPlan(
       labelName: label.name,
       labelColor: selfEmploymentGanttLabelColor(label.id),
       title: todo.title,
-      priority: todo.priority,
+      eisenhowerQuadrant: todo.eisenhowerQuadrant,
+      eisenhowerMeaningLabel: selfEmploymentEisenhowerQuadrantDetails(todo.eisenhowerQuadrant).meaning,
+      eisenhowerActionLabel: selfEmploymentEisenhowerQuadrantDetails(todo.eisenhowerQuadrant).action,
       status: todo.status,
       completed: todo.completed,
       hours: roundHours(todoHours),
@@ -514,7 +592,7 @@ function scheduleWorkPlanTasks(
   let cursor = startOfLocalDay(startDate);
   const scheduledOpenTasks: SelfEmploymentProjectWorkPlanTask[] = [];
 
-  for (const task of tasks.filter((item) => !item.completed).sort(compareWorkPlanPriority)) {
+  for (const task of tasks.filter((item) => !item.completed).sort(compareWorkPlanEisenhower)) {
     let guard = 0;
     while (guard < 3700) {
       const dateKey = dateToString(cursor);
@@ -528,7 +606,7 @@ function scheduleWorkPlanTasks(
           overdue: dateKey < todayString
         };
         const nextDay = day ?? { date: dateKey, capacityHours, plannedHours: 0, tasks: [] };
-        nextDay.tasks = [...nextDay.tasks, plannedTask].sort(compareWorkPlanPriority);
+        nextDay.tasks = [...nextDay.tasks, plannedTask].sort(compareWorkPlanEisenhower);
         nextDay.plannedHours = roundHours(nextDay.plannedHours + task.hours);
         dayPlans.set(dateKey, nextDay);
         scheduledOpenTasks.push(plannedTask);
@@ -620,18 +698,22 @@ function buildWorkPlanBottlenecks(input: {
 function sortWorkPlanTasks(tasks: SelfEmploymentProjectWorkPlanTask[]): SelfEmploymentProjectWorkPlanTask[] {
   return [...tasks].sort((first, second) => {
     if (first.completed !== second.completed) return first.completed ? 1 : -1;
+    const rankDiff = selfEmploymentEisenhowerQuadrantRank(first.eisenhowerQuadrant) - selfEmploymentEisenhowerQuadrantRank(second.eisenhowerQuadrant);
+    if (rankDiff !== 0) return rankDiff;
     if (first.plannedDate && second.plannedDate && first.plannedDate !== second.plannedDate) {
       return first.plannedDate.localeCompare(second.plannedDate);
     }
     if (first.plannedDate !== second.plannedDate) return first.plannedDate ? -1 : 1;
-    return compareWorkPlanPriority(first, second);
+    return first.title.localeCompare(second.title, "de");
   });
 }
 
-function compareWorkPlanPriority(first: Pick<SelfEmploymentProjectWorkPlanTask, "priority" | "title">, second: Pick<SelfEmploymentProjectWorkPlanTask, "priority" | "title">): number {
-  const priorityOrder: Record<SelfEmploymentGanttTodo["priority"], number> = { high: 0, medium: 1, low: 2 };
-  const priorityDiff = priorityOrder[first.priority] - priorityOrder[second.priority];
-  if (priorityDiff !== 0) return priorityDiff;
+function compareWorkPlanEisenhower(
+  first: Pick<SelfEmploymentProjectWorkPlanTask, "eisenhowerQuadrant" | "title">,
+  second: Pick<SelfEmploymentProjectWorkPlanTask, "eisenhowerQuadrant" | "title">
+): number {
+  const rankDiff = selfEmploymentEisenhowerQuadrantRank(first.eisenhowerQuadrant) - selfEmploymentEisenhowerQuadrantRank(second.eisenhowerQuadrant);
+  if (rankDiff !== 0) return rankDiff;
   return first.title.localeCompare(second.title, "de");
 }
 
@@ -704,7 +786,7 @@ function normalizeGanttCardPlan(
         normalizeGanttTodo(
           {
             title: legacyNote || fallbackTitle,
-            priority: "medium",
+            eisenhowerQuadrant: "important_not_urgent",
             completed: typeof raw?.completed === "boolean" ? raw.completed : false
           },
           cardId,
@@ -730,12 +812,15 @@ function normalizeGanttTodo(
 ): SelfEmploymentGanttTodo {
   const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : `todo-${cardId}-${index + 1}`;
   const title = String(raw.title ?? raw.text ?? "").trim() || fallbackTitle.trim() || "Todo";
-  const priority = raw.priority === "high" || raw.priority === "low" ? raw.priority : "medium";
+  const eisenhowerQuadrant = selfEmploymentEisenhowerQuadrantFromValue(
+    raw.eisenhowerQuadrant,
+    selfEmploymentEisenhowerQuadrantFromLegacyPriority(raw.priority)
+  );
   const status = normalizeGanttTodoStatus(raw.status, raw.completed === true);
   return {
     id,
     title,
-    priority,
+    eisenhowerQuadrant,
     status,
     completed: status === "done"
   };

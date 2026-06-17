@@ -1,9 +1,11 @@
 import { businessIdeaCanvasNodeText } from "../../domain/businessIdeaCanvas";
 import {
+  SELF_EMPLOYMENT_EISENHOWER_QUADRANTS,
   buildSelfEmploymentProjectGantt,
   normalizeSelfEmploymentGanttPlan,
   normalizedGanttLabelId,
   orderedGanttLabels,
+  selfEmploymentEisenhowerQuadrantDetails,
   selfEmploymentGanttLabelColor,
   visibleSelfEmploymentGanttRows,
   type SelfEmploymentGanttSummary
@@ -420,18 +422,7 @@ function selfEmploymentGanttTodoRow(projectId: string, cardId: string, todo: Sel
       </label>
       <div class="self-employment-gantt-todo-body">
         <div class="self-employment-gantt-todo-meta">
-          <select
-            class="self-employment-gantt-todo-priority ${escapeHtml(todo.priority)}"
-            aria-label="Todo-Prioritaet"
-            data-self-employment-project-id="${escapeHtml(projectId)}"
-            data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
-            data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
-            data-self-employment-gantt-todo-field="priority"
-          >
-            ${selfEmploymentOption("high", "Hoch", todo.priority)}
-            ${selfEmploymentOption("medium", "Mittel", todo.priority)}
-            ${selfEmploymentOption("low", "Niedrig", todo.priority)}
-          </select>
+          ${selfEmploymentGanttTodoEisenhowerButtons(projectId, cardId, todo)}
           <span>${escapeHtml(todo.status === "done" ? "Erledigt" : todo.status === "in_progress" ? "In Arbeit" : "Geplant")}</span>
         </div>
         <input
@@ -466,6 +457,30 @@ function selfEmploymentGanttTodoRow(projectId: string, cardId: string, todo: Sel
           title="Todo loeschen"
         >x</button>
       </div>
+    </div>
+  `;
+}
+
+function selfEmploymentGanttTodoEisenhowerButtons(projectId: string, cardId: string, todo: SelfEmploymentGanttTodo): string {
+  return `
+    <div class="self-employment-gantt-eisenhower-buttons" role="group" aria-label="Eisenhower-Quadrant">
+      ${SELF_EMPLOYMENT_EISENHOWER_QUADRANTS.map((quadrant) => {
+        const detail = selfEmploymentEisenhowerQuadrantDetails(quadrant);
+        const active = todo.eisenhowerQuadrant === quadrant;
+        return `
+          <button
+            class="self-employment-eisenhower-button ${escapeHtml(quadrant)}${active ? " active" : ""}"
+            type="button"
+            title="${escapeHtml(`${detail.label}: ${detail.action}`)}"
+            data-action="self-employment-set-gantt-todo-eisenhower"
+            data-self-employment-project-id="${escapeHtml(projectId)}"
+            data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+            data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+            data-self-employment-eisenhower-quadrant="${escapeHtml(quadrant)}"
+            aria-pressed="${active}"
+          >${escapeHtml(detail.shortLabel)}</button>
+        `;
+      }).join("")}
     </div>
   `;
 }

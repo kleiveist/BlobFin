@@ -190,7 +190,7 @@ describe("self employment project gantt", () => {
         cardId: "a",
         timeBudgetHours: 4,
         completed: false,
-        todos: [{ id: "todo-a-1", title: "A", priority: "medium", status: "planned", completed: false }]
+        todos: [{ id: "todo-a-1", title: "A", eisenhowerQuadrant: "important_not_urgent", status: "planned", completed: false }]
       }
     ]);
   });
@@ -216,11 +216,11 @@ describe("self employment project gantt", () => {
     expect(gantt.cardPlans[0]).toMatchObject({
       cardId: "a",
       completed: true,
-      todos: [{ title: "Legacy Notiz", priority: "medium", status: "done", completed: true }]
+      todos: [{ title: "Legacy Notiz", eisenhowerQuadrant: "important_not_urgent", status: "done", completed: true }]
     });
   });
 
-  it("normalizes todo status and keeps completed in sync", () => {
+  it("normalizes todo status, Eisenhower quadrant, and legacy priorities", () => {
     const canvas = parseBusinessIdeaCanvasFile({
       nodes: [{ id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }],
       edges: []
@@ -236,7 +236,14 @@ describe("self employment project gantt", () => {
             todos: [
               { id: "legacy-done", title: "Legacy erledigt", priority: "high", completed: true },
               { id: "status-done", title: "Status erledigt", priority: "medium", status: "done", completed: false },
-              { id: "status-progress", title: "In Arbeit", priority: "low", status: "in_progress", completed: true }
+              { id: "status-progress", title: "In Arbeit", priority: "low", status: "in_progress", completed: true },
+              {
+                id: "quadrant-direct",
+                title: "Delegieren",
+                eisenhowerQuadrant: "not_important_urgent",
+                status: "planned",
+                completed: false
+              }
             ]
           }
         ]
@@ -248,9 +255,10 @@ describe("self employment project gantt", () => {
     expect(gantt.cardPlans[0]).toMatchObject({
       completed: false,
       todos: [
-        { id: "legacy-done", status: "done", completed: true },
-        { id: "status-done", status: "done", completed: true },
-        { id: "status-progress", status: "in_progress", completed: false }
+        { id: "legacy-done", eisenhowerQuadrant: "important_urgent", status: "done", completed: true },
+        { id: "status-done", eisenhowerQuadrant: "important_not_urgent", status: "done", completed: true },
+        { id: "status-progress", eisenhowerQuadrant: "not_important_not_urgent", status: "in_progress", completed: false },
+        { id: "quadrant-direct", eisenhowerQuadrant: "not_important_urgent", status: "planned", completed: false }
       ]
     });
   });
@@ -297,8 +305,8 @@ describe("self employment project gantt", () => {
           timeBudgetHours: 4,
           completed: false,
           todos: [
-            { id: "todo-done", title: "Erledigt", priority: "low", status: "done", completed: true },
-            { id: "todo-open", title: "Offen", priority: "high", status: "in_progress", completed: false }
+            { id: "todo-done", title: "Erledigt", eisenhowerQuadrant: "not_important_not_urgent", status: "done", completed: true },
+            { id: "todo-open", title: "Offen", eisenhowerQuadrant: "important_urgent", status: "in_progress", completed: false }
           ]
         }
       ]
@@ -353,7 +361,9 @@ describe("self employment project gantt", () => {
     expect(plan.tasks.find((task) => task.todoId === "todo-open")).toMatchObject({
       plannedDate: "2026-07-06",
       overdue: true,
-      priority: "high",
+      eisenhowerQuadrant: "important_urgent",
+      eisenhowerMeaningLabel: "Muss sofort passieren",
+      eisenhowerActionLabel: "Jetzt erledigen",
       status: "in_progress"
     });
     expect(plan.labelHours).toEqual([
@@ -380,7 +390,7 @@ describe("self employment project gantt", () => {
           cardId: "a",
           timeBudgetHours: 8,
           completed: false,
-          todos: [{ id: "todo-open", title: "Offen", priority: "high", status: "planned", completed: false }]
+          todos: [{ id: "todo-open", title: "Offen", eisenhowerQuadrant: "important_urgent", status: "planned", completed: false }]
         }
       ]
     });
