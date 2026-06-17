@@ -254,13 +254,15 @@ export function normalizeAppSectionId(value: unknown, fallback: AppSectionId): A
   if (
     value === "home" ||
     value === "income_planning" ||
-    value === "income_stamp_planner" ||
     value === "self_employment_dashboard" ||
     value === "real_estate_financing" ||
     value === "statutory_pension" ||
     value === "combined_wealth"
   ) {
     return value;
+  }
+  if (value === "income_stamp_planner") {
+    return "income_planning";
   }
   return fallback;
 }

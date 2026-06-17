@@ -133,7 +133,14 @@ export function renderSelfEmploymentDashboard(): void {
     </section>
     ${analysisHtml}
     ${tablesHtml}
-    ${selected ? selfEmploymentProjectDetails(selected, host.getState().selfEmployment.selectedRoadmapAreaId, host.incomePlanningModelForActiveWeek()) : ""}
+    ${selected
+      ? selfEmploymentProjectDetails(
+          selected,
+          host.getState().selfEmployment.selectedRoadmapAreaId,
+          host.incomePlanningModelForActiveWeek(),
+          host.getState().incomePlanning
+        )
+      : ""}
   `;
 }
 

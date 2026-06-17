@@ -26,6 +26,7 @@ import incomePlanningCalendarDragControllerSource from "../features/income-plann
 import incomePlanningDialogControllerSource from "../features/income-planning/dialogController.ts?raw";
 import incomePlanningSanitizerSource from "../features/income-planning/planningSanitizer.ts?raw";
 import incomePlanningRenderControllerSource from "../features/income-planning/renderController.ts?raw";
+import incomePlanningPlanningPopupControllerSource from "../features/income-planning/planningPopupController.ts?raw";
 import incomePlanningStampPlannerControllerSource from "../features/income-planning/stampPlannerController.ts?raw";
 import incomePlanningStampPopupControllerSource from "../features/income-planning/stampPopupController.ts?raw";
 import incomePlanningWeekScenarioControllerSource from "../features/income-planning/weekScenarioController.ts?raw";
@@ -187,7 +188,7 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-module-section="investment_overview"');
     expect(html).toContain('data-action="open-section-income"');
     expect(html).toContain('data-action="open-section-income_planning"');
-    expect(html).toContain('data-action="open-section-income_stamp_planner"');
+    expect(html).not.toContain('data-action="open-section-income_stamp_planner"');
     expect(html).toContain('data-action="open-section-self_employment_dashboard"');
     expect(html).toContain('data-action="open-section-planning_scenarios"');
     expect(html).toContain('data-action="open-section-real_estate_financing"');
@@ -395,7 +396,7 @@ describe("follow-up ui rendering", () => {
     const html = renderAppShell();
 
     expect(html).toContain('data-module-section="income_planning"');
-    expect(html).toContain('data-action="open-section-income_stamp_planner"');
+    expect(html).not.toContain('data-action="open-section-income_stamp_planner"');
     expect(html).toContain("Zeitbudget & Habits");
     expect(html).toContain('id="incomePlanningMetricGrid"');
     expect(html).toContain('id="incomePlanningWorkBlocks"');
@@ -407,6 +408,7 @@ describe("follow-up ui rendering", () => {
     expect(html).toContain('id="incomePlanningCalendarStamps"');
     expect(html).toContain('id="incomePlanningWeeklyPlanner"');
     expect(html).toContain('id="incomePlanningDialogRoot"');
+    expect(html).toContain('id="incomePlanningPlanningPopupRoot"');
     expect(html).toContain('id="incomePlanningHabitIconPicker"');
     expect(html).toContain('id="incomePlanningStampPicker"');
     expect(html).toContain('id="incomePlanningStampMenu"');
@@ -430,11 +432,8 @@ describe("follow-up ui rendering", () => {
     expect(html.indexOf('id="incomePlanningWorkBlocks"')).toBeLessThan(html.indexOf('id="incomePlanningCareerLife"'));
     expect(html.indexOf('id="incomePlanningCareerLife"')).toBeLessThan(html.indexOf('id="incomePlanningAssumptions"'));
     expect(html.indexOf('id="incomePlanningAssumptions"')).toBeLessThan(html.indexOf('id="incomePlanningHabits"'));
-    const incomePlanningIndex = html.indexOf('data-module-section="income_planning"');
-    const stampPlannerButtonIndex = html.indexOf('data-action="open-section-income_stamp_planner"', incomePlanningIndex);
-    const homeButtonIndex = html.indexOf('data-action="open-section-home"', incomePlanningIndex);
-    expect(stampPlannerButtonIndex).toBeGreaterThan(incomePlanningIndex);
-    expect(stampPlannerButtonIndex).toBeLessThan(homeButtonIndex);
+    expect(incomePlanningRenderControllerSource).toContain('data-action="income-planning-open-planning-popup-year"');
+    expect(incomePlanningRenderControllerSource).toContain('data-action="income-planning-open-planning-popup-stamp"');
   });
 
   it("wires week scenario controls into the income planning calendar", () => {
@@ -449,6 +448,8 @@ describe("follow-up ui rendering", () => {
     expect(incomePlanningFeatureSource).toContain("return incomePlanningActiveWeekRange();");
     expect(incomePlanningFeatureSource).toContain('data-action="income-planning-open-week-scenario-dialog"');
     expect(incomePlanningFeatureSource).toContain('data-action="income-planning-save-week-scenario"');
+    expect(incomePlanningFeatureSource).toContain("incomePlanningIsoWeeksForYear");
+    expect(incomePlanningFeatureSource).toContain("setIncomePlanningScenarioForWeekStart");
     expect(incomePlanningFeatureSource).toContain("data-income-planning-dialog-scenario-id");
     expect(incomePlanningFeatureSource).toContain("data-income-planning-stamp-scenario-id");
     expect(incomePlanningFeatureSource).toContain("data-income-stamp-planner-scenario-id");
@@ -458,18 +459,21 @@ describe("follow-up ui rendering", () => {
     expect(incomePlanningFeatureSource).not.toContain("data-income-planning-scenario-suggestion");
   });
 
-  it("renders the stamp planner as an independent page", () => {
+  it("renders the stamp planner only inside the shared planning popup", () => {
     const html = renderAppShell();
 
-    expect(html).toContain('data-module-section="income_stamp_planner"');
-    expect(html).toContain("Stempel Planer");
-    expect(html).toContain('id="incomeStampPlannerControls"');
-    expect(html).toContain('id="incomeStampPlannerGrid"');
-    expect(html).toContain('id="incomeStampPlannerDialogRoot"');
-    expect(html).toContain('data-action="income-stamp-planner-add"');
-    expect(html).toContain('data-action="open-section-income_planning"');
-    expect(html).toContain("Einmalige Stempel fuer kommende Wochen");
-    expect(html).toContain("Monatsuebersicht fuer einmalige Kalender-Stempel");
+    expect(html).not.toContain('data-module-section="income_stamp_planner"');
+    expect(html).not.toContain('data-action="open-section-income_stamp_planner"');
+    expect(html).toContain('id="incomePlanningPlanningPopupRoot"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-planning-planning-popup-${view}"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('planningPopupTab("year", "Jahresplanung"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('planningPopupTab("stamp", "Stempelplaner"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('data-income-planning-year-week-scenario');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('id="incomeStampPlannerControls"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('id="incomeStampPlannerGrid"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('id="incomeStampPlannerDialogRoot"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-stamp-planner-add"');
+    expect(incomePlanningStampPlannerControllerSource).toContain("renderIncomeStampPlannerContent");
   });
 
   it("keeps income planning header icon actions wired", () => {

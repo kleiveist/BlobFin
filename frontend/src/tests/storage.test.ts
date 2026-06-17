@@ -112,7 +112,6 @@ describe("storage", () => {
     for (const section of [
       "income",
       "income_planning",
-      "income_stamp_planner",
       "self_employment_dashboard",
       "planning_scenarios",
       "real_estate_financing",
@@ -127,6 +126,16 @@ describe("storage", () => {
 
       expect(loaded.ui.activeSection).toBe(section);
     }
+  });
+
+  it("normalizes legacy stamp planner section ids to income planning", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ ...state, ui: { ...state.ui, activeSection: "income_stamp_planner" } }));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.ui.activeSection).toBe("income_planning");
   });
 
   it("starts with a self employment example project", () => {

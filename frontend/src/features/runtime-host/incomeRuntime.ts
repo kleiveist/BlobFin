@@ -5,7 +5,6 @@ import {
 import {
   configureIncomePlanningHost,
   renderIncomePlanning,
-  renderIncomeStampPlanner,
   startIncomePlanningCurrentTimeTicker
 } from "../income-planning";
 import { runtimeApi, runtimeHost } from "./hostContext";
@@ -32,7 +31,6 @@ export function configureIncomeRuntime(persistCurrentState: () => void, renderAl
 function renderIncomeRuntime(): void {
   renderIncomeTracker();
   renderIncomePlanning();
-  renderIncomeStampPlanner();
 }
 
 function startIncomeRuntimeTicker(): void {

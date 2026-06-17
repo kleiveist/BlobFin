@@ -40,10 +40,12 @@ describe("app shell", () => {
   it("normalizes current route section ids and aliases", () => {
     expect(appSectionIdFromValue("income")).toBe("income");
     expect(appSectionIdFromValue("income_tracking")).toBe("income");
+    expect(appSectionIdFromValue("income_stamp_planner")).toBe("income_planning");
     expect(appSectionIdFromValue("year_table")).toBe("planning_scenarios");
     expect(appSectionIdFromValue("investment_overview")).toBe("planning_scenarios");
     expect(appSectionIdFromValue("unknown")).toBeNull();
     expect(sectionFromLocationHash("#income_charts")).toBe("income");
+    expect(sectionFromLocationHash("#income_stamp_planner")).toBe("income_planning");
     expect(sectionFromLocationHash("#real_estate_financing")).toBe("real_estate_financing");
     expect(sectionFromLocationHash("")).toBeNull();
   });
@@ -56,7 +58,6 @@ describe("app shell", () => {
       "investment",
       "income-tracker",
       "income-planning",
-      "income-stamp-planner",
       "self-employment",
       "business-canvas",
       "real-estate",

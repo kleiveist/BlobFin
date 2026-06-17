@@ -222,3 +222,133 @@
   box-shadow: var(--shadow);
   padding: 16px;
 }
+
+.income-planning-planning-popup {
+  width: min(1120px, 100%);
+}
+
+.income-planning-popup-head {
+  gap: 12px;
+}
+
+.income-planning-popup-tabs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.income-planning-popup-tab {
+  border: 1px solid var(--row-border);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 950;
+  padding: 8px 10px;
+}
+
+.income-planning-popup-tab:hover,
+.income-planning-popup-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.income-planning-year-view,
+.income-planning-stamp-popup-view {
+  display: grid;
+  gap: 12px;
+}
+
+.income-planning-year-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.income-planning-year-field {
+  min-width: 116px;
+}
+
+.income-planning-year-summary {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.income-planning-year-summary strong {
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 950;
+}
+
+.income-planning-year-scenario-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.income-planning-year-scenario-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--row-border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 900;
+  padding: 6px 9px;
+}
+
+.income-planning-year-scenario-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--income-planning-scenario-color);
+}
+
+.income-planning-year-week-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+  gap: 8px;
+}
+
+.income-planning-year-week-row {
+  display: grid;
+  grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--row-border);
+  border-left: 5px solid var(--income-planning-scenario-color);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.income-planning-year-week-key {
+  display: grid;
+  gap: 2px;
+}
+
+.income-planning-year-week-key strong {
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.income-planning-year-week-key span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.income-planning-stamp-popup-view .income-planning-card-head {
+  align-items: start;
+}

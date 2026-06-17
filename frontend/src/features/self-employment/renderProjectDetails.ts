@@ -1,6 +1,6 @@
 import { escapeHtml, intNumber, money, percent } from "../../lib/format";
 import { positionIconSvg } from "../../lib/positionIcons";
-import type { SelfEmploymentProject, SelfEmploymentRoadmapAreaId } from "../../types";
+import type { IncomePlanningState, SelfEmploymentProject, SelfEmploymentRoadmapAreaId } from "../../types";
 import type { IncomePlanningModel } from "../../domain/incomePlanning";
 import {
   SELF_EMPLOYMENT_EISENHOWER_QUADRANTS,
@@ -30,7 +30,8 @@ import {
 export function selfEmploymentProjectDetails(
   evaluation: SelfEmploymentProjectEvaluation,
   selectedRoadmapAreaId: unknown,
-  incomePlanningModel: IncomePlanningModel
+  incomePlanningModel: IncomePlanningModel,
+  incomePlanningState?: IncomePlanningState
 ): string {
   const { project } = evaluation;
   const selectedArea = selfEmploymentRoadmapAreaIdFromValue(selectedRoadmapAreaId) ?? "idea";
@@ -55,7 +56,7 @@ export function selfEmploymentProjectDetails(
           </div>
           ${selectedArea === "planning" ? renderSelfEmploymentGanttPhaseFilter(project) : ""}
         </header>
-        ${selfEmploymentRoadmapPanel(selectedArea, evaluation, incomePlanningModel)}
+        ${selfEmploymentRoadmapPanel(selectedArea, evaluation, incomePlanningModel, incomePlanningState)}
       </article>
     </section>
   `;
@@ -114,10 +115,11 @@ function selfEmploymentRoadmap(selectedArea: SelfEmploymentRoadmapAreaId): strin
 function selfEmploymentRoadmapPanel(
   areaId: SelfEmploymentRoadmapAreaId,
   evaluation: SelfEmploymentProjectEvaluation,
-  incomePlanningModel: IncomePlanningModel
+  incomePlanningModel: IncomePlanningModel,
+  incomePlanningState?: IncomePlanningState
 ): string {
   const { project } = evaluation;
-  const workPlan = buildSelfEmploymentProjectWorkPlan(project, incomePlanningModel);
+  const workPlan = buildSelfEmploymentProjectWorkPlan(project, incomePlanningModel, new Date(), incomePlanningState);
   if (areaId === "idea") {
     return renderBusinessCanvas(project);
   }

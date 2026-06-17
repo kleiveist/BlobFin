@@ -23,6 +23,11 @@ import {
 } from "./stampPopupController";
 import { updateIncomeStampPlannerScenarioSelection } from "./stampPlannerController";
 import {
+  renderIncomePlanningPlanningPopup,
+  setIncomePlanningPlanningPopupYear,
+  setIncomePlanningYearWeekScenario
+} from "./planningPopupController";
+import {
   incomePlanningUiState,
   type IncomePlanningSleepSlotGroup
 } from "./uiState";
@@ -66,6 +71,13 @@ export {
   showPreviousIncomePlanningWeek,
   updateIncomePlanningWeekScenarioDialogDraft
 } from "./weekScenarioController";
+export {
+  closeIncomePlanningPlanningPopup,
+  openIncomePlanningPlanningPopup,
+  setIncomePlanningPlanningPopupView,
+  showNextIncomePlanningPlanningPopupYear,
+  showPreviousIncomePlanningPlanningPopupYear
+} from "./planningPopupController";
 export {
   renderIncomePlanningAssumptions,
   renderIncomePlanningCalendarStamps,
@@ -134,6 +146,7 @@ export function renderIncomePlanning(): void {
   renderIncomePlanningCalendarStamps();
   renderIncomePlanningSummary(activeWeekModel);
   renderIncomePlanningDialog();
+  renderIncomePlanningPlanningPopup();
   renderIncomePlanningWeekScenarioDialog();
   renderIncomePlanningHabitIconPicker();
   renderIncomePlanningStampPicker();
@@ -161,6 +174,16 @@ export function handleIncomePlanningControl(
 ): boolean {
   if (target.dataset.incomePlanningWeekScenarioDialogField) {
     updateIncomePlanningWeekScenarioDialogDraft(target.dataset.incomePlanningWeekScenarioDialogField, target.value);
+    return true;
+  }
+
+  if (target.dataset.incomePlanningPlanningPopupYear !== undefined) {
+    setIncomePlanningPlanningPopupYear(target.value);
+    return true;
+  }
+
+  if (target.dataset.incomePlanningYearWeekScenario) {
+    setIncomePlanningYearWeekScenario(target.dataset.incomePlanningYearWeekScenario, target.value);
     return true;
   }
 

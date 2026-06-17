@@ -32,8 +32,10 @@ import {
 
 export function renderIncomeStampPlanner(): void {
   requireIncomePlanningHost();
-  const panel = document.querySelector<HTMLElement>('[data-module-section="income_stamp_planner"]');
-  if (!panel) return;
+  renderIncomeStampPlannerContent();
+}
+
+export function renderIncomeStampPlannerContent(): void {
   renderIncomeStampPlannerControls();
   renderIncomeStampPlannerGrid();
   renderIncomeStampPlannerDialog();
@@ -357,7 +359,11 @@ export function openIncomeStampPlannerDialogForEdit(stampId: string, options: { 
     error: ""
   };
   if (options.switchToPlanner) {
-    host.setActiveSection("income_stamp_planner");
+    const date = incomeStampPlannerDateFromString(stamp.date);
+    incomePlanningUiState.planningPopup = {
+      view: "stamp",
+      year: date?.getFullYear() ?? new Date().getFullYear()
+    };
     host.renderAll();
     return;
   }

@@ -12,7 +12,6 @@ export type AppSectionId =
   | "home"
   | "income"
   | "income_planning"
-  | "income_stamp_planner"
   | "self_employment_dashboard"
   | "planning_scenarios"
   | "real_estate_financing"

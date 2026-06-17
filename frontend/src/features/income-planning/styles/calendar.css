@@ -269,11 +269,21 @@
   gap: 10px;
 }
 
+.income-planning-week-toolbar {
+  grid-template-columns: minmax(240px, auto) minmax(0, 1fr) auto;
+}
+
 .income-planning-week-nav {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+.income-planning-week-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .income-planning-week-label,

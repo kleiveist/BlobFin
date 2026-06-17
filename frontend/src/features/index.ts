@@ -1,7 +1,6 @@
 import type { FeatureModule } from "../app/contracts";
 import { combinedWealthFeature } from "./combined-wealth";
 import { incomePlanningFeature } from "./income-planning";
-import { incomeStampPlannerFeature } from "./income-stamp-planner";
 import { incomeTrackerFeature } from "./income-tracker";
 import { investmentFeature } from "./investment";
 import { planningFeature } from "./planning";
@@ -19,7 +18,6 @@ export const featureModules: readonly FeatureModule[] = [
   investmentFeature,
   incomeTrackerFeature,
   incomePlanningFeature,
-  incomeStampPlannerFeature,
   selfEmploymentFeature,
   businessCanvasFeature,
   realEstateFeature,

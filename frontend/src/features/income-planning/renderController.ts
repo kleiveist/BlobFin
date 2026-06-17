@@ -485,6 +485,10 @@ function renderIncomePlanningScenarios(model: IncomePlanningModel): void {
           <strong>${escapeHtml(model.scenarioLabel)}</strong>
           <span>${escapeHtml(scenario.description)}</span>
         </div>
+        <div class="income-planning-week-actions">
+          <button class="button" type="button" data-action="income-planning-open-planning-popup-year">Jahresplanung</button>
+          <button class="button secondary" type="button" data-action="income-planning-open-planning-popup-stamp">Stempelplaner</button>
+        </div>
       </div>
       <div class="income-planning-week-scenario" aria-label="Wochenszenario">
         <div>

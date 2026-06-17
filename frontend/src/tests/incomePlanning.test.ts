@@ -14,8 +14,20 @@ import {
 } from "../domain/incomePlanning";
 import { exportIncomePlanningCsv, incomePlanningFromCsvRows, parseCsv } from "../lib/csv";
 import type { IncomePlanningSlot, IncomePlanningState } from "../types";
+import { incomePlanningIsoWeeksForYear } from "../features/income-planning/weekScenarioController";
 
 describe("income planning", () => {
+  it("builds real ISO calendar weeks for annual planning", () => {
+    const weeks2020 = incomePlanningIsoWeeksForYear(2020);
+    const weeks2021 = incomePlanningIsoWeeksForYear(2021);
+
+    expect(weeks2020).toHaveLength(53);
+    expect(weeks2020[0]).toMatchObject({ weekNumber: 1, weekStartDate: "2019-12-30" });
+    expect(weeks2020[52]).toMatchObject({ weekNumber: 53, weekStartDate: "2020-12-28" });
+    expect(weeks2021).toHaveLength(52);
+    expect(weeks2021[0]).toMatchObject({ weekNumber: 1, weekStartDate: "2021-01-04" });
+  });
+
   it("calculates the default time budget without income amounts", () => {
     const model = buildIncomePlanningModel(defaultIncomePlanningState());
 

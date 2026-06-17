@@ -430,6 +430,67 @@ describe("self employment project gantt", () => {
     expect(plan.endDate).toBe("2026-07-06");
     expect(plan.bottlenecks).not.toContain("Offene Projektzeit uebersteigt das aktuelle Wochenkontingent.");
   });
+
+  it("uses annual week scenario assignments for project end dates", () => {
+    const state = defaultAppState();
+    const project = projectWithCanvas({
+      nodes: [{ id: "a", type: "text", text: "Umsetzungskarte", x: 0, y: 0, width: 100, height: 80 }],
+      nodeMeta: {
+        a: { labelId: "implementation", phaseId: "phase-1", shape: "rounded-rectangle" }
+      },
+      cardPlans: [
+        {
+          cardId: "a",
+          timeBudgetHours: 10,
+          completed: false,
+          todos: [
+            { id: "todo-one", title: "Erster Block", eisenhowerQuadrant: "important_urgent", status: "planned", completed: false },
+            { id: "todo-two", title: "Zweiter Block", eisenhowerQuadrant: "important_not_urgent", status: "planned", completed: false }
+          ]
+        }
+      ]
+    });
+    const incomePlanning = {
+      ...state.incomePlanning,
+      weekScenarioAssignments: [
+        { weekStartDate: "2026-03-02", scenarioId: "self_employed" },
+        { weekStartDate: "2026-03-16", scenarioId: "self_employed" }
+      ],
+      workBlocks: [
+        {
+          id: "project-work",
+          active: true,
+          category: "side_income" as const,
+          name: "Projektzeit",
+          description: "",
+          color: "#123456",
+          slots: [
+            {
+              id: "project-work-monday",
+              day: "monday" as const,
+              startTime: "09:00",
+              endTime: "17:00",
+              flexible: false,
+              durationMinutes: 480,
+              scenarioIds: ["self_employed"]
+            }
+          ]
+        }
+      ],
+      habits: [],
+      manualBlocks: []
+    };
+    const plan = buildSelfEmploymentProjectWorkPlan(
+      { ...project, startDate: "2026-03-02", timeSources: [{ ownerType: "work", ownerId: "project-work" }] },
+      buildIncomePlanningModel(incomePlanning),
+      new Date(2026, 2, 2),
+      incomePlanning
+    );
+
+    expect(plan.availableHoursPerWeek).toBe(8);
+    expect(plan.days.map((day) => day.date)).toEqual(["2026-03-02", "2026-03-16"]);
+    expect(plan.endDate).toBe("2026-03-16");
+  });
 });
 
 function projectWithCanvas(input: {

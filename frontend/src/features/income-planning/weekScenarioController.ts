@@ -6,7 +6,7 @@ import {
   incomePlanningWeekScenarioConfigs
 } from "../../domain/incomePlanning";
 import { escapeHtml, monthName } from "../../lib/format";
-import type { IncomePlanningWeekScenario, IncomePlanningWeekScenarioId, IncomePlanningWeekday } from "../../types";
+import type { IncomePlanningState, IncomePlanningWeekScenario, IncomePlanningWeekScenarioId, IncomePlanningWeekday } from "../../types";
 import { incomePlanningHostRef as host } from "./host";
 import { incomePlanningHeaderIcon, incomePlanningWeekdayLabel } from "./shared";
 import { incomePlanningUiState } from "./uiState";
@@ -21,10 +21,7 @@ export function incomePlanningKnownScenarioIds(): IncomePlanningWeekScenarioId[]
 
 export function incomePlanningActiveWeekScenarioId(): IncomePlanningWeekScenarioId {
   const weekStartDate = incomePlanningActiveWeekStartDate();
-  const assignedScenarioId = (host.getState().incomePlanning.weekScenarioAssignments ?? []).find(
-    (assignment) => assignment.weekStartDate === weekStartDate
-  )?.scenarioId;
-  return incomePlanningKnownScenarioIds().includes(assignedScenarioId ?? "") ? assignedScenarioId ?? "normal" : "normal";
+  return incomePlanningScenarioIdForWeekStart(weekStartDate);
 }
 
 export function incomePlanningActiveWeekStartDate(): string {
@@ -60,8 +57,45 @@ export function showCurrentIncomePlanningWeek(): void {
 }
 
 export function setIncomePlanningWeekScenario(value: string): void {
+  setIncomePlanningScenarioForWeekStart(incomePlanningActiveWeekStartDate(), value);
+}
+
+export interface IncomePlanningIsoWeek {
+  weekNumber: number;
+  weekStartDate: string;
+  start: Date;
+  end: Date;
+}
+
+export function incomePlanningIsoWeeksForYear(year: number): IncomePlanningIsoWeek[] {
+  const safeYear = Number.isFinite(year) ? Math.trunc(year) : new Date().getFullYear();
+  const firstThursdayAnchor = new Date(safeYear, 0, 4);
+  const weeks: IncomePlanningIsoWeek[] = [];
+  for (let cursor = incomeStampPlannerWeekStart(firstThursdayAnchor), weekNumber = 1; weekNumber <= 53; cursor = incomeStampPlannerAddDays(cursor, 7), weekNumber += 1) {
+    const thursday = incomeStampPlannerAddDays(cursor, 3);
+    if (thursday.getFullYear() !== safeYear) break;
+    weeks.push({
+      weekNumber,
+      weekStartDate: incomeStampPlannerDateString(cursor),
+      start: cursor,
+      end: incomeStampPlannerAddDays(cursor, 6)
+    });
+  }
+  return weeks;
+}
+
+export function incomePlanningScenarioIdForWeekStart(
+  weekStartDate: string,
+  state: IncomePlanningState = host.getState().incomePlanning
+): IncomePlanningWeekScenarioId {
+  const knownIds = new Set(incomePlanningWeekScenarioConfigs(state.weekScenarios ?? []).map((scenario) => scenario.id));
+  const assignedScenarioId = (state.weekScenarioAssignments ?? []).find((assignment) => assignment.weekStartDate === weekStartDate)?.scenarioId;
+  return knownIds.has(assignedScenarioId ?? "") ? assignedScenarioId ?? "normal" : "normal";
+}
+
+export function setIncomePlanningScenarioForWeekStart(weekStartDate: string, value: string): void {
   if (!incomePlanningKnownScenarioIds().includes(value)) return;
-  const weekStartDate = incomePlanningActiveWeekStartDate();
+  if (!incomeStampPlannerDateFromString(weekStartDate)) return;
   const assignments = (host.getState().incomePlanning.weekScenarioAssignments ?? []).filter(
     (assignment) => assignment.weekStartDate !== weekStartDate
   );

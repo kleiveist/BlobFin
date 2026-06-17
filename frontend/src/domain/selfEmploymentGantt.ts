@@ -1,10 +1,16 @@
 import { businessIdeaCanvasCardNodes, businessIdeaCanvasNodeText } from "./businessIdeaCanvas";
-import { INCOME_PLANNING_WEEK_DAYS, type IncomePlanningModel } from "./incomePlanning";
+import {
+  buildIncomePlanningModel,
+  INCOME_PLANNING_WEEK_DAYS,
+  incomePlanningWeekScenarioConfigs,
+  type IncomePlanningModel
+} from "./incomePlanning";
 import type {
   BusinessIdeaCanvas,
   BusinessIdeaCanvasLabel,
   BusinessIdeaCanvasMeta,
   BusinessIdeaCanvasPhase,
+  IncomePlanningState,
   IncomePlanningWeekday,
   JsonCanvasNode,
   SelfEmploymentGanttCardPlan,
@@ -438,7 +444,8 @@ function isSelfEmploymentEisenhowerQuadrant(value: unknown): value is SelfEmploy
 export function buildSelfEmploymentProjectWorkPlan(
   project: SelfEmploymentProject,
   incomePlanningModel: IncomePlanningModel,
-  today: Date = new Date()
+  today: Date = new Date(),
+  incomePlanningState?: IncomePlanningState
 ): SelfEmploymentProjectWorkPlan {
   const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
   const labels = orderedGanttLabels(project.businessIdeaCanvasMeta);
@@ -447,12 +454,12 @@ export function buildSelfEmploymentProjectWorkPlan(
   const phaseById = new Map(phases.map((phase) => [phase.id, phase]));
   const plansByCardId = new Map(gantt.cardPlans.map((plan) => [plan.cardId, plan]));
   const selectedSourceKeys = new Set(project.timeSources.map((source) => timeSourceKey(source.ownerType, source.ownerId)));
-  const sources = buildWorkPlanSources(incomePlanningModel, selectedSourceKeys);
-  const selectedActiveKeys = new Set(sources.filter((source) => source.selected).map((source) => timeSourceKey(source.ownerType, source.ownerId)));
-  const capacityByDay = workPlanCapacityByDay(incomePlanningModel, selectedActiveKeys);
-  const availableHoursPerWeek = roundHours([...capacityByDay.values()].reduce((sum, hours) => sum + hours, 0));
   const todayString = dateToString(startOfLocalDay(today));
   const startDate = parseLocalDate(project.startDate) ?? startOfLocalDay(today);
+  const capacityContext = buildWorkPlanCapacityContext(incomePlanningModel, selectedSourceKeys, startDate, incomePlanningState);
+  const sources = capacityContext.sources;
+  const selectedActiveKeys = capacityContext.selectedActiveKeys;
+  const availableHoursPerWeek = capacityContext.availableHoursPerWeek;
 
   const tasks = businessIdeaCanvasCardNodes(project.businessIdeaCanvas).flatMap((node) => {
     const plan = plansByCardId.get(node.id) ?? normalizeGanttCardPlan(
@@ -489,20 +496,21 @@ export function buildSelfEmploymentProjectWorkPlan(
     }));
   });
 
-  const scheduled = scheduleWorkPlanTasks(tasks, startDate, capacityByDay, todayString);
+  const scheduled = capacityContext.scheduleTasks(tasks, startDate, todayString);
   const completedHours = roundHours(scheduled.tasks.filter((task) => task.completed).reduce((sum, task) => sum + task.hours, 0));
   const totalHours = roundHours(scheduled.tasks.reduce((sum, task) => sum + task.hours, 0));
   const openHours = roundHours(Math.max(0, totalHours - completedHours));
   const labelHours = buildWorkPlanLabelHours(scheduled.tasks, labels);
   const cardEfforts = buildWorkPlanCardEfforts(scheduled.tasks);
   const plannedProgressPercent = totalHours > 0
-    ? Math.min(100, (workPlanElapsedCapacityHours(startDate, startOfLocalDay(today), capacityByDay) / totalHours) * 100)
+    ? Math.min(100, (capacityContext.elapsedCapacityHours(startDate, startOfLocalDay(today)) / totalHours) * 100)
     : 100;
   const bottlenecks = buildWorkPlanBottlenecks({
     selectedCount: project.timeSources.length,
     activeSelectedCount: selectedActiveKeys.size,
     availableHoursPerWeek,
-    openHours
+    openHours,
+    hasPlanningCapacity: capacityContext.hasPlanningCapacity
   });
 
   return {
@@ -525,6 +533,98 @@ export function buildSelfEmploymentProjectWorkPlan(
     endDate: scheduled.endDate,
     bottlenecks
   };
+}
+
+interface WorkPlanCapacityContext {
+  sources: SelfEmploymentProjectWorkPlanSource[];
+  selectedActiveKeys: Set<string>;
+  availableHoursPerWeek: number;
+  hasPlanningCapacity: boolean;
+  scheduleTasks(
+    tasks: SelfEmploymentProjectWorkPlanTask[],
+    startDate: Date,
+    todayString: string
+  ): { tasks: SelfEmploymentProjectWorkPlanTask[]; days: SelfEmploymentProjectWorkPlanDay[]; endDate: string | null };
+  elapsedCapacityHours(startDate: Date, today: Date): number;
+}
+
+function buildWorkPlanCapacityContext(
+  model: IncomePlanningModel,
+  selectedSourceKeys: Set<string>,
+  startDate: Date,
+  incomePlanningState?: IncomePlanningState
+): WorkPlanCapacityContext {
+  if (incomePlanningState) {
+    return buildAnnualWorkPlanCapacityContext(incomePlanningState, selectedSourceKeys, startDate);
+  }
+  const sources = buildWorkPlanSources(model, selectedSourceKeys);
+  const selectedActiveKeys = new Set(sources.filter((source) => source.selected).map((source) => timeSourceKey(source.ownerType, source.ownerId)));
+  const capacityByDay = workPlanCapacityByDay(model, selectedActiveKeys);
+  const availableHoursPerWeek = roundHours([...capacityByDay.values()].reduce((sum, hours) => sum + hours, 0));
+  return {
+    sources,
+    selectedActiveKeys,
+    availableHoursPerWeek,
+    hasPlanningCapacity: availableHoursPerWeek > 0,
+    scheduleTasks: (tasks, projectStartDate, todayString) => scheduleWorkPlanTasks(tasks, projectStartDate, capacityByDay, todayString),
+    elapsedCapacityHours: (projectStartDate, today) => workPlanElapsedCapacityHours(projectStartDate, today, capacityByDay)
+  };
+}
+
+function buildAnnualWorkPlanCapacityContext(
+  state: IncomePlanningState,
+  selectedSourceKeys: Set<string>,
+  startDate: Date
+): WorkPlanCapacityContext {
+  const scenarioIds = incomePlanningWeekScenarioConfigs(state.weekScenarios ?? []).map((scenario) => scenario.id);
+  const modelByScenarioId = new Map<string, IncomePlanningModel>();
+  const capacityByScenarioId = new Map<string, Map<IncomePlanningWeekday, number>>();
+  const modelForScenario = (scenarioId: string): IncomePlanningModel => {
+    const cached = modelByScenarioId.get(scenarioId);
+    if (cached) return cached;
+    const next = buildIncomePlanningModel(state, { scenarioId });
+    modelByScenarioId.set(scenarioId, next);
+    return next;
+  };
+  const capacityForScenario = (scenarioId: string, selectedKeys?: Set<string>): Map<IncomePlanningWeekday, number> => {
+    const effectiveSelectedKeys = selectedKeys ?? selectedActiveKeys;
+    const cacheKey = `${scenarioId}:${[...effectiveSelectedKeys].sort().join("|")}`;
+    const cached = capacityByScenarioId.get(cacheKey);
+    if (cached) return cached;
+    const capacity = workPlanCapacityByDay(modelForScenario(scenarioId), effectiveSelectedKeys);
+    capacityByScenarioId.set(cacheKey, capacity);
+    return capacity;
+  };
+  const sources = mergeWorkPlanSources(
+    scenarioIds.flatMap((scenarioId) => buildWorkPlanSources(modelForScenario(scenarioId), selectedSourceKeys))
+  );
+  const selectedActiveKeys = new Set(sources.filter((source) => source.selected).map((source) => timeSourceKey(source.ownerType, source.ownerId)));
+  const capacityForDate = (date: Date): number => {
+    const scenarioId = workPlanScenarioIdForDate(state, date);
+    return capacityForScenario(scenarioId).get(weekdayForDate(date)) ?? 0;
+  };
+  const hasPlanningCapacity = scenarioIds.some((scenarioId) =>
+    [...capacityForScenario(scenarioId).values()].some((hours) => hours > 0)
+  );
+  return {
+    sources,
+    selectedActiveKeys,
+    availableHoursPerWeek: workPlanCapacityForWeek(startDate, capacityForDate),
+    hasPlanningCapacity,
+    scheduleTasks: (tasks, projectStartDate, todayString) =>
+      scheduleWorkPlanTasksByDateCapacity(tasks, projectStartDate, capacityForDate, todayString, hasPlanningCapacity),
+    elapsedCapacityHours: (projectStartDate, today) => workPlanElapsedCapacityHoursByDateCapacity(projectStartDate, today, capacityForDate)
+  };
+}
+
+function mergeWorkPlanSources(sources: SelfEmploymentProjectWorkPlanSource[]): SelfEmploymentProjectWorkPlanSource[] {
+  const byKey = new Map<string, SelfEmploymentProjectWorkPlanSource>();
+  for (const source of sources) {
+    const key = timeSourceKey(source.ownerType, source.ownerId);
+    const current = byKey.get(key);
+    byKey.set(key, current ? { ...current, hoursPerWeek: Math.max(current.hoursPerWeek, source.hoursPerWeek) } : source);
+  }
+  return [...byKey.values()].sort((first, second) => first.name.localeCompare(second.name, "de"));
 }
 
 function buildWorkPlanSources(
@@ -580,7 +680,23 @@ function scheduleWorkPlanTasks(
   todayString: string
 ): { tasks: SelfEmploymentProjectWorkPlanTask[]; days: SelfEmploymentProjectWorkPlanDay[]; endDate: string | null } {
   const weeklyCapacity = [...capacityByDay.values()].reduce((sum, hours) => sum + hours, 0);
-  if (weeklyCapacity <= 0) {
+  return scheduleWorkPlanTasksByDateCapacity(
+    tasks,
+    startDate,
+    (date) => capacityByDay.get(weekdayForDate(date)) ?? 0,
+    todayString,
+    weeklyCapacity > 0
+  );
+}
+
+function scheduleWorkPlanTasksByDateCapacity(
+  tasks: SelfEmploymentProjectWorkPlanTask[],
+  startDate: Date,
+  capacityForDate: (date: Date) => number,
+  todayString: string,
+  hasPlanningCapacity: boolean
+): { tasks: SelfEmploymentProjectWorkPlanTask[]; days: SelfEmploymentProjectWorkPlanDay[]; endDate: string | null } {
+  if (!hasPlanningCapacity) {
     return {
       tasks: sortWorkPlanTasks(tasks),
       days: [],
@@ -594,9 +710,10 @@ function scheduleWorkPlanTasks(
 
   for (const task of tasks.filter((item) => !item.completed).sort(compareWorkPlanEisenhower)) {
     let guard = 0;
+    let scheduled = false;
     while (guard < 3700) {
       const dateKey = dateToString(cursor);
-      const capacityHours = capacityByDay.get(weekdayForDate(cursor)) ?? 0;
+      const capacityHours = capacityForDate(cursor);
       const day = dayPlans.get(dateKey);
       const usedHours = day?.plannedHours ?? 0;
       if (capacityHours > 0 && (usedHours === 0 || usedHours + task.hours <= capacityHours)) {
@@ -611,11 +728,13 @@ function scheduleWorkPlanTasks(
         dayPlans.set(dateKey, nextDay);
         scheduledOpenTasks.push(plannedTask);
         if (nextDay.plannedHours >= capacityHours) cursor = addDays(cursor, 1);
+        scheduled = true;
         break;
       }
       cursor = addDays(cursor, 1);
       guard += 1;
     }
+    if (!scheduled) scheduledOpenTasks.push({ ...task, plannedDate: null, overdue: false });
   }
 
   const completedTasks = tasks.filter((task) => task.completed).map((task) => ({ ...task, plannedDate: null, overdue: false }));
@@ -670,16 +789,31 @@ function buildWorkPlanCardEfforts(tasks: SelfEmploymentProjectWorkPlanTask[]): S
 }
 
 function workPlanElapsedCapacityHours(startDate: Date, today: Date, capacityByDay: Map<IncomePlanningWeekday, number>): number {
+  return workPlanElapsedCapacityHoursByDateCapacity(startDate, today, (date) => capacityByDay.get(weekdayForDate(date)) ?? 0);
+}
+
+function workPlanElapsedCapacityHoursByDateCapacity(
+  startDate: Date,
+  today: Date,
+  capacityForDate: (date: Date) => number
+): number {
   if (today < startDate) return 0;
   let total = 0;
   let cursor = startOfLocalDay(startDate);
   let guard = 0;
   while (cursor <= today && guard < 3700) {
-    total += capacityByDay.get(weekdayForDate(cursor)) ?? 0;
+    total += capacityForDate(cursor);
     cursor = addDays(cursor, 1);
     guard += 1;
   }
   return roundHours(total);
+}
+
+function workPlanCapacityForWeek(date: Date, capacityForDate: (date: Date) => number): number {
+  const weekStart = startOfLocalWeek(date);
+  return roundHours(
+    Array.from({ length: 7 }, (_, index) => capacityForDate(addDays(weekStart, index))).reduce((sum, hours) => sum + hours, 0)
+  );
 }
 
 function buildWorkPlanBottlenecks(input: {
@@ -687,11 +821,12 @@ function buildWorkPlanBottlenecks(input: {
   activeSelectedCount: number;
   availableHoursPerWeek: number;
   openHours: number;
+  hasPlanningCapacity: boolean;
 }): string[] {
   const bottlenecks: string[] = [];
   if (input.selectedCount === 0) bottlenecks.push("Keine Projekt-Zeitquelle ausgewaehlt.");
   else if (input.activeSelectedCount === 0) bottlenecks.push("Ausgewaehlte Zeitquellen sind im aktiven Wochenplan nicht verfuegbar.");
-  if (input.openHours > 0 && input.availableHoursPerWeek <= 0) bottlenecks.push("Offene Projektzeit kann ohne Wochenkontingent nicht geplant werden.");
+  if (input.openHours > 0 && !input.hasPlanningCapacity) bottlenecks.push("Offene Projektzeit kann ohne Wochenkontingent nicht geplant werden.");
   return bottlenecks;
 }
 
@@ -746,6 +881,11 @@ function addDays(date: Date, days: number): Date {
   return next;
 }
 
+function startOfLocalWeek(date: Date): Date {
+  const start = startOfLocalDay(date);
+  return addDays(start, -((start.getDay() + 6) % 7));
+}
+
 function daysBetween(first: Date, second: Date): number {
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.ceil((second.getTime() - first.getTime()) / msPerDay);
@@ -753,6 +893,13 @@ function daysBetween(first: Date, second: Date): number {
 
 function weekdayForDate(date: Date): IncomePlanningWeekday {
   return INCOME_PLANNING_WEEK_DAYS[(date.getDay() + 6) % 7] ?? "monday";
+}
+
+function workPlanScenarioIdForDate(state: IncomePlanningState, date: Date): string {
+  const weekStartDate = dateToString(startOfLocalWeek(date));
+  const knownIds = new Set(incomePlanningWeekScenarioConfigs(state.weekScenarios ?? []).map((scenario) => scenario.id));
+  const assignedScenarioId = (state.weekScenarioAssignments ?? []).find((assignment) => assignment.weekStartDate === weekStartDate)?.scenarioId;
+  return knownIds.has(assignedScenarioId ?? "") ? assignedScenarioId ?? "normal" : "normal";
 }
 
 function normalizeGanttPhase(

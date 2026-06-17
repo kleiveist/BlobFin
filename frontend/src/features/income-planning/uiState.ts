@@ -134,6 +134,7 @@ export type IncomeStampPlannerStampDragState = {
   element: HTMLElement;
   moved: boolean;
 } | null;
+export type IncomePlanningPlanningPopupState = { view: "year" | "stamp"; year: number } | null;
 
 export interface IncomePlanningUiState {
   dialog: IncomePlanningDialogState;
@@ -168,6 +169,7 @@ export interface IncomePlanningUiState {
     scenarioIds: IncomePlanningWeekScenarioId[];
     error: string;
   } | null;
+  planningPopup: IncomePlanningPlanningPopupState;
   weekScenarioDialog: { label: string; error: string } | null;
   currentTimeTimerId: number | null;
 }
@@ -187,6 +189,7 @@ export const incomePlanningUiState: IncomePlanningUiState = {
   stampPlannerStampDragState: null,
   stampPlannerSuppressNextClick: false,
   stampPlannerDialog: null,
+  planningPopup: null,
   weekScenarioDialog: null,
   currentTimeTimerId: null
 };
