@@ -476,7 +476,7 @@ function selfEmploymentKanbanColumn(
   return `
     <section class="self-employment-kanban-column" data-self-employment-kanban-status="${escapeHtml(status)}" aria-label="${escapeHtml(label)}">
       <header>
-        <strong>${escapeHtml(label)}</strong>
+        <strong><span aria-hidden="true">${escapeHtml(selfEmploymentKanbanStatusIcon(status))}</span>${escapeHtml(label)}</strong>
         <span>${escapeHtml(intNumber(columnTasks.length))}</span>
       </header>
       <div class="self-employment-kanban-column-list">
@@ -488,6 +488,12 @@ function selfEmploymentKanbanColumn(
       </div>
     </section>
   `;
+}
+
+function selfEmploymentKanbanStatusIcon(status: SelfEmploymentProjectWorkPlanTask["status"]): string {
+  if (status === "in_progress") return "🟦";
+  if (status === "done") return "✅";
+  return "⬜";
 }
 
 function selfEmploymentKanbanTaskCard(project: SelfEmploymentProject, task: SelfEmploymentProjectWorkPlanTask): string {

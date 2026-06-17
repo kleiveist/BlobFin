@@ -946,6 +946,19 @@
   font-weight: 900;
 }
 
+.self-employment-kanban-column > header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.self-employment-kanban-column > header strong span {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1rem;
+}
+
 .self-employment-kanban-column-list {
   display: grid;
   gap: 8px;
