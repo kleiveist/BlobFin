@@ -16,6 +16,7 @@ export type {
   SelfEmploymentGanttPlan,
   SelfEmploymentGanttStartMode,
   SelfEmploymentGanttTodo,
+  SelfEmploymentGanttTodoStatus,
   SelfEmploymentProjectTimeSource,
   SelfEmploymentInvoice,
   SelfEmploymentInvoiceStatus,

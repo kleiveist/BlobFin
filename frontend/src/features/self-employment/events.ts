@@ -22,6 +22,7 @@ import {
   updateSelfEmploymentGanttCardField,
   updateSelfEmploymentGanttPhaseField,
   updateSelfEmploymentGanttTodoField,
+  updateSelfEmploymentGanttTodoStatus,
   updateSelfEmploymentProjectField,
   updateSelfEmploymentProjectListField
 } from "./controller";
@@ -183,6 +184,10 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
   if (action === "self-employment-toggle-label") {
     toggleSelfEmploymentProjectLabel(button.dataset.selfEmploymentProjectId || "", button.dataset.selfEmploymentLabel || "");
   }
+  if (action === "self-employment-set-task-priority-filter") {
+    selfEmploymentUiState.taskPriorityFilter = selfEmploymentTaskPriorityFilterFromValue(button.dataset.selfEmploymentTaskPriorityFilter);
+    context.scheduler.request();
+  }
   if (action === "self-employment-add-contact") addSelfEmploymentContact(button.dataset.selfEmploymentProjectId || "");
   if (action === "self-employment-remove-contact") {
     removeSelfEmploymentCollectionItem(button.dataset.selfEmploymentProjectId || "", "contacts", button.dataset.selfEmploymentItemId || "");
@@ -205,6 +210,14 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
       button.dataset.selfEmploymentGanttTodoId || ""
     );
   }
+  if (action === "self-employment-set-kanban-status") {
+    updateSelfEmploymentGanttTodoStatus(
+      button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
+      button.dataset.selfEmploymentGanttCardId || "",
+      button.dataset.selfEmploymentGanttTodoId || "",
+      selfEmploymentKanbanStatusFromValue(button.dataset.selfEmploymentKanbanStatus)
+    );
+  }
   if (action === "self-employment-toggle-gantt-phase-filter") {
     toggleSelfEmploymentGanttPhaseFilter(
       button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
@@ -214,6 +227,52 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
   if (action === "self-employment-gantt-open-phase") openSelfEmploymentGanttPhaseEditor(button);
   if (action === "self-employment-gantt-open-card") openSelfEmploymentGanttCardEditor(button);
   if (action === "self-employment-gantt-close-editor") closeSelfEmploymentGanttEditor();
+  return true;
+}
+
+export function onSelfEmploymentDragStart(event: DragEvent, context: AppContext): boolean | void {
+  const card = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-self-employment-kanban-card]");
+  if (!card) return;
+  const projectId = card.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId;
+  const cardId = card.dataset.selfEmploymentGanttCardId || "";
+  const todoId = card.dataset.selfEmploymentGanttTodoId || "";
+  const status = selfEmploymentKanbanStatusFromValue(card.dataset.selfEmploymentKanbanStatus);
+  if (!projectId || !cardId || !todoId) return;
+  selfEmploymentUiState.kanbanDrag = { projectId, cardId, todoId, status };
+  event.dataTransfer?.setData("text/plain", `${projectId}:${cardId}:${todoId}`);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  card.classList.add("dragging");
+  return true;
+}
+
+export function onSelfEmploymentDragOver(event: DragEvent): boolean | void {
+  if (!selfEmploymentUiState.kanbanDrag) return;
+  const column = selfEmploymentKanbanColumnFromEvent(event);
+  if (!column) return;
+  event.preventDefault();
+  column.classList.add("drag-over");
+  return true;
+}
+
+export function onSelfEmploymentDragLeave(event: DragEvent): boolean | void {
+  const column = selfEmploymentKanbanColumnFromEvent(event);
+  column?.classList.remove("drag-over");
+}
+
+export function onSelfEmploymentDrop(event: DragEvent): boolean | void {
+  const column = selfEmploymentKanbanColumnFromEvent(event);
+  const drag = selfEmploymentUiState.kanbanDrag;
+  if (!column || !drag) return;
+  event.preventDefault();
+  const status = selfEmploymentKanbanStatusFromValue(column.dataset.selfEmploymentKanbanStatus);
+  updateSelfEmploymentGanttTodoStatus(drag.projectId, drag.cardId, drag.todoId, status);
+  clearSelfEmploymentKanbanDragState();
+  return true;
+}
+
+export function onSelfEmploymentDragEnd(): boolean | void {
+  if (!selfEmploymentUiState.kanbanDrag) return;
+  clearSelfEmploymentKanbanDragState();
   return true;
 }
 
@@ -250,4 +309,24 @@ function isSelfEmploymentGanttAction(action: string | undefined): boolean {
     action === "self-employment-gantt-open-card" ||
     action === "self-employment-gantt-close-editor"
   );
+}
+
+function selfEmploymentTaskPriorityFilterFromValue(value: unknown): typeof selfEmploymentUiState.taskPriorityFilter {
+  return value === "high" || value === "medium" || value === "low" ? value : "all";
+}
+
+function selfEmploymentKanbanStatusFromValue(value: unknown): "planned" | "in_progress" | "done" {
+  if (value === "done" || value === "in_progress") return value;
+  return "planned";
+}
+
+function selfEmploymentKanbanColumnFromEvent(event: DragEvent): HTMLElement | null {
+  return (event.target as HTMLElement | null)?.closest<HTMLElement>(".self-employment-kanban-column[data-self-employment-kanban-status]") ?? null;
+}
+
+function clearSelfEmploymentKanbanDragState(): void {
+  selfEmploymentUiState.kanbanDrag = null;
+  for (const element of document.querySelectorAll(".self-employment-kanban-column.drag-over, .self-employment-task-dashboard-item.dragging")) {
+    element.classList.remove("drag-over", "dragging");
+  }
 }

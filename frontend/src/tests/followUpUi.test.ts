@@ -15,6 +15,7 @@ import businessCanvasViewportControllerSource from "../features/self-employment/
 import businessCanvasViewSource from "../features/self-employment/business-canvas/view.ts?raw";
 import selfEmploymentConfigSource from "../features/self-employment/config.ts?raw";
 import selfEmploymentControllerSource from "../features/self-employment/controller.ts?raw";
+import selfEmploymentEventsSource from "../features/self-employment/events.ts?raw";
 import selfEmploymentFeasibilityControllerSource from "../features/self-employment/feasibilityController.ts?raw";
 import selfEmploymentGanttControllerSource from "../features/self-employment/ganttController.ts?raw";
 import selfEmploymentRenderFeasibilitySource from "../features/self-employment/renderFeasibility.ts?raw";
@@ -82,6 +83,7 @@ const stylesSource = cssSourcePaths
 
 const selfEmploymentFeatureSource = [
   selfEmploymentControllerSource,
+  selfEmploymentEventsSource,
   selfEmploymentFeasibilityControllerSource,
   selfEmploymentGanttControllerSource,
   selfEmploymentRenderFeasibilitySource,
@@ -295,8 +297,26 @@ describe("follow-up ui rendering", () => {
     expect(selfEmploymentFeatureSource).toContain("data-self-employment-gantt-phase-field");
     expect(selfEmploymentFeatureSource).toContain("data-self-employment-gantt-card-field");
     expect(selfEmploymentFeatureSource).toContain("timeBudgetHours");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-gantt-todo-row");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-gantt-todo-body");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-kanban-board");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-kanban-column");
+    expect(selfEmploymentFeatureSource).toContain('data-self-employment-kanban-card="true"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-set-kanban-status"');
+    expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-set-task-priority-filter"');
+    expect(selfEmploymentFeatureSource).toContain("onSelfEmploymentDragStart");
+    expect(selfEmploymentFeatureSource).toContain("updateSelfEmploymentGanttTodoStatus");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-label-chart-grid");
+    expect(selfEmploymentFeatureSource).toContain("selfEmploymentLabelDonutChart");
+    expect(selfEmploymentFeatureSource).toContain("Benoetigte Wochen");
+    expect(selfEmploymentFeatureSource).toContain("formatSelfEmploymentWeeks");
+    expect(selfEmploymentFeatureSource).not.toContain("Groesstes Label");
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button");
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button.active");
+    expect(stylesSource).toContain(".self-employment-kanban-board");
+    expect(stylesSource).toContain(".self-employment-priority-rosette");
+    expect(stylesSource).toContain(".self-employment-label-chart-grid");
+    expect(stylesSource).toContain("grid-template-columns: repeat(4, minmax(0, 1fr))");
     expect(selfEmploymentFeatureSource).not.toContain('selfEmploymentTextareaField(project, "projectGoal"');
     expect(selfEmploymentFeatureSource).not.toContain('selfEmploymentNumberField(project, "plannedDurationWeeks"');
     expect(businessCanvasViewSource).toContain('data-action="business-canvas-add-node"');

@@ -702,14 +702,19 @@
 
 .self-employment-gantt-todo-list {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .self-employment-gantt-todo-row {
   display: grid;
-  grid-template-columns: auto minmax(94px, 0.35fr) minmax(160px, 1fr) 34px 34px;
-  align-items: center;
-  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 9px;
 }
 
 .self-employment-gantt-todo-row.completed input[type="text"] {
@@ -717,7 +722,52 @@
   text-decoration: line-through;
 }
 
-.self-employment-gantt-todo-row select,
+.self-employment-gantt-todo-body {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.self-employment-gantt-todo-meta,
+.self-employment-gantt-todo-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.self-employment-gantt-todo-meta {
+  justify-content: space-between;
+}
+
+.self-employment-gantt-todo-meta span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.self-employment-gantt-todo-priority {
+  width: auto;
+  min-width: 86px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.self-employment-gantt-todo-priority.high {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.self-employment-gantt-todo-priority.medium {
+  border-color: #eab308;
+  background: #fefce8;
+}
+
+.self-employment-gantt-todo-priority.low {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
 .self-employment-gantt-todo-row input[type="text"] {
   min-width: 0;
   width: 100%;
@@ -729,9 +779,16 @@
 .self-employment-workday-list,
 .self-employment-task-list,
 .self-employment-time-source-list,
-.self-employment-label-time-list {
+.self-employment-label-time-list,
+.self-employment-label-chart-grid,
+.self-employment-label-bar-chart,
+.self-employment-label-progress-chart {
   display: grid;
   gap: 10px;
+}
+
+.self-employment-time-source-list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .self-employment-dashboard-metrics {
@@ -744,7 +801,8 @@
 .self-employment-workday-card,
 .self-employment-task-dashboard-item,
 .self-employment-time-source,
-.self-employment-label-time-row {
+.self-employment-label-time-row,
+.self-employment-label-chart-card {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -762,7 +820,11 @@
 .self-employment-task-dashboard-item small,
 .self-employment-task-dashboard-item > span:last-child,
 .self-employment-label-time-row span,
-.self-employment-label-time-row small {
+.self-employment-label-time-row small,
+.self-employment-label-bar-row span,
+.self-employment-label-progress-row span,
+.self-employment-label-progress-row small,
+.self-employment-label-donut-legend span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 800;
@@ -792,10 +854,116 @@
   gap: 6px;
 }
 
+.self-employment-priority-rosette {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(86px, 1fr));
+  gap: 10px;
+}
+
+.self-employment-priority-node {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-height: 92px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.self-employment-priority-node strong {
+  font-size: 1.25rem;
+}
+
+.self-employment-priority-node span {
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.self-employment-priority-node.all {
+  border-color: var(--accent);
+}
+
+.self-employment-priority-node.high {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.self-employment-priority-node.medium {
+  border-color: #eab308;
+  background: #fefce8;
+}
+
+.self-employment-priority-node.low {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.self-employment-priority-node.active {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.self-employment-kanban-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.self-employment-kanban-column {
+  display: grid;
+  gap: 10px;
+  min-height: 220px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.self-employment-kanban-column.drag-over {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.self-employment-kanban-column > header,
+.self-employment-task-dashboard-item-head,
+.self-employment-label-bar-row,
+.self-employment-label-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.self-employment-kanban-column > header span {
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.self-employment-kanban-column-list {
+  display: grid;
+  gap: 8px;
+}
+
 .self-employment-task-dashboard-item {
   display: grid;
   gap: 5px;
   border-left: 5px solid var(--self-employment-gantt-color);
+}
+
+.self-employment-task-dashboard-item[draggable="true"] {
+  cursor: grab;
+}
+
+.self-employment-task-dashboard-item.dragging {
+  cursor: grabbing;
+  opacity: 0.52;
 }
 
 .self-employment-task-dashboard-item.completed {
@@ -815,6 +983,52 @@
   font-size: 0.74rem;
   font-weight: 950;
   text-transform: uppercase;
+}
+
+.self-employment-priority-pill {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.self-employment-priority-pill.high {
+  border-color: #dc2626;
+  color: #991b1b;
+}
+
+.self-employment-priority-pill.medium {
+  border-color: #eab308;
+  color: #854d0e;
+}
+
+.self-employment-priority-pill.low {
+  border-color: #16a34a;
+  color: #166534;
+}
+
+.self-employment-kanban-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.self-employment-kanban-status-button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  padding: 5px 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.self-employment-kanban-status-button.active {
+  border-color: var(--self-employment-gantt-color);
+  background: color-mix(in srgb, var(--self-employment-gantt-color) 14%, var(--surface));
+  color: var(--text);
 }
 
 .self-employment-time-source {
@@ -857,17 +1071,99 @@
   background: var(--self-employment-gantt-color);
 }
 
-@media (max-width: 680px) {
-  .self-employment-gantt-todo-row {
-    grid-template-columns: auto 1fr 34px 34px;
+.self-employment-label-chart-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.self-employment-label-chart-card {
+  display: grid;
+  gap: 10px;
+}
+
+.self-employment-label-donut {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.self-employment-label-donut svg {
+  width: 110px;
+  height: 110px;
+  transform: rotate(-90deg);
+}
+
+.self-employment-label-donut-legend {
+  display: grid;
+  gap: 6px;
+}
+
+.self-employment-label-donut-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.self-employment-label-donut-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--self-employment-gantt-color);
+}
+
+.self-employment-label-bar-row,
+.self-employment-label-progress-row {
+  display: grid;
+  grid-template-columns: minmax(70px, 0.8fr) minmax(100px, 1fr) auto;
+}
+
+.self-employment-label-bar-row > div,
+.self-employment-label-progress-row > div {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.self-employment-label-bar-row i,
+.self-employment-label-progress-row i {
+  display: block;
+  height: 100%;
+  background: var(--self-employment-gantt-color);
+}
+
+.self-employment-label-progress-row i.open {
+  background: color-mix(in srgb, var(--self-employment-gantt-color) 24%, var(--surface-muted));
+}
+
+@media (max-width: 980px) {
+  .self-employment-time-source-list,
+  .self-employment-priority-rosette {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .self-employment-gantt-todo-row select,
-  .self-employment-gantt-todo-row input[type="text"] {
+  .self-employment-kanban-board {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .self-employment-gantt-todo-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .self-employment-gantt-todo-actions {
     grid-column: 2 / -1;
   }
 
+  .self-employment-time-source-list,
+  .self-employment-priority-rosette,
   .self-employment-label-time-row {
+    grid-template-columns: 1fr;
+  }
+
+  .self-employment-label-donut {
     grid-template-columns: 1fr;
   }
 }

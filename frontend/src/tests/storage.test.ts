@@ -223,7 +223,7 @@ describe("storage", () => {
     expect(loadedProject.gantt.cardPlans.find((plan) => plan.cardId === cardId)).toMatchObject({
       timeBudgetHours: 3.5,
       completed: false,
-      todos: [{ id: `todo-${cardId}-1`, title: "Wichtig", priority: "medium", completed: false }]
+      todos: [{ id: `todo-${cardId}-1`, title: "Wichtig", priority: "medium", status: "planned", completed: false }]
     });
     expect(loadedProject.ganttPhaseFilterIds).toEqual(["phase-1", "phase-2"]);
   });

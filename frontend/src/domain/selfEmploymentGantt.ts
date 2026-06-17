@@ -83,6 +83,7 @@ export interface SelfEmploymentProjectWorkPlanTask {
   labelColor: string;
   title: string;
   priority: SelfEmploymentGanttTodo["priority"];
+  status: SelfEmploymentGanttTodo["status"];
   completed: boolean;
   hours: number;
   plannedDate: string | null;
@@ -402,6 +403,7 @@ export function buildSelfEmploymentProjectWorkPlan(
       labelColor: selfEmploymentGanttLabelColor(label.id),
       title: todo.title,
       priority: todo.priority,
+      status: todo.status,
       completed: todo.completed,
       hours: roundHours(todoHours),
       plannedDate: null,
@@ -612,9 +614,6 @@ function buildWorkPlanBottlenecks(input: {
   if (input.selectedCount === 0) bottlenecks.push("Keine Projekt-Zeitquelle ausgewaehlt.");
   else if (input.activeSelectedCount === 0) bottlenecks.push("Ausgewaehlte Zeitquellen sind im aktiven Wochenplan nicht verfuegbar.");
   if (input.openHours > 0 && input.availableHoursPerWeek <= 0) bottlenecks.push("Offene Projektzeit kann ohne Wochenkontingent nicht geplant werden.");
-  if (input.availableHoursPerWeek > 0 && input.openHours > input.availableHoursPerWeek) {
-    bottlenecks.push("Offene Projektzeit uebersteigt das aktuelle Wochenkontingent.");
-  }
   return bottlenecks;
 }
 
@@ -714,7 +713,7 @@ function normalizeGanttCardPlan(
         )
       ];
   const manuallyCompleted = raw?.completed === true;
-  const normalizedTodos = manuallyCompleted ? todos.map((todo) => ({ ...todo, completed: true })) : todos;
+  const normalizedTodos = manuallyCompleted ? todos.map((todo) => ({ ...todo, status: "done" as const, completed: true })) : todos;
   return {
     cardId,
     timeBudgetHours: normalizedHours(raw?.timeBudgetHours, defaultHours),
@@ -732,12 +731,19 @@ function normalizeGanttTodo(
   const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : `todo-${cardId}-${index + 1}`;
   const title = String(raw.title ?? raw.text ?? "").trim() || fallbackTitle.trim() || "Todo";
   const priority = raw.priority === "high" || raw.priority === "low" ? raw.priority : "medium";
+  const status = normalizeGanttTodoStatus(raw.status, raw.completed === true);
   return {
     id,
     title,
     priority,
-    completed: raw.completed === true
+    status,
+    completed: status === "done"
   };
+}
+
+function normalizeGanttTodoStatus(value: unknown, completed: boolean): SelfEmploymentGanttTodo["status"] {
+  if (value === "done" || value === "in_progress" || value === "planned") return value;
+  return completed ? "done" : "planned";
 }
 
 function dependencyStartHour(

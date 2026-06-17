@@ -190,7 +190,7 @@ describe("self employment project gantt", () => {
         cardId: "a",
         timeBudgetHours: 4,
         completed: false,
-        todos: [{ id: "todo-a-1", title: "A", priority: "medium", completed: false }]
+        todos: [{ id: "todo-a-1", title: "A", priority: "medium", status: "planned", completed: false }]
       }
     ]);
   });
@@ -216,7 +216,42 @@ describe("self employment project gantt", () => {
     expect(gantt.cardPlans[0]).toMatchObject({
       cardId: "a",
       completed: true,
-      todos: [{ title: "Legacy Notiz", priority: "medium", completed: true }]
+      todos: [{ title: "Legacy Notiz", priority: "medium", status: "done", completed: true }]
+    });
+  });
+
+  it("normalizes todo status and keeps completed in sync", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [{ id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }],
+      edges: []
+    });
+    const meta = normalizeBusinessIdeaCanvasMeta({}, canvas);
+
+    const gantt = normalizeSelfEmploymentGanttPlan(
+      {
+        cardPlans: [
+          {
+            cardId: "a",
+            timeBudgetHours: 4,
+            todos: [
+              { id: "legacy-done", title: "Legacy erledigt", priority: "high", completed: true },
+              { id: "status-done", title: "Status erledigt", priority: "medium", status: "done", completed: false },
+              { id: "status-progress", title: "In Arbeit", priority: "low", status: "in_progress", completed: true }
+            ]
+          }
+        ]
+      },
+      canvas,
+      meta
+    );
+
+    expect(gantt.cardPlans[0]).toMatchObject({
+      completed: false,
+      todos: [
+        { id: "legacy-done", status: "done", completed: true },
+        { id: "status-done", status: "done", completed: true },
+        { id: "status-progress", status: "in_progress", completed: false }
+      ]
     });
   });
 
@@ -262,8 +297,8 @@ describe("self employment project gantt", () => {
           timeBudgetHours: 4,
           completed: false,
           todos: [
-            { id: "todo-done", title: "Erledigt", priority: "low", completed: true },
-            { id: "todo-open", title: "Offen", priority: "high", completed: false }
+            { id: "todo-done", title: "Erledigt", priority: "low", status: "done", completed: true },
+            { id: "todo-open", title: "Offen", priority: "high", status: "in_progress", completed: false }
           ]
         }
       ]
@@ -318,7 +353,8 @@ describe("self employment project gantt", () => {
     expect(plan.tasks.find((task) => task.todoId === "todo-open")).toMatchObject({
       plannedDate: "2026-07-06",
       overdue: true,
-      priority: "high"
+      priority: "high",
+      status: "in_progress"
     });
     expect(plan.labelHours).toEqual([
       {
@@ -330,6 +366,59 @@ describe("self employment project gantt", () => {
         openHours: 2
       }
     ]);
+  });
+
+  it("plans multi-week work without flagging weekly capacity as a bottleneck", () => {
+    const state = defaultAppState();
+    const project = projectWithCanvas({
+      nodes: [{ id: "a", type: "text", text: "Umsetzungskarte", x: 0, y: 0, width: 100, height: 80 }],
+      nodeMeta: {
+        a: { labelId: "implementation", phaseId: "phase-1", shape: "rounded-rectangle" }
+      },
+      cardPlans: [
+        {
+          cardId: "a",
+          timeBudgetHours: 8,
+          completed: false,
+          todos: [{ id: "todo-open", title: "Offen", priority: "high", status: "planned", completed: false }]
+        }
+      ]
+    });
+    const incomePlanning = {
+      ...state.incomePlanning,
+      workBlocks: [
+        {
+          id: "project-work",
+          active: true,
+          category: "side_income" as const,
+          name: "Projektzeit",
+          description: "",
+          color: "#123456",
+          slots: [
+            {
+              id: "project-work-monday",
+              day: "monday" as const,
+              startTime: "10:00",
+              endTime: "13:00",
+              flexible: false,
+              durationMinutes: 180
+            }
+          ]
+        }
+      ],
+      habits: [],
+      manualBlocks: []
+    };
+    const plan = buildSelfEmploymentProjectWorkPlan(
+      { ...project, startDate: "2026-07-06", timeSources: [{ ownerType: "work", ownerId: "project-work" }] },
+      buildIncomePlanningModel(incomePlanning),
+      new Date(2026, 6, 6)
+    );
+
+    expect(plan.availableHoursPerWeek).toBe(3);
+    expect(plan.openHours).toBe(8);
+    expect(plan.endDate).toBe("2026-07-06");
+    expect(plan.bottlenecks).not.toContain("Offene Projektzeit uebersteigt das aktuelle Wochenkontingent.");
   });
 });
 

@@ -47,6 +47,11 @@ export interface FeatureModule {
   onInput?(event: Event, context: AppContext): boolean | void;
   onChange?(event: Event, context: AppContext): boolean | void;
   onClick?(event: MouseEvent, context: AppContext): boolean | void;
+  onDragStart?(event: DragEvent, context: AppContext): boolean | void;
+  onDragOver?(event: DragEvent, context: AppContext): boolean | void;
+  onDragLeave?(event: DragEvent, context: AppContext): boolean | void;
+  onDrop?(event: DragEvent, context: AppContext): boolean | void;
+  onDragEnd?(event: DragEvent, context: AppContext): boolean | void;
   onDblClick?(event: MouseEvent, context: AppContext): boolean | void;
   onContextMenu?(event: MouseEvent, context: AppContext): boolean | void;
   onPointerDown?(event: PointerEvent, context: AppContext): boolean | void;

@@ -4,6 +4,11 @@ export interface AppEventHandlers {
   onInput?(event: Event, context: AppContext): boolean | void;
   onChange?(event: Event, context: AppContext): boolean | void;
   onClick?(event: MouseEvent, context: AppContext): boolean | void;
+  onDragStart?(event: DragEvent, context: AppContext): boolean | void;
+  onDragOver?(event: DragEvent, context: AppContext): boolean | void;
+  onDragLeave?(event: DragEvent, context: AppContext): boolean | void;
+  onDrop?(event: DragEvent, context: AppContext): boolean | void;
+  onDragEnd?(event: DragEvent, context: AppContext): boolean | void;
   onDblClick?(event: MouseEvent, context: AppContext): boolean | void;
   onContextMenu?(event: MouseEvent, context: AppContext): boolean | void;
   onPointerDown?(event: PointerEvent, context: AppContext): boolean | void;
@@ -25,6 +30,11 @@ export function bindAppEvents(
   bindRoot("input", "onInput");
   bindRoot("change", "onChange");
   bindRoot("click", "onClick");
+  bindRoot("dragstart", "onDragStart");
+  bindRoot("dragover", "onDragOver");
+  bindRoot("dragleave", "onDragLeave");
+  bindRoot("drop", "onDrop");
+  bindRoot("dragend", "onDragEnd");
   bindRoot("dblclick", "onDblClick");
   bindRoot("contextmenu", "onContextMenu");
   bindRoot("pointerdown", "onPointerDown");

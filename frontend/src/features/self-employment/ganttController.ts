@@ -418,46 +418,54 @@ function selfEmploymentGanttTodoRow(projectId: string, cardId: string, todo: Sel
           data-self-employment-gantt-todo-field="completed"
         />
       </label>
-      <select
-        aria-label="Todo-Prioritaet"
-        data-self-employment-project-id="${escapeHtml(projectId)}"
-        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
-        data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
-        data-self-employment-gantt-todo-field="priority"
-      >
-        ${selfEmploymentOption("high", "Hoch", todo.priority)}
-        ${selfEmploymentOption("medium", "Mittel", todo.priority)}
-        ${selfEmploymentOption("low", "Niedrig", todo.priority)}
-      </select>
-      <input
-        type="text"
-        value="${escapeHtml(todo.title)}"
-        aria-label="Todo"
-        data-self-employment-project-id="${escapeHtml(projectId)}"
-        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
-        data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
-        data-self-employment-gantt-todo-field="title"
-      />
-      <button
-        class="icon-button"
-        type="button"
-        data-action="self-employment-gantt-add-todo"
-        data-self-employment-project-id="${escapeHtml(projectId)}"
-        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
-        data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
-        aria-label="Todo hinzufuegen"
-        title="Todo hinzufuegen"
-      >+</button>
-      <button
-        class="icon-button danger"
-        type="button"
-        data-action="self-employment-gantt-remove-todo"
-        data-self-employment-project-id="${escapeHtml(projectId)}"
-        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
-        data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
-        aria-label="Todo loeschen"
-        title="Todo loeschen"
-      >x</button>
+      <div class="self-employment-gantt-todo-body">
+        <div class="self-employment-gantt-todo-meta">
+          <select
+            class="self-employment-gantt-todo-priority ${escapeHtml(todo.priority)}"
+            aria-label="Todo-Prioritaet"
+            data-self-employment-project-id="${escapeHtml(projectId)}"
+            data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+            data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+            data-self-employment-gantt-todo-field="priority"
+          >
+            ${selfEmploymentOption("high", "Hoch", todo.priority)}
+            ${selfEmploymentOption("medium", "Mittel", todo.priority)}
+            ${selfEmploymentOption("low", "Niedrig", todo.priority)}
+          </select>
+          <span>${escapeHtml(todo.status === "done" ? "Erledigt" : todo.status === "in_progress" ? "In Arbeit" : "Geplant")}</span>
+        </div>
+        <input
+          type="text"
+          value="${escapeHtml(todo.title)}"
+          aria-label="Todo"
+          data-self-employment-project-id="${escapeHtml(projectId)}"
+          data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+          data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+          data-self-employment-gantt-todo-field="title"
+        />
+      </div>
+      <div class="self-employment-gantt-todo-actions">
+        <button
+          class="icon-button"
+          type="button"
+          data-action="self-employment-gantt-add-todo"
+          data-self-employment-project-id="${escapeHtml(projectId)}"
+          data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+          data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+          aria-label="Todo hinzufuegen"
+          title="Todo hinzufuegen"
+        >+</button>
+        <button
+          class="icon-button danger"
+          type="button"
+          data-action="self-employment-gantt-remove-todo"
+          data-self-employment-project-id="${escapeHtml(projectId)}"
+          data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+          data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+          aria-label="Todo loeschen"
+          title="Todo loeschen"
+        >x</button>
+      </div>
     </div>
   `;
 }

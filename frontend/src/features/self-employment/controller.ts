@@ -14,6 +14,7 @@ import type {
   BusinessIdeaCanvasShape,
   PlanningSettings,
   ReservePosition,
+  SelfEmploymentGanttTodoStatus,
   SelfEmploymentGanttTodo,
   SelfEmploymentGanttStartMode,
   SelfEmploymentProject
@@ -538,7 +539,7 @@ export function updateSelfEmploymentGanttCardField(
           return {
             ...plan,
             completed,
-            todos: plan.todos.map((todo) => ({ ...todo, completed }))
+            todos: plan.todos.map((todo) => ({ ...todo, status: completed ? "done" : "planned", completed }))
           };
         }
         return plan;
@@ -571,7 +572,8 @@ export function updateSelfEmploymentGanttTodoField(
           if (todo.id !== todoId) return todo;
           if (field === "title") return { ...todo, title: String(rawValue) };
           if (field === "priority") return { ...todo, priority: selfEmploymentTaskPriorityFromValue(String(rawValue), todo.priority) };
-          if (field === "completed") return { ...todo, completed: rawValue === true || rawValue === "true" };
+          if (field === "completed") return selfEmploymentGanttTodoWithStatus(todo, rawValue === true || rawValue === "true" ? "done" : "planned");
+          if (field === "status") return selfEmploymentGanttTodoWithStatus(todo, selfEmploymentGanttTodoStatusFromValue(String(rawValue), todo.status));
           return todo;
         });
         return { ...plan, todos, completed: todos.every((todo) => todo.completed) };
@@ -597,6 +599,7 @@ export function addSelfEmploymentGanttTodo(projectId: string, cardId: string, af
           id: createId(),
           title: "Neue Aufgabe",
           priority: "medium",
+          status: "planned",
           completed: false
         };
         const afterIndex = plan.todos.findIndex((item) => item.id === afterTodoId);
@@ -626,7 +629,7 @@ export function removeSelfEmploymentGanttTodo(projectId: string, cardId: string,
         const remaining = plan.todos.filter((todo) => todo.id !== todoId);
         const todos = remaining.length
           ? remaining
-          : [{ id: createId(), title: "Neue Aufgabe", priority: "medium" as const, completed: false }];
+          : [{ id: createId(), title: "Neue Aufgabe", priority: "medium" as const, status: "planned" as const, completed: false }];
         return { ...plan, todos, completed: todos.every((todo) => todo.completed) };
       });
       const nextProject = { ...project, gantt: { ...gantt, cardPlans } };
@@ -637,6 +640,28 @@ export function removeSelfEmploymentGanttTodo(projectId: string, cardId: string,
     },
     true
   );
+}
+
+export function updateSelfEmploymentGanttTodoStatus(
+  projectId: string,
+  cardId: string,
+  todoId: string,
+  status: SelfEmploymentGanttTodoStatus
+): void {
+  updateSelfEmploymentGanttTodoField(projectId, cardId, todoId, "status", status, true);
+}
+
+function selfEmploymentGanttTodoWithStatus(todo: SelfEmploymentGanttTodo, status: SelfEmploymentGanttTodoStatus): SelfEmploymentGanttTodo {
+  return {
+    ...todo,
+    status,
+    completed: status === "done"
+  };
+}
+
+function selfEmploymentGanttTodoStatusFromValue(value: string, fallback: SelfEmploymentGanttTodoStatus): SelfEmploymentGanttTodoStatus {
+  if (value === "done" || value === "in_progress" || value === "planned") return value;
+  return fallback;
 }
 
 export function toggleSelfEmploymentTimeSource(

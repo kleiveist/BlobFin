@@ -3,6 +3,11 @@ import {
   closeSelfEmploymentOverlays,
   onSelfEmploymentChange,
   onSelfEmploymentClick,
+  onSelfEmploymentDragEnd,
+  onSelfEmploymentDragLeave,
+  onSelfEmploymentDragOver,
+  onSelfEmploymentDragStart,
+  onSelfEmploymentDrop,
   onSelfEmploymentInput,
   onSelfEmploymentWindowKeyDown
 } from "./events";
@@ -13,6 +18,11 @@ export const selfEmploymentFeature: FeatureModule = {
   onInput: onSelfEmploymentInput,
   onChange: onSelfEmploymentChange,
   onClick: onSelfEmploymentClick,
+  onDragStart: onSelfEmploymentDragStart,
+  onDragOver: onSelfEmploymentDragOver,
+  onDragLeave: onSelfEmploymentDragLeave,
+  onDrop: onSelfEmploymentDrop,
+  onDragEnd: onSelfEmploymentDragEnd,
   onWindowKeyDown: onSelfEmploymentWindowKeyDown,
   closeOverlays: closeSelfEmploymentOverlays
 };

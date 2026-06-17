@@ -7,6 +7,7 @@ import {
   type SelfEmploymentProjectWorkPlan,
   type SelfEmploymentProjectWorkPlanTask
 } from "../../domain/selfEmploymentGantt";
+import { selfEmploymentUiState } from "./uiState";
 import { renderBusinessCanvas } from "./business-canvas";
 import type { SelfEmploymentProjectEvaluation } from "./feasibilityController";
 import {
@@ -120,7 +121,7 @@ function selfEmploymentRoadmapPanel(
   }
   if (areaId === "contacts") return selfEmploymentContactsEditor(project);
   if (areaId === "invoices") return selfEmploymentInvoicesEditor(project);
-  if (areaId === "tasks") return selfEmploymentTasksDashboard(workPlan);
+  if (areaId === "tasks") return selfEmploymentTasksDashboard(project, workPlan);
   if (areaId === "time") {
     return selfEmploymentTimeDashboard(project, workPlan, evaluation);
   }
@@ -294,10 +295,12 @@ function selfEmploymentInvoicesEditor(project: SelfEmploymentProject): string {
   `;
 }
 
-function selfEmploymentTasksDashboard(workPlan: SelfEmploymentProjectWorkPlan): string {
+function selfEmploymentTasksDashboard(project: SelfEmploymentProject, workPlan: SelfEmploymentProjectWorkPlan): string {
   const openTasks = workPlan.tasks.filter((task) => !task.completed);
   const doneTasks = workPlan.tasks.filter((task) => task.completed);
   const overdueTasks = openTasks.filter((task) => task.overdue);
+  const priorityFilter = selfEmploymentUiState.taskPriorityFilter;
+  const visibleTasks = priorityFilter === "all" ? workPlan.tasks : workPlan.tasks.filter((task) => task.priority === priorityFilter);
   return `
     <div class="self-employment-task-dashboard">
       <div class="self-employment-dashboard-metrics">
@@ -307,30 +310,16 @@ function selfEmploymentTasksDashboard(workPlan: SelfEmploymentProjectWorkPlan): 
         ${selfEmploymentDashboardMetric("Wochenkontingent", hoursLabel(workPlan.availableHoursPerWeek), workPlan.endDate ?? "kein Enddatum")}
       </div>
       ${workPlan.bottlenecks.length ? selfEmploymentBottlenecks(workPlan.bottlenecks) : ""}
-      <section class="self-employment-dashboard-section">
+      ${selfEmploymentPriorityRosette(workPlan, priorityFilter)}
+      <section class="self-employment-dashboard-section self-employment-kanban-section">
         <header>
-          <strong>Tagesplanung</strong>
-          <span>${escapeHtml(workPlan.endDate ? `bis ${selfEmploymentDateLabel(workPlan.endDate)}` : "nicht berechenbar")}</span>
+          <strong>Kanban Dashboard</strong>
+          <span>${escapeHtml(`${intNumber(visibleTasks.length)} sichtbare Todos`)}</span>
         </header>
-        <div class="self-employment-workday-list">
-          ${
-            workPlan.days.length
-              ? workPlan.days.map(selfEmploymentWorkPlanDay).join("")
-              : `<p class="self-employment-empty-note">Keine Tagesplanung ohne offene Todos und Zeitkontingent.</p>`
-          }
-        </div>
-      </section>
-      <section class="self-employment-dashboard-section">
-        <header>
-          <strong>Aufgaben nach Prioritaet</strong>
-          <span>${escapeHtml(`${intNumber(workPlan.tasks.length)} Todos aus Karten`)}</span>
-        </header>
-        <div class="self-employment-task-list">
-          ${
-            workPlan.tasks.length
-              ? workPlan.tasks.map(selfEmploymentTaskDashboardItem).join("")
-              : `<p class="self-employment-empty-note">Noch keine Karten-Todos vorhanden.</p>`
-          }
+        <div class="self-employment-kanban-board">
+          ${selfEmploymentKanbanColumn(project, "planned", "Geplant", visibleTasks)}
+          ${selfEmploymentKanbanColumn(project, "in_progress", "In Arbeit", visibleTasks)}
+          ${selfEmploymentKanbanColumn(project, "done", "Erledigt", visibleTasks)}
         </div>
       </section>
     </div>
@@ -355,7 +344,7 @@ function selfEmploymentTimeDashboard(
         ${selfEmploymentDashboardMetric("Geplanter Fortschritt", percent(workPlan.plannedProgressPercent), "nach Startdatum")}
         ${selfEmploymentDashboardMetric("Gesamtstunden", hoursLabel(workPlan.totalHours), `${hoursLabel(workPlan.openHours)} offen`)}
         ${selfEmploymentDashboardMetric("Verfuegbar / Woche", hoursLabel(workPlan.availableHoursPerWeek), `${intNumber(workPlan.sources.filter((source) => source.selected).length)} Quellen`)}
-        ${selfEmploymentDashboardMetric("Groesstes Label", workPlan.largestLabel?.labelName ?? "Keins", workPlan.largestLabel ? hoursLabel(workPlan.largestLabel.totalHours) : "0 h")}
+        ${selfEmploymentNeededWeeksMetric(workPlan)}
         ${selfEmploymentDashboardMetric("Karten mit Aufwand", workPlan.largestCards[0]?.title ?? "Keine", workPlan.largestCards[0] ? hoursLabel(workPlan.largestCards[0].totalHours) : "0 h")}
       </div>
       ${workPlan.bottlenecks.length ? selfEmploymentBottlenecks(workPlan.bottlenecks) : ""}
@@ -377,13 +366,7 @@ function selfEmploymentTimeDashboard(
           <strong>Label-Zeitverteilung</strong>
           <span>${escapeHtml(hoursLabel(workPlan.totalHours))}</span>
         </header>
-        <div class="self-employment-label-time-list">
-          ${
-            workPlan.labelHours.length
-              ? workPlan.labelHours.map((label) => selfEmploymentLabelTimeRow(label, workPlan.totalHours)).join("")
-              : `<p class="self-employment-empty-note">Noch keine Kartenstunden vorhanden.</p>`
-          }
-        </div>
+        ${selfEmploymentLabelTimeCharts(workPlan)}
       </section>
       <section class="self-employment-dashboard-section">
         <header>
@@ -422,6 +405,19 @@ function selfEmploymentDashboardMetric(label: string, value: string, detail: str
   `;
 }
 
+function selfEmploymentNeededWeeksMetric(workPlan: SelfEmploymentProjectWorkPlan): string {
+  if (workPlan.openHours <= 0) return selfEmploymentDashboardMetric("Benoetigte Wochen", "0 Wochen", "alles erledigt");
+  if (workPlan.availableHoursPerWeek <= 0) {
+    return selfEmploymentDashboardMetric("Benoetigte Wochen", "Nicht berechenbar", `${hoursLabel(workPlan.openHours)} offen`);
+  }
+  const weeks = Math.ceil((workPlan.openHours / workPlan.availableHoursPerWeek) * 10) / 10;
+  return selfEmploymentDashboardMetric("Benoetigte Wochen", `${formatSelfEmploymentWeeks(weeks)} Wochen`, `${hoursLabel(workPlan.openHours)} offen`);
+}
+
+function formatSelfEmploymentWeeks(value: number): string {
+  return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(value);
+}
+
 function selfEmploymentBottlenecks(items: string[]): string {
   return `
     <div class="self-employment-bottleneck-list">
@@ -430,28 +426,116 @@ function selfEmploymentBottlenecks(items: string[]): string {
   `;
 }
 
-function selfEmploymentWorkPlanDay(day: SelfEmploymentProjectWorkPlan["days"][number]): string {
+function selfEmploymentPriorityRosette(
+  workPlan: SelfEmploymentProjectWorkPlan,
+  activeFilter: typeof selfEmploymentUiState.taskPriorityFilter
+): string {
+  const options: Array<{ value: typeof selfEmploymentUiState.taskPriorityFilter; label: string; className: string }> = [
+    { value: "all", label: "Alle", className: "all" },
+    { value: "high", label: "Hoch", className: "high" },
+    { value: "medium", label: "Mittel", className: "medium" },
+    { value: "low", label: "Niedrig", className: "low" }
+  ];
   return `
-    <article class="self-employment-workday-card">
+    <section class="self-employment-dashboard-section self-employment-priority-panel">
       <header>
-        <strong>${escapeHtml(selfEmploymentDateLabel(day.date))}</strong>
-        <span>${escapeHtml(`${hoursLabel(day.plannedHours)} / ${hoursLabel(day.capacityHours)}`)}</span>
+        <strong>Aufgaben nach Prioritaet</strong>
+        <span>${escapeHtml(`${intNumber(workPlan.tasks.length)} Todos aus Karten`)}</span>
       </header>
-      <div class="self-employment-task-list compact">
-        ${day.tasks.map(selfEmploymentTaskDashboardItem).join("")}
+      <div class="self-employment-priority-rosette" role="toolbar" aria-label="Aufgaben nach Prioritaet filtern">
+        ${options
+          .map((option) => {
+            const count = option.value === "all" ? workPlan.tasks.length : workPlan.tasks.filter((task) => task.priority === option.value).length;
+            const active = activeFilter === option.value;
+            return `
+              <button
+                class="self-employment-priority-node ${option.className}${active ? " active" : ""}"
+                type="button"
+                data-action="self-employment-set-task-priority-filter"
+                data-self-employment-task-priority-filter="${escapeHtml(option.value)}"
+                aria-pressed="${active}"
+              >
+                <span>${escapeHtml(option.label)}</span>
+                <strong>${escapeHtml(intNumber(count))}</strong>
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function selfEmploymentKanbanColumn(
+  project: SelfEmploymentProject,
+  status: SelfEmploymentProjectWorkPlanTask["status"],
+  label: string,
+  tasks: SelfEmploymentProjectWorkPlanTask[]
+): string {
+  const columnTasks = selfEmploymentSortKanbanTasks(tasks.filter((task) => task.status === status));
+  return `
+    <section class="self-employment-kanban-column" data-self-employment-kanban-status="${escapeHtml(status)}" aria-label="${escapeHtml(label)}">
+      <header>
+        <strong>${escapeHtml(label)}</strong>
+        <span>${escapeHtml(intNumber(columnTasks.length))}</span>
+      </header>
+      <div class="self-employment-kanban-column-list">
+        ${
+          columnTasks.length
+            ? columnTasks.map((task) => selfEmploymentKanbanTaskCard(project, task)).join("")
+            : `<p class="self-employment-empty-note">Keine Todos</p>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function selfEmploymentKanbanTaskCard(project: SelfEmploymentProject, task: SelfEmploymentProjectWorkPlanTask): string {
+  return `
+    <article
+      class="self-employment-task-dashboard-item${task.completed ? " completed" : ""}${task.overdue ? " overdue" : ""}"
+      style="--self-employment-gantt-color:${escapeHtml(task.labelColor)};"
+      draggable="true"
+      data-self-employment-kanban-card="true"
+      data-self-employment-project-id="${escapeHtml(project.id)}"
+      data-self-employment-gantt-card-id="${escapeHtml(task.cardId)}"
+      data-self-employment-gantt-todo-id="${escapeHtml(task.todoId)}"
+      data-self-employment-kanban-status="${escapeHtml(task.status)}"
+    >
+      <div class="self-employment-task-dashboard-item-head">
+        <span class="self-employment-task-label">${escapeHtml(task.labelName)}</span>
+        <span class="self-employment-priority-pill ${escapeHtml(task.priority)}">${escapeHtml(selfEmploymentPriorityLabel(task.priority))}</span>
+      </div>
+      <strong>${escapeHtml(task.title)}</strong>
+      <small>${escapeHtml(`${hoursLabel(task.hours)} · ${task.plannedDate ? selfEmploymentDateLabel(task.plannedDate) : "ohne Tagesplan"}`)}</small>
+      <span>${escapeHtml(task.cardTitle)}</span>
+      <div class="self-employment-kanban-card-actions" role="group" aria-label="Todo-Status setzen">
+        ${selfEmploymentKanbanStatusButton(project, task, "planned", "Geplant")}
+        ${selfEmploymentKanbanStatusButton(project, task, "in_progress", "In Arbeit")}
+        ${selfEmploymentKanbanStatusButton(project, task, "done", "Erledigt")}
       </div>
     </article>
   `;
 }
 
-function selfEmploymentTaskDashboardItem(task: SelfEmploymentProjectWorkPlanTask): string {
+function selfEmploymentKanbanStatusButton(
+  project: SelfEmploymentProject,
+  task: SelfEmploymentProjectWorkPlanTask,
+  status: SelfEmploymentProjectWorkPlanTask["status"],
+  label: string
+): string {
+  const active = task.status === status;
   return `
-    <article class="self-employment-task-dashboard-item${task.completed ? " completed" : ""}${task.overdue ? " overdue" : ""}" style="--self-employment-gantt-color:${escapeHtml(task.labelColor)};">
-      <span class="self-employment-task-label">${escapeHtml(task.labelName)}</span>
-      <strong>${escapeHtml(task.title)}</strong>
-      <small>${escapeHtml(`${selfEmploymentPriorityLabel(task.priority)} · ${hoursLabel(task.hours)} · ${task.plannedDate ? selfEmploymentDateLabel(task.plannedDate) : "erledigt"}`)}</small>
-      <span>${escapeHtml(task.cardTitle)}</span>
-    </article>
+    <button
+      class="self-employment-kanban-status-button${active ? " active" : ""}"
+      type="button"
+      data-action="self-employment-set-kanban-status"
+      data-self-employment-project-id="${escapeHtml(project.id)}"
+      data-self-employment-gantt-card-id="${escapeHtml(task.cardId)}"
+      data-self-employment-gantt-todo-id="${escapeHtml(task.todoId)}"
+      data-self-employment-kanban-status="${escapeHtml(status)}"
+      aria-pressed="${active}"
+    >${escapeHtml(label)}</button>
   `;
 }
 
@@ -476,23 +560,108 @@ function selfEmploymentTimeSource(
   `;
 }
 
-function selfEmploymentLabelTimeRow(
-  label: SelfEmploymentProjectWorkPlan["labelHours"][number],
-  totalHours: number
-): string {
+function selfEmploymentLabelTimeCharts(workPlan: SelfEmploymentProjectWorkPlan): string {
+  if (!workPlan.labelHours.length) return `<p class="self-employment-empty-note">Noch keine Kartenstunden vorhanden.</p>`;
+  return `
+    <div class="self-employment-label-chart-grid">
+      <article class="self-employment-label-chart-card">
+        <strong>Kreis</strong>
+        ${selfEmploymentLabelDonutChart(workPlan)}
+      </article>
+      <article class="self-employment-label-chart-card">
+        <strong>Balken</strong>
+        <div class="self-employment-label-bar-chart">
+          ${workPlan.labelHours.map((label) => selfEmploymentLabelBar(label, workPlan.totalHours)).join("")}
+        </div>
+      </article>
+      <article class="self-employment-label-chart-card">
+        <strong>Erledigt / Offen</strong>
+        <div class="self-employment-label-progress-chart">
+          ${workPlan.labelHours.map(selfEmploymentLabelProgressBar).join("")}
+        </div>
+      </article>
+    </div>
+  `;
+}
+
+function selfEmploymentLabelDonutChart(workPlan: SelfEmploymentProjectWorkPlan): string {
+  const circumference = 100;
+  let offset = 25;
+  const circles = workPlan.labelHours
+    .map((label) => {
+      const share = workPlan.totalHours > 0 ? (label.totalHours / workPlan.totalHours) * circumference : 0;
+      const circle = `
+        <circle
+          r="15.9"
+          cx="20"
+          cy="20"
+          fill="none"
+          stroke="${escapeHtml(label.labelColor)}"
+          stroke-width="7"
+          stroke-dasharray="${share} ${circumference - share}"
+          stroke-dashoffset="${offset}"
+        />`;
+      offset -= share;
+      return circle;
+    })
+    .join("");
+  return `
+    <div class="self-employment-label-donut">
+      <svg viewBox="0 0 40 40" role="img" aria-label="Label-Zeitverteilung Kreisdiagramm">
+        <circle r="15.9" cx="20" cy="20" fill="none" stroke="var(--surface-muted)" stroke-width="7" />
+        ${circles}
+      </svg>
+      <div class="self-employment-label-donut-legend">
+        ${workPlan.labelHours
+          .map(
+            (label) => `
+              <span style="--self-employment-gantt-color:${escapeHtml(label.labelColor)};">
+                <i></i>${escapeHtml(label.labelName)} ${escapeHtml(hoursLabel(label.totalHours))}
+              </span>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function selfEmploymentLabelBar(label: SelfEmploymentProjectWorkPlan["labelHours"][number], totalHours: number): string {
   const width = totalHours > 0 ? Math.round((label.totalHours / totalHours) * 1000) / 10 : 0;
   return `
-    <article class="self-employment-label-time-row" style="--self-employment-gantt-color:${escapeHtml(label.labelColor)};">
-      <div>
-        <strong>${escapeHtml(label.labelName)}</strong>
-        <span>${escapeHtml(`${hoursLabel(label.completedHours)} erledigt · ${hoursLabel(label.openHours)} offen`)}</span>
-      </div>
-      <div class="self-employment-label-time-bar" aria-hidden="true">
-        <span style="width:${escapeHtml(width)}%;"></span>
-      </div>
-      <small>${escapeHtml(`${hoursLabel(label.totalHours)} · ${width.toLocaleString("de-DE")} %`)}</small>
-    </article>
+    <div class="self-employment-label-bar-row" style="--self-employment-gantt-color:${escapeHtml(label.labelColor)};">
+      <span>${escapeHtml(label.labelName)}</span>
+      <div><i style="width:${escapeHtml(width)}%;"></i></div>
+      <strong>${escapeHtml(hoursLabel(label.totalHours))}</strong>
+    </div>
   `;
+}
+
+function selfEmploymentLabelProgressBar(label: SelfEmploymentProjectWorkPlan["labelHours"][number]): string {
+  const doneWidth = label.totalHours > 0 ? Math.round((label.completedHours / label.totalHours) * 1000) / 10 : 0;
+  return `
+    <div class="self-employment-label-progress-row" style="--self-employment-gantt-color:${escapeHtml(label.labelColor)};">
+      <span>${escapeHtml(label.labelName)}</span>
+      <div>
+        <i class="done" style="width:${escapeHtml(doneWidth)}%;"></i>
+        <i class="open" style="width:${escapeHtml(Math.max(0, 100 - doneWidth))}%;"></i>
+      </div>
+      <small>${escapeHtml(`${hoursLabel(label.completedHours)} / ${hoursLabel(label.openHours)}`)}</small>
+    </div>
+  `;
+}
+
+function selfEmploymentSortKanbanTasks(tasks: SelfEmploymentProjectWorkPlanTask[]): SelfEmploymentProjectWorkPlanTask[] {
+  const priorityOrder: Record<SelfEmploymentProjectWorkPlanTask["priority"], number> = { high: 0, medium: 1, low: 2 };
+  return [...tasks].sort((first, second) => {
+    if (first.status === "planned" && second.status === "planned") {
+      if (first.plannedDate && second.plannedDate && first.plannedDate !== second.plannedDate) return first.plannedDate.localeCompare(second.plannedDate);
+      if (first.plannedDate !== second.plannedDate) return first.plannedDate ? -1 : 1;
+    }
+    const priorityDiff = priorityOrder[first.priority] - priorityOrder[second.priority];
+    if (priorityDiff !== 0) return priorityDiff;
+    return first.title.localeCompare(second.title, "de");
+  });
 }
 
 function selfEmploymentPriorityLabel(priority: SelfEmploymentProjectWorkPlanTask["priority"]): string {

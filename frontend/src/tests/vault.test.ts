@@ -68,7 +68,7 @@ describe("vault serializer", () => {
     state.selfEmployment.projects[0].gantt.cardPlans[0] = {
       ...state.selfEmployment.projects[0].gantt.cardPlans[0],
       timeBudgetHours: 4,
-      todos: [{ id: "vault-todo", title: "Nur Sidecar", priority: "medium", completed: false }],
+      todos: [{ id: "vault-todo", title: "Nur Sidecar", priority: "medium", status: "planned", completed: false }],
       completed: false
     };
     const serialized = serializeVaultState(state);
@@ -93,7 +93,7 @@ describe("vault serializer", () => {
     });
     expect(loaded.selfEmployment.projects[0].gantt.cardPlans[0]).toMatchObject({
       timeBudgetHours: 4,
-      todos: [{ id: "vault-todo", title: "Nur Sidecar", priority: "medium", completed: false }]
+      todos: [{ id: "vault-todo", title: "Nur Sidecar", priority: "medium", status: "planned", completed: false }]
     });
     expect(serializedCanvas).toBeDefined();
     expect(JSON.stringify(serializedCanvas)).not.toContain("gantt");

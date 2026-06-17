@@ -80,6 +80,7 @@ export type SelfEmploymentRiskLevel = "low" | "medium" | "high";
 export type SelfEmploymentFeasibility = "realistic" | "borderline" | "unrealistic";
 export type SelfEmploymentTaskPriority = "low" | "medium" | "high";
 export type SelfEmploymentTaskStatus = "open" | "in_progress" | "done";
+export type SelfEmploymentGanttTodoStatus = "planned" | "in_progress" | "done";
 export type SelfEmploymentContactStatus = "lead" | "first_contact" | "offer_sent" | "customer" | "paused";
 export type SelfEmploymentInvoiceStatus = "offer_open" | "offer_accepted" | "invoice_created" | "paid";
 export type SelfEmploymentRoadmapAreaId =
@@ -268,6 +269,7 @@ export interface SelfEmploymentGanttTodo {
   id: string;
   title: string;
   priority: SelfEmploymentTaskPriority;
+  status: SelfEmploymentGanttTodoStatus;
   completed: boolean;
 }
 
