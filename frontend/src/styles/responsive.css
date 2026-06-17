@@ -340,6 +340,8 @@
 
   .income-planning-card-head,
   .income-planning-compact-head,
+  .income-planning-popup-top-row,
+  .income-planning-year-toolbar,
   .income-planning-work-card-main,
   .income-planning-dialog-section-head,
   .income-stamp-planner-control-stack,
@@ -348,6 +350,24 @@
     align-items: flex-start;
     flex-direction: column;
     grid-template-columns: 1fr;
+  }
+
+  .income-planning-year-summary {
+    justify-items: start;
+  }
+
+  .income-planning-year-week-list {
+    grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  }
+
+  .income-planning-year-week-popover {
+    position: static;
+    margin: 0 8px 8px;
+  }
+
+  .income-planning-stamp-popup-controls {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .income-planning-week-nav,
@@ -435,4 +455,3 @@
     grid-template-columns: 1fr;
   }
 }
-

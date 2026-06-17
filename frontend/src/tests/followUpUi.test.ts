@@ -468,7 +468,10 @@ describe("follow-up ui rendering", () => {
     expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-planning-planning-popup-${view}"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('planningPopupTab("year", "Jahresplanung"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('planningPopupTab("stamp", "Stempelplaner"');
-    expect(incomePlanningPlanningPopupControllerSource).toContain('data-income-planning-year-week-scenario');
+    expect(incomePlanningPlanningPopupControllerSource).not.toContain('data-income-planning-year-week-scenario');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-planning-year-week-toggle-scenario"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-planning-year-week-select-scenario"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('class="income-planning-year-week-popover"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('id="incomeStampPlannerControls"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('id="incomeStampPlannerGrid"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('id="incomeStampPlannerDialogRoot"');

@@ -134,7 +134,11 @@ export type IncomeStampPlannerStampDragState = {
   element: HTMLElement;
   moved: boolean;
 } | null;
-export type IncomePlanningPlanningPopupState = { view: "year" | "stamp"; year: number } | null;
+export type IncomePlanningPlanningPopupState = {
+  view: "year" | "stamp";
+  year: number;
+  yearWeekScenarioPicker: string | null;
+} | null;
 
 export interface IncomePlanningUiState {
   dialog: IncomePlanningDialogState;

@@ -38,6 +38,7 @@ import {
   selectIncomeStampPlannerIcon,
   selectIncomeStampPlannerPreset,
   setIncomePlanningPlanningPopupView,
+  setIncomePlanningYearWeekScenario,
   setIncomePlanningWeekScenario,
   showCurrentIncomePlanningWeek,
   showCurrentIncomeStampPlannerMonth,
@@ -49,6 +50,7 @@ import {
   showPreviousIncomePlanningWeek,
   showPreviousIncomeStampPlannerMonth,
   startIncomePlanningCalendarDrag,
+  toggleIncomePlanningYearWeekScenarioPicker,
   updateIncomePlanningDialogDraft,
   updateIncomePlanningStampPickerDraft,
   updateIncomeStampPlannerDialogDraft
@@ -207,6 +209,15 @@ export function onIncomePlanningClick(event: MouseEvent): boolean | void {
   if (action === "income-planning-planning-popup-stamp") setIncomePlanningPlanningPopupView("stamp");
   if (action === "income-planning-planning-popup-prev-year") showPreviousIncomePlanningPlanningPopupYear();
   if (action === "income-planning-planning-popup-next-year") showNextIncomePlanningPlanningPopupYear();
+  if (action === "income-planning-year-week-toggle-scenario") {
+    toggleIncomePlanningYearWeekScenarioPicker(button.dataset.incomePlanningYearWeekStart || "");
+  }
+  if (action === "income-planning-year-week-select-scenario") {
+    setIncomePlanningYearWeekScenario(
+      button.dataset.incomePlanningYearWeekStart || "",
+      button.dataset.incomePlanningYearWeekOptionId || ""
+    );
+  }
   if (action?.startsWith("select-income-planning-week-scenario-")) setIncomePlanningWeekScenario(action.replace("select-income-planning-week-scenario-", ""));
   if (action === "income-planning-open-week-scenario-dialog") openIncomePlanningWeekScenarioDialog();
   if (action === "income-planning-close-week-scenario-dialog") closeIncomePlanningWeekScenarioDialog();

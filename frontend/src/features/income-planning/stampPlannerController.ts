@@ -362,7 +362,8 @@ export function openIncomeStampPlannerDialogForEdit(stampId: string, options: { 
     const date = incomeStampPlannerDateFromString(stamp.date);
     incomePlanningUiState.planningPopup = {
       view: "stamp",
-      year: date?.getFullYear() ?? new Date().getFullYear()
+      year: date?.getFullYear() ?? new Date().getFullYear(),
+      yearWeekScenarioPicker: null
     };
     host.renderAll();
     return;

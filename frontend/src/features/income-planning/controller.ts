@@ -24,8 +24,7 @@ import {
 import { updateIncomeStampPlannerScenarioSelection } from "./stampPlannerController";
 import {
   renderIncomePlanningPlanningPopup,
-  setIncomePlanningPlanningPopupYear,
-  setIncomePlanningYearWeekScenario
+  setIncomePlanningPlanningPopupYear
 } from "./planningPopupController";
 import {
   incomePlanningUiState,
@@ -75,8 +74,10 @@ export {
   closeIncomePlanningPlanningPopup,
   openIncomePlanningPlanningPopup,
   setIncomePlanningPlanningPopupView,
+  setIncomePlanningYearWeekScenario,
   showNextIncomePlanningPlanningPopupYear,
-  showPreviousIncomePlanningPlanningPopupYear
+  showPreviousIncomePlanningPlanningPopupYear,
+  toggleIncomePlanningYearWeekScenarioPicker
 } from "./planningPopupController";
 export {
   renderIncomePlanningAssumptions,
@@ -179,11 +180,6 @@ export function handleIncomePlanningControl(
 
   if (target.dataset.incomePlanningPlanningPopupYear !== undefined) {
     setIncomePlanningPlanningPopupYear(target.value);
-    return true;
-  }
-
-  if (target.dataset.incomePlanningYearWeekScenario) {
-    setIncomePlanningYearWeekScenario(target.dataset.incomePlanningYearWeekScenario, target.value);
     return true;
   }
 
