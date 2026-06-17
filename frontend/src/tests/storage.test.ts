@@ -205,7 +205,9 @@ describe("storage", () => {
           : phase
       ),
       cardPlans: state.selfEmployment.projects[0].gantt.cardPlans.map((plan) =>
-        plan.cardId === cardId ? { ...plan, timeBudgetHours: 3.5, startDate: "2026-07-01", note: "Wichtig" } : plan
+        plan.cardId === cardId
+          ? ({ cardId: plan.cardId, timeBudgetHours: 3.5, startDate: "2026-07-01", note: "Wichtig" } as unknown as typeof plan)
+          : plan
       )
     };
 
@@ -216,13 +218,12 @@ describe("storage", () => {
     expect(loadedProject.gantt.phases.find((phase) => phase.phaseId === "phase-2")).toMatchObject({
       startMode: "after_previous_label",
       triggerPreviousPhaseId: "phase-1",
-      triggerLabelId: "goal",
-      defaultTimeBudgetHours: 2
+      triggerLabelId: "goal"
     });
     expect(loadedProject.gantt.cardPlans.find((plan) => plan.cardId === cardId)).toMatchObject({
       timeBudgetHours: 3.5,
-      startDate: "2026-07-01",
-      note: "Wichtig"
+      completed: false,
+      todos: [{ id: `todo-${cardId}-1`, title: "Wichtig", priority: "medium", completed: false }]
     });
     expect(loadedProject.ganttPhaseFilterIds).toEqual(["phase-1", "phase-2"]);
   });

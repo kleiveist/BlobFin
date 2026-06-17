@@ -1,4 +1,5 @@
 import { clamp, money } from "../../lib/format";
+import { normalizeSelfEmploymentGanttPlan } from "../../domain/selfEmploymentGantt";
 import type {
   SelfEmploymentFeasibility,
   SelfEmploymentInvoice,
@@ -37,8 +38,12 @@ export function evaluateSelfEmploymentProject(
   const openInvoiceAmount = project.invoices
     .filter((invoice) => invoice.status !== "paid")
     .reduce((sum, invoice) => sum + invoice.amount, 0);
-  const openTasks = project.tasks.filter((task) => task.status !== "done");
-  const openTaskHours = openTasks.reduce((sum, task) => sum + task.estimatedHours, 0);
+  const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+  const openTasks = gantt.cardPlans.flatMap((plan) => {
+    const todoHours = plan.todos.length > 0 ? plan.timeBudgetHours / plan.todos.length : plan.timeBudgetHours;
+    return plan.todos.filter((todo) => !todo.completed).map((todo) => ({ todo, hours: todoHours }));
+  });
+  const openTaskHours = openTasks.reduce((sum, task) => sum + task.hours, 0);
   const reasons: string[] = [];
 
   if (project.requiredHoursPerWeek > context.availableTimeHours) {

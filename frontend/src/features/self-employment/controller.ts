@@ -14,6 +14,7 @@ import type {
   BusinessIdeaCanvasShape,
   PlanningSettings,
   ReservePosition,
+  SelfEmploymentGanttTodo,
   SelfEmploymentGanttStartMode,
   SelfEmploymentProject
 } from "../../types";
@@ -129,7 +130,7 @@ export function renderSelfEmploymentDashboard(): void {
     </section>
     ${analysisHtml}
     ${tablesHtml}
-    ${selected ? selfEmploymentProjectDetails(selected, host.getState().selfEmployment.selectedRoadmapAreaId) : ""}
+    ${selected ? selfEmploymentProjectDetails(selected, host.getState().selfEmployment.selectedRoadmapAreaId, host.incomePlanningModelForActiveWeek()) : ""}
   `;
 }
 
@@ -200,16 +201,7 @@ export function addSelfEmploymentProject(): void {
     nextSteps: ["Idee pruefen", "Zeitbedarf schaetzen", "Startbudget klaeren"],
     contacts: [],
     invoices: [],
-    tasks: [
-      {
-        id: createId(),
-        title: "Projektidee konkretisieren",
-        priority: "medium",
-        dueDate: "",
-        estimatedHours: 1,
-        status: "open"
-      }
-    ],
+    tasks: [],
     requiredHoursPerWeek: 4,
     fixedProjectHoursPerWeek: 0,
     flexibleProjectHoursPerWeek: 4,
@@ -218,6 +210,7 @@ export function addSelfEmploymentProject(): void {
     monthlyRunningCosts: 0,
     oneTimeCosts: 0,
     monthlyWorkHours: 16,
+    timeSources: [],
     gantt: normalizeSelfEmploymentGanttPlan({}, canvasDefaults.businessIdeaCanvas, canvasDefaults.businessIdeaCanvasMeta),
     ganttPhaseFilterIds: []
   };
@@ -468,7 +461,6 @@ export function updateSelfEmploymentGanttPhaseField(
         if (phase.phaseId !== phaseId) return phase;
         const value = String(rawValue);
         if (field === "enabled") return { ...phase, enabled: Boolean(rawValue) };
-        if (field === "startDate") return { ...phase, startDate: value.trim() || null };
         if (field === "startMode") {
           const startMode: SelfEmploymentGanttStartMode = value === "after_previous_label" ? "after_previous_label" : "manual";
           return { ...phase, startMode };
@@ -479,12 +471,6 @@ export function updateSelfEmploymentGanttPhaseField(
         if (field === "triggerLabelId") {
           const labelId = normalizedGanttLabelId(value);
           return { ...phase, triggerLabelId: labelIds.has(labelId) ? labelId : phase.triggerLabelId };
-        }
-        if (field === "defaultTimeBudgetHours") {
-          return {
-            ...phase,
-            defaultTimeBudgetHours: selfEmploymentNumberValue(value, phase.defaultTimeBudgetHours, 0, 100000)
-          };
         }
         return phase;
       });
@@ -547,8 +533,14 @@ export function updateSelfEmploymentGanttCardField(
         if (field === "timeBudgetHours") {
           return { ...plan, timeBudgetHours: selfEmploymentNumberValue(value, plan.timeBudgetHours, 0, 100000) };
         }
-        if (field === "startDate") return { ...plan, startDate: value.trim() || null };
-        if (field === "note") return { ...plan, note: value };
+        if (field === "completed") {
+          const completed = rawValue === true || rawValue === "true";
+          return {
+            ...plan,
+            completed,
+            todos: plan.todos.map((todo) => ({ ...todo, completed }))
+          };
+        }
         return plan;
       });
       const nextProject = { ...project, gantt: { ...gantt, cardPlans } };
@@ -558,6 +550,112 @@ export function updateSelfEmploymentGanttCardField(
       };
     },
     renderAfterUpdate
+  );
+}
+
+export function updateSelfEmploymentGanttTodoField(
+  projectId: string,
+  cardId: string,
+  todoId: string,
+  field: string,
+  rawValue: string | boolean,
+  renderAfterUpdate: boolean
+): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+      const cardPlans = gantt.cardPlans.map((plan) => {
+        if (plan.cardId !== cardId) return plan;
+        const todos = plan.todos.map((todo) => {
+          if (todo.id !== todoId) return todo;
+          if (field === "title") return { ...todo, title: String(rawValue) };
+          if (field === "priority") return { ...todo, priority: selfEmploymentTaskPriorityFromValue(String(rawValue), todo.priority) };
+          if (field === "completed") return { ...todo, completed: rawValue === true || rawValue === "true" };
+          return todo;
+        });
+        return { ...plan, todos, completed: todos.every((todo) => todo.completed) };
+      });
+      const nextProject = { ...project, gantt: { ...gantt, cardPlans } };
+      return {
+        ...nextProject,
+        gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, nextProject.businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
+      };
+    },
+    renderAfterUpdate
+  );
+}
+
+export function addSelfEmploymentGanttTodo(projectId: string, cardId: string, afterTodoId = ""): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+      const cardPlans = gantt.cardPlans.map((plan) => {
+        if (plan.cardId !== cardId) return plan;
+        const todo: SelfEmploymentGanttTodo = {
+          id: createId(),
+          title: "Neue Aufgabe",
+          priority: "medium",
+          completed: false
+        };
+        const afterIndex = plan.todos.findIndex((item) => item.id === afterTodoId);
+        const todos =
+          afterIndex >= 0
+            ? [...plan.todos.slice(0, afterIndex + 1), todo, ...plan.todos.slice(afterIndex + 1)]
+            : [...plan.todos, todo];
+        return { ...plan, todos, completed: false };
+      });
+      const nextProject = { ...project, gantt: { ...gantt, cardPlans } };
+      return {
+        ...nextProject,
+        gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, nextProject.businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
+      };
+    },
+    true
+  );
+}
+
+export function removeSelfEmploymentGanttTodo(projectId: string, cardId: string, todoId: string): void {
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+      const cardPlans = gantt.cardPlans.map((plan) => {
+        if (plan.cardId !== cardId) return plan;
+        const remaining = plan.todos.filter((todo) => todo.id !== todoId);
+        const todos = remaining.length
+          ? remaining
+          : [{ id: createId(), title: "Neue Aufgabe", priority: "medium" as const, completed: false }];
+        return { ...plan, todos, completed: todos.every((todo) => todo.completed) };
+      });
+      const nextProject = { ...project, gantt: { ...gantt, cardPlans } };
+      return {
+        ...nextProject,
+        gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, nextProject.businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
+      };
+    },
+    true
+  );
+}
+
+export function toggleSelfEmploymentTimeSource(
+  projectId: string,
+  ownerType: "work" | "habit",
+  ownerId: string,
+  checked: boolean
+): void {
+  if (!ownerId) return;
+  updateSelfEmploymentProject(
+    projectId,
+    (project) => {
+      const sources = project.timeSources.filter((source) => !(source.ownerType === ownerType && source.ownerId === ownerId));
+      return {
+        ...project,
+        timeSources: checked ? [...sources, { ownerType, ownerId }] : sources
+      };
+    },
+    true
   );
 }
 
@@ -663,27 +761,6 @@ export function addSelfEmploymentInvoice(projectId: string): void {
           status: "offer_open",
           dueDate: "",
           amount: 0
-        }
-      ]
-    }),
-    true
-  );
-}
-
-export function addSelfEmploymentTask(projectId: string): void {
-  updateSelfEmploymentProject(
-    projectId,
-    (project) => ({
-      ...project,
-      tasks: [
-        ...project.tasks,
-        {
-          id: createId(),
-          title: "Neue Aufgabe",
-          priority: "medium",
-          dueDate: "",
-          estimatedHours: 1,
-          status: "open"
         }
       ]
     }),

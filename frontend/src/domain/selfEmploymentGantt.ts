@@ -1,27 +1,41 @@
 import { businessIdeaCanvasCardNodes, businessIdeaCanvasNodeText } from "./businessIdeaCanvas";
+import { INCOME_PLANNING_WEEK_DAYS, type IncomePlanningModel } from "./incomePlanning";
 import type {
   BusinessIdeaCanvas,
   BusinessIdeaCanvasLabel,
   BusinessIdeaCanvasMeta,
   BusinessIdeaCanvasPhase,
+  IncomePlanningWeekday,
   JsonCanvasNode,
   SelfEmploymentGanttCardPlan,
   SelfEmploymentGanttPhase,
   SelfEmploymentGanttPlan,
   SelfEmploymentGanttStartMode,
+  SelfEmploymentGanttTodo,
   SelfEmploymentProject
 } from "../types";
 
 export const SELF_EMPLOYMENT_GANTT_DEFAULT_TIME_BUDGET_HOURS = 1;
 export const SELF_EMPLOYMENT_GANTT_LABEL_ORDER = ["idea", "knowledge", "start", "implementation", "goal"] as const;
+export const SELF_EMPLOYMENT_GANTT_LABEL_COLORS: Record<(typeof SELF_EMPLOYMENT_GANTT_LABEL_ORDER)[number], string> = {
+  idea: "#b42318",
+  knowledge: "#eab308",
+  start: "#1f7a68",
+  implementation: "#b87514",
+  goal: "#2563eb"
+};
+
+export type SelfEmploymentGanttLabelId = (typeof SELF_EMPLOYMENT_GANTT_LABEL_ORDER)[number];
 
 export interface SelfEmploymentGanttCardSegment {
   cardId: string;
   title: string;
   timeBudgetHours: number;
   widthPercent: number;
-  startDate: string | null;
-  note: string;
+  completed: boolean;
+  todoCount: number;
+  completedTodoCount: number;
+  progressPercent: number;
 }
 
 export interface SelfEmploymentGanttLabelSegment {
@@ -39,11 +53,9 @@ export interface SelfEmploymentGanttPhaseRow {
   phaseId: string;
   phaseName: string;
   enabled: boolean;
-  startDate: string | null;
   startMode: SelfEmploymentGanttStartMode;
   triggerPreviousPhaseId: string | null;
   triggerLabelId: string | null;
-  defaultTimeBudgetHours: number;
   cardHours: number;
   scheduledHours: number;
   startHour: number;
@@ -58,6 +70,77 @@ export interface SelfEmploymentGanttSummary {
   totalCardHours: number;
   projectSpanHours: number;
   rows: SelfEmploymentGanttPhaseRow[];
+}
+
+export interface SelfEmploymentProjectWorkPlanTask {
+  todoId: string;
+  cardId: string;
+  cardTitle: string;
+  phaseId: string;
+  phaseName: string;
+  labelId: string;
+  labelName: string;
+  labelColor: string;
+  title: string;
+  priority: SelfEmploymentGanttTodo["priority"];
+  completed: boolean;
+  hours: number;
+  plannedDate: string | null;
+  overdue: boolean;
+}
+
+export interface SelfEmploymentProjectWorkPlanDay {
+  date: string;
+  capacityHours: number;
+  plannedHours: number;
+  tasks: SelfEmploymentProjectWorkPlanTask[];
+}
+
+export interface SelfEmploymentProjectWorkPlanSource {
+  ownerType: "work" | "habit";
+  ownerId: string;
+  name: string;
+  hoursPerWeek: number;
+  selected: boolean;
+}
+
+export interface SelfEmploymentProjectWorkPlanLabelHours {
+  labelId: string;
+  labelName: string;
+  labelColor: string;
+  totalHours: number;
+  completedHours: number;
+  openHours: number;
+}
+
+export interface SelfEmploymentProjectWorkPlanCardEffort {
+  cardId: string;
+  title: string;
+  labelId: string;
+  labelName: string;
+  labelColor: string;
+  totalHours: number;
+  completedHours: number;
+  openHours: number;
+  progressPercent: number;
+}
+
+export interface SelfEmploymentProjectWorkPlan {
+  tasks: SelfEmploymentProjectWorkPlanTask[];
+  days: SelfEmploymentProjectWorkPlanDay[];
+  sources: SelfEmploymentProjectWorkPlanSource[];
+  labelHours: SelfEmploymentProjectWorkPlanLabelHours[];
+  largestLabel: SelfEmploymentProjectWorkPlanLabelHours | null;
+  largestCards: SelfEmploymentProjectWorkPlanCardEffort[];
+  totalHours: number;
+  completedHours: number;
+  openHours: number;
+  progressPercent: number;
+  plannedProgressPercent: number;
+  availableHoursPerWeek: number;
+  remainingDays: number | null;
+  endDate: string | null;
+  bottlenecks: string[];
 }
 
 interface PendingPhaseRow {
@@ -92,13 +175,9 @@ export function normalizeSelfEmploymentGanttPlan(
   const phases = orderedPhases(meta).map((phase, index, allPhases) =>
     normalizeGanttPhase(rawPhaseById.get(phase.id), phase, allPhases[index - 1]?.id ?? null)
   );
-  const phasesById = new Map(phases.map((phase) => [phase.phaseId, phase]));
   const cardPlans = businessIdeaCanvasCardNodes(canvas).map((node) => {
     const raw = rawCardById.get(node.id);
-    const nodeMeta = meta.nodeMeta[node.id];
-    const phaseDefault = phasesById.get(nodeMeta?.phaseId ?? meta.activePhaseId)?.defaultTimeBudgetHours
-      ?? SELF_EMPLOYMENT_GANTT_DEFAULT_TIME_BUDGET_HOURS;
-    return normalizeGanttCardPlan(raw, node.id, phaseDefault);
+    return normalizeGanttCardPlan(raw, node.id, SELF_EMPLOYMENT_GANTT_DEFAULT_TIME_BUDGET_HOURS, businessIdeaCanvasNodeText(node));
   });
   return { phases, cardPlans };
 }
@@ -134,14 +213,24 @@ export function buildSelfEmploymentProjectGantt(project: SelfEmploymentProject):
     const labelSegments = labels.map((label) => {
       const cards = cardsByPhaseAndLabel.get(phaseLabelKey(phase.id, label.id)) ?? [];
       const cardSegments = cards.map((node) => {
-        const plan = plansByCardId.get(node.id) ?? normalizeGanttCardPlan(null, node.id, settings.defaultTimeBudgetHours);
+        const plan =
+          plansByCardId.get(node.id) ??
+          normalizeGanttCardPlan(
+            null,
+            node.id,
+            SELF_EMPLOYMENT_GANTT_DEFAULT_TIME_BUDGET_HOURS,
+            businessIdeaCanvasNodeText(node)
+          );
+        const completedTodoCount = plan.todos.filter((todo) => todo.completed).length;
         return {
           cardId: node.id,
           title: businessIdeaCanvasNodeText(node),
           timeBudgetHours: plan.timeBudgetHours,
           widthPercent: 0,
-          startDate: plan.startDate,
-          note: plan.note
+          completed: plan.completed,
+          todoCount: plan.todos.length,
+          completedTodoCount,
+          progressPercent: plan.todos.length > 0 ? (completedTodoCount / plan.todos.length) * 100 : plan.completed ? 100 : 0
         };
       });
       const totalHours = cardSegments.reduce((sum, card) => sum + card.timeBudgetHours, 0);
@@ -187,11 +276,9 @@ export function buildSelfEmploymentProjectGantt(project: SelfEmploymentProject):
       phaseId: pending.phase.id,
       phaseName: pending.phase.name,
       enabled: pending.settings.enabled,
-      startDate: pending.settings.startDate,
       startMode: pending.settings.startMode,
       triggerPreviousPhaseId: pending.settings.triggerPreviousPhaseId,
       triggerLabelId: pending.settings.triggerLabelId,
-      defaultTimeBudgetHours: pending.settings.defaultTimeBudgetHours,
       cardHours: pending.cardHours,
       scheduledHours,
       startHour,
@@ -266,36 +353,390 @@ export function normalizedGanttLabelId(value: unknown): string {
   return labelId === "active" ? "goal" : labelId;
 }
 
+export function selfEmploymentGanttLabelColor(labelId: string): string {
+  if (isSelfEmploymentGanttLabelId(labelId)) return SELF_EMPLOYMENT_GANTT_LABEL_COLORS[labelId];
+  return "#6f7785";
+}
+
+export function buildSelfEmploymentProjectWorkPlan(
+  project: SelfEmploymentProject,
+  incomePlanningModel: IncomePlanningModel,
+  today: Date = new Date()
+): SelfEmploymentProjectWorkPlan {
+  const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+  const labels = orderedGanttLabels(project.businessIdeaCanvasMeta);
+  const labelById = new Map(labels.map((label) => [label.id, label]));
+  const phases = orderedPhases(project.businessIdeaCanvasMeta);
+  const phaseById = new Map(phases.map((phase) => [phase.id, phase]));
+  const plansByCardId = new Map(gantt.cardPlans.map((plan) => [plan.cardId, plan]));
+  const selectedSourceKeys = new Set(project.timeSources.map((source) => timeSourceKey(source.ownerType, source.ownerId)));
+  const sources = buildWorkPlanSources(incomePlanningModel, selectedSourceKeys);
+  const selectedActiveKeys = new Set(sources.filter((source) => source.selected).map((source) => timeSourceKey(source.ownerType, source.ownerId)));
+  const capacityByDay = workPlanCapacityByDay(incomePlanningModel, selectedActiveKeys);
+  const availableHoursPerWeek = roundHours([...capacityByDay.values()].reduce((sum, hours) => sum + hours, 0));
+  const todayString = dateToString(startOfLocalDay(today));
+  const startDate = parseLocalDate(project.startDate) ?? startOfLocalDay(today);
+
+  const tasks = businessIdeaCanvasCardNodes(project.businessIdeaCanvas).flatMap((node) => {
+    const plan = plansByCardId.get(node.id) ?? normalizeGanttCardPlan(
+      null,
+      node.id,
+      SELF_EMPLOYMENT_GANTT_DEFAULT_TIME_BUDGET_HOURS,
+      businessIdeaCanvasNodeText(node)
+    );
+    const nodeMeta = project.businessIdeaCanvasMeta.nodeMeta[node.id];
+    const labelId = normalizedGanttLabelId(nodeMeta?.labelId ?? project.businessIdeaCanvasMeta.activeLabelId);
+    const label = labelById.get(labelId) ?? labels[0] ?? CANONICAL_GANTT_LABELS[0];
+    const phaseId = nodeMeta?.phaseId ?? project.businessIdeaCanvasMeta.activePhaseId;
+    const phase = phaseById.get(phaseId) ?? phases[0];
+    const cardTitle = businessIdeaCanvasNodeText(node).trim() || "Karte";
+    const todoHours = plan.todos.length > 0 ? plan.timeBudgetHours / plan.todos.length : plan.timeBudgetHours;
+    return plan.todos.map((todo) => ({
+      todoId: todo.id,
+      cardId: plan.cardId,
+      cardTitle,
+      phaseId,
+      phaseName: phase?.name ?? "Phase",
+      labelId: label.id,
+      labelName: label.name,
+      labelColor: selfEmploymentGanttLabelColor(label.id),
+      title: todo.title,
+      priority: todo.priority,
+      completed: todo.completed,
+      hours: roundHours(todoHours),
+      plannedDate: null,
+      overdue: false
+    }));
+  });
+
+  const scheduled = scheduleWorkPlanTasks(tasks, startDate, capacityByDay, todayString);
+  const completedHours = roundHours(scheduled.tasks.filter((task) => task.completed).reduce((sum, task) => sum + task.hours, 0));
+  const totalHours = roundHours(scheduled.tasks.reduce((sum, task) => sum + task.hours, 0));
+  const openHours = roundHours(Math.max(0, totalHours - completedHours));
+  const labelHours = buildWorkPlanLabelHours(scheduled.tasks, labels);
+  const cardEfforts = buildWorkPlanCardEfforts(scheduled.tasks);
+  const plannedProgressPercent = totalHours > 0
+    ? Math.min(100, (workPlanElapsedCapacityHours(startDate, startOfLocalDay(today), capacityByDay) / totalHours) * 100)
+    : 100;
+  const bottlenecks = buildWorkPlanBottlenecks({
+    selectedCount: project.timeSources.length,
+    activeSelectedCount: selectedActiveKeys.size,
+    availableHoursPerWeek,
+    openHours
+  });
+
+  return {
+    tasks: scheduled.tasks,
+    days: scheduled.days,
+    sources,
+    labelHours,
+    largestLabel: labelHours.reduce<SelfEmploymentProjectWorkPlanLabelHours | null>(
+      (largest, item) => (!largest || item.totalHours > largest.totalHours ? item : largest),
+      null
+    ),
+    largestCards: cardEfforts.sort((first, second) => second.totalHours - first.totalHours).slice(0, 3),
+    totalHours,
+    completedHours,
+    openHours,
+    progressPercent: totalHours > 0 ? (completedHours / totalHours) * 100 : 100,
+    plannedProgressPercent,
+    availableHoursPerWeek,
+    remainingDays: scheduled.endDate ? Math.max(0, daysBetween(startOfLocalDay(today), parseLocalDate(scheduled.endDate) ?? startOfLocalDay(today))) : null,
+    endDate: scheduled.endDate,
+    bottlenecks
+  };
+}
+
+function buildWorkPlanSources(
+  model: IncomePlanningModel,
+  selectedSourceKeys: Set<string>
+): SelfEmploymentProjectWorkPlanSource[] {
+  const workSources = model.activeWorkBlocks.map((block) => ({
+    ownerType: "work" as const,
+    ownerId: block.id,
+    name: block.name,
+    hoursPerWeek: workPlanOwnerHours(model, "work", block.id),
+    selected: selectedSourceKeys.has(timeSourceKey("work", block.id))
+  }));
+  const habitSources = model.activeHabits.map((habit) => ({
+    ownerType: "habit" as const,
+    ownerId: habit.id,
+    name: habit.name,
+    hoursPerWeek: workPlanOwnerHours(model, "habit", habit.id),
+    selected: selectedSourceKeys.has(timeSourceKey("habit", habit.id))
+  }));
+  return [...workSources, ...habitSources].filter((source) => source.hoursPerWeek > 0);
+}
+
+function workPlanCapacityByDay(model: IncomePlanningModel, selectedSourceKeys: Set<string>): Map<IncomePlanningWeekday, number> {
+  const capacity = new Map<IncomePlanningWeekday, number>(INCOME_PLANNING_WEEK_DAYS.map((day) => [day, 0]));
+  for (const entry of model.calendarEntries) {
+    const ownerType = workPlanEntryOwnerType(entry.type);
+    if (!ownerType || entry.type === "pause" || entry.invalid) continue;
+    if (!selectedSourceKeys.has(timeSourceKey(ownerType, entry.ownerId))) continue;
+    capacity.set(entry.day, roundHours((capacity.get(entry.day) ?? 0) + entry.durationMinutes / 60));
+  }
+  return capacity;
+}
+
+function workPlanOwnerHours(model: IncomePlanningModel, ownerType: "work" | "habit", ownerId: string): number {
+  return roundHours(
+    model.calendarEntries
+      .filter((entry) => workPlanEntryOwnerType(entry.type) === ownerType && entry.ownerId === ownerId && entry.type !== "pause" && !entry.invalid)
+      .reduce((sum, entry) => sum + entry.durationMinutes / 60, 0)
+  );
+}
+
+function workPlanEntryOwnerType(type: string): "work" | "habit" | null {
+  if (type === "career" || type === "side_work") return "work";
+  if (type === "good_habit" || type === "bad_habit" || type === "replacement_habit") return "habit";
+  return null;
+}
+
+function scheduleWorkPlanTasks(
+  tasks: SelfEmploymentProjectWorkPlanTask[],
+  startDate: Date,
+  capacityByDay: Map<IncomePlanningWeekday, number>,
+  todayString: string
+): { tasks: SelfEmploymentProjectWorkPlanTask[]; days: SelfEmploymentProjectWorkPlanDay[]; endDate: string | null } {
+  const weeklyCapacity = [...capacityByDay.values()].reduce((sum, hours) => sum + hours, 0);
+  if (weeklyCapacity <= 0) {
+    return {
+      tasks: sortWorkPlanTasks(tasks),
+      days: [],
+      endDate: null
+    };
+  }
+
+  const dayPlans = new Map<string, SelfEmploymentProjectWorkPlanDay>();
+  let cursor = startOfLocalDay(startDate);
+  const scheduledOpenTasks: SelfEmploymentProjectWorkPlanTask[] = [];
+
+  for (const task of tasks.filter((item) => !item.completed).sort(compareWorkPlanPriority)) {
+    let guard = 0;
+    while (guard < 3700) {
+      const dateKey = dateToString(cursor);
+      const capacityHours = capacityByDay.get(weekdayForDate(cursor)) ?? 0;
+      const day = dayPlans.get(dateKey);
+      const usedHours = day?.plannedHours ?? 0;
+      if (capacityHours > 0 && (usedHours === 0 || usedHours + task.hours <= capacityHours)) {
+        const plannedTask = {
+          ...task,
+          plannedDate: dateKey,
+          overdue: dateKey < todayString
+        };
+        const nextDay = day ?? { date: dateKey, capacityHours, plannedHours: 0, tasks: [] };
+        nextDay.tasks = [...nextDay.tasks, plannedTask].sort(compareWorkPlanPriority);
+        nextDay.plannedHours = roundHours(nextDay.plannedHours + task.hours);
+        dayPlans.set(dateKey, nextDay);
+        scheduledOpenTasks.push(plannedTask);
+        if (nextDay.plannedHours >= capacityHours) cursor = addDays(cursor, 1);
+        break;
+      }
+      cursor = addDays(cursor, 1);
+      guard += 1;
+    }
+  }
+
+  const completedTasks = tasks.filter((task) => task.completed).map((task) => ({ ...task, plannedDate: null, overdue: false }));
+  const days = [...dayPlans.values()].sort((first, second) => first.date.localeCompare(second.date));
+  return {
+    tasks: sortWorkPlanTasks([...scheduledOpenTasks, ...completedTasks]),
+    days,
+    endDate: days[days.length - 1]?.date ?? null
+  };
+}
+
+function buildWorkPlanLabelHours(
+  tasks: SelfEmploymentProjectWorkPlanTask[],
+  labels: BusinessIdeaCanvasLabel[]
+): SelfEmploymentProjectWorkPlanLabelHours[] {
+  return labels
+    .map((label) => {
+      const labelTasks = tasks.filter((task) => task.labelId === label.id);
+      const totalHours = roundHours(labelTasks.reduce((sum, task) => sum + task.hours, 0));
+      const completedHours = roundHours(labelTasks.filter((task) => task.completed).reduce((sum, task) => sum + task.hours, 0));
+      return {
+        labelId: label.id,
+        labelName: label.name,
+        labelColor: selfEmploymentGanttLabelColor(label.id),
+        totalHours,
+        completedHours,
+        openHours: roundHours(Math.max(0, totalHours - completedHours))
+      };
+    })
+    .filter((label) => label.totalHours > 0);
+}
+
+function buildWorkPlanCardEfforts(tasks: SelfEmploymentProjectWorkPlanTask[]): SelfEmploymentProjectWorkPlanCardEffort[] {
+  const byCardId = new Map<string, SelfEmploymentProjectWorkPlanTask[]>();
+  for (const task of tasks) byCardId.set(task.cardId, [...(byCardId.get(task.cardId) ?? []), task]);
+  return [...byCardId.values()].map((cardTasks) => {
+    const first = cardTasks[0];
+    const totalHours = roundHours(cardTasks.reduce((sum, task) => sum + task.hours, 0));
+    const completedHours = roundHours(cardTasks.filter((task) => task.completed).reduce((sum, task) => sum + task.hours, 0));
+    return {
+      cardId: first.cardId,
+      title: first.cardTitle,
+      labelId: first.labelId,
+      labelName: first.labelName,
+      labelColor: first.labelColor,
+      totalHours,
+      completedHours,
+      openHours: roundHours(Math.max(0, totalHours - completedHours)),
+      progressPercent: totalHours > 0 ? (completedHours / totalHours) * 100 : 100
+    };
+  });
+}
+
+function workPlanElapsedCapacityHours(startDate: Date, today: Date, capacityByDay: Map<IncomePlanningWeekday, number>): number {
+  if (today < startDate) return 0;
+  let total = 0;
+  let cursor = startOfLocalDay(startDate);
+  let guard = 0;
+  while (cursor <= today && guard < 3700) {
+    total += capacityByDay.get(weekdayForDate(cursor)) ?? 0;
+    cursor = addDays(cursor, 1);
+    guard += 1;
+  }
+  return roundHours(total);
+}
+
+function buildWorkPlanBottlenecks(input: {
+  selectedCount: number;
+  activeSelectedCount: number;
+  availableHoursPerWeek: number;
+  openHours: number;
+}): string[] {
+  const bottlenecks: string[] = [];
+  if (input.selectedCount === 0) bottlenecks.push("Keine Projekt-Zeitquelle ausgewaehlt.");
+  else if (input.activeSelectedCount === 0) bottlenecks.push("Ausgewaehlte Zeitquellen sind im aktiven Wochenplan nicht verfuegbar.");
+  if (input.openHours > 0 && input.availableHoursPerWeek <= 0) bottlenecks.push("Offene Projektzeit kann ohne Wochenkontingent nicht geplant werden.");
+  if (input.availableHoursPerWeek > 0 && input.openHours > input.availableHoursPerWeek) {
+    bottlenecks.push("Offene Projektzeit uebersteigt das aktuelle Wochenkontingent.");
+  }
+  return bottlenecks;
+}
+
+function sortWorkPlanTasks(tasks: SelfEmploymentProjectWorkPlanTask[]): SelfEmploymentProjectWorkPlanTask[] {
+  return [...tasks].sort((first, second) => {
+    if (first.completed !== second.completed) return first.completed ? 1 : -1;
+    if (first.plannedDate && second.plannedDate && first.plannedDate !== second.plannedDate) {
+      return first.plannedDate.localeCompare(second.plannedDate);
+    }
+    if (first.plannedDate !== second.plannedDate) return first.plannedDate ? -1 : 1;
+    return compareWorkPlanPriority(first, second);
+  });
+}
+
+function compareWorkPlanPriority(first: Pick<SelfEmploymentProjectWorkPlanTask, "priority" | "title">, second: Pick<SelfEmploymentProjectWorkPlanTask, "priority" | "title">): number {
+  const priorityOrder: Record<SelfEmploymentGanttTodo["priority"], number> = { high: 0, medium: 1, low: 2 };
+  const priorityDiff = priorityOrder[first.priority] - priorityOrder[second.priority];
+  if (priorityDiff !== 0) return priorityDiff;
+  return first.title.localeCompare(second.title, "de");
+}
+
+function timeSourceKey(ownerType: "work" | "habit", ownerId: string): string {
+  return `${ownerType}:${ownerId}`;
+}
+
+function isSelfEmploymentGanttLabelId(value: string): value is SelfEmploymentGanttLabelId {
+  return SELF_EMPLOYMENT_GANTT_LABEL_ORDER.includes(value as SelfEmploymentGanttLabelId);
+}
+
+function parseLocalDate(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : startOfLocalDay(date);
+}
+
+function dateToString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function daysBetween(first: Date, second: Date): number {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.ceil((second.getTime() - first.getTime()) / msPerDay);
+}
+
+function weekdayForDate(date: Date): IncomePlanningWeekday {
+  return INCOME_PLANNING_WEEK_DAYS[(date.getDay() + 6) % 7] ?? "monday";
+}
+
 function normalizeGanttPhase(
   raw: Record<string, unknown> | null | undefined,
   phase: BusinessIdeaCanvasPhase,
   previousPhaseId: string | null
 ): SelfEmploymentGanttPhase {
   const startMode: SelfEmploymentGanttStartMode = raw?.startMode === "after_previous_label" ? "after_previous_label" : "manual";
-  const defaultTimeBudgetHours = normalizedHours(raw?.defaultTimeBudgetHours, SELF_EMPLOYMENT_GANTT_DEFAULT_TIME_BUDGET_HOURS);
   return {
     phaseId: phase.id,
     enabled: typeof raw?.enabled === "boolean" ? raw.enabled : true,
-    startDate: typeof raw?.startDate === "string" && raw.startDate.trim() ? raw.startDate.trim() : phase.startDate,
     startMode,
     triggerPreviousPhaseId: typeof raw?.triggerPreviousPhaseId === "string" && raw.triggerPreviousPhaseId.trim()
       ? raw.triggerPreviousPhaseId.trim()
       : previousPhaseId,
-    triggerLabelId: normalizedGanttLabelId(raw?.triggerLabelId || "goal"),
-    defaultTimeBudgetHours
+    triggerLabelId: normalizedGanttLabelId(raw?.triggerLabelId || "goal")
   };
 }
 
 function normalizeGanttCardPlan(
   raw: Record<string, unknown> | null | undefined,
   cardId: string,
-  defaultHours: number
+  defaultHours: number,
+  fallbackTitle: string
 ): SelfEmploymentGanttCardPlan {
+  const rawTodos = Array.isArray(raw?.todos) ? raw.todos.filter(isRecord) : [];
+  const legacyNote = typeof raw?.note === "string" ? raw.note.trim() : "";
+  const todos = rawTodos.length
+    ? rawTodos.map((todo, index) => normalizeGanttTodo(todo, cardId, index, fallbackTitle))
+    : [
+        normalizeGanttTodo(
+          {
+            title: legacyNote || fallbackTitle,
+            priority: "medium",
+            completed: typeof raw?.completed === "boolean" ? raw.completed : false
+          },
+          cardId,
+          0,
+          fallbackTitle
+        )
+      ];
+  const manuallyCompleted = raw?.completed === true;
+  const normalizedTodos = manuallyCompleted ? todos.map((todo) => ({ ...todo, completed: true })) : todos;
   return {
     cardId,
     timeBudgetHours: normalizedHours(raw?.timeBudgetHours, defaultHours),
-    startDate: typeof raw?.startDate === "string" && raw.startDate.trim() ? raw.startDate.trim() : null,
-    note: typeof raw?.note === "string" ? raw.note : ""
+    completed: normalizedTodos.every((todo) => todo.completed),
+    todos: normalizedTodos
+  };
+}
+
+function normalizeGanttTodo(
+  raw: Record<string, unknown>,
+  cardId: string,
+  index: number,
+  fallbackTitle: string
+): SelfEmploymentGanttTodo {
+  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : `todo-${cardId}-${index + 1}`;
+  const title = String(raw.title ?? raw.text ?? "").trim() || fallbackTitle.trim() || "Todo";
+  const priority = raw.priority === "high" || raw.priority === "low" ? raw.priority : "medium";
+  return {
+    id,
+    title,
+    priority,
+    completed: raw.completed === true
   };
 }
 
@@ -322,6 +763,10 @@ function normalizedHours(value: unknown, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return Math.max(0, fallback);
   return Math.max(0, Math.min(100000, parsed));
+}
+
+function roundHours(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

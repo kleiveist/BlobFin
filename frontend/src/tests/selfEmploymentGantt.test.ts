@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
 import {
+  buildSelfEmploymentProjectWorkPlan,
   buildSelfEmploymentProjectGantt,
   normalizeSelfEmploymentGanttPlan,
   orderedGanttLabels,
   visibleSelfEmploymentGanttRows
 } from "../domain/selfEmploymentGantt";
+import { buildIncomePlanningModel } from "../domain/incomePlanning";
 import { normalizeBusinessIdeaCanvasMeta, parseBusinessIdeaCanvasFile } from "../domain/businessIdeaCanvas";
 import type { SelfEmploymentProject } from "../types";
 
@@ -183,7 +185,39 @@ describe("self employment project gantt", () => {
       meta
     );
 
-    expect(gantt.cardPlans).toEqual([{ cardId: "a", timeBudgetHours: 4, startDate: null, note: "" }]);
+    expect(gantt.cardPlans).toEqual([
+      {
+        cardId: "a",
+        timeBudgetHours: 4,
+        completed: false,
+        todos: [{ id: "todo-a-1", title: "A", priority: "medium", completed: false }]
+      }
+    ]);
+  });
+
+  it("migrates legacy notes to todos and derives card completion", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [{ id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }],
+      edges: []
+    });
+    const meta = normalizeBusinessIdeaCanvasMeta({}, canvas);
+
+    const gantt = normalizeSelfEmploymentGanttPlan(
+      {
+        phases: [{ phaseId: "phase-1", startDate: "2026-07-01", defaultTimeBudgetHours: 8 }],
+        cardPlans: [{ cardId: "a", timeBudgetHours: 4, startDate: "2026-07-02", note: "Legacy Notiz", completed: true }]
+      },
+      canvas,
+      meta
+    );
+
+    expect(gantt.phases[0]).not.toHaveProperty("startDate");
+    expect(gantt.phases[0]).not.toHaveProperty("defaultTimeBudgetHours");
+    expect(gantt.cardPlans[0]).toMatchObject({
+      cardId: "a",
+      completed: true,
+      todos: [{ title: "Legacy Notiz", priority: "medium", completed: true }]
+    });
   });
 
   it("falls back to active/default phase and label for cards without metadata", () => {
@@ -214,12 +248,95 @@ describe("self employment project gantt", () => {
     expect(summary.rows.find((row) => row.phaseId === "phase-1")?.cardHours).toBe(1);
     expect(summary.rows.find((row) => row.phaseId === "phase-1")?.labels.find((label) => label.labelId === "idea")?.totalHours).toBe(1);
   });
+
+  it("builds a project work plan from selected weekly work and habit sources", () => {
+    const state = defaultAppState();
+    const project = projectWithCanvas({
+      nodes: [{ id: "a", type: "text", text: "Umsetzungskarte", x: 0, y: 0, width: 100, height: 80 }],
+      nodeMeta: {
+        a: { labelId: "implementation", phaseId: "phase-1", shape: "rounded-rectangle" }
+      },
+      cardPlans: [
+        {
+          cardId: "a",
+          timeBudgetHours: 4,
+          completed: false,
+          todos: [
+            { id: "todo-done", title: "Erledigt", priority: "low", completed: true },
+            { id: "todo-open", title: "Offen", priority: "high", completed: false }
+          ]
+        }
+      ]
+    });
+    const incomePlanning = {
+      ...state.incomePlanning,
+      workBlocks: [
+        {
+          id: "project-work",
+          active: true,
+          category: "side_income" as const,
+          name: "Projektzeit",
+          description: "",
+          color: "#123456",
+          slots: [
+            {
+              id: "project-work-monday",
+              day: "monday" as const,
+              startTime: "10:00",
+              endTime: "12:00",
+              flexible: false,
+              durationMinutes: 120
+            },
+            {
+              id: "project-work-wednesday",
+              day: "wednesday" as const,
+              startTime: "10:00",
+              endTime: "11:00",
+              flexible: false,
+              durationMinutes: 60
+            }
+          ]
+        }
+      ],
+      habits: [],
+      manualBlocks: []
+    };
+    const model = buildIncomePlanningModel(incomePlanning);
+    const plan = buildSelfEmploymentProjectWorkPlan(
+      { ...project, startDate: "2026-07-06", timeSources: [{ ownerType: "work", ownerId: "project-work" }] },
+      model,
+      new Date(2026, 6, 7)
+    );
+
+    expect(plan.availableHoursPerWeek).toBe(3);
+    expect(plan.totalHours).toBe(4);
+    expect(plan.completedHours).toBe(2);
+    expect(plan.openHours).toBe(2);
+    expect(plan.progressPercent).toBe(50);
+    expect(plan.plannedProgressPercent).toBe(50);
+    expect(plan.endDate).toBe("2026-07-06");
+    expect(plan.tasks.find((task) => task.todoId === "todo-open")).toMatchObject({
+      plannedDate: "2026-07-06",
+      overdue: true,
+      priority: "high"
+    });
+    expect(plan.labelHours).toEqual([
+      {
+        labelId: "implementation",
+        labelName: "Umsetzung",
+        labelColor: "#b87514",
+        totalHours: 4,
+        completedHours: 2,
+        openHours: 2
+      }
+    ]);
+  });
 });
 
 function projectWithCanvas(input: {
   nodes: Array<{ id: string; type: "text"; text: string; x: number; y: number; width: number; height: number }>;
   nodeMeta: Record<string, { labelId: string; phaseId: string; shape: "rounded-rectangle" }>;
-  cardPlans: Array<{ cardId: string; timeBudgetHours: number; startDate: string | null; note: string }>;
+  cardPlans: Array<Record<string, unknown> & { cardId: string; timeBudgetHours: number }>;
   phaseOverrides?: Array<{
     phaseId: string;
     enabled: boolean;

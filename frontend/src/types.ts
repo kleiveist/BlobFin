@@ -264,6 +264,13 @@ export interface SelfEmploymentTask {
   status: SelfEmploymentTaskStatus;
 }
 
+export interface SelfEmploymentGanttTodo {
+  id: string;
+  title: string;
+  priority: SelfEmploymentTaskPriority;
+  completed: boolean;
+}
+
 export interface JsonCanvasBaseNode {
   id: string;
   type: JsonCanvasNodeType;
@@ -376,23 +383,26 @@ export interface BusinessIdeaCanvasMeta {
 export interface SelfEmploymentGanttPhase {
   phaseId: string;
   enabled: boolean;
-  startDate: string | null;
   startMode: SelfEmploymentGanttStartMode;
   triggerPreviousPhaseId: string | null;
   triggerLabelId: string | null;
-  defaultTimeBudgetHours: number;
 }
 
 export interface SelfEmploymentGanttCardPlan {
   cardId: string;
   timeBudgetHours: number;
-  startDate: string | null;
-  note: string;
+  completed: boolean;
+  todos: SelfEmploymentGanttTodo[];
 }
 
 export interface SelfEmploymentGanttPlan {
   phases: SelfEmploymentGanttPhase[];
   cardPlans: SelfEmploymentGanttCardPlan[];
+}
+
+export interface SelfEmploymentProjectTimeSource {
+  ownerType: "work" | "habit";
+  ownerId: string;
 }
 
 export interface SelfEmploymentProject {
@@ -426,6 +436,7 @@ export interface SelfEmploymentProject {
   oneTimeCosts: number;
   taxReservePercent: number;
   monthlyWorkHours: number;
+  timeSources: SelfEmploymentProjectTimeSource[];
   contacts: SelfEmploymentContact[];
   invoices: SelfEmploymentInvoice[];
   tasks: SelfEmploymentTask[];

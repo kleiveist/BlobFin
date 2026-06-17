@@ -1,6 +1,12 @@
-import { escapeHtml, intNumber, money } from "../../lib/format";
+import { escapeHtml, intNumber, money, percent } from "../../lib/format";
 import { positionIconSvg } from "../../lib/positionIcons";
 import type { SelfEmploymentProject, SelfEmploymentRoadmapAreaId } from "../../types";
+import type { IncomePlanningModel } from "../../domain/incomePlanning";
+import {
+  buildSelfEmploymentProjectWorkPlan,
+  type SelfEmploymentProjectWorkPlan,
+  type SelfEmploymentProjectWorkPlanTask
+} from "../../domain/selfEmploymentGantt";
 import { renderBusinessCanvas } from "./business-canvas";
 import type { SelfEmploymentProjectEvaluation } from "./feasibilityController";
 import {
@@ -17,7 +23,8 @@ import {
 
 export function selfEmploymentProjectDetails(
   evaluation: SelfEmploymentProjectEvaluation,
-  selectedRoadmapAreaId: unknown
+  selectedRoadmapAreaId: unknown,
+  incomePlanningModel: IncomePlanningModel
 ): string {
   const { project } = evaluation;
   const selectedArea = selfEmploymentRoadmapAreaIdFromValue(selectedRoadmapAreaId) ?? "idea";
@@ -42,7 +49,7 @@ export function selfEmploymentProjectDetails(
           </div>
           ${selectedArea === "planning" ? renderSelfEmploymentGanttPhaseFilter(project) : ""}
         </header>
-        ${selfEmploymentRoadmapPanel(selectedArea, evaluation)}
+        ${selfEmploymentRoadmapPanel(selectedArea, evaluation, incomePlanningModel)}
       </article>
     </section>
   `;
@@ -100,9 +107,11 @@ function selfEmploymentRoadmap(selectedArea: SelfEmploymentRoadmapAreaId): strin
 
 function selfEmploymentRoadmapPanel(
   areaId: SelfEmploymentRoadmapAreaId,
-  evaluation: SelfEmploymentProjectEvaluation
+  evaluation: SelfEmploymentProjectEvaluation,
+  incomePlanningModel: IncomePlanningModel
 ): string {
   const { project } = evaluation;
+  const workPlan = buildSelfEmploymentProjectWorkPlan(project, incomePlanningModel);
   if (areaId === "idea") {
     return renderBusinessCanvas(project);
   }
@@ -111,20 +120,9 @@ function selfEmploymentRoadmapPanel(
   }
   if (areaId === "contacts") return selfEmploymentContactsEditor(project);
   if (areaId === "invoices") return selfEmploymentInvoicesEditor(project);
-  if (areaId === "tasks") return selfEmploymentTasksEditor(project);
+  if (areaId === "tasks") return selfEmploymentTasksDashboard(workPlan);
   if (areaId === "time") {
-    return `
-      <div class="self-employment-edit-grid">
-        ${selfEmploymentNumberField(project, "requiredHoursPerWeek", "Projektzeit benoetigt / Woche", project.requiredHoursPerWeek, 0, 168, 0.5)}
-        ${selfEmploymentReadOnlyField("Freie Reserve / Woche", `${hoursLabel(evaluation.availableTimeHours)} / Woche`)}
-        ${selfEmploymentNumberField(project, "fixedProjectHoursPerWeek", "Feste Projektzeit / Woche", project.fixedProjectHoursPerWeek, 0, 168, 0.5)}
-        ${selfEmploymentNumberField(project, "flexibleProjectHoursPerWeek", "Flexible Projektzeit / Woche", project.flexibleProjectHoursPerWeek, 0, 168, 0.5)}
-        ${selfEmploymentListTextareaField(project, "linkedHabits", "Zugehoerige Habits", project.linkedHabits)}
-        ${selfEmploymentListTextareaField(project, "blockingHabits", "Blockierende Habits", project.blockingHabits)}
-        ${selfEmploymentTextField(project, "weekScenario", "Projekt-Szenario", project.weekScenario)}
-        ${selfEmploymentReadOnlyField("Hinweis", evaluation.reasons[0])}
-      </div>
-    `;
+    return selfEmploymentTimeDashboard(project, workPlan, evaluation);
   }
   if (areaId === "budget") {
     return `
@@ -192,22 +190,6 @@ function selfEmploymentNumberField(
       <input type="number" min="${min}" max="${max}" step="${step}" value="${escapeHtml(value)}" data-self-employment-project-id="${escapeHtml(
         project.id
       )}" data-self-employment-field="${escapeHtml(field)}" />
-    </label>
-  `;
-}
-
-function selfEmploymentListTextareaField(
-  project: SelfEmploymentProject,
-  field: string,
-  label: string,
-  value: string[]
-): string {
-  return `
-    <label class="field self-employment-edit-field wide">
-      <span>${escapeHtml(label)}</span>
-      <textarea rows="3" data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-list-field="${escapeHtml(
-        field
-      )}">${escapeHtml(value.join("\n"))}</textarea>
     </label>
   `;
 }
@@ -312,52 +294,217 @@ function selfEmploymentInvoicesEditor(project: SelfEmploymentProject): string {
   `;
 }
 
-function selfEmploymentTasksEditor(project: SelfEmploymentProject): string {
+function selfEmploymentTasksDashboard(workPlan: SelfEmploymentProjectWorkPlan): string {
+  const openTasks = workPlan.tasks.filter((task) => !task.completed);
+  const doneTasks = workPlan.tasks.filter((task) => task.completed);
+  const overdueTasks = openTasks.filter((task) => task.overdue);
   return `
-    <div class="self-employment-collection-editor">
-      <div class="self-employment-collection-head">
-        <span>${project.tasks.length ? `${intNumber(project.tasks.length)} Aufgaben` : "Noch keine Aufgaben"}</span>
-        <button class="button mini secondary" type="button" data-action="self-employment-add-task" data-self-employment-project-id="${escapeHtml(
-          project.id
-        )}">Aufgabe hinzufuegen</button>
+    <div class="self-employment-task-dashboard">
+      <div class="self-employment-dashboard-metrics">
+        ${selfEmploymentDashboardMetric("Offen", intNumber(openTasks.length), hoursLabel(workPlan.openHours))}
+        ${selfEmploymentDashboardMetric("Erledigt", intNumber(doneTasks.length), hoursLabel(workPlan.completedHours))}
+        ${selfEmploymentDashboardMetric("Ueberfaellig", intNumber(overdueTasks.length), overdueTasks.length ? "Handlungsbedarf" : "im Plan")}
+        ${selfEmploymentDashboardMetric("Wochenkontingent", hoursLabel(workPlan.availableHoursPerWeek), workPlan.endDate ?? "kein Enddatum")}
       </div>
-      <div class="self-employment-collection-list">
-        ${
-          project.tasks.length
-            ? project.tasks
-                .map(
-                  (task) => `
-                    <article class="self-employment-collection-item">
-                      <header>
-                        <strong>${escapeHtml(task.title || "Aufgabe")}</strong>
-                        <button class="button mini danger" type="button" data-action="self-employment-remove-task" data-self-employment-project-id="${escapeHtml(
-                          project.id
-                        )}" data-self-employment-item-id="${escapeHtml(task.id)}">Loeschen</button>
-                      </header>
-                      <div class="self-employment-edit-grid compact">
-                        ${selfEmploymentCollectionTextField(project, "tasks", task.id, "title", "Titel", task.title)}
-                        ${selfEmploymentCollectionSelectField(project, "tasks", task.id, "priority", "Prioritaet", task.priority, [
-                          ["low", "Niedrig"],
-                          ["medium", "Mittel"],
-                          ["high", "Hoch"]
-                        ])}
-                        ${selfEmploymentCollectionTextField(project, "tasks", task.id, "dueDate", "Faelligkeit", task.dueDate, "date")}
-                        ${selfEmploymentCollectionNumberField(project, "tasks", task.id, "estimatedHours", "Zeit in Stunden", task.estimatedHours, 0, 1000, 0.5)}
-                        ${selfEmploymentCollectionSelectField(project, "tasks", task.id, "status", "Status", task.status, [
-                          ["open", "Offen"],
-                          ["in_progress", "In Arbeit"],
-                          ["done", "Erledigt"]
-                        ])}
-                      </div>
-                    </article>
-                  `
-                )
-                .join("")
-            : `<p class="self-employment-empty-note">Projektbezogene Aufgaben anlegen</p>`
-        }
-      </div>
+      ${workPlan.bottlenecks.length ? selfEmploymentBottlenecks(workPlan.bottlenecks) : ""}
+      <section class="self-employment-dashboard-section">
+        <header>
+          <strong>Tagesplanung</strong>
+          <span>${escapeHtml(workPlan.endDate ? `bis ${selfEmploymentDateLabel(workPlan.endDate)}` : "nicht berechenbar")}</span>
+        </header>
+        <div class="self-employment-workday-list">
+          ${
+            workPlan.days.length
+              ? workPlan.days.map(selfEmploymentWorkPlanDay).join("")
+              : `<p class="self-employment-empty-note">Keine Tagesplanung ohne offene Todos und Zeitkontingent.</p>`
+          }
+        </div>
+      </section>
+      <section class="self-employment-dashboard-section">
+        <header>
+          <strong>Aufgaben nach Prioritaet</strong>
+          <span>${escapeHtml(`${intNumber(workPlan.tasks.length)} Todos aus Karten`)}</span>
+        </header>
+        <div class="self-employment-task-list">
+          ${
+            workPlan.tasks.length
+              ? workPlan.tasks.map(selfEmploymentTaskDashboardItem).join("")
+              : `<p class="self-employment-empty-note">Noch keine Karten-Todos vorhanden.</p>`
+          }
+        </div>
+      </section>
     </div>
   `;
+}
+
+function selfEmploymentTimeDashboard(
+  project: SelfEmploymentProject,
+  workPlan: SelfEmploymentProjectWorkPlan,
+  evaluation: SelfEmploymentProjectEvaluation
+): string {
+  return `
+    <div class="self-employment-time-dashboard">
+      <div class="self-employment-edit-grid">
+        ${selfEmploymentTextField(project, "startDate", "Startdatum", project.startDate, "date")}
+        ${selfEmploymentReadOnlyField("Errechnetes Enddatum", workPlan.endDate ? selfEmploymentDateLabel(workPlan.endDate) : "Nicht berechenbar")}
+        ${selfEmploymentReadOnlyField("Verbleibende Tage", workPlan.remainingDays === null ? "Nicht berechenbar" : intNumber(workPlan.remainingDays))}
+        ${selfEmploymentReadOnlyField("Freie Reserve / Woche", `${hoursLabel(evaluation.availableTimeHours)} / Woche`)}
+      </div>
+      <div class="self-employment-dashboard-metrics">
+        ${selfEmploymentDashboardMetric("Projektfortschritt", percent(workPlan.progressPercent), `${hoursLabel(workPlan.completedHours)} erledigt`)}
+        ${selfEmploymentDashboardMetric("Geplanter Fortschritt", percent(workPlan.plannedProgressPercent), "nach Startdatum")}
+        ${selfEmploymentDashboardMetric("Gesamtstunden", hoursLabel(workPlan.totalHours), `${hoursLabel(workPlan.openHours)} offen`)}
+        ${selfEmploymentDashboardMetric("Verfuegbar / Woche", hoursLabel(workPlan.availableHoursPerWeek), `${intNumber(workPlan.sources.filter((source) => source.selected).length)} Quellen`)}
+        ${selfEmploymentDashboardMetric("Groesstes Label", workPlan.largestLabel?.labelName ?? "Keins", workPlan.largestLabel ? hoursLabel(workPlan.largestLabel.totalHours) : "0 h")}
+        ${selfEmploymentDashboardMetric("Karten mit Aufwand", workPlan.largestCards[0]?.title ?? "Keine", workPlan.largestCards[0] ? hoursLabel(workPlan.largestCards[0].totalHours) : "0 h")}
+      </div>
+      ${workPlan.bottlenecks.length ? selfEmploymentBottlenecks(workPlan.bottlenecks) : ""}
+      <section class="self-employment-dashboard-section">
+        <header>
+          <strong>Zeitquellen</strong>
+          <span>${escapeHtml(workPlan.availableHoursPerWeek > 0 ? `${hoursLabel(workPlan.availableHoursPerWeek)} ausgewaehlt` : "keine Stunden ausgewaehlt")}</span>
+        </header>
+        <div class="self-employment-time-source-list">
+          ${
+            workPlan.sources.length
+              ? workPlan.sources.map((source) => selfEmploymentTimeSource(project, source)).join("")
+              : `<p class="self-employment-empty-note">Aktive Work- oder Habit-Zeitbloecke im Wochenplaner anlegen.</p>`
+          }
+        </div>
+      </section>
+      <section class="self-employment-dashboard-section">
+        <header>
+          <strong>Label-Zeitverteilung</strong>
+          <span>${escapeHtml(hoursLabel(workPlan.totalHours))}</span>
+        </header>
+        <div class="self-employment-label-time-list">
+          ${
+            workPlan.labelHours.length
+              ? workPlan.labelHours.map((label) => selfEmploymentLabelTimeRow(label, workPlan.totalHours)).join("")
+              : `<p class="self-employment-empty-note">Noch keine Kartenstunden vorhanden.</p>`
+          }
+        </div>
+      </section>
+      <section class="self-employment-dashboard-section">
+        <header>
+          <strong>Groesste Karten</strong>
+          <span>nach Aufwand</span>
+        </header>
+        <div class="self-employment-task-list">
+          ${
+            workPlan.largestCards.length
+              ? workPlan.largestCards
+                  .map(
+                    (card) => `
+                      <article class="self-employment-task-dashboard-item" style="--self-employment-gantt-color:${escapeHtml(card.labelColor)};">
+                        <span class="self-employment-task-label">${escapeHtml(card.labelName)}</span>
+                        <strong>${escapeHtml(card.title)}</strong>
+                        <small>${escapeHtml(`${hoursLabel(card.totalHours)} · ${percent(card.progressPercent)}`)}</small>
+                      </article>
+                    `
+                  )
+                  .join("")
+              : `<p class="self-employment-empty-note">Keine Karten mit Aufwand vorhanden.</p>`
+          }
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function selfEmploymentDashboardMetric(label: string, value: string, detail: string): string {
+  return `
+    <article class="self-employment-dashboard-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </article>
+  `;
+}
+
+function selfEmploymentBottlenecks(items: string[]): string {
+  return `
+    <div class="self-employment-bottleneck-list">
+      ${items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+    </div>
+  `;
+}
+
+function selfEmploymentWorkPlanDay(day: SelfEmploymentProjectWorkPlan["days"][number]): string {
+  return `
+    <article class="self-employment-workday-card">
+      <header>
+        <strong>${escapeHtml(selfEmploymentDateLabel(day.date))}</strong>
+        <span>${escapeHtml(`${hoursLabel(day.plannedHours)} / ${hoursLabel(day.capacityHours)}`)}</span>
+      </header>
+      <div class="self-employment-task-list compact">
+        ${day.tasks.map(selfEmploymentTaskDashboardItem).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function selfEmploymentTaskDashboardItem(task: SelfEmploymentProjectWorkPlanTask): string {
+  return `
+    <article class="self-employment-task-dashboard-item${task.completed ? " completed" : ""}${task.overdue ? " overdue" : ""}" style="--self-employment-gantt-color:${escapeHtml(task.labelColor)};">
+      <span class="self-employment-task-label">${escapeHtml(task.labelName)}</span>
+      <strong>${escapeHtml(task.title)}</strong>
+      <small>${escapeHtml(`${selfEmploymentPriorityLabel(task.priority)} · ${hoursLabel(task.hours)} · ${task.plannedDate ? selfEmploymentDateLabel(task.plannedDate) : "erledigt"}`)}</small>
+      <span>${escapeHtml(task.cardTitle)}</span>
+    </article>
+  `;
+}
+
+function selfEmploymentTimeSource(
+  project: SelfEmploymentProject,
+  source: SelfEmploymentProjectWorkPlan["sources"][number]
+): string {
+  return `
+    <label class="self-employment-time-source">
+      <input
+        type="checkbox"
+        ${source.selected ? "checked" : ""}
+        data-self-employment-project-id="${escapeHtml(project.id)}"
+        data-self-employment-time-source-owner-type="${escapeHtml(source.ownerType)}"
+        data-self-employment-time-source-owner-id="${escapeHtml(source.ownerId)}"
+      />
+      <span>
+        <strong>${escapeHtml(source.name)}</strong>
+        <small>${escapeHtml(`${source.ownerType === "work" ? "Work" : "Habit"} · ${hoursLabel(source.hoursPerWeek)} / Woche`)}</small>
+      </span>
+    </label>
+  `;
+}
+
+function selfEmploymentLabelTimeRow(
+  label: SelfEmploymentProjectWorkPlan["labelHours"][number],
+  totalHours: number
+): string {
+  const width = totalHours > 0 ? Math.round((label.totalHours / totalHours) * 1000) / 10 : 0;
+  return `
+    <article class="self-employment-label-time-row" style="--self-employment-gantt-color:${escapeHtml(label.labelColor)};">
+      <div>
+        <strong>${escapeHtml(label.labelName)}</strong>
+        <span>${escapeHtml(`${hoursLabel(label.completedHours)} erledigt · ${hoursLabel(label.openHours)} offen`)}</span>
+      </div>
+      <div class="self-employment-label-time-bar" aria-hidden="true">
+        <span style="width:${escapeHtml(width)}%;"></span>
+      </div>
+      <small>${escapeHtml(`${hoursLabel(label.totalHours)} · ${width.toLocaleString("de-DE")} %`)}</small>
+    </article>
+  `;
+}
+
+function selfEmploymentPriorityLabel(priority: SelfEmploymentProjectWorkPlanTask["priority"]): string {
+  if (priority === "high") return "Hoch";
+  if (priority === "low") return "Niedrig";
+  return "Mittel";
+}
+
+function selfEmploymentDateLabel(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  return `${match[3]}.${match[2]}.${match[1]}`;
 }
 
 function selfEmploymentCollectionTextField(

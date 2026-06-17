@@ -4,9 +4,10 @@ import {
   addSelfEmploymentContact,
   addSelfEmploymentInvoice,
   addSelfEmploymentProject,
-  addSelfEmploymentTask,
+  addSelfEmploymentGanttTodo,
   deleteSelfEmploymentProject,
   hideSelfEmploymentIconPicker,
+  removeSelfEmploymentGanttTodo,
   removeSelfEmploymentCollectionItem,
   renameSelfEmploymentProject,
   selectSelfEmploymentIcon,
@@ -16,9 +17,11 @@ import {
   showSelfEmploymentIconPicker,
   toggleSelfEmploymentLabelPicker,
   toggleSelfEmploymentProjectLabel,
+  toggleSelfEmploymentTimeSource,
   updateSelfEmploymentCollectionItemField,
   updateSelfEmploymentGanttCardField,
   updateSelfEmploymentGanttPhaseField,
+  updateSelfEmploymentGanttTodoField,
   updateSelfEmploymentProjectField,
   updateSelfEmploymentProjectListField
 } from "./controller";
@@ -39,7 +42,7 @@ export function onSelfEmploymentInput(event: Event, context: AppContext): boolea
       target.dataset.selfEmploymentGanttPhaseId,
       target.dataset.selfEmploymentGanttPhaseField,
       selfEmploymentControlValue(target),
-      false
+      target instanceof HTMLInputElement && target.type === "checkbox"
     );
     return true;
   }
@@ -49,7 +52,23 @@ export function onSelfEmploymentInput(event: Event, context: AppContext): boolea
       target.dataset.selfEmploymentGanttCardId,
       target.dataset.selfEmploymentGanttCardField,
       selfEmploymentControlValue(target),
-      false
+      target instanceof HTMLInputElement && target.type === "checkbox"
+    );
+    return true;
+  }
+  if (
+    target.dataset.selfEmploymentGanttTodoField &&
+    target.dataset.selfEmploymentProjectId &&
+    target.dataset.selfEmploymentGanttCardId &&
+    target.dataset.selfEmploymentGanttTodoId
+  ) {
+    updateSelfEmploymentGanttTodoField(
+      target.dataset.selfEmploymentProjectId,
+      target.dataset.selfEmploymentGanttCardId,
+      target.dataset.selfEmploymentGanttTodoId,
+      target.dataset.selfEmploymentGanttTodoField,
+      selfEmploymentControlValue(target),
+      target instanceof HTMLInputElement && target.type === "checkbox"
     );
     return true;
   }
@@ -79,6 +98,17 @@ export function onSelfEmploymentInput(event: Event, context: AppContext): boolea
       target.dataset.selfEmploymentItemField,
       target.value,
       false
+    );
+    return true;
+  }
+  if (target.dataset.selfEmploymentTimeSourceOwnerType && target.dataset.selfEmploymentTimeSourceOwnerId) {
+    if (!(target instanceof HTMLInputElement)) return false;
+    const ownerType = target.dataset.selfEmploymentTimeSourceOwnerType === "habit" ? "habit" : "work";
+    toggleSelfEmploymentTimeSource(
+      target.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
+      ownerType,
+      target.dataset.selfEmploymentTimeSourceOwnerId,
+      target.checked
     );
     return true;
   }
@@ -161,9 +191,19 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
   if (action === "self-employment-remove-invoice") {
     removeSelfEmploymentCollectionItem(button.dataset.selfEmploymentProjectId || "", "invoices", button.dataset.selfEmploymentItemId || "");
   }
-  if (action === "self-employment-add-task") addSelfEmploymentTask(button.dataset.selfEmploymentProjectId || "");
-  if (action === "self-employment-remove-task") {
-    removeSelfEmploymentCollectionItem(button.dataset.selfEmploymentProjectId || "", "tasks", button.dataset.selfEmploymentItemId || "");
+  if (action === "self-employment-gantt-add-todo") {
+    addSelfEmploymentGanttTodo(
+      button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
+      button.dataset.selfEmploymentGanttCardId || "",
+      button.dataset.selfEmploymentGanttTodoId || ""
+    );
+  }
+  if (action === "self-employment-gantt-remove-todo") {
+    removeSelfEmploymentGanttTodo(
+      button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
+      button.dataset.selfEmploymentGanttCardId || "",
+      button.dataset.selfEmploymentGanttTodoId || ""
+    );
   }
   if (action === "self-employment-toggle-gantt-phase-filter") {
     toggleSelfEmploymentGanttPhaseFilter(

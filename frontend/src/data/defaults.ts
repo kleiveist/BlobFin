@@ -468,6 +468,7 @@ export function defaultSelfEmploymentState(): SelfEmploymentState {
         oneTimeCosts: 500,
         taxReservePercent: 30,
         monthlyWorkHours: 20,
+        timeSources: [],
         contacts: [
           {
             id: "self-contact-example",

@@ -4,6 +4,7 @@ import {
   normalizeSelfEmploymentGanttPlan,
   normalizedGanttLabelId,
   orderedGanttLabels,
+  selfEmploymentGanttLabelColor,
   visibleSelfEmploymentGanttRows,
   type SelfEmploymentGanttSummary
 } from "../../domain/selfEmploymentGantt";
@@ -13,6 +14,7 @@ import type {
   JsonCanvasNode,
   SelfEmploymentGanttCardPlan,
   SelfEmploymentGanttPhase,
+  SelfEmploymentGanttTodo,
   SelfEmploymentProject
 } from "../../types";
 import { selfEmploymentUiState } from "./uiState";
@@ -153,7 +155,7 @@ function renderSelfEmploymentProjectGanttRow(project: SelfEmploymentProject, row
   const emptyState = row.enabled ? "Keine Karten in dieser Phase" : "Phase inaktiv";
   const startLabel = row.startMode === "after_previous_label"
     ? `ab ${selfEmploymentGanttLabelName(project, row.triggerLabelId)}`
-    : (row.startDate ? `Start ${row.startDate}` : "manueller Start");
+    : "manueller Start";
   return `
     <section class="self-employment-project-gantt-row${row.enabled ? "" : " disabled"}">
       <button
@@ -191,7 +193,7 @@ function renderSelfEmploymentProjectGanttLabel(
       const cardWidth = selfEmploymentGanttPercent(card.widthPercent);
       return `
         <button
-          class="self-employment-project-gantt-card"
+          class="self-employment-project-gantt-card${card.completed ? " completed" : ""}"
           type="button"
           style="flex-basis: ${cardWidth}%;"
           data-action="self-employment-gantt-open-card"
@@ -200,7 +202,7 @@ function renderSelfEmploymentProjectGanttLabel(
           title="${escapeHtml(`${card.title} · ${hoursLabel(card.timeBudgetHours)}`)}"
         >
           <span>${escapeHtml(card.title)}</span>
-          <small>${escapeHtml(hoursLabel(card.timeBudgetHours))}</small>
+          <small>${escapeHtml(`${hoursLabel(card.timeBudgetHours)} · ${Math.round(card.progressPercent)} %`)}</small>
         </button>
       `;
     })
@@ -208,7 +210,7 @@ function renderSelfEmploymentProjectGanttLabel(
   return `
     <div
       class="self-employment-project-gantt-label"
-      style="left: ${left}%; width: ${width}%; --self-employment-gantt-color: ${escapeHtml(selfEmploymentGanttColor(label.color))};"
+      style="left: ${left}%; width: ${width}%; --self-employment-gantt-color: ${escapeHtml(selfEmploymentGanttLabelColor(label.labelId))};"
       title="${escapeHtml(`${label.labelName}: ${hoursLabel(label.totalHours)}`)}"
     >
       <div class="self-employment-project-gantt-label-head">
@@ -265,7 +267,6 @@ function renderSelfEmploymentGanttPhasePopover(
           data-self-employment-gantt-phase-field="enabled"
         />
       </label>
-      ${selfEmploymentGanttPhaseTextField(project.id, phase, "startDate", "Startdatum", phase.startDate ?? "", "date")}
       ${selfEmploymentGanttPhaseSelectField(project.id, phase, "startMode", "Startmodus", phase.startMode, [
         ["manual", "Manuell"],
         ["after_previous_label", "Nach Label der Vorphase"]
@@ -279,7 +280,6 @@ function renderSelfEmploymentGanttPhasePopover(
         phaseOptions
       )}
       ${selfEmploymentGanttPhaseSelectField(project.id, phase, "triggerLabelId", "Start ab Label", phase.triggerLabelId ?? "goal", labelOptions)}
-      ${selfEmploymentGanttPhaseNumberField(project.id, phase, "defaultTimeBudgetHours", "Default-Stunden je Karte", phase.defaultTimeBudgetHours)}
     </div>
   `;
 }
@@ -297,48 +297,41 @@ function renderSelfEmploymentGanttCardPopover(project: SelfEmploymentProject, ca
   };
   const labelOptions = orderedGanttLabels(project.businessIdeaCanvasMeta).map((label) => [label.id, label.name] as [string, string]);
   const phaseOptions = selfEmploymentGanttPhaseOptions(project);
+  const completedTodos = plan.todos.filter((todo) => todo.completed).length;
   return `
     <div class="self-employment-gantt-popover self-employment-gantt-card-popover" ${positionAttributes} role="dialog" aria-label="${escapeHtml(`${selfEmploymentGanttNodeTitle(node)} planen`)}">
       <header>
         <strong>${escapeHtml(selfEmploymentGanttNodeTitle(node))}</strong>
         <button class="icon-button" type="button" data-action="self-employment-gantt-close-editor" aria-label="Gantt-Editor schliessen">x</button>
       </header>
+      <div class="self-employment-gantt-popover-summary">
+        <span>${escapeHtml(`${completedTodos}/${plan.todos.length} Todos erledigt`)}</span>
+        <span>${escapeHtml(`${Math.round(plan.todos.length > 0 ? (completedTodos / plan.todos.length) * 100 : plan.completed ? 100 : 0)} % Fortschritt`)}</span>
+      </div>
       ${selfEmploymentGanttCardNumberField(project.id, plan, "timeBudgetHours", "Stundenbudget", plan.timeBudgetHours)}
-      ${selfEmploymentGanttCardTextField(project.id, plan, "startDate", "Startdatum", plan.startDate ?? "", "date")}
       ${selfEmploymentGanttCardSelectField(project.id, plan.cardId, "labelId", "Label", normalizedGanttLabelId(nodeMeta.labelId), labelOptions)}
       ${selfEmploymentGanttCardSelectField(project.id, plan.cardId, "phaseId", "Phase", nodeMeta.phaseId, phaseOptions)}
-      <label class="field self-employment-edit-field wide">
-        <span>Notiz</span>
-        <textarea
-          rows="3"
+      <label class="self-employment-gantt-status-switch">
+        <span>Nicht erledigt</span>
+        <input
+          type="checkbox"
+          ${plan.completed ? "checked" : ""}
           data-self-employment-project-id="${escapeHtml(project.id)}"
           data-self-employment-gantt-card-id="${escapeHtml(plan.cardId)}"
-          data-self-employment-gantt-card-field="note"
-        >${escapeHtml(plan.note)}</textarea>
+          data-self-employment-gantt-card-field="completed"
+        />
+        <span>Erledigt</span>
       </label>
+      <div class="self-employment-gantt-todos">
+        <div class="self-employment-gantt-todos-head">
+          <span>Todos</span>
+          <button class="button mini secondary" type="button" data-action="self-employment-gantt-add-todo" data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-gantt-card-id="${escapeHtml(plan.cardId)}">+</button>
+        </div>
+        <div class="self-employment-gantt-todo-list">
+          ${plan.todos.map((todo) => selfEmploymentGanttTodoRow(project.id, plan.cardId, todo)).join("")}
+        </div>
+      </div>
     </div>
-  `;
-}
-
-function selfEmploymentGanttPhaseTextField(
-  projectId: string,
-  phase: SelfEmploymentGanttPhase,
-  field: keyof SelfEmploymentGanttPhase,
-  label: string,
-  value: string,
-  type = "text"
-): string {
-  return `
-    <label class="field self-employment-edit-field">
-      <span>${escapeHtml(label)}</span>
-      <input
-        type="${escapeHtml(type)}"
-        value="${escapeHtml(value)}"
-        data-self-employment-project-id="${escapeHtml(projectId)}"
-        data-self-employment-gantt-phase-id="${escapeHtml(phase.phaseId)}"
-        data-self-employment-gantt-phase-field="${escapeHtml(field)}"
-      />
-    </label>
   `;
 }
 
@@ -388,28 +381,6 @@ function selfEmploymentGanttPhaseSelectField(
   `;
 }
 
-function selfEmploymentGanttCardTextField(
-  projectId: string,
-  plan: SelfEmploymentGanttCardPlan,
-  field: keyof SelfEmploymentGanttCardPlan,
-  label: string,
-  value: string,
-  type = "text"
-): string {
-  return `
-    <label class="field self-employment-edit-field">
-      <span>${escapeHtml(label)}</span>
-      <input
-        type="${escapeHtml(type)}"
-        value="${escapeHtml(value)}"
-        data-self-employment-project-id="${escapeHtml(projectId)}"
-        data-self-employment-gantt-card-id="${escapeHtml(plan.cardId)}"
-        data-self-employment-gantt-card-field="${escapeHtml(field)}"
-      />
-    </label>
-  `;
-}
-
 function selfEmploymentGanttCardNumberField(
   projectId: string,
   plan: SelfEmploymentGanttCardPlan,
@@ -431,6 +402,63 @@ function selfEmploymentGanttCardNumberField(
         data-self-employment-gantt-card-field="${escapeHtml(field)}"
       />
     </label>
+  `;
+}
+
+function selfEmploymentGanttTodoRow(projectId: string, cardId: string, todo: SelfEmploymentGanttTodo): string {
+  return `
+    <div class="self-employment-gantt-todo-row${todo.completed ? " completed" : ""}">
+      <label class="self-employment-gantt-todo-check" title="Todo erledigt">
+        <input
+          type="checkbox"
+          ${todo.completed ? "checked" : ""}
+          data-self-employment-project-id="${escapeHtml(projectId)}"
+          data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+          data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+          data-self-employment-gantt-todo-field="completed"
+        />
+      </label>
+      <select
+        aria-label="Todo-Prioritaet"
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+        data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+        data-self-employment-gantt-todo-field="priority"
+      >
+        ${selfEmploymentOption("high", "Hoch", todo.priority)}
+        ${selfEmploymentOption("medium", "Mittel", todo.priority)}
+        ${selfEmploymentOption("low", "Niedrig", todo.priority)}
+      </select>
+      <input
+        type="text"
+        value="${escapeHtml(todo.title)}"
+        aria-label="Todo"
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+        data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+        data-self-employment-gantt-todo-field="title"
+      />
+      <button
+        class="icon-button"
+        type="button"
+        data-action="self-employment-gantt-add-todo"
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+        data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+        aria-label="Todo hinzufuegen"
+        title="Todo hinzufuegen"
+      >+</button>
+      <button
+        class="icon-button danger"
+        type="button"
+        data-action="self-employment-gantt-remove-todo"
+        data-self-employment-project-id="${escapeHtml(projectId)}"
+        data-self-employment-gantt-card-id="${escapeHtml(cardId)}"
+        data-self-employment-gantt-todo-id="${escapeHtml(todo.id)}"
+        aria-label="Todo loeschen"
+        title="Todo loeschen"
+      >x</button>
+    </div>
   `;
 }
 
@@ -479,17 +507,6 @@ export function selfEmploymentGanttPhaseNumber(phaseId: string): string {
 
 function selfEmploymentGanttPercent(value: number): string {
   return String(Math.round(clamp(value, 0, 100) * 1000) / 1000);
-}
-
-function selfEmploymentGanttColor(color: string): string {
-  if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
-  if (color === "1") return "var(--danger)";
-  if (color === "2") return "var(--gold)";
-  if (color === "3") return "#eab308";
-  if (color === "4") return "var(--accent)";
-  if (color === "5") return "#2563eb";
-  if (color === "6") return "#7c3aed";
-  return "var(--accent)";
 }
 
 function selfEmploymentOption(value: string, label: string, selectedValue: string): string {

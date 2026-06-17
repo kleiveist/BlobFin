@@ -15,6 +15,7 @@ import type {
   SelfEmploymentInvoiceStatus,
   SelfEmploymentProject,
   SelfEmploymentProjectStatus,
+  SelfEmploymentProjectTimeSource,
   SelfEmploymentRiskLevel,
   SelfEmploymentRoadmapAreaId,
   SelfEmploymentState,
@@ -101,6 +102,7 @@ export function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentPr
     oneTimeCosts: clampNumber(numberOrDefault(value.oneTimeCosts, 0), 0, Number.MAX_SAFE_INTEGER),
     taxReservePercent: clampNumber(numberOrDefault(value.taxReservePercent, fallback.taxReservePercent), 0, 100),
     monthlyWorkHours: clampNumber(numberOrDefault(value.monthlyWorkHours, 0), 0, 744),
+    timeSources: normalizeSelfEmploymentProjectTimeSources(value.timeSources),
     contacts: Array.isArray(value.contacts)
       ? value.contacts.map(normalizeSelfEmploymentContact).filter((contact): contact is SelfEmploymentContact => contact !== null)
       : [],
@@ -174,6 +176,23 @@ export function normalizeSelfEmploymentTask(value: unknown): SelfEmploymentTask 
     estimatedHours: clampNumber(numberOrDefault(value.estimatedHours, 0), 0, 1000),
     status: normalizeSelfEmploymentTaskStatus(value.status, "open")
   };
+}
+
+export function normalizeSelfEmploymentProjectTimeSources(value: unknown): SelfEmploymentProjectTimeSource[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const sources: SelfEmploymentProjectTimeSource[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const ownerType = item.ownerType === "work" || item.ownerType === "habit" ? item.ownerType : null;
+    const ownerId = typeof item.ownerId === "string" ? item.ownerId.trim() : "";
+    if (!ownerType || !ownerId) continue;
+    const key = `${ownerType}:${ownerId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    sources.push({ ownerType, ownerId });
+  }
+  return sources;
 }
 
 export function normalizeSelfEmploymentRoadmapAreaId(
