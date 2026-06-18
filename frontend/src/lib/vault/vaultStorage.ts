@@ -190,7 +190,7 @@ function withExternalSelfEmploymentCanvases(value: unknown, canvasFiles: unknown
   const hasSourceState = isRecord(value);
   const source = hasSourceState ? value : { selectedProjectId: "", selectedRoadmapAreaId: "idea", projects: [] };
   const hasProjectArray = Array.isArray(source.projects);
-  const projects = hasProjectArray ? source.projects : [];
+  const projects: unknown[] = hasProjectArray ? source.projects : [];
   const existingCanvasFiles = new Set(
     projects.flatMap((project) => {
       if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") return [];
