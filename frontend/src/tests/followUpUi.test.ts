@@ -73,6 +73,7 @@ const cssSourcePaths = [
   "../features/combined-wealth/styles.css",
   "../features/income-tracker/styles.css",
   "../features/income-planning/styles.css",
+  "../features/income-planning/styles/dialogs.css",
   "../features/income-stamp-planner/styles.css",
   "../features/self-employment/styles.css",
   "../features/self-employment/business-canvas/styles.css"
@@ -466,8 +467,16 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain('data-action="open-section-income_stamp_planner"');
     expect(html).toContain('id="incomePlanningPlanningPopupRoot"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-planning-planning-popup-${view}"');
-    expect(incomePlanningPlanningPopupControllerSource).toContain('planningPopupTab("year", "Jahresplanung"');
-    expect(incomePlanningPlanningPopupControllerSource).toContain('planningPopupTab("stamp", "Stempelplaner"');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('class="income-planning-popup-view-switcher"');
+    expect(incomePlanningPlanningPopupControllerSource).not.toContain(["income", "planning", "popup", "tabs"].join("-"));
+    expect(incomePlanningPlanningPopupControllerSource).toContain('planningPopupTab("year", "Jahresplanung", activeView)');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('planningPopupTab("stamp", "Stempelplaner", activeView)');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('income-section-head income-planning-card-head income-planning-popup-top-row');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('renderIncomePlanningScenarioLegend(scenarios)');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('data-income-planning-year-week-list');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('data-income-planning-year-week-row');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('preserveIncomePlanningPlanningPopupScroll');
+    expect(incomePlanningPlanningPopupControllerSource).toContain('setIncomePlanningScenarioForWeekStart(weekStartDate, scenarioId, { render: false })');
     expect(incomePlanningPlanningPopupControllerSource).not.toContain('data-income-planning-year-week-scenario');
     expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-planning-year-week-toggle-scenario"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-planning-year-week-select-scenario"');
@@ -476,6 +485,9 @@ describe("follow-up ui rendering", () => {
     expect(incomePlanningPlanningPopupControllerSource).toContain('id="incomeStampPlannerGrid"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('id="incomeStampPlannerDialogRoot"');
     expect(incomePlanningPlanningPopupControllerSource).toContain('data-action="income-stamp-planner-add"');
+    expect(stylesSource).toContain(".income-planning-year-week-grid");
+    expect(stylesSource).toContain("grid-template-columns: repeat(7, minmax(80px, 1fr));");
+    expect(stylesSource).toContain("min-width: 80px;");
     expect(incomePlanningStampPlannerControllerSource).toContain("renderIncomeStampPlannerContent");
   });
 

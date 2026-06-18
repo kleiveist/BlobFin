@@ -352,12 +352,20 @@
     grid-template-columns: 1fr;
   }
 
+  .income-planning-popup-view-switcher,
+  .income-planning-year-scenario-legend {
+    align-self: stretch;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
   .income-planning-year-summary {
     justify-items: start;
   }
 
-  .income-planning-year-week-list {
-    grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  .income-planning-year-week-list,
+  .income-planning-year-week-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
 
   .income-planning-year-week-popover {

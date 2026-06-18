@@ -54,25 +54,34 @@ export function showNextIncomePlanningPlanningPopupYear(): void {
 }
 
 export function setIncomePlanningYearWeekScenario(weekStartDate: string, scenarioId: string): void {
-  if (incomePlanningUiState.planningPopup) {
-    incomePlanningUiState.planningPopup = { ...incomePlanningUiState.planningPopup, yearWeekScenarioPicker: null };
+  const popup = incomePlanningUiState.planningPopup;
+  if (!popup || popup.view !== "year") {
+    setIncomePlanningScenarioForWeekStart(weekStartDate, scenarioId);
+    return;
   }
-  setIncomePlanningScenarioForWeekStart(weekStartDate, scenarioId);
+  const previousPicker = popup.yearWeekScenarioPicker;
+  const updated = setIncomePlanningScenarioForWeekStart(weekStartDate, scenarioId, { render: false });
+  if (!updated) return;
+  incomePlanningUiState.planningPopup = { ...popup, yearWeekScenarioPicker: null };
+  renderIncomePlanningYearWeekRowsForDates([previousPicker, weekStartDate]);
 }
 
 export function toggleIncomePlanningYearWeekScenarioPicker(weekStartDate: string): void {
   const popup = incomePlanningUiState.planningPopup;
   if (!popup || popup.view !== "year") return;
+  const previousPicker = popup.yearWeekScenarioPicker;
+  const nextPicker = previousPicker === weekStartDate ? null : weekStartDate;
   incomePlanningUiState.planningPopup = {
     ...popup,
-    yearWeekScenarioPicker: popup.yearWeekScenarioPicker === weekStartDate ? null : weekStartDate
+    yearWeekScenarioPicker: nextPicker
   };
-  renderIncomePlanningPlanningPopup();
+  renderIncomePlanningYearWeekRowsForDates([previousPicker, nextPicker]);
 }
 
 export function renderIncomePlanningPlanningPopup(): void {
   const root = document.querySelector<HTMLDivElement>("#incomePlanningPlanningPopupRoot");
   if (!root) return;
+  const previousScrollTop = root.querySelector<HTMLElement>(".income-planning-planning-popup")?.scrollTop ?? 0;
   const popup = incomePlanningUiState.planningPopup;
   if (!popup) {
     root.innerHTML = "";
@@ -86,6 +95,8 @@ export function renderIncomePlanningPlanningPopup(): void {
       </div>
     </div>
   `;
+  const nextPopup = root.querySelector<HTMLElement>(".income-planning-planning-popup");
+  if (nextPopup) nextPopup.scrollTop = previousScrollTop;
   if (popup.view === "stamp") renderIncomeStampPlannerContent();
 }
 
@@ -102,9 +113,9 @@ function planningPopupTab(view: "year" | "stamp", label: string, activeView: "ye
   `;
 }
 
-function renderPlanningPopupTabs(activeView: "year" | "stamp"): string {
+function renderPlanningPopupViewSwitch(activeView: "year" | "stamp"): string {
   return `
-    <div class="income-planning-popup-tabs" role="tablist" aria-label="Planungsansicht">
+    <div class="income-planning-popup-view-switcher" role="tablist" aria-label="Planungsansicht">
       ${planningPopupTab("year", "Jahresplanung", activeView)}
       ${planningPopupTab("stamp", "Stempelplaner", activeView)}
     </div>
@@ -117,37 +128,71 @@ function renderIncomePlanningYearPlanningView(year: number): string {
   const activePicker = incomePlanningUiState.planningPopup?.yearWeekScenarioPicker ?? null;
   return `
     <section class="income-planning-year-view" aria-label="Jahresplanung">
-      <div class="income-planning-year-toolbar">
-        <div class="income-stamp-planner-month-nav" role="group" aria-label="Jahr auswaehlen">
-          <button class="income-stamp-planner-month-button" type="button" data-action="income-planning-planning-popup-prev-year" aria-label="Vorheriges Jahr" title="Vorheriges Jahr">
-            ${incomePlanningHeaderIcon("chevron-left")}
-          </button>
-          <label class="field compact income-planning-year-field">
-            <span>Jahr</span>
-            <input type="number" min="2000" max="2100" step="1" value="${escapeHtml(String(year))}" data-income-planning-planning-popup-year />
-          </label>
-          <button class="income-stamp-planner-month-button" type="button" data-action="income-planning-planning-popup-next-year" aria-label="Naechstes Jahr" title="Naechstes Jahr">
-            ${incomePlanningHeaderIcon("chevron-right")}
-          </button>
+      <div class="income-section-head income-planning-card-head income-planning-popup-top-row income-planning-year-popup-head">
+        <div class="income-planning-popup-title-stack">
+          <div>
+            <h3>Jahresplanung</h3>
+            <p>Kalenderwochen und Wochenszenarien fuer ${escapeHtml(String(year))}.</p>
+          </div>
+          <div class="income-planning-year-toolbar">
+            <div class="income-stamp-planner-month-nav" role="group" aria-label="Jahr auswaehlen">
+              <button class="income-stamp-planner-month-button" type="button" data-action="income-planning-planning-popup-prev-year" aria-label="Vorheriges Jahr" title="Vorheriges Jahr">
+                ${incomePlanningHeaderIcon("chevron-left")}
+              </button>
+              <label class="field compact income-planning-year-field">
+                <span>Jahr</span>
+                <input type="number" min="2000" max="2100" step="1" value="${escapeHtml(String(year))}" data-income-planning-planning-popup-year />
+              </label>
+              <button class="income-stamp-planner-month-button" type="button" data-action="income-planning-planning-popup-next-year" aria-label="Naechstes Jahr" title="Naechstes Jahr">
+                ${incomePlanningHeaderIcon("chevron-right")}
+              </button>
+            </div>
+            <div class="income-planning-year-summary">
+              <strong>${intNumber(weeks.length)} Kalenderwochen</strong>
+              <span>Nicht gesetzte Wochen nutzen ${escapeHtml(incomePlanningWeekScenarioConfig("normal", host.getState().incomePlanning.weekScenarios ?? []).label)}.</span>
+            </div>
+          </div>
         </div>
-        <div class="income-planning-year-summary">
-          <strong>${intNumber(weeks.length)} Kalenderwochen</strong>
-          <span>Nicht gesetzte Wochen nutzen ${escapeHtml(incomePlanningWeekScenarioConfig("normal", host.getState().incomePlanning.weekScenarios ?? []).label)}.</span>
-        </div>
+        ${renderPlanningPopupViewSwitch("year")}
+        ${renderIncomePlanningScenarioLegend(scenarios)}
       </div>
-      ${renderPlanningPopupTabs("year")}
-      <div class="income-planning-year-scenario-legend" aria-label="Wochenszenario-Farben">
-        ${scenarios.map((scenario) => `
-          <span style="--income-planning-scenario-color:${escapeHtml(scenario.color)}">
-            <i></i>${escapeHtml(scenario.label)}
-          </span>
-        `).join("")}
-      </div>
-      <div class="income-planning-year-week-list">
+      <div class="income-planning-year-week-list income-planning-year-week-grid" data-income-planning-year-week-list>
         ${weeks.map((week) => renderIncomePlanningYearWeekRow(week, scenarios, activePicker === week.weekStartDate)).join("")}
       </div>
     </section>
   `;
+}
+
+function renderIncomePlanningYearWeekRowsForDates(weekStartDates: Array<string | null>): void {
+  const popup = incomePlanningUiState.planningPopup;
+  if (!popup || popup.view !== "year") return;
+  const weeks = incomePlanningIsoWeeksForYear(popup.year);
+  const scenarios = incomePlanningWeekScenarioOptions();
+  const uniqueWeekStartDates = Array.from(new Set(weekStartDates.filter((value): value is string => Boolean(value))));
+  preserveIncomePlanningPlanningPopupScroll(() => {
+    uniqueWeekStartDates.forEach((weekStartDate) => {
+      const row = incomePlanningYearWeekRowElement(weekStartDate);
+      const week = weeks.find((entry) => entry.weekStartDate === weekStartDate);
+      if (!row || !week) return;
+      row.outerHTML = renderIncomePlanningYearWeekRow(
+        week,
+        scenarios,
+        incomePlanningUiState.planningPopup?.yearWeekScenarioPicker === week.weekStartDate
+      );
+    });
+  });
+}
+
+function incomePlanningYearWeekRowElement(weekStartDate: string): HTMLElement | null {
+  const rows = document.querySelectorAll<HTMLElement>("[data-income-planning-year-week-row]");
+  return Array.from(rows).find((row) => row.dataset.incomePlanningYearWeekRow === weekStartDate) ?? null;
+}
+
+function preserveIncomePlanningPlanningPopupScroll(render: () => void): void {
+  const popup = document.querySelector<HTMLElement>(".income-planning-planning-popup");
+  const scrollTop = popup?.scrollTop ?? 0;
+  render();
+  if (popup) popup.scrollTop = scrollTop;
 }
 
 function renderIncomePlanningYearWeekRow(
@@ -159,7 +204,11 @@ function renderIncomePlanningYearWeekRow(
   const scenario = incomePlanningWeekScenarioConfig(scenarioId, host.getState().incomePlanning.weekScenarios ?? []);
   const popoverId = incomePlanningYearWeekPopoverId(week.weekStartDate);
   return `
-    <article class="income-planning-year-week-row${open ? " open" : ""}" style="--income-planning-scenario-color:${escapeHtml(scenario.color)};">
+    <article
+      class="income-planning-year-week-row${open ? " open" : ""}"
+      data-income-planning-year-week-row="${escapeHtml(week.weekStartDate)}"
+      style="--income-planning-scenario-color:${escapeHtml(scenario.color)};"
+    >
       <button
         class="income-planning-year-week-card-button"
         type="button"
@@ -173,9 +222,9 @@ function renderIncomePlanningYearWeekRow(
           <strong>KW ${String(week.weekNumber).padStart(2, "0")}</strong>
           <span>${escapeHtml(incomePlanningYearWeekRangeLabel(week.start, week.end))}</span>
         </span>
-        <span class="income-planning-year-week-scenario">
+        <span class="income-planning-year-week-scenario" aria-label="Szenario ${escapeHtml(scenario.label)}">
           <i></i>
-          <span>${escapeHtml(scenario.label)}</span>
+          <span title="${escapeHtml(scenario.label)}">${escapeHtml(incomePlanningScenarioAbbreviation(scenario.label))}</span>
         </span>
       </button>
       ${open ? renderIncomePlanningYearWeekPopover(week, scenarios, scenarioId, popoverId) : ""}
@@ -211,23 +260,45 @@ function renderIncomePlanningYearWeekPopover(
 }
 
 function renderIncomePlanningStampPlannerView(): string {
+  const scenarios = incomePlanningWeekScenarioOptions();
   return `
     <section class="income-planning-stamp-popup-view" aria-label="Stempelplaner">
       <div class="income-section-head income-planning-card-head income-planning-popup-top-row">
-        <div>
-          <h3>Planungsraster</h3>
-          <p>Monatsuebersicht fuer einmalige Kalender-Stempel.</p>
+        <div class="income-planning-popup-title-stack">
+          <div>
+            <h3>Planungsraster</h3>
+            <p>Monatsuebersicht fuer einmalige Kalender-Stempel.</p>
+          </div>
+          <div class="income-planning-stamp-popup-controls">
+            <div id="incomeStampPlannerControls" class="income-stamp-planner-controls"></div>
+            <button class="button" type="button" data-action="income-stamp-planner-add">Stempel planen</button>
+          </div>
         </div>
-        <div class="button-row income-planning-stamp-popup-controls">
-          <button class="button" type="button" data-action="income-stamp-planner-add">Stempel planen</button>
-          <div id="incomeStampPlannerControls" class="income-stamp-planner-controls"></div>
-        </div>
+        ${renderPlanningPopupViewSwitch("stamp")}
+        ${renderIncomePlanningScenarioLegend(scenarios)}
       </div>
-      ${renderPlanningPopupTabs("stamp")}
       <div id="incomeStampPlannerGrid" class="income-stamp-planner-grid"></div>
       <div id="incomeStampPlannerDialogRoot"></div>
     </section>
   `;
+}
+
+function renderIncomePlanningScenarioLegend(scenarios: ReturnType<typeof incomePlanningWeekScenarioOptions>): string {
+  return `
+    <div class="income-planning-year-scenario-legend" aria-label="Wochenszenario-Farben">
+      ${scenarios.map((scenario) => `
+        <span style="--income-planning-scenario-color:${escapeHtml(scenario.color)}">
+          <i></i>${escapeHtml(scenario.label)}
+        </span>
+      `).join("")}
+    </div>
+  `;
+}
+
+function incomePlanningScenarioAbbreviation(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (words.length > 1) return words.map((word) => word[0] ?? "").join("").slice(0, 3).toUpperCase();
+  return label.trim().slice(0, 3).toUpperCase();
 }
 
 function incomePlanningYearWeekRangeLabel(start: Date, end: Date): string {

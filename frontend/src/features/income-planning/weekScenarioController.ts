@@ -93,9 +93,13 @@ export function incomePlanningScenarioIdForWeekStart(
   return knownIds.has(assignedScenarioId ?? "") ? assignedScenarioId ?? "normal" : "normal";
 }
 
-export function setIncomePlanningScenarioForWeekStart(weekStartDate: string, value: string): void {
-  if (!incomePlanningKnownScenarioIds().includes(value)) return;
-  if (!incomeStampPlannerDateFromString(weekStartDate)) return;
+export function setIncomePlanningScenarioForWeekStart(
+  weekStartDate: string,
+  value: string,
+  options: { render?: boolean } = {}
+): boolean {
+  if (!incomePlanningKnownScenarioIds().includes(value)) return false;
+  if (!incomeStampPlannerDateFromString(weekStartDate)) return false;
   const assignments = (host.getState().incomePlanning.weekScenarioAssignments ?? []).filter(
     (assignment) => assignment.weekStartDate !== weekStartDate
   );
@@ -108,8 +112,9 @@ export function setIncomePlanningScenarioForWeekStart(weekStartDate: string, val
             first.weekStartDate.localeCompare(second.weekStartDate)
           )
   };
-  host.renderAll();
+  if (options.render ?? true) host.renderAll();
   host.persistCurrentState();
+  return true;
 }
 
 export function openIncomePlanningWeekScenarioDialog(): void {
