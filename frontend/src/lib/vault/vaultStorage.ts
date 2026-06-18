@@ -188,9 +188,16 @@ async function discoverSelfEmploymentCanvasPaths(rootPath: string): Promise<stri
 function withExternalSelfEmploymentCanvases(value: unknown, canvasFiles: unknown): unknown {
   if (!isRecord(canvasFiles)) return value;
   const hasSourceState = isRecord(value);
-  const source = hasSourceState ? value : { selectedProjectId: "", selectedRoadmapAreaId: "idea", projects: [] };
-  const hasProjectArray = Array.isArray(source.projects);
-  const projects: unknown[] = hasProjectArray ? source.projects : [];
+  const source: Record<string, unknown> = hasSourceState
+    ? value
+    : { selectedProjectId: "", selectedRoadmapAreaId: "idea", projects: [] };
+  const rawProjects = source.projects;
+  let hasProjectArray = false;
+  let projects: unknown[] = [];
+  if (Array.isArray(rawProjects)) {
+    hasProjectArray = true;
+    projects = rawProjects;
+  }
   const existingCanvasFiles = new Set(
     projects.flatMap((project) => {
       if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") return [];
