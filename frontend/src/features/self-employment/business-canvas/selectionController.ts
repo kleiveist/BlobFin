@@ -1,6 +1,7 @@
 import { createId } from "../../../data/defaults";
 import {
   businessIdeaCanvasBoundsForNodes,
+  businessIdeaCanvasMoveDeltaForNodes,
   snapBusinessIdeaCanvasValue
 } from "../../../domain/businessIdeaCanvas";
 import type { BusinessIdeaCanvasNodeMeta } from "../../../types";
@@ -22,6 +23,27 @@ export function selectBusinessIdeaCanvasNodes(projectId: string, nodeIds: string
   businessCanvasUiState.selectedEdge = null;
   businessCanvasUiState.editingEdgeLabel = null;
   businessCanvasUiState.contextMenu = null;
+}
+
+export function moveBusinessIdeaCanvasSelection(deltaX: number, deltaY: number): boolean {
+  const selection = businessCanvasUiState.selectedNodeIds;
+  if (!selection?.nodeIds.length) return false;
+  const project = businessCanvasProjectById(selection.projectId);
+  if (!project) return false;
+  const selectedIds = new Set(selection.nodeIds);
+  const selectedNodes = project.businessIdeaCanvas.nodes.filter((node) => selectedIds.has(node.id));
+  const delta = businessIdeaCanvasMoveDeltaForNodes(selectedNodes, deltaX, deltaY);
+  if (delta.x === 0 && delta.y === 0) return false;
+  updateBusinessIdeaCanvasProject(selection.projectId, (item) => ({
+    ...item,
+    businessIdeaCanvas: {
+      ...item.businessIdeaCanvas,
+      nodes: item.businessIdeaCanvas.nodes.map((node) =>
+        selectedIds.has(node.id) ? { ...node, x: node.x + delta.x, y: node.y + delta.y } : node
+      )
+    }
+  }), true);
+  return true;
 }
 
 export function clearBusinessIdeaCanvasSelection(): void {

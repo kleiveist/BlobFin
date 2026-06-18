@@ -19,6 +19,7 @@ import { deleteBusinessIdeaCanvasSelectedNode } from "./nodeController";
 import {
   businessIdeaCanvasSelectedIds,
   copyBusinessIdeaCanvasSelection,
+  moveBusinessIdeaCanvasSelection,
   pasteBusinessIdeaCanvasClipboard,
   selectBusinessIdeaCanvasNodes
 } from "./selectionController";
@@ -81,6 +82,7 @@ export {
   businessIdeaCanvasSelectedIds,
   clearBusinessIdeaCanvasSelection,
   copyBusinessIdeaCanvasSelection,
+  moveBusinessIdeaCanvasSelection,
   pasteBusinessIdeaCanvasClipboard,
   selectBusinessIdeaCanvasNodes
 } from "./selectionController";
@@ -224,6 +226,16 @@ export function handleBusinessIdeaCanvasKeyDown(event: KeyboardEvent): void {
   const hasCanvasFocus = Boolean(document.querySelector(".business-canvas-editor"));
   if (!hasCanvasFocus) return;
   const usesModifier = event.ctrlKey || event.metaKey;
+  const arrowDelta = businessIdeaCanvasArrowKeyDelta(event.key);
+  const selection = businessCanvasUiState.selectedNodeIds;
+  if (arrowDelta && !usesModifier && !event.altKey && selection?.nodeIds.length) {
+    if (isBusinessIdeaCanvasProjectRendered(selection.projectId)) {
+      const step = event.shiftKey ? 1 : 10;
+      event.preventDefault();
+      moveBusinessIdeaCanvasSelection(arrowDelta.x * step, arrowDelta.y * step);
+      return;
+    }
+  }
   if (usesModifier && event.key.toLowerCase() === "c" && businessCanvasUiState.selectedNodeIds?.nodeIds.length) {
     event.preventDefault();
     copyBusinessIdeaCanvasSelection();
@@ -268,6 +280,20 @@ export function isBusinessIdeaCanvasEditableFocus(): boolean {
   if (!active) return false;
   const tagName = active.tagName.toLowerCase();
   return tagName === "input" || tagName === "textarea" || tagName === "select" || active.isContentEditable;
+}
+
+function businessIdeaCanvasArrowKeyDelta(key: string): { x: number; y: number } | null {
+  if (key === "ArrowUp") return { x: 0, y: -1 };
+  if (key === "ArrowDown") return { x: 0, y: 1 };
+  if (key === "ArrowLeft") return { x: -1, y: 0 };
+  if (key === "ArrowRight") return { x: 1, y: 0 };
+  return null;
+}
+
+function isBusinessIdeaCanvasProjectRendered(projectId: string): boolean {
+  return Array.from(document.querySelectorAll<HTMLElement>("[data-business-canvas-project-id]")).some(
+    (element) => element.dataset.businessCanvasProjectId === projectId
+  );
 }
 
 export function openBusinessIdeaCanvasPalette(button: HTMLElement): void {

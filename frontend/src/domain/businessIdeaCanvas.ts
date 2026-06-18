@@ -295,6 +295,25 @@ export function clampBusinessIdeaCanvasNodeSize(width: number, height: number): 
   };
 }
 
+export function businessIdeaCanvasMoveDeltaForNodes(
+  nodes: JsonCanvasNode[],
+  deltaX: number,
+  deltaY: number
+): BusinessIdeaCanvasPoint {
+  const bounds = businessIdeaCanvasBoundsForNodes(nodes);
+  if (!bounds) return { x: 0, y: 0 };
+  const requestedX = finiteRoundedDelta(deltaX);
+  const requestedY = finiteRoundedDelta(deltaY);
+  const minX = -BUSINESS_IDEA_CANVAS_ORIGIN;
+  const minY = -BUSINESS_IDEA_CANVAS_ORIGIN;
+  const maxRight = BUSINESS_IDEA_CANVAS_WIDTH - BUSINESS_IDEA_CANVAS_ORIGIN;
+  const maxBottom = BUSINESS_IDEA_CANVAS_HEIGHT - BUSINESS_IDEA_CANVAS_ORIGIN;
+  return {
+    x: clampMoveDelta(requestedX, minX - bounds.x, maxRight - (bounds.x + bounds.width)),
+    y: clampMoveDelta(requestedY, minY - bounds.y, maxBottom - (bounds.y + bounds.height))
+  };
+}
+
 export function businessIdeaCanvasGanttRows(
   canvas: BusinessIdeaCanvas,
   meta: BusinessIdeaCanvasMeta
@@ -497,6 +516,15 @@ function parseEdge(value: unknown, nodeIds: Set<string>, label: string): JsonCan
     color: optionalString(value.color),
     label: optionalString(value.label)
   };
+}
+
+function finiteRoundedDelta(value: number): number {
+  return Number.isFinite(value) ? Math.round(value) : 0;
+}
+
+function clampMoveDelta(value: number, min: number, max: number): number {
+  if (min > max) return 0;
+  return Math.min(max, Math.max(min, value));
 }
 
 function serializeNode(node: JsonCanvasNode): JsonCanvasNode {

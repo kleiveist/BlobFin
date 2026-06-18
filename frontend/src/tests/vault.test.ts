@@ -1,10 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
 import { getVaultStatus, initializeStorage, loadState, normalizeStoredState, saveState } from "../lib/storage";
 import { readVaultFallbackMetadata, saveVaultFallbackMetadata } from "../lib/vault/vaultFallback";
 import { createVaultManifest, parseVaultManifest } from "../lib/vault/vaultManifest";
 import { deserializeVaultState, serializeVaultState } from "../lib/vault/vaultSerializer";
+import { joinVaultPath, manifestPath, profilePath, readVault, readVaultState, writeVaultState } from "../lib/vault/vaultStorage";
+
+const tauriInvokeMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: tauriInvokeMock
+}));
 
 const STORAGE_KEY = "blobfin.reserveCalculator.v1";
 
@@ -35,6 +42,41 @@ class MemoryStorage implements Storage {
     this.values.set(key, value);
   }
 }
+
+class MemoryVaultFiles {
+  private values = new Map<string, string>();
+
+  async invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
+    const path = String(args.path ?? "");
+    if (command === "vault_read_text_file") return this.values.get(path) ?? null;
+    if (command === "vault_write_text_file") {
+      this.values.set(path, String(args.contents ?? ""));
+      return undefined;
+    }
+    if (command === "vault_create_dir_all") return undefined;
+    throw new Error(`Unexpected vault command: ${command}`);
+  }
+
+  readJson(path: string): unknown {
+    const contents = this.values.get(path);
+    if (!contents) throw new Error(`Missing memory vault file: ${path}`);
+    return JSON.parse(contents);
+  }
+
+  writeJson(path: string, value: unknown): void {
+    this.values.set(path, `${JSON.stringify(value, null, 2)}\n`);
+  }
+}
+
+function useMemoryVaultFiles(): MemoryVaultFiles {
+  const vault = new MemoryVaultFiles();
+  tauriInvokeMock.mockImplementation((command: string, args: Record<string, unknown>) => vault.invoke(command, args ?? {}));
+  return vault;
+}
+
+afterEach(() => {
+  tauriInvokeMock.mockReset();
+});
 
 describe("vault serializer", () => {
   it("roundtrips persisted state areas through split vault files", () => {
@@ -147,6 +189,203 @@ describe("vault serializer", () => {
     expect(JSON.stringify(files.planningPositions)).not.toContain(";");
   });
 });
+
+describe("vault storage", () => {
+  it("roundtrips self employment projects through wallet files and sidecar canvases", async () => {
+    const vault = useMemoryVaultFiles();
+    const rootPath = "/tmp/blobfin-vault";
+    const state = stateWithPersistentSelfEmploymentProject();
+
+    await writeVaultState(rootPath, state);
+    replaceEmbeddedSelfEmploymentCanvasWithStaleData(vault, rootPath);
+
+    const loaded = normalizeStoredState(await readVaultState(rootPath));
+    const project = loaded.selfEmployment.projects.find((item) => item.id === state.selfEmployment.projects[0].id);
+    const cardPlan = project?.gantt.cardPlans.find((plan) => plan.cardId === "vault-project-card");
+
+    expect(project).toBeDefined();
+    expect(loaded.selfEmployment.selectedProjectId).toBe(state.selfEmployment.projects[0].id);
+    expect(loaded.selfEmployment.selectedRoadmapAreaId).toBe("planning");
+    expect(project?.name).toBe("Roundtrip-Projekt");
+    expect(project?.labels).toEqual(["Launch", "Kunde"]);
+    expect(project?.milestones).toEqual(["Erster zahlender Kunde"]);
+    expect(project?.projectGoal).toBe("Projekt im Dashboard behalten");
+    expect(project?.businessIdeaCanvas.nodes.some((node) => node.id === "vault-project-card")).toBe(true);
+    expect(project?.businessIdeaCanvasMeta.nodeMeta["vault-project-card"]).toEqual({
+      labelId: "implementation",
+      phaseId: "phase-4",
+      shape: "diamond"
+    });
+    expect(project?.businessIdeaCanvasMeta.labels.find((label) => label.id === "implementation")?.color).toBe("6");
+    expect(project?.gantt.phases.find((phase) => phase.phaseId === "phase-4")).toMatchObject({
+      startMode: "after_previous_label",
+      triggerPreviousPhaseId: "phase-3",
+      triggerLabelId: "implementation"
+    });
+    expect(cardPlan).toMatchObject({
+      timeBudgetHours: 6,
+      todos: [
+        {
+          id: "todo-vault-card",
+          title: "Angebotspaket pruefen",
+          eisenhowerQuadrant: "important_urgent",
+          status: "in_progress",
+          completed: false
+        }
+      ]
+    });
+  });
+
+  it("merges self employment sidecar canvases into raw vault state before normalization", async () => {
+    const vault = useMemoryVaultFiles();
+    const rootPath = "/tmp/blobfin-sidecar-vault";
+    const state = stateWithPersistentSelfEmploymentProject();
+    const project = state.selfEmployment.projects[0];
+    const manifest = createVaultManifest("2026-06-18T00:00:00.000Z");
+    const staleSelfEmployment = {
+      ...state.selfEmployment,
+      projects: state.selfEmployment.projects.map((item) => ({
+        ...item,
+        businessIdeaCanvas: {
+          nodes: [
+            {
+              id: "embedded-stale-card",
+              type: "text",
+              text: "Veraltete eingebettete Karte",
+              x: 0,
+              y: 0,
+              width: 160,
+              height: 80
+            }
+          ],
+          edges: []
+        }
+      }))
+    };
+
+    vault.writeJson(manifestPath(rootPath), manifest);
+    vault.writeJson(joinVaultPath(profilePath(rootPath), manifest.dataFiles.selfEmploymentState), staleSelfEmployment);
+    vault.writeJson(joinVaultPath(profilePath(rootPath), project.businessIdeaCanvasFile), project.businessIdeaCanvas);
+
+    const result = await readVault(rootPath);
+    const selfEmploymentState = result.dataFiles.selfEmploymentState as typeof state.selfEmployment;
+    const mergedProject = selfEmploymentState.projects[0];
+
+    expect(mergedProject.businessIdeaCanvas.nodes.some((node) => node.id === "vault-project-card")).toBe(true);
+    expect(mergedProject.businessIdeaCanvas.nodes.some((node) => node.id === "embedded-stale-card")).toBe(false);
+
+    const loaded = normalizeStoredState(await readVaultState(rootPath));
+    expect(loaded.selfEmployment.projects[0].gantt.cardPlans.some((plan) => plan.cardId === "vault-project-card")).toBe(true);
+  });
+});
+
+function stateWithPersistentSelfEmploymentProject(): ReturnType<typeof defaultAppState> {
+  const state = defaultAppState();
+  const project = state.selfEmployment.projects[0];
+  const card = {
+    id: "vault-project-card",
+    type: "text" as const,
+    text: "Projektkarte bleibt sichtbar",
+    x: 720,
+    y: 220,
+    width: 280,
+    height: 120,
+    color: "4"
+  };
+  const projectWithPlanning = {
+    ...project,
+    name: "Roundtrip-Projekt",
+    labels: ["Launch", "Kunde"],
+    projectGoal: "Projekt im Dashboard behalten",
+    milestones: ["Erster zahlender Kunde"],
+    businessIdeaCanvas: {
+      ...project.businessIdeaCanvas,
+      nodes: [...project.businessIdeaCanvas.nodes, card]
+    },
+    businessIdeaCanvasMeta: {
+      ...project.businessIdeaCanvasMeta,
+      labels: project.businessIdeaCanvasMeta.labels.map((label) =>
+        label.id === "implementation" ? { ...label, color: "6" } : label
+      ),
+      activeLabelId: "implementation",
+      activePhaseId: "phase-4",
+      nodeMeta: {
+        ...project.businessIdeaCanvasMeta.nodeMeta,
+        [card.id]: {
+          labelId: "implementation",
+          phaseId: "phase-4",
+          shape: "diamond" as const
+        }
+      }
+    },
+    gantt: {
+      ...project.gantt,
+      phases: project.gantt.phases.map((phase) =>
+        phase.phaseId === "phase-4"
+          ? {
+              ...phase,
+              startMode: "after_previous_label" as const,
+              triggerPreviousPhaseId: "phase-3",
+              triggerLabelId: "implementation"
+            }
+          : phase
+      ),
+      cardPlans: [
+        ...project.gantt.cardPlans,
+        {
+          cardId: card.id,
+          timeBudgetHours: 6,
+          completed: false,
+          todos: [
+            {
+              id: "todo-vault-card",
+              title: "Angebotspaket pruefen",
+              eisenhowerQuadrant: "important_urgent" as const,
+              status: "in_progress" as const,
+              completed: false
+            }
+          ]
+        }
+      ]
+    },
+    ganttPhaseFilterIds: ["phase-4"]
+  };
+
+  return {
+    ...state,
+    selfEmployment: {
+      ...state.selfEmployment,
+      selectedProjectId: project.id,
+      selectedRoadmapAreaId: "planning",
+      projects: [projectWithPlanning]
+    }
+  };
+}
+
+function replaceEmbeddedSelfEmploymentCanvasWithStaleData(vault: MemoryVaultFiles, rootPath: string): void {
+  const path = joinVaultPath(profilePath(rootPath), "self-employment/state.json");
+  const selfEmploymentState = vault.readJson(path) as ReturnType<typeof defaultAppState>["selfEmployment"];
+  vault.writeJson(path, {
+    ...selfEmploymentState,
+    projects: selfEmploymentState.projects.map((project) => ({
+      ...project,
+      businessIdeaCanvas: {
+        nodes: [
+          {
+            id: "embedded-stale-card",
+            type: "text",
+            text: "Veraltete eingebettete Karte",
+            x: 0,
+            y: 0,
+            width: 160,
+            height: 80
+          }
+        ],
+        edges: []
+      }
+    }))
+  });
+}
 
 describe("vault manifest", () => {
   it("creates a BlobFin vault manifest with versioned data file paths", () => {

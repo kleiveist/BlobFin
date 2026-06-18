@@ -195,19 +195,21 @@ export function addBusinessIdeaCanvasNodeFromLine(edgeId: string): void {
 export function handleBusinessIdeaCanvasDoubleClick(event: MouseEvent): void {
   if (Date.now() - businessCanvasUiState.lastDragEndAt < 350) return;
   const target = event.target as HTMLElement | null;
-  if (!target?.closest("[data-business-canvas-node-text], .business-canvas-group-title")) return;
-  const nodeElement = target.closest<HTMLElement>("[data-business-canvas-node-id]");
+  const textElement = target?.closest<HTMLElement>("[data-business-canvas-node-text]");
+  if (!textElement?.dataset.businessCanvasNodeText) return;
+  const nodeElement = textElement.closest<HTMLElement>("[data-business-canvas-node-id]");
   if (!nodeElement?.dataset.businessCanvasNodeId) return;
   const projectId = nodeElement.closest<HTMLElement>("[data-business-canvas-project-id]")?.dataset.businessCanvasProjectId;
   const project = projectId ? businessCanvasProjectById(projectId) : null;
-  const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === nodeElement.dataset.businessCanvasNodeId);
+  const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === textElement.dataset.businessCanvasNodeText);
   if (!projectId || !node || node.type !== "text") return;
   event.preventDefault();
-  editBusinessIdeaCanvasNode(node.id);
+  editBusinessIdeaCanvasNode(node.id, projectId);
 }
 
-export function editBusinessIdeaCanvasNode(nodeId: string): void {
-  const projectId = businessCanvasUiState.selectedNodeIds?.projectId ?? businessCanvasHost().getState().selfEmployment.selectedProjectId;
+export function editBusinessIdeaCanvasNode(nodeId: string, projectIdOverride?: string): void {
+  const projectId =
+    projectIdOverride ?? businessCanvasUiState.selectedNodeIds?.projectId ?? businessCanvasHost().getState().selfEmployment.selectedProjectId;
   const project = businessCanvasProjectById(projectId);
   const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === nodeId);
   if (!project || !node || node.type !== "text") return;
@@ -220,8 +222,19 @@ export function editBusinessIdeaCanvasNode(nodeId: string): void {
     const editor = document.querySelector<HTMLElement>(
       `[data-business-canvas-node-text="${cssEscape(nodeId)}"]`
     );
-    editor?.focus();
+    if (!editor) return;
+    editor.focus();
+    selectBusinessIdeaCanvasNodeText(editor);
   }, 0);
+}
+
+function selectBusinessIdeaCanvasNodeText(editor: HTMLElement): void {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 export function insertBusinessIdeaCanvasNode(projectId: string, node: JsonCanvasNode, renderAfterUpdate: boolean): void {

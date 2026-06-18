@@ -2,6 +2,10 @@
 
 import { describe, expect, it } from "vitest";
 
+import { defaultAppState } from "../data/defaults";
+import { APP_STATE_PERSISTENCE_REGISTRY } from "../lib/storage/appStatePersistenceRegistry";
+import { normalizeLegacyState, normalizeState } from "../lib/storage/normalizeState";
+
 const sourceModules = import.meta.glob("../**/*.ts", {
   eager: true,
   import: "default",
@@ -29,6 +33,7 @@ const reviewedDomainCalculatorLineLimitExceptions: Record<string, string> = {};
 const mainSource = sourceAt("../main.ts");
 const appControllerSource = sourceAt("../app/appController.ts");
 const controllerRuntimeSource = sourceAt("../app/controllerRuntime.ts");
+const typesSource = sourceAt("../types.ts");
 
 const featureSources = Object.fromEntries(
   Object.entries(sourceModules).filter(([path]) => path.startsWith("../features/"))
@@ -167,6 +172,29 @@ describe("architecture guards", () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it("keeps AppState top-level modules registered across defaults, normalization, and vault persistence", () => {
+    const appStateKeys = interfaceKeys(typesSource, "AppState");
+    const defaultState = defaultAppState();
+    const normalizedState = normalizeState(defaultState);
+    const legacyState = normalizeLegacyState(defaultState);
+    const registryKeys = Object.keys(APP_STATE_PERSISTENCE_REGISTRY).sort();
+
+    expect(Object.keys(defaultState).sort()).toEqual(appStateKeys);
+    expect(Object.keys(normalizedState).sort()).toEqual(appStateKeys);
+    expect(Object.keys(legacyState).sort()).toEqual(appStateKeys);
+    expect(registryKeys).toEqual(appStateKeys);
+    expect(APP_STATE_PERSISTENCE_REGISTRY.selfEmployment).toMatchObject({
+      vaultFiles: ["selfEmploymentState"],
+      sidecars: [
+        {
+          field: "projects[].businessIdeaCanvasFile",
+          basePath: "planning/projects/",
+          extension: ".canvas"
+        }
+      ]
+    });
+  });
 });
 
 function lineCount(source: string): number {
@@ -177,6 +205,17 @@ function sourceAt(path: string): string {
   const source = sourceModules[path];
   if (!source) throw new Error(`Missing source module: ${path}`);
   return source;
+}
+
+function interfaceKeys(source: string, name: string): string[] {
+  const match = new RegExp(`export\\s+interface\\s+${escapeRegExp(name)}\\s*\\{([\\s\\S]*?)\\n\\}`).exec(source);
+  if (!match) throw new Error(`Missing interface ${name}`);
+  return match[1]
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^[A-Za-z_$][\w$]*\??:/.test(line))
+    .map((line) => line.replace(/\??:.*/, ""))
+    .sort();
 }
 
 function isLineLimitException(path: string): boolean {

@@ -5,7 +5,6 @@ import {
   defaultIncomeTrackerState,
   defaultPositionTableViewState,
   defaultRealEstateFinancingSettings,
-  defaultSelfEmploymentState,
   defaultStatutoryPensionSettings,
   defaultPlanningSettings
 } from "../../data/defaults";
@@ -21,6 +20,7 @@ import {
   normalizeInvestmentByAccountId
 } from "./normalizePlanning";
 import { migrateMonthlyNetIncomePosition, normalizePositions } from "./normalizePositions";
+import { normalizeSelfEmploymentState } from "./normalizeSelfEmployment";
 import { isRecord, numberOrDefault } from "./validators";
 
 export function normalizeLegacyState(value: unknown): AppState {
@@ -61,7 +61,7 @@ export function normalizeLegacyState(value: unknown): AppState {
     statutoryPension: defaultStatutoryPensionSettings(),
     incomeTracker: defaultIncomeTrackerState(),
     incomePlanning: defaultIncomePlanningState(),
-    selfEmployment: defaultSelfEmploymentState(),
+    selfEmployment: normalizeSelfEmploymentState(value.selfEmployment),
     positions,
     investmentByAccountId,
     investment,

@@ -5,6 +5,7 @@ import {
   businessIdeaCanvasDirectionFromEdge,
   businessIdeaCanvasEndsForDirection,
   businessIdeaCanvasGanttRows,
+  businessIdeaCanvasMoveDeltaForNodes,
   businessIdeaCanvasNodesInsideRect,
   businessIdeaCanvasPaletteRows,
   businessIdeaCanvasPaletteWithCustomColor,
@@ -234,6 +235,45 @@ describe("business idea canvas", () => {
 
     expect(businessIdeaCanvasBoundsForNodes(canvas.nodes.slice(0, 2), 10)).toEqual({ x: -10, y: -10, width: 240, height: 100 });
     expect(businessIdeaCanvasNodesInsideRect(canvas, { x: -5, y: -5, width: 112, height: 92 })).toEqual(["a"]);
+  });
+
+  it("moves a single canvas node by the requested keyboard delta", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [{ id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }],
+      edges: []
+    });
+
+    expect(businessIdeaCanvasMoveDeltaForNodes(canvas.nodes, 10, -10)).toEqual({ x: 10, y: -10 });
+  });
+
+  it("keeps multi-selection movement relative by clamping a shared delta", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [
+        { id: "a", type: "text", text: "A", x: -1190, y: 0, width: 100, height: 80 },
+        { id: "b", type: "text", text: "B", x: 120, y: 20, width: 100, height: 80 }
+      ],
+      edges: []
+    });
+
+    const delta = businessIdeaCanvasMoveDeltaForNodes(canvas.nodes, -20, 10);
+    const moved = canvas.nodes.map((node) => ({ ...node, x: node.x + delta.x, y: node.y + delta.y }));
+
+    expect(delta).toEqual({ x: -10, y: 10 });
+    expect(moved[1].x - moved[0].x).toBe(canvas.nodes[1].x - canvas.nodes[0].x);
+    expect(moved[1].y - moved[0].y).toBe(canvas.nodes[1].y - canvas.nodes[0].y);
+  });
+
+  it("clamps keyboard movement to the visible canvas bounds", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [{ id: "a", type: "text", text: "A", x: 1295, y: 615, width: 100, height: 80 }],
+      edges: []
+    });
+
+    expect(businessIdeaCanvasMoveDeltaForNodes(canvas.nodes, 10, 10)).toEqual({ x: 5, y: 5 });
+    expect(businessIdeaCanvasMoveDeltaForNodes([{ ...canvas.nodes[0], x: -1195, y: -1195 }], -10, -10)).toEqual({
+      x: -5,
+      y: -5
+    });
   });
 
   it("maps zoom around a stable viewport point", () => {

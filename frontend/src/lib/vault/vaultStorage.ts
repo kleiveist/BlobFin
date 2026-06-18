@@ -50,6 +50,10 @@ export async function readVault(rootPath: string): Promise<VaultReadResult> {
     dataFiles[key] = parseJson(contents, manifest.dataFiles[key]);
   }
   dataFiles.selfEmploymentCanvasFiles = await readSelfEmploymentCanvasFiles(rootPath, dataFiles.selfEmploymentState);
+  dataFiles.selfEmploymentState = withExternalSelfEmploymentCanvases(
+    dataFiles.selfEmploymentState,
+    dataFiles.selfEmploymentCanvasFiles
+  );
 
   return { manifest, dataFiles };
 }
@@ -155,6 +159,18 @@ async function readSelfEmploymentCanvasFiles(
     canvasFiles[relativePath] = parseBusinessIdeaCanvasFile(parseJson(contents, relativePath), relativePath);
   }
   return canvasFiles;
+}
+
+function withExternalSelfEmploymentCanvases(value: unknown, canvasFiles: unknown): unknown {
+  if (!isRecord(value) || !isRecord(canvasFiles) || !Array.isArray(value.projects)) return value;
+  return {
+    ...value,
+    projects: value.projects.map((project) => {
+      if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") return project;
+      const externalCanvas = canvasFiles[project.businessIdeaCanvasFile];
+      return externalCanvas === undefined ? project : { ...project, businessIdeaCanvas: externalCanvas };
+    })
+  };
 }
 
 function vaultDataFilePath(rootPath: string, manifest: VaultManifest, key: keyof VaultManifest["dataFiles"]): string {

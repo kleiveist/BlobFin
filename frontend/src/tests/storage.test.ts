@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
 import { loadState, saveState } from "../lib/storage";
+import { normalizeLegacyState } from "../lib/storage/normalizeState";
 
 const STORAGE_KEY = "blobfin.reserveCalculator.v1";
 
@@ -173,6 +174,36 @@ describe("storage", () => {
 
     expect(loaded.selfEmployment.selectedRoadmapAreaId).toBe("idea");
     expect(loaded.selfEmployment.projects[0].icon).toBe("briefcase");
+  });
+
+  it("keeps self employment projects when normalizing legacy app state", () => {
+    const state = defaultAppState();
+    const project = {
+      ...state.selfEmployment.projects[0],
+      id: "legacy-self-project",
+      name: "Legacy-Projekt",
+      milestones: ["Erster Auftrag"],
+      projectGoal: "Legacy-Projekt sichtbar behalten",
+      businessIdeaCanvasFile: "planning/projects/legacy-self-project/canvas-geschaeftsidee.canvas"
+    };
+
+    const loaded = normalizeLegacyState({
+      ...state,
+      selfEmployment: {
+        selectedProjectId: project.id,
+        selectedRoadmapAreaId: "planning",
+        projects: [project]
+      }
+    });
+
+    expect(loaded.selfEmployment.selectedProjectId).toBe("legacy-self-project");
+    expect(loaded.selfEmployment.selectedRoadmapAreaId).toBe("planning");
+    expect(loaded.selfEmployment.projects[0]).toMatchObject({
+      id: "legacy-self-project",
+      name: "Legacy-Projekt",
+      milestones: ["Erster Auftrag"],
+      projectGoal: "Legacy-Projekt sichtbar behalten"
+    });
   });
 
   it("migrates legacy self employment projects to a business idea canvas", () => {
