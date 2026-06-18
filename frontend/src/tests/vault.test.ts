@@ -54,6 +54,7 @@ class MemoryVaultFiles {
       return undefined;
     }
     if (command === "vault_create_dir_all") return undefined;
+    if (command === "vault_list_project_canvas_files") return this.listProjectCanvasFiles(path);
     throw new Error(`Unexpected vault command: ${command}`);
   }
 
@@ -65,6 +66,15 @@ class MemoryVaultFiles {
 
   writeJson(path: string, value: unknown): void {
     this.values.set(path, `${JSON.stringify(value, null, 2)}\n`);
+  }
+
+  private listProjectCanvasFiles(path: string): string[] {
+    const prefix = `${path.replace(/[\\/]+$/, "")}/`;
+    return Array.from(this.values.keys())
+      .filter((item) => item.startsWith(prefix) && item.endsWith(".canvas"))
+      .map((item) => item.slice(prefix.length))
+      .filter((item) => item.split(/[\\/]/).length === 2)
+      .sort();
   }
 }
 
@@ -276,6 +286,62 @@ describe("vault storage", () => {
 
     const loaded = normalizeStoredState(await readVaultState(rootPath));
     expect(loaded.selfEmployment.projects[0].gantt.cardPlans.some((plan) => plan.cardId === "vault-project-card")).toBe(true);
+  });
+
+  it("recovers orphaned self employment canvas folders from planning projects", async () => {
+    const vault = useMemoryVaultFiles();
+    const rootPath = "/tmp/blobfin-orphaned-vault";
+    const state = defaultAppState();
+    const manifest = createVaultManifest("2026-06-18T00:00:00.000Z");
+    const firstOrphanCanvas = {
+      nodes: [
+        { id: "0ef758b8-c185-4755-a14c-efa1778a0f5b-idea", type: "text", text: "Neue Geschaeftsidee", x: 0, y: 0, width: 240, height: 110 }
+      ],
+      edges: []
+    };
+    const secondOrphanCanvas = {
+      nodes: [
+        { id: "16f7ff8d-0885-42c5-bec4-92c6a9657625", type: "text", text: "IUFS", x: 0, y: 0, width: 240, height: 110 },
+        { id: "1430e520-d8f8-4f04-b943-48624fab20d6", type: "text", text: "Semester 1", x: 260, y: 0, width: 240, height: 110 }
+      ],
+      edges: []
+    };
+
+    vault.writeJson(manifestPath(rootPath), manifest);
+    vault.writeJson(joinVaultPath(profilePath(rootPath), manifest.dataFiles.selfEmploymentState), state.selfEmployment);
+    vault.writeJson(
+      joinVaultPath(profilePath(rootPath), "planning/projects/0ef758b8-c185-4755-a14c-efa1778a0f5b/canvas-geschaeftsidee.canvas"),
+      firstOrphanCanvas
+    );
+    vault.writeJson(
+      joinVaultPath(profilePath(rootPath), "planning/projects/8b304256-7dcd-4ee7-8722-bfd97ed5ebd8/canvas-geschaeftsidee.canvas"),
+      secondOrphanCanvas
+    );
+
+    const loaded = normalizeStoredState(await readVaultState(rootPath));
+    const projectIds = loaded.selfEmployment.projects.map((project) => project.id);
+    const recoveredStudyProject = loaded.selfEmployment.projects.find((project) => project.id === "8b304256-7dcd-4ee7-8722-bfd97ed5ebd8");
+
+    expect(projectIds).toEqual([
+      "self-project-example",
+      "0ef758b8-c185-4755-a14c-efa1778a0f5b",
+      "8b304256-7dcd-4ee7-8722-bfd97ed5ebd8"
+    ]);
+    expect(recoveredStudyProject).toMatchObject({
+      name: "IUFS",
+      status: "idea",
+      labels: [],
+      milestones: [],
+      businessIdeaCanvasFile: "planning/projects/8b304256-7dcd-4ee7-8722-bfd97ed5ebd8/canvas-geschaeftsidee.canvas"
+    });
+    expect(recoveredStudyProject?.businessIdeaCanvas.nodes.map((node) => node.id)).toEqual([
+      "16f7ff8d-0885-42c5-bec4-92c6a9657625",
+      "1430e520-d8f8-4f04-b943-48624fab20d6"
+    ]);
+    expect(recoveredStudyProject?.gantt.cardPlans.map((plan) => plan.cardId)).toEqual([
+      "16f7ff8d-0885-42c5-bec4-92c6a9657625",
+      "1430e520-d8f8-4f04-b943-48624fab20d6"
+    ]);
   });
 });
 

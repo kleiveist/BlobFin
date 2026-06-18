@@ -1,5 +1,11 @@
-import type { AppState } from "../../types";
-import { parseBusinessIdeaCanvasFile, serializeBusinessIdeaCanvas } from "../../domain/businessIdeaCanvas";
+import { defaultSelfEmploymentState } from "../../data/defaults";
+import type { AppState, BusinessIdeaCanvas, SelfEmploymentProject } from "../../types";
+import {
+  normalizeBusinessIdeaCanvasMeta,
+  parseBusinessIdeaCanvasFile,
+  serializeBusinessIdeaCanvas
+} from "../../domain/businessIdeaCanvas";
+import { defaultSelfEmploymentGanttPlan } from "../../domain/selfEmploymentGantt";
 import { createVaultManifest, updateVaultManifestTimestamp } from "./vaultManifest";
 import { migrateVaultManifest } from "./vaultMigration";
 import { deserializeVaultState, serializeVaultState } from "./vaultSerializer";
@@ -148,11 +154,12 @@ async function readSelfEmploymentCanvasFiles(
   rootPath: string,
   selfEmploymentState: unknown
 ): Promise<Record<string, unknown>> {
-  if (!isRecord(selfEmploymentState) || !Array.isArray(selfEmploymentState.projects)) return {};
+  const relativePaths = new Set<string>([
+    ...selfEmploymentCanvasPaths(selfEmploymentState),
+    ...(await discoverSelfEmploymentCanvasPaths(rootPath))
+  ]);
   const canvasFiles: Record<string, unknown> = {};
-  for (const project of selfEmploymentState.projects) {
-    if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") continue;
-    const relativePath = project.businessIdeaCanvasFile;
+  for (const relativePath of [...relativePaths].sort()) {
     if (!isSafeRelativeCanvasPath(relativePath)) continue;
     const contents = await readTextFile(joinVaultPath(profilePath(rootPath), relativePath));
     if (!contents) continue;
@@ -161,16 +168,119 @@ async function readSelfEmploymentCanvasFiles(
   return canvasFiles;
 }
 
+function selfEmploymentCanvasPaths(selfEmploymentState: unknown): string[] {
+  if (!isRecord(selfEmploymentState) || !Array.isArray(selfEmploymentState.projects)) return [];
+  return selfEmploymentState.projects.flatMap((project) => {
+    if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") return [];
+    return [project.businessIdeaCanvasFile];
+  });
+}
+
+async function discoverSelfEmploymentCanvasPaths(rootPath: string): Promise<string[]> {
+  const projectRootPath = joinVaultPath(profilePath(rootPath), "planning", "projects");
+  const discovered = await invokeCommand<unknown>("vault_list_project_canvas_files", { path: projectRootPath });
+  if (!Array.isArray(discovered)) return [];
+  return discovered
+    .filter((value): value is string => typeof value === "string")
+    .map((relativePath) => `planning/projects/${relativePath.replace(/^[\\/]+/g, "")}`);
+}
+
 function withExternalSelfEmploymentCanvases(value: unknown, canvasFiles: unknown): unknown {
-  if (!isRecord(value) || !isRecord(canvasFiles) || !Array.isArray(value.projects)) return value;
-  return {
-    ...value,
-    projects: value.projects.map((project) => {
+  if (!isRecord(canvasFiles)) return value;
+  const hasSourceState = isRecord(value);
+  const source = hasSourceState ? value : { selectedProjectId: "", selectedRoadmapAreaId: "idea", projects: [] };
+  const hasProjectArray = Array.isArray(source.projects);
+  const projects = hasProjectArray ? source.projects : [];
+  const existingCanvasFiles = new Set(
+    projects.flatMap((project) => {
+      if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") return [];
+      return [project.businessIdeaCanvasFile];
+    })
+  );
+  const recoveredProjects = Object.entries(canvasFiles)
+    .filter(([relativePath]) => !existingCanvasFiles.has(relativePath) && isSafeRelativeCanvasPath(relativePath))
+    .map(([relativePath, canvas]) => recoveredSelfEmploymentProject(relativePath, canvas))
+    .filter((project): project is SelfEmploymentProject => project !== null);
+  if ((!hasSourceState || !hasProjectArray) && recoveredProjects.length === 0) return value;
+  const selectedProjectId = typeof source.selectedProjectId === "string" ? source.selectedProjectId : "";
+  const selectedRoadmapAreaId = typeof source.selectedRoadmapAreaId === "string" ? source.selectedRoadmapAreaId : "idea";
+  const nextProjects = [
+    ...projects.map((project) => {
       if (!isRecord(project) || typeof project.businessIdeaCanvasFile !== "string") return project;
       const externalCanvas = canvasFiles[project.businessIdeaCanvasFile];
       return externalCanvas === undefined ? project : { ...project, businessIdeaCanvas: externalCanvas };
-    })
+    }),
+    ...recoveredProjects
+  ];
+  return {
+    ...source,
+    selectedProjectId: selectedProjectId || recoveredProjects[0]?.id || "",
+    selectedRoadmapAreaId,
+    projects: nextProjects
   };
+}
+
+function recoveredSelfEmploymentProject(relativePath: string, canvasValue: unknown): SelfEmploymentProject | null {
+  if (!isSafeRelativeCanvasPath(relativePath) || !isBusinessIdeaCanvas(canvasValue)) return null;
+  const projectId = projectIdFromCanvasPath(relativePath);
+  if (!projectId) return null;
+  const fallbackProject = defaultSelfEmploymentState().projects[0];
+  const canvas = serializeBusinessIdeaCanvas(canvasValue);
+  const businessIdeaCanvasMeta = normalizeBusinessIdeaCanvasMeta({}, canvas);
+  const projectName = recoveredProjectName(canvas, projectId);
+  return {
+    ...fallbackProject,
+    id: projectId,
+    name: projectName,
+    labels: [],
+    status: "idea",
+    idea: projectName,
+    problem: "",
+    targetGroup: "",
+    revenueModel: "",
+    motivation: "",
+    projectGoal: "",
+    milestones: [],
+    startDate: "",
+    plannedDurationWeeks: 0,
+    nextSteps: [],
+    dependencies: "",
+    requiredHoursPerWeek: 0,
+    fixedProjectHoursPerWeek: 0,
+    flexibleProjectHoursPerWeek: 0,
+    linkedHabits: [],
+    blockingHabits: [],
+    weekScenario: "",
+    startCapitalRequired: 0,
+    availableReserveOverride: null,
+    monthlyRevenueExpected: 0,
+    monthlyRunningCosts: 0,
+    oneTimeCosts: 0,
+    monthlyWorkHours: 0,
+    timeSources: [],
+    contacts: [],
+    invoices: [],
+    tasks: [],
+    businessIdeaCanvas: canvas,
+    businessIdeaCanvasFile: relativePath,
+    businessIdeaCanvasMeta,
+    gantt: defaultSelfEmploymentGanttPlan(canvas, businessIdeaCanvasMeta),
+    ganttPhaseFilterIds: []
+  };
+}
+
+function projectIdFromCanvasPath(relativePath: string): string {
+  return /^planning\/projects\/([^/]+)\//.exec(relativePath)?.[1] ?? "";
+}
+
+function recoveredProjectName(canvas: BusinessIdeaCanvas, projectId: string): string {
+  const textNode = canvas.nodes.find((node) => node.type === "text" && node.text.trim());
+  if (textNode?.type === "text") return textNode.text.trim().split(/\s+/).slice(0, 6).join(" ");
+  return `Projekt ${projectId.slice(0, 8)}`;
+}
+
+function isBusinessIdeaCanvas(value: unknown): value is BusinessIdeaCanvas {
+  return isRecord(value) && Array.isArray(value.nodes) && Array.isArray(value.edges);
 }
 
 function vaultDataFilePath(rootPath: string, manifest: VaultManifest, key: keyof VaultManifest["dataFiles"]): string {

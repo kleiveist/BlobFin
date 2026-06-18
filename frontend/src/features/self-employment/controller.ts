@@ -76,6 +76,24 @@ function requireSelfEmploymentHost(): void {
   if (!host) throw new Error("Self-employment feature host has not been configured.");
 }
 
+interface SelfEmploymentCommitOptions {
+  render?: boolean;
+  persist?: boolean;
+}
+
+function commitSelfEmploymentState(
+  nextSelfEmployment: AppState["selfEmployment"],
+  options: SelfEmploymentCommitOptions = {}
+): void {
+  host.getState().selfEmployment = nextSelfEmployment;
+  host.syncStoreState();
+  if (options.render) {
+    host.renderAll();
+    return;
+  }
+  if (options.persist) host.persistCurrentState();
+}
+
 export function renderSelfEmploymentDashboard(): void {
   requireSelfEmploymentHost();
   const container = document.querySelector<HTMLDivElement>("#selfEmploymentDashboard");
@@ -160,35 +178,34 @@ export function selfEmploymentProjectById(projectId: string): SelfEmploymentProj
 function normalizeSelfEmploymentSelection(): void {
   const selectedRoadmapAreaId = selfEmploymentRoadmapAreaIdFromValue(host.getState().selfEmployment.selectedRoadmapAreaId) ?? "idea";
   if (host.getState().selfEmployment.projects.length === 0) {
-    host.getState().selfEmployment = {
+    commitSelfEmploymentState({
       ...host.getState().selfEmployment,
       selectedProjectId: "",
       selectedRoadmapAreaId
-    };
+    });
     return;
   }
   if (host.getState().selfEmployment.selectedRoadmapAreaId !== selectedRoadmapAreaId) {
-    host.getState().selfEmployment = {
+    commitSelfEmploymentState({
       ...host.getState().selfEmployment,
       selectedRoadmapAreaId
-    };
+    });
   }
   if (!host.getState().selfEmployment.projects.some((project) => project.id === host.getState().selfEmployment.selectedProjectId)) {
-    host.getState().selfEmployment = {
+    commitSelfEmploymentState({
       ...host.getState().selfEmployment,
       selectedProjectId: host.getState().selfEmployment.projects[0].id
-    };
+    });
   }
 }
 
 export function selectSelfEmploymentProject(projectId: string): void {
   if (!host.getState().selfEmployment.projects.some((project) => project.id === projectId)) return;
   selfEmploymentUiState.ganttEditor = null;
-  host.getState().selfEmployment = {
+  commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     selectedProjectId: projectId
-  };
-  host.renderAll();
+  }, { render: true });
 }
 
 export function addSelfEmploymentProject(): void {
@@ -224,24 +241,22 @@ export function addSelfEmploymentProject(): void {
     gantt: normalizeSelfEmploymentGanttPlan({}, canvasDefaults.businessIdeaCanvas, canvasDefaults.businessIdeaCanvasMeta),
     ganttPhaseFilterIds: []
   };
-  host.getState().selfEmployment = {
+  commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     selectedProjectId: id,
     selectedRoadmapAreaId: "idea",
     projects: [...host.getState().selfEmployment.projects, project]
-  };
-  host.renderAll();
+  }, { render: true });
 }
 
 export function selectSelfEmploymentRoadmapArea(rawAreaId: string): void {
   const selectedRoadmapAreaId = selfEmploymentRoadmapAreaIdFromValue(rawAreaId);
   if (!selectedRoadmapAreaId) return;
   selfEmploymentUiState.ganttEditor = null;
-  host.getState().selfEmployment = {
+  commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     selectedRoadmapAreaId
-  };
-  host.renderAll();
+  }, { render: true });
 }
 
 export function showSelfEmploymentIconPicker(button: HTMLButtonElement): void {
@@ -324,11 +339,10 @@ export function renameSelfEmploymentProject(projectId: string): void {
   if (!project) return;
   const nextName = window.prompt("Projekt umbenennen", project.name)?.trim();
   if (!nextName || nextName === project.name) return;
-  host.getState().selfEmployment = {
+  commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     projects: host.getState().selfEmployment.projects.map((item) => (item.id === projectId ? { ...item, name: nextName } : item))
-  };
-  host.renderAll();
+  }, { render: true });
 }
 
 export function deleteSelfEmploymentProject(projectId: string): void {
@@ -341,12 +355,11 @@ export function deleteSelfEmploymentProject(projectId: string): void {
   if (selfEmploymentUiState.labelPickerProjectId === projectId) selfEmploymentUiState.labelPickerProjectId = null;
   if (selfEmploymentUiState.iconPicker?.projectId === projectId) selfEmploymentUiState.iconPicker = null;
   if (selfEmploymentUiState.ganttEditor?.projectId === projectId) selfEmploymentUiState.ganttEditor = null;
-  host.getState().selfEmployment = {
+  commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     selectedProjectId,
     projects
-  };
-  host.renderAll();
+  }, { render: true });
 }
 
 export function toggleSelfEmploymentLabelPicker(projectId: string): void {
@@ -358,7 +371,7 @@ export function toggleSelfEmploymentLabelPicker(projectId: string): void {
 export function toggleSelfEmploymentProjectLabel(projectId: string, rawLabel: string): void {
   const label = rawLabel.trim();
   if (!label) return;
-  host.getState().selfEmployment = {
+  commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     projects: host.getState().selfEmployment.projects.map((project) => {
       if (project.id !== projectId) return project;
@@ -367,8 +380,7 @@ export function toggleSelfEmploymentProjectLabel(projectId: string, rawLabel: st
         : [...project.labels, label];
       return { ...project, labels };
     })
-  };
-  host.renderAll();
+  }, { render: true });
 }
 
 export function updateSelfEmploymentProjectField(
@@ -841,16 +853,10 @@ export function updateSelfEmploymentProject(
   renderAfterUpdate: boolean
 ): void {
   if (!projectId || !host.getState().selfEmployment.projects.some((project) => project.id === projectId)) return;
-  host.getState().selfEmployment = {
+  commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     projects: host.getState().selfEmployment.projects.map((project) => (project.id === projectId ? updater(project) : project))
-  };
-  host.syncStoreState();
-  if (renderAfterUpdate) {
-    host.renderAll();
-    return;
-  }
-  host.persistCurrentState();
+  }, { render: renderAfterUpdate, persist: !renderAfterUpdate });
 }
 
 export function selfEmploymentControlValue(target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): string | boolean {
