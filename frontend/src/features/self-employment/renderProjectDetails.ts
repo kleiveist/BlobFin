@@ -567,7 +567,12 @@ function selfEmploymentKanbanColumn(
 ): string {
   const columnTasks = selfEmploymentSortKanbanTasks(tasks.filter((task) => task.status === status));
   return `
-    <section class="self-employment-kanban-column" data-self-employment-kanban-status="${escapeHtml(status)}" aria-label="${escapeHtml(label)}">
+    <section
+      class="self-employment-kanban-column"
+      data-self-employment-project-id="${escapeHtml(project.id)}"
+      data-self-employment-kanban-status="${escapeHtml(status)}"
+      aria-label="${escapeHtml(label)}"
+    >
       <header>
         <strong><span aria-hidden="true">${escapeHtml(selfEmploymentKanbanStatusIcon(status))}</span>${escapeHtml(label)}</strong>
         <span>${escapeHtml(intNumber(columnTasks.length))}</span>
@@ -590,9 +595,13 @@ function selfEmploymentKanbanStatusIcon(status: SelfEmploymentProjectWorkPlanTas
 }
 
 function selfEmploymentKanbanTaskCard(project: SelfEmploymentProject, task: SelfEmploymentProjectWorkPlanTask): string {
+  const selected =
+    selfEmploymentUiState.kanbanSelectedCard?.projectId === project.id &&
+    selfEmploymentUiState.kanbanSelectedCard.cardId === task.cardId &&
+    selfEmploymentUiState.kanbanSelectedCard.todoId === task.todoId;
   return `
     <article
-      class="self-employment-task-dashboard-item${task.completed ? " completed" : ""}${task.overdue ? " overdue" : ""}"
+      class="self-employment-task-dashboard-item${selected ? " selected" : ""}${task.completed ? " completed" : ""}${task.overdue ? " overdue" : ""}"
       style="--self-employment-gantt-color:${escapeHtml(task.labelColor)};"
       draggable="true"
       data-self-employment-kanban-card="true"
@@ -603,6 +612,7 @@ function selfEmploymentKanbanTaskCard(project: SelfEmploymentProject, task: Self
       data-self-employment-kanban-phase-id="${escapeHtml(task.phaseId)}"
       data-self-employment-kanban-label-id="${escapeHtml(task.labelId)}"
       data-self-employment-eisenhower-quadrant="${escapeHtml(task.eisenhowerQuadrant)}"
+      aria-selected="${selected}"
     >
       <div class="self-employment-task-dashboard-item-head">
         <span class="self-employment-task-label">${escapeHtml(task.labelName)}</span>

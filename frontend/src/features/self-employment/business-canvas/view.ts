@@ -397,6 +397,9 @@ function renderBusinessIdeaCanvasMultiToolbar(
   const bounds = businessIdeaCanvasBoundsForNodes(nodes);
   if (!bounds) return "";
   const position = toolbarPosition(project.businessIdeaCanvasMeta, bounds.x, bounds.y);
+  const cardNodes = nodes.filter((node) => node.type !== "group");
+  const selectedLabelId = commonBusinessIdeaCanvasNodeMetaValue(project, cardNodes, "labelId");
+  const selectedPhaseId = commonBusinessIdeaCanvasNodeMetaValue(project, cardNodes, "phaseId");
   return `
     <div class="business-canvas-multi-toolbar" style="left:${position.left}px;top:${position.top}px;" data-business-canvas-multi-toolbar>
       <strong>${intNumber(nodes.length)}</strong>
@@ -404,11 +407,30 @@ function renderBusinessIdeaCanvasMultiToolbar(
       <button class="icon-button" type="button" data-action="business-canvas-paste-selection" ${renderState.clipboardAvailable ? "" : "disabled"} title="Einfuegen" aria-label="Einfuegen">V</button>
       <button class="icon-button" type="button" data-action="business-canvas-create-group" title="Gruppe erstellen" aria-label="Gruppe erstellen">G</button>
       ${renderPaletteButton(renderState.selectedNodeIds, nodes[0]?.color)}
+      ${
+        cardNodes.length
+          ? `${renderLabelDropdown(project.businessIdeaCanvasMeta.labels, selectedLabelId, "node", "labelId", "Label")}
+             ${renderPhaseDropdown(orderedPhases(project.businessIdeaCanvasMeta), selectedPhaseId, "node", "phaseId", "Phase")}`
+          : ""
+      }
       <button class="icon-button" type="button" data-action="business-canvas-align-left" title="Links ausrichten" aria-label="Links ausrichten">|</button>
       <button class="icon-button" type="button" data-action="business-canvas-align-top" title="Oben ausrichten" aria-label="Oben ausrichten">_</button>
       <button class="icon-button danger" type="button" data-action="business-canvas-delete-node" title="Loeschen" aria-label="Loeschen">x</button>
     </div>
   `;
+}
+
+function commonBusinessIdeaCanvasNodeMetaValue(
+  project: SelfEmploymentProject,
+  nodes: JsonCanvasNode[],
+  field: "labelId" | "phaseId"
+): string | null {
+  if (!nodes.length) return null;
+  const meta = project.businessIdeaCanvasMeta;
+  const fallbackValue = field === "labelId" ? meta.activeLabelId : meta.activePhaseId;
+  const values = nodes.map((node) => meta.nodeMeta[node.id]?.[field] ?? fallbackValue);
+  const firstValue = values[0] ?? fallbackValue;
+  return values.every((value) => value === firstValue) ? firstValue : null;
 }
 
 function renderShapeDropdown(selectedShape: BusinessIdeaCanvasShape): string {
@@ -443,27 +465,29 @@ function renderShapeDropdown(selectedShape: BusinessIdeaCanvasShape): string {
 
 function renderLabelDropdown(
   labels: BusinessIdeaCanvasMeta["labels"],
-  selectedLabelId: string,
+  selectedLabelId: string | null,
   target: "meta" | "node",
   field: "activeLabelId" | "labelId",
   ariaLabel: string
 ): string {
-  const selectedLabel = labels.find((label) => label.id === selectedLabelId) ?? labels[0];
+  const mixed = selectedLabelId === null;
+  const selectedLabel = mixed ? null : labels.find((label) => label.id === selectedLabelId) ?? labels[0];
+  const triggerLabel = mixed ? "Gemischt" : selectedLabel?.name ?? "Label";
   return `
     <details class="business-canvas-dropdown business-canvas-label-dropdown" data-business-canvas-dropdown>
       <summary
         class="business-canvas-dropdown-trigger business-canvas-label-trigger ${businessIdeaColorClass(selectedLabel?.color)}"
-        title="${escapeHtml(selectedLabel?.name ?? ariaLabel)}"
+        title="${escapeHtml(mixed ? "Gemischt" : selectedLabel?.name ?? ariaLabel)}"
         aria-label="${escapeHtml(ariaLabel)}"
         style="${businessIdeaColorStyle(selectedLabel?.color)}"
       >
         <span class="business-canvas-label-dot" aria-hidden="true"></span>
-        <span>${escapeHtml(selectedLabel?.name ?? "Label")}</span>
+        <span>${escapeHtml(triggerLabel)}</span>
       </summary>
       <div class="business-canvas-dropdown-menu" role="menu">
         ${labels
           .map((label) => {
-            const selected = label.id === selectedLabelId;
+            const selected = !mixed && label.id === selectedLabelId;
             return `
               <button
                 class="business-canvas-dropdown-option ${businessIdeaColorClass(label.color)}${selected ? " active" : ""}"
@@ -491,23 +515,24 @@ function renderLabelDropdown(
 
 function renderPhaseDropdown(
   phases: BusinessIdeaCanvasMeta["phases"],
-  selectedPhaseId: string,
+  selectedPhaseId: string | null,
   target: "meta" | "node",
   field: "activePhaseId" | "phaseId",
   ariaLabel: string
 ): string {
-  const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0];
+  const mixed = selectedPhaseId === null;
+  const selectedPhase = mixed ? null : phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0];
   return `
     <details class="business-canvas-dropdown business-canvas-phase-dropdown" data-business-canvas-dropdown>
       <summary class="business-canvas-dropdown-trigger business-canvas-phase-trigger" title="${escapeHtml(
-        selectedPhase?.name ?? ariaLabel
+        mixed ? "Gemischt" : selectedPhase?.name ?? ariaLabel
       )}" aria-label="${escapeHtml(ariaLabel)}">
-        <span class="business-canvas-phase-badge-button">${escapeHtml(phaseBadgeLabel(selectedPhase?.order ?? 1))}</span>
+        <span class="business-canvas-phase-badge-button">${escapeHtml(mixed ? "Gemischt" : phaseBadgeLabel(selectedPhase?.order ?? 1))}</span>
       </summary>
       <div class="business-canvas-dropdown-menu" role="menu">
         ${phases
           .map((phase) => {
-            const selected = phase.id === selectedPhaseId;
+            const selected = !mixed && phase.id === selectedPhaseId;
             return `
               <button
                 class="business-canvas-dropdown-option${selected ? " active" : ""}"
@@ -801,7 +826,7 @@ function edgeToolbarPosition(
 }
 
 function phaseBadgeLabel(order: number): string {
-  const normalized = Number.isFinite(order) && order > 0 ? Math.round(order) : 1;
+  const normalized = Number.isFinite(order) && order >= 0 ? Math.round(order) : 1;
   return String(normalized);
 }
 

@@ -10,8 +10,12 @@ import {
   toggleSelfEmploymentProjectLabel,
   updateSelfEmploymentProject
 } from "../features/self-employment/controller";
+import { onSelfEmploymentClick } from "../features/self-employment/events";
+import { selfEmploymentUiState } from "../features/self-employment/uiState";
 
 afterEach(() => {
+  selfEmploymentUiState.kanbanSelectedCard = null;
+  selfEmploymentUiState.kanbanDrag = null;
   vi.unstubAllGlobals();
 });
 
@@ -53,6 +57,44 @@ describe("self employment controller persistence", () => {
 
     expect(host.calls).toEqual(["sync", "persist"]);
     expect(host.state.selfEmployment.projects[0].name).toBe("Direkt persistiert");
+  });
+
+  it("toggles kanban card selection by clicking a card", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const project = host.state.selfEmployment.projects[0];
+    const plan = project.gantt.cardPlans.find((item) => item.todos.length > 0)!;
+    const todo = plan.todos[0];
+    const scheduler = { request: vi.fn() };
+    const card = fakeKanbanCard(project.id, plan.cardId, todo.id);
+
+    onSelfEmploymentClick(fakeMouseEvent(card), fakeAppContext(host.state, scheduler));
+
+    expect(selfEmploymentUiState.kanbanSelectedCard).toEqual({ projectId: project.id, cardId: plan.cardId, todoId: todo.id });
+    expect(scheduler.request).toHaveBeenCalledTimes(1);
+
+    onSelfEmploymentClick(fakeMouseEvent(card), fakeAppContext(host.state, scheduler));
+
+    expect(selfEmploymentUiState.kanbanSelectedCard).toBeNull();
+    expect(scheduler.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("moves the selected kanban card when clicking a target column", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const project = host.state.selfEmployment.projects[0];
+    const plan = project.gantt.cardPlans.find((item) => item.todos.length > 0)!;
+    const todo = plan.todos[0];
+    selfEmploymentUiState.kanbanSelectedCard = { projectId: project.id, cardId: plan.cardId, todoId: todo.id };
+
+    const event = fakeMouseEvent(fakeKanbanColumn(project.id, "in_progress"));
+    onSelfEmploymentClick(event, fakeAppContext(host.state, { request: vi.fn() }));
+
+    const updatedTodo = host.state.selfEmployment.projects[0].gantt.cardPlans
+      .find((item) => item.cardId === plan.cardId)
+      ?.todos.find((item) => item.id === todo.id);
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(updatedTodo?.status).toBe("in_progress");
+    expect(updatedTodo?.completed).toBe(false);
+    expect(host.calls).toEqual(["sync", "render"]);
   });
 });
 
@@ -110,4 +152,45 @@ function fakeIncomePlanningModel(): IncomePlanningModel {
     status: "realistic",
     warnings: []
   };
+}
+
+function fakeAppContext(
+  state: ReturnType<typeof defaultAppState>,
+  scheduler: { request: () => void }
+): Parameters<typeof onSelfEmploymentClick>[1] {
+  return {
+    store: { getState: () => state },
+    scheduler
+  } as Parameters<typeof onSelfEmploymentClick>[1];
+}
+
+function fakeMouseEvent(target: HTMLElement): MouseEvent & { preventDefault: ReturnType<typeof vi.fn> } {
+  return {
+    target,
+    preventDefault: vi.fn()
+  } as unknown as MouseEvent & { preventDefault: ReturnType<typeof vi.fn> };
+}
+
+function fakeKanbanCard(projectId: string, cardId: string, todoId: string): HTMLElement {
+  const card = {
+    dataset: {
+      selfEmploymentProjectId: projectId,
+      selfEmploymentGanttCardId: cardId,
+      selfEmploymentGanttTodoId: todoId
+    },
+    closest: (selector: string) => (selector === "[data-self-employment-kanban-card]" ? card : null)
+  } as unknown as HTMLElement;
+  return card;
+}
+
+function fakeKanbanColumn(projectId: string, status: string): HTMLElement {
+  const column = {
+    dataset: {
+      selfEmploymentProjectId: projectId,
+      selfEmploymentKanbanStatus: status
+    },
+    closest: (selector: string) =>
+      selector === ".self-employment-kanban-column[data-self-employment-kanban-status]" ? column : null
+  } as unknown as HTMLElement;
+  return column;
 }

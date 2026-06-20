@@ -155,6 +155,22 @@ export function onSelfEmploymentChange(event: Event, context: AppContext): boole
 export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): boolean | void {
   const target = event.target as HTMLElement | null;
   const button = target?.closest<HTMLButtonElement>("button[data-action]");
+  const kanbanCard = target?.closest<HTMLElement>("[data-self-employment-kanban-card]");
+  const kanbanColumn = target?.closest<HTMLElement>(".self-employment-kanban-column[data-self-employment-kanban-status]");
+
+  if (!button && kanbanCard) {
+    event.preventDefault();
+    toggleSelfEmploymentKanbanCardSelection(kanbanCard, context);
+    return true;
+  }
+
+  if (!button && kanbanColumn) {
+    const moved = moveSelectedSelfEmploymentKanbanCardToColumn(kanbanColumn);
+    if (moved) {
+      event.preventDefault();
+      return true;
+    }
+  }
 
   if (!button) {
     closeSelfEmploymentOverlaysForTarget(target);
@@ -347,6 +363,29 @@ function toggledSelfEmploymentFilterValues(values: string[], value: string): str
 function selfEmploymentKanbanStatusFromValue(value: unknown): "planned" | "in_progress" | "done" {
   if (value === "done" || value === "in_progress") return value;
   return "planned";
+}
+
+function toggleSelfEmploymentKanbanCardSelection(card: HTMLElement, context: AppContext): void {
+  const projectId = card.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId;
+  const cardId = card.dataset.selfEmploymentGanttCardId || "";
+  const todoId = card.dataset.selfEmploymentGanttTodoId || "";
+  if (!projectId || !cardId || !todoId) return;
+  const selected = selfEmploymentUiState.kanbanSelectedCard;
+  selfEmploymentUiState.kanbanSelectedCard =
+    selected?.projectId === projectId && selected.cardId === cardId && selected.todoId === todoId
+      ? null
+      : { projectId, cardId, todoId };
+  context.scheduler.request();
+}
+
+function moveSelectedSelfEmploymentKanbanCardToColumn(column: HTMLElement): boolean {
+  const selected = selfEmploymentUiState.kanbanSelectedCard;
+  if (!selected) return false;
+  const projectId = column.dataset.selfEmploymentProjectId || "";
+  if (projectId && projectId !== selected.projectId) return false;
+  const status = selfEmploymentKanbanStatusFromValue(column.dataset.selfEmploymentKanbanStatus);
+  updateSelfEmploymentGanttTodoStatus(selected.projectId, selected.cardId, selected.todoId, status);
+  return true;
 }
 
 function selfEmploymentKanbanColumnFromEvent(event: DragEvent): HTMLElement | null {

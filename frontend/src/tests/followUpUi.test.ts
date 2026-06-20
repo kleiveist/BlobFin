@@ -304,6 +304,8 @@ describe("follow-up ui rendering", () => {
     expect(selfEmploymentFeatureSource).toContain("self-employment-kanban-board");
     expect(selfEmploymentFeatureSource).toContain("self-employment-kanban-column");
     expect(selfEmploymentFeatureSource).toContain('data-self-employment-kanban-card="true"');
+    expect(selfEmploymentFeatureSource).toContain("data-self-employment-project-id");
+    expect(selfEmploymentFeatureSource).toContain('aria-selected="${selected}"');
     expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-set-kanban-status"');
     expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-set-task-eisenhower-filter"');
     expect(selfEmploymentFeatureSource).toContain('data-action="self-employment-toggle-kanban-phase-filter"');
@@ -326,6 +328,9 @@ describe("follow-up ui rendering", () => {
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button");
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button.active");
     expect(stylesSource).toContain(".self-employment-kanban-board");
+    expect(stylesSource).toContain("align-items: stretch");
+    expect(stylesSource).toContain("min-height: clamp(420px, 62vh, 900px)");
+    expect(stylesSource).toContain(".self-employment-task-dashboard-item.selected");
     expect(stylesSource).toContain(".self-employment-eisenhower-matrix");
     expect(stylesSource).toContain(".self-employment-kanban-filter-chip");
     expect(stylesSource).toContain(".self-employment-label-chart-grid");

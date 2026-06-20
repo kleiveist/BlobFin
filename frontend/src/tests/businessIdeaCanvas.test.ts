@@ -41,6 +41,7 @@ describe("business idea canvas", () => {
       "Ziel"
     ]);
     expect(defaults.businessIdeaCanvasMeta.phases.map((phase) => phase.name)).toEqual([
+      "Phase 0",
       "Phase 1",
       "Phase 2",
       "Phase 3",
@@ -52,6 +53,8 @@ describe("business idea canvas", () => {
       "Phase 9",
       "Phase 10"
     ]);
+    expect(defaults.businessIdeaCanvasMeta.phases[0]).toMatchObject({ id: "phase-0", order: 0 });
+    expect(defaults.businessIdeaCanvasMeta.activePhaseId).toBe("phase-1");
     expect(defaults.businessIdeaCanvasMeta.palette.length).toBeGreaterThan(0);
     expect(defaults.businessIdeaCanvasMeta.groupMeta).toEqual({});
   });
@@ -308,8 +311,9 @@ describe("business idea canvas", () => {
 
     expect(meta.labels.map((label) => label.name).slice(0, 5)).toEqual(["Idee", "Wissen", "Start", "Umsetzung", "Ziel"]);
     expect(meta.labels.map((label) => label.name)).toContain("Eigen");
-    expect(meta.phases).toHaveLength(10);
+    expect(meta.phases).toHaveLength(11);
     expect(meta.phases.map((phase) => phase.name)).toEqual([
+      "Phase 0",
       "Phase 1",
       "Phase 2",
       "Phase 3",
@@ -321,7 +325,7 @@ describe("business idea canvas", () => {
       "Phase 9",
       "Phase 10"
     ]);
-    expect(meta.phases[0].startDate).toBe("2026-01-01");
+    expect(meta.phases.find((phase) => phase.id === "phase-1")?.startDate).toBe("2026-01-01");
   });
 
   it("keeps standard palette first and shows newest custom colors compactly", () => {

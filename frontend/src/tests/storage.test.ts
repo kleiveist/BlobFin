@@ -150,9 +150,12 @@ describe("storage", () => {
     );
     expect(state.selfEmployment.projects[0].businessIdeaCanvas.nodes.length).toBeGreaterThan(0);
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.phases.map((phase) => phase.name)).toContain(
+      "Phase 0"
+    );
+    expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.phases.map((phase) => phase.name)).toContain(
       "Phase 1"
     );
-    expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.phases).toHaveLength(10);
+    expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.phases).toHaveLength(11);
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.palette.length).toBeGreaterThan(0);
     expect(state.selfEmployment.projects[0].businessIdeaCanvasMeta.groupMeta).toEqual({});
     expect(state.selfEmployment.projects[0].gantt.cardPlans).toHaveLength(

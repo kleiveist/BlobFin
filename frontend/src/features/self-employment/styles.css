@@ -942,13 +942,15 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
+  min-height: clamp(420px, 62vh, 900px);
 }
 
 .self-employment-kanban-column {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
-  min-height: 220px;
+  min-height: clamp(320px, 56vh, 820px);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-soft);
@@ -995,7 +997,9 @@
 
 .self-employment-kanban-column-list {
   display: grid;
+  align-content: start;
   gap: 8px;
+  min-height: 100%;
 }
 
 .self-employment-task-dashboard-item {
@@ -1011,6 +1015,13 @@
 .self-employment-task-dashboard-item.dragging {
   cursor: grabbing;
   opacity: 0.52;
+}
+
+.self-employment-task-dashboard-item.selected {
+  background: color-mix(in srgb, var(--self-employment-gantt-color) 10%, var(--surface));
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--self-employment-gantt-color) 70%, var(--accent)),
+    0 10px 24px rgba(15, 23, 42, 0.1);
 }
 
 .self-employment-task-dashboard-item.completed {
@@ -1160,6 +1171,7 @@
 
   .self-employment-kanban-board {
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 }
 

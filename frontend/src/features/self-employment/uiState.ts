@@ -13,6 +13,7 @@ export interface SelfEmploymentUiState {
   kanbanPhaseFilterIds: string[];
   kanbanLabelFilterIds: string[];
   kanbanDrag: { projectId: string; cardId: string; todoId: string; status: "planned" | "in_progress" | "done" } | null;
+  kanbanSelectedCard: { projectId: string; cardId: string; todoId: string } | null;
 }
 
 export const selfEmploymentUiState: SelfEmploymentUiState = {
@@ -22,5 +23,6 @@ export const selfEmploymentUiState: SelfEmploymentUiState = {
   taskEisenhowerFilter: "all",
   kanbanPhaseFilterIds: [],
   kanbanLabelFilterIds: [],
-  kanbanDrag: null
+  kanbanDrag: null,
+  kanbanSelectedCard: null
 };

@@ -4,9 +4,13 @@ import { defaultAppState } from "../data/defaults";
 import { defaultBusinessIdeaCanvasForProject, normalizeBusinessIdeaCanvasMeta } from "../domain/businessIdeaCanvas";
 import { handleBusinessIdeaCanvasKeyDown } from "../features/self-employment/business-canvas/controller";
 import { configureBusinessCanvasHost } from "../features/self-employment/business-canvas/host";
-import { handleBusinessIdeaCanvasDoubleClick } from "../features/self-employment/business-canvas/nodeController";
+import {
+  handleBusinessIdeaCanvasDoubleClick,
+  updateBusinessIdeaCanvasSelectedNodeField
+} from "../features/self-employment/business-canvas/nodeController";
 import { selectBusinessIdeaCanvasNodes } from "../features/self-employment/business-canvas/selectionController";
 import { businessCanvasUiState } from "../features/self-employment/business-canvas/uiState";
+import { renderBusinessIdeaCanvasEditor, type BusinessIdeaCanvasRenderState } from "../features/self-employment/business-canvas/view";
 import type { JsonCanvasNode, SelfEmploymentProject } from "../types";
 
 afterEach(() => {
@@ -16,6 +20,83 @@ afterEach(() => {
 });
 
 describe("business canvas controller", () => {
+  it("renders shared label and phase controls for multi-card selections", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 },
+      { id: "b", type: "text", text: "B", x: 120, y: 20, width: 100, height: 80 }
+    ]);
+    host.project().businessIdeaCanvasMeta.nodeMeta.a = {
+      ...host.project().businessIdeaCanvasMeta.nodeMeta.a,
+      labelId: "implementation",
+      phaseId: "phase-2"
+    };
+    host.project().businessIdeaCanvasMeta.nodeMeta.b = {
+      ...host.project().businessIdeaCanvasMeta.nodeMeta.b,
+      labelId: "implementation",
+      phaseId: "phase-2"
+    };
+
+    const toolbar = renderSelectedMultiToolbar(host.project(), ["a", "b"]);
+
+    expect(toolbar).toContain("business-canvas-label-dropdown");
+    expect(toolbar).toContain("business-canvas-phase-dropdown");
+    expect(toolbar).toContain("Umsetzung");
+    expect(toolbar).toContain("business-canvas-phase-badge-button\">2");
+    expect(toolbar).toContain("Phase 0");
+    expect(toolbar).toContain('data-business-canvas-selected-node-value="phase-0"');
+  });
+
+  it("renders mixed label and phase states for heterogeneous multi-card selections", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 },
+      { id: "b", type: "text", text: "B", x: 120, y: 20, width: 100, height: 80 }
+    ]);
+    host.project().businessIdeaCanvasMeta.nodeMeta.a = {
+      ...host.project().businessIdeaCanvasMeta.nodeMeta.a,
+      labelId: "idea",
+      phaseId: "phase-1"
+    };
+    host.project().businessIdeaCanvasMeta.nodeMeta.b = {
+      ...host.project().businessIdeaCanvasMeta.nodeMeta.b,
+      labelId: "implementation",
+      phaseId: "phase-2"
+    };
+
+    const toolbar = renderSelectedMultiToolbar(host.project(), ["a", "b"]);
+
+    expect(toolbar).toContain("Gemischt");
+    expect(toolbar).not.toContain(" active");
+  });
+
+  it("does not render label and phase controls for group-only selections", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "group-a", type: "group", label: "Gruppe A", x: 0, y: 0, width: 180, height: 140 },
+      { id: "group-b", type: "group", label: "Gruppe B", x: 200, y: 20, width: 180, height: 140 }
+    ]);
+
+    const toolbar = renderSelectedMultiToolbar(host.project(), ["group-a", "group-b"]);
+
+    expect(toolbar).not.toContain("business-canvas-label-dropdown");
+    expect(toolbar).not.toContain("business-canvas-phase-dropdown");
+  });
+
+  it("updates label and phase for all selected cards while leaving groups unchanged", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 },
+      { id: "b", type: "text", text: "B", x: 120, y: 20, width: 100, height: 80 },
+      { id: "group", type: "group", label: "Gruppe", x: -20, y: -20, width: 300, height: 160 }
+    ]);
+    const originalGroupMeta = { ...host.project().businessIdeaCanvasMeta.nodeMeta.group };
+    selectBusinessIdeaCanvasNodes(host.projectId, ["a", "b", "group"]);
+
+    updateBusinessIdeaCanvasSelectedNodeField("labelId", "goal");
+    updateBusinessIdeaCanvasSelectedNodeField("phaseId", "phase-3");
+
+    expect(host.project().businessIdeaCanvasMeta.nodeMeta.a).toMatchObject({ labelId: "goal", phaseId: "phase-3" });
+    expect(host.project().businessIdeaCanvasMeta.nodeMeta.b).toMatchObject({ labelId: "goal", phaseId: "phase-3" });
+    expect(host.project().businessIdeaCanvasMeta.nodeMeta.group).toEqual(originalGroupMeta);
+  });
+
   it("moves the selected card with arrow keys and preserves selection", () => {
     const host = configureFakeBusinessCanvasHost([
       { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }
@@ -137,6 +218,26 @@ function configureFakeBusinessCanvasHost(nodes: JsonCanvasNode[]): { projectId: 
     projectId,
     project: () => state.selfEmployment.projects[0]
   };
+}
+
+function renderSelectedMultiToolbar(project: SelfEmploymentProject, selectedNodeIds: string[]): string {
+  const html = renderBusinessIdeaCanvasEditor(project, {
+    selectedNodeIds,
+    selectedEdgeId: null,
+    editingNodeId: null,
+    editingEdgeLabelId: null,
+    editingEdgeLabelDraft: "",
+    armedNodeId: null,
+    lineMenu: null,
+    selectionRect: null,
+    contextMenu: null,
+    palettePopover: null,
+    paletteEditor: null,
+    clipboardAvailable: false
+  } satisfies BusinessIdeaCanvasRenderState);
+  const start = html.indexOf("data-business-canvas-multi-toolbar");
+  if (start === -1) return "";
+  return html.slice(start, start + 4000);
 }
 
 function keyboardEvent(

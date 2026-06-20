@@ -19,7 +19,7 @@ import type {
 const DEFAULT_GRID_SIZE = 20;
 const MIN_NODE_WIDTH = 100;
 const MIN_NODE_HEIGHT = 60;
-const MAX_PHASES = 10;
+const MAX_PHASES = 11;
 export const BUSINESS_IDEA_CANVAS_ORIGIN = 1200;
 export const BUSINESS_IDEA_CANVAS_WIDTH = 2600;
 export const BUSINESS_IDEA_CANVAS_HEIGHT = 1900;
@@ -44,9 +44,9 @@ const DEFAULT_PALETTE: BusinessIdeaCanvasPaletteColor[] = [
 ];
 
 const DEFAULT_PHASES: BusinessIdeaCanvasPhase[] = Array.from({ length: MAX_PHASES }, (_, index) => ({
-  id: `phase-${index + 1}`,
-  name: `Phase ${index + 1}`,
-  order: index + 1,
+  id: `phase-${index}`,
+  name: `Phase ${index}`,
+  order: index,
   startDate: null
 }));
 
@@ -171,7 +171,7 @@ export function defaultBusinessIdeaCanvasMeta(canvas: BusinessIdeaCanvas): Busin
   const labels = DEFAULT_LABELS.map((label) => ({ ...label }));
   const phases = DEFAULT_PHASES.map((phase) => ({ ...phase }));
   const activeLabelId = labels[0]?.id ?? "idea";
-  const activePhaseId = phases[0]?.id ?? "phase-1";
+  const activePhaseId = phases.find((phase) => phase.id === "phase-1")?.id ?? phases[0]?.id ?? "phase-1";
   return {
     viewport: { ...BUSINESS_IDEA_CANVAS_DEFAULT_VIEWPORT },
     grid: { size: DEFAULT_GRID_SIZE, snap: true, alignToObjects: true },
@@ -196,7 +196,7 @@ export function normalizeBusinessIdeaCanvasMeta(
   const labels = normalizeLabels(source.labels, fallback.labels);
   const phases = normalizePhases(source.phases, fallback.phases);
   const fallbackLabelId = labels[0]?.id ?? "idea";
-  const fallbackPhaseId = phases[0]?.id ?? "phase-1";
+  const fallbackPhaseId = phases.find((phase) => phase.id === "phase-1")?.id ?? phases[0]?.id ?? "phase-1";
   const sourceActiveLabelId = normalizeBusinessIdeaCanvasLabelId(source.activeLabelId);
   const activeLabelId = labels.some((label) => label.id === sourceActiveLabelId) ? sourceActiveLabelId : fallbackLabelId;
   const activePhaseId = phases.some((phase) => phase.id === source.activePhaseId) ? String(source.activePhaseId) : fallbackPhaseId;
