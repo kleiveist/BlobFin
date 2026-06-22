@@ -78,6 +78,7 @@ export interface BusinessIdeaCanvasRenderState {
   palettePopover: BusinessIdeaCanvasPalettePopoverState | null;
   paletteEditor: BusinessIdeaCanvasPaletteEditorState | null;
   clipboardAvailable: boolean;
+  ganttCollapsed: boolean;
 }
 
 const BUSINESS_CANVAS_SHAPE_OPTIONS: Array<{ value: BusinessIdeaCanvasShape; icon: string; label: string }> = [
@@ -110,7 +111,7 @@ export function renderBusinessIdeaCanvasEditor(
   return `
     <div class="business-canvas-editor" data-business-canvas-project-id="${escapeHtml(project.id)}">
       ${renderBusinessIdeaCanvasTopToolbar(project, renderState)}
-      <div class="business-canvas-workbench">
+      <div class="business-canvas-workbench${renderState.ganttCollapsed ? " gantt-collapsed" : ""}">
         <div
           class="business-canvas-viewport"
           data-business-canvas-viewport
@@ -133,7 +134,7 @@ export function renderBusinessIdeaCanvasEditor(
           ${renderBusinessIdeaCanvasMultiToolbar(project, renderState)}
           ${renderBusinessIdeaCanvasEdgeToolbar(project, renderState)}
         </div>
-        ${renderBusinessIdeaCanvasGantt(project)}
+        ${renderBusinessIdeaCanvasGantt(project, renderState.ganttCollapsed)}
       </div>
       ${renderBusinessIdeaCanvasContextMenu(project, renderState)}
       ${renderBusinessIdeaCanvasPalettePopover(project, renderState)}
@@ -772,38 +773,51 @@ function renderBusinessIdeaCanvasPaletteEditor(renderState: BusinessIdeaCanvasRe
   `;
 }
 
-function renderBusinessIdeaCanvasGantt(project: SelfEmploymentProject): string {
+function renderBusinessIdeaCanvasGantt(project: SelfEmploymentProject, collapsed: boolean): string {
   const rows = businessIdeaCanvasGanttRows(project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
   return `
-    <aside class="business-canvas-gantt" aria-label="Gantt-Auswertung">
-      <div class="business-canvas-gantt-head">
-        <h4>Gantt-Auswertung</h4>
-        <span>${intNumber(businessIdeaCanvasCardNodes(project.businessIdeaCanvas).length)} Karten</span>
-      </div>
-      <div class="business-canvas-gantt-rows">
-        ${rows
-          .map(
-            (row) => `
-              <div class="business-canvas-gantt-row">
-                <span class="business-canvas-gantt-phase">${escapeHtml(row.phaseName)}</span>
-                <div class="business-canvas-gantt-bar">
-                  ${
-                    row.count
-                      ? `<span
-                          class="business-canvas-gantt-fill"
-                          style="width:${Math.max(0, row.ratio * 100)}%;--business-canvas-gantt-color:${escapeHtml(row.phaseColor)};"
-                          title="${escapeHtml(`${row.phaseName}: ${row.count}`)}"
-                        ></span>`
-                      : `<span class="business-canvas-gantt-empty"></span>`
-                  }
-                </div>
-                <strong>${intNumber(row.count)}</strong>
+    <div class="business-canvas-gantt-shell${collapsed ? " collapsed" : ""}" data-business-canvas-gantt-shell>
+      <button
+        class="business-canvas-gantt-toggle"
+        type="button"
+        data-action="business-canvas-toggle-gantt-summary"
+        aria-expanded="${!collapsed}"
+        aria-label="${collapsed ? "Gantt-Auswertung anzeigen" : "Gantt-Auswertung verbergen"}"
+      >${escapeHtml(collapsed ? "<" : ">")}</button>
+      ${
+        collapsed
+          ? ""
+          : `<aside class="business-canvas-gantt" aria-label="Gantt-Auswertung">
+              <div class="business-canvas-gantt-head">
+                <h4>Gantt-Auswertung</h4>
+                <span>${intNumber(businessIdeaCanvasCardNodes(project.businessIdeaCanvas).length)} Karten</span>
               </div>
-            `
-          )
-          .join("")}
-      </div>
-    </aside>
+              <div class="business-canvas-gantt-rows">
+                ${rows
+                  .map(
+                    (row) => `
+                      <div class="business-canvas-gantt-row">
+                        <span class="business-canvas-gantt-phase">${escapeHtml(row.phaseName)}</span>
+                        <div class="business-canvas-gantt-bar">
+                          ${
+                            row.count
+                              ? `<span
+                                  class="business-canvas-gantt-fill"
+                                  style="width:${Math.max(0, row.ratio * 100)}%;--business-canvas-gantt-color:${escapeHtml(row.phaseColor)};"
+                                  title="${escapeHtml(`${row.phaseName}: ${row.count}`)}"
+                                ></span>`
+                              : `<span class="business-canvas-gantt-empty"></span>`
+                          }
+                        </div>
+                        <strong>${intNumber(row.count)}</strong>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </aside>`
+      }
+    </div>
   `;
 }
 

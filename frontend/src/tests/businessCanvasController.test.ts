@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultAppState } from "../data/defaults";
 import { defaultBusinessIdeaCanvasForProject, normalizeBusinessIdeaCanvasMeta } from "../domain/businessIdeaCanvas";
 import { normalizeSelfEmploymentGanttPlan } from "../domain/selfEmploymentGantt";
-import { handleBusinessIdeaCanvasKeyDown } from "../features/self-employment/business-canvas/controller";
+import {
+  handleBusinessIdeaCanvasKeyDown,
+  toggleBusinessIdeaCanvasGanttSummary
+} from "../features/self-employment/business-canvas/controller";
 import { configureBusinessCanvasHost } from "../features/self-employment/business-canvas/host";
 import {
   handleBusinessIdeaCanvasDoubleClick,
@@ -154,6 +157,37 @@ describe("business canvas controller", () => {
     expect(openArticle).not.toContain(" completed");
     expect(groupArticle).not.toContain("business-canvas-completed-badge");
     expect(groupArticle).not.toContain(" completed");
+  });
+
+  it("toggles the business canvas gantt summary for the current project", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }
+    ]);
+
+    const openHtml = renderBusinessIdeaCanvasEditor(host.project(), blankBusinessIdeaCanvasRenderState());
+    expect(openHtml).not.toContain("gantt-collapsed");
+    expect(openHtml).toContain("business-canvas-gantt-shell");
+    expect(openHtml).toContain('aria-expanded="true"');
+    expect(openHtml).toContain("&gt;</button>");
+    expect(openHtml).not.toContain(">Einklappen<");
+    expect(openHtml).not.toContain(">Ausklappen<");
+    expect(openHtml).toContain("business-canvas-gantt-rows");
+
+    toggleBusinessIdeaCanvasGanttSummary();
+    const collapsedHtml = renderBusinessIdeaCanvasEditor(host.project(), blankBusinessIdeaCanvasRenderState());
+
+    expect(businessCanvasUiState.collapsedGanttProjectIds).toEqual([host.projectId]);
+    expect(collapsedHtml).toContain("business-canvas-workbench gantt-collapsed");
+    expect(collapsedHtml).toContain("business-canvas-gantt-shell collapsed");
+    expect(collapsedHtml).toContain('aria-expanded="false"');
+    expect(collapsedHtml).toContain("&lt;</button>");
+    expect(collapsedHtml).not.toContain("business-canvas-gantt-rows");
+    expect(collapsedHtml).not.toContain(">Einklappen<");
+    expect(collapsedHtml).not.toContain(">Ausklappen<");
+
+    toggleBusinessIdeaCanvasGanttSummary();
+
+    expect(businessCanvasUiState.collapsedGanttProjectIds).toEqual([]);
   });
 
   it("updates label and phase for all selected cards while leaving groups unchanged", () => {
@@ -309,7 +343,8 @@ function renderSelectedMultiToolbar(project: SelfEmploymentProject, selectedNode
     contextMenu: null,
     palettePopover: null,
     paletteEditor: null,
-    clipboardAvailable: false
+    clipboardAvailable: false,
+    ganttCollapsed: businessCanvasUiState.collapsedGanttProjectIds.includes(project.id)
   } satisfies BusinessIdeaCanvasRenderState);
   const start = html.indexOf("data-business-canvas-multi-toolbar");
   if (start === -1) return "";
@@ -329,7 +364,8 @@ function blankBusinessIdeaCanvasRenderState(): BusinessIdeaCanvasRenderState {
     contextMenu: null,
     palettePopover: null,
     paletteEditor: null,
-    clipboardAvailable: false
+    clipboardAvailable: false,
+    ganttCollapsed: businessCanvasUiState.collapsedGanttProjectIds.includes("project-keyboard")
   };
 }
 
@@ -416,6 +452,7 @@ function resetBusinessCanvasUiState(): void {
   businessCanvasUiState.palettePopover = null;
   businessCanvasUiState.paletteEditor = null;
   businessCanvasUiState.clipboard = null;
+  businessCanvasUiState.collapsedGanttProjectIds = [];
   businessCanvasUiState.spacePressed = false;
   businessCanvasUiState.lastDragEndAt = 0;
 }

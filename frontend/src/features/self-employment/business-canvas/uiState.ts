@@ -95,6 +95,7 @@ export interface BusinessIdeaCanvasUiState {
   palettePopover: BusinessIdeaCanvasPalettePopoverState | null;
   paletteEditor: BusinessIdeaCanvasPaletteEditorState | null;
   clipboard: BusinessIdeaCanvasClipboardState;
+  collapsedGanttProjectIds: string[];
   spacePressed: boolean;
   lastDragEndAt: number;
 }
@@ -116,6 +117,7 @@ export const businessCanvasUiState: BusinessIdeaCanvasUiState = {
   palettePopover: null,
   paletteEditor: null,
   clipboard: null,
+  collapsedGanttProjectIds: [],
   spacePressed: false,
   lastDragEndAt: 0
 };

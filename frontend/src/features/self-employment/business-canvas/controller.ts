@@ -104,8 +104,18 @@ export function businessIdeaCanvasRenderState(projectId: string): BusinessIdeaCa
     contextMenu: businessCanvasUiState.contextMenu?.projectId === projectId ? businessCanvasUiState.contextMenu : null,
     palettePopover: businessCanvasUiState.palettePopover?.projectId === projectId ? businessCanvasUiState.palettePopover : null,
     paletteEditor: businessCanvasUiState.paletteEditor?.projectId === projectId ? businessCanvasUiState.paletteEditor : null,
-    clipboardAvailable: Boolean(businessCanvasUiState.clipboard?.nodes.length)
+    clipboardAvailable: Boolean(businessCanvasUiState.clipboard?.nodes.length),
+    ganttCollapsed: businessCanvasUiState.collapsedGanttProjectIds.includes(projectId)
   };
+}
+
+export function toggleBusinessIdeaCanvasGanttSummary(): void {
+  const projectId = businessCanvasHost().getState().selfEmployment.selectedProjectId;
+  if (!projectId) return;
+  businessCanvasUiState.collapsedGanttProjectIds = businessCanvasUiState.collapsedGanttProjectIds.includes(projectId)
+    ? businessCanvasUiState.collapsedGanttProjectIds.filter((id) => id !== projectId)
+    : [...businessCanvasUiState.collapsedGanttProjectIds, projectId];
+  renderAll();
 }
 
 export function updateBusinessIdeaCanvasMetaField(field: string, value: string): void {

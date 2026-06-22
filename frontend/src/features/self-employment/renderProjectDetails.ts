@@ -329,6 +329,7 @@ function selfEmploymentTasksDashboard(project: SelfEmploymentProject, workPlan: 
           ${selfEmploymentKanbanColumn(project, "done", "Erledigt", visibleTasks)}
         </div>
       </section>
+      ${selfEmploymentTaskContextPopup(project, workPlan)}
     </div>
   `;
 }
@@ -608,6 +609,7 @@ function selfEmploymentKanbanTaskCard(project: SelfEmploymentProject, task: Self
       data-self-employment-project-id="${escapeHtml(project.id)}"
       data-self-employment-gantt-card-id="${escapeHtml(task.cardId)}"
       data-self-employment-gantt-todo-id="${escapeHtml(task.todoId)}"
+      data-self-employment-kanban-todo-key="${escapeHtml(`${project.id}:${task.cardId}:${task.todoId}`)}"
       data-self-employment-kanban-status="${escapeHtml(task.status)}"
       data-self-employment-kanban-phase-id="${escapeHtml(task.phaseId)}"
       data-self-employment-kanban-label-id="${escapeHtml(task.labelId)}"
@@ -630,6 +632,58 @@ function selfEmploymentKanbanTaskCard(project: SelfEmploymentProject, task: Self
         ${selfEmploymentKanbanStatusButton(project, task, "done", "Erledigt")}
       </div>
     </article>
+  `;
+}
+
+function selfEmploymentTaskContextPopup(project: SelfEmploymentProject, workPlan: SelfEmploymentProjectWorkPlan): string {
+  const popup = selfEmploymentUiState.taskContextPopup;
+  if (!popup || popup.projectId !== project.id) return "";
+  const tasks = selfEmploymentSortKanbanTasks(workPlan.tasks.filter((task) => task.cardId === popup.cardId));
+  if (!tasks.length) return "";
+  const activeTask = tasks.find((task) => task.todoId === popup.todoId) ?? tasks[0];
+  const title = activeTask?.cardTitle ?? "Aufgabenkarte";
+  return `
+    <div
+      class="self-employment-task-context-popup"
+      style="left:${escapeHtml(popup.left)}px;top:${escapeHtml(popup.top)}px;"
+      role="dialog"
+      aria-label="${escapeHtml(`${title} Todos`)}"
+      data-self-employment-task-context-popup
+    >
+      <header>
+        <div>
+          <span>Aufgabenkarte</span>
+          <strong>${escapeHtml(title)}</strong>
+        </div>
+        <button class="icon-button" type="button" data-action="self-employment-close-task-context-popup" aria-label="Todo-Popup schliessen">x</button>
+      </header>
+      <div class="self-employment-task-context-list">
+        ${tasks.map((task) => selfEmploymentTaskContextPopupItem(project, task, task.todoId === popup.todoId)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function selfEmploymentTaskContextPopupItem(
+  project: SelfEmploymentProject,
+  task: SelfEmploymentProjectWorkPlanTask,
+  active: boolean
+): string {
+  return `
+    <button
+      class="self-employment-task-context-item${active ? " active" : ""}${task.completed ? " completed" : ""}${task.overdue ? " overdue" : ""}"
+      type="button"
+      data-action="self-employment-jump-kanban-todo"
+      data-self-employment-project-id="${escapeHtml(project.id)}"
+      data-self-employment-gantt-card-id="${escapeHtml(task.cardId)}"
+      data-self-employment-gantt-todo-id="${escapeHtml(task.todoId)}"
+      style="--self-employment-gantt-color:${escapeHtml(task.labelColor)};"
+      aria-current="${active ? "true" : "false"}"
+    >
+      <span class="self-employment-task-context-status">${escapeHtml(task.status === "done" ? "Erledigt" : task.status === "in_progress" ? "In Arbeit" : "Geplant")}</span>
+      <strong>${escapeHtml(task.title)}</strong>
+      <small>${escapeHtml(`${hoursLabel(task.hours)} · ${task.plannedDate ? selfEmploymentDateLabel(task.plannedDate) : "ohne Tagesplan"}`)}</small>
+    </button>
   `;
 }
 

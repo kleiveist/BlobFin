@@ -29,6 +29,7 @@ import {
   pasteBusinessIdeaCanvasClipboard,
   saveBusinessIdeaCanvasPaletteColor,
   startBusinessIdeaCanvasPointer,
+  toggleBusinessIdeaCanvasGanttSummary,
   updateBusinessIdeaCanvasEdgeLabelDraft,
   updateBusinessIdeaCanvasGridField,
   updateBusinessIdeaCanvasMetaField,
@@ -223,6 +224,10 @@ export function handleBusinessCanvasClick(event: MouseEvent): boolean {
   }
   if (action === "business-canvas-close-palette-editor") {
     closeBusinessIdeaCanvasPaletteEditor();
+    return true;
+  }
+  if (action === "business-canvas-toggle-gantt-summary") {
+    toggleBusinessIdeaCanvasGanttSummary();
     return true;
   }
   if (action === "business-canvas-edit-node") {

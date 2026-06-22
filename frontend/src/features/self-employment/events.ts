@@ -160,6 +160,11 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
 
   if (!button && kanbanCard) {
     event.preventDefault();
+    if (event.ctrlKey && event.button === 0) {
+      openSelfEmploymentTaskContextPopup(kanbanCard, event, context);
+      return true;
+    }
+    selfEmploymentUiState.taskContextPopup = null;
     toggleSelfEmploymentKanbanCardSelection(kanbanCard, context);
     return true;
   }
@@ -219,6 +224,13 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
       button.dataset.selfEmploymentKanbanLabelId || ""
     );
     context.scheduler.request();
+  }
+  if (action === "self-employment-close-task-context-popup") {
+    selfEmploymentUiState.taskContextPopup = null;
+    context.scheduler.request();
+  }
+  if (action === "self-employment-jump-kanban-todo") {
+    jumpToSelfEmploymentKanbanTodo(button, context);
   }
   if (action === "self-employment-add-contact") addSelfEmploymentContact(button.dataset.selfEmploymentProjectId || "");
   if (action === "self-employment-remove-contact") {
@@ -324,6 +336,7 @@ export function onSelfEmploymentWindowKeyDown(event: KeyboardEvent): boolean | v
 export function closeSelfEmploymentOverlays(): void {
   hideSelfEmploymentIconPicker();
   closeSelfEmploymentGanttEditor();
+  closeSelfEmploymentTaskContextPopup();
 }
 
 function closeSelfEmploymentOverlaysForTarget(target: HTMLElement | null): void {
@@ -332,6 +345,9 @@ function closeSelfEmploymentOverlaysForTarget(target: HTMLElement | null): void 
   }
   if (selfEmploymentUiState.ganttEditor && !target?.closest("[data-self-employment-gantt-popover]")) {
     closeSelfEmploymentGanttEditor();
+  }
+  if (selfEmploymentUiState.taskContextPopup && !target?.closest("[data-self-employment-task-context-popup]")) {
+    closeSelfEmploymentTaskContextPopup();
   }
 }
 
@@ -376,6 +392,66 @@ function toggleSelfEmploymentKanbanCardSelection(card: HTMLElement, context: App
       ? null
       : { projectId, cardId, todoId };
   context.scheduler.request();
+}
+
+function openSelfEmploymentTaskContextPopup(card: HTMLElement, event: MouseEvent, context: AppContext): void {
+  const projectId = card.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId;
+  const cardId = card.dataset.selfEmploymentGanttCardId || "";
+  const todoId = card.dataset.selfEmploymentGanttTodoId || "";
+  if (!projectId || !cardId || !todoId) return;
+  const position = selfEmploymentPopupPosition(card, event);
+  selfEmploymentUiState.taskContextPopup = {
+    projectId,
+    cardId,
+    todoId,
+    ...position
+  };
+  selfEmploymentUiState.kanbanSelectedCard = { projectId, cardId, todoId };
+  context.scheduler.request();
+}
+
+function jumpToSelfEmploymentKanbanTodo(button: HTMLButtonElement, context: AppContext): void {
+  const projectId = button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId;
+  const cardId = button.dataset.selfEmploymentGanttCardId || "";
+  const todoId = button.dataset.selfEmploymentGanttTodoId || "";
+  if (!projectId || !cardId || !todoId) return;
+  selfEmploymentUiState.kanbanSelectedCard = { projectId, cardId, todoId };
+  selfEmploymentUiState.taskContextPopup = null;
+  selfEmploymentUiState.taskEisenhowerFilter = "all";
+  selfEmploymentUiState.kanbanPhaseFilterIds = [];
+  selfEmploymentUiState.kanbanLabelFilterIds = [];
+  context.scheduler.request();
+  globalThis.setTimeout(() => scrollSelfEmploymentKanbanTodoIntoView(projectId, cardId, todoId), 0);
+}
+
+function selfEmploymentPopupPosition(card: HTMLElement, event: MouseEvent): { left: number; top: number } {
+  const rect = card.getBoundingClientRect?.();
+  const viewportWidth = typeof window === "undefined" ? 1200 : window.innerWidth || 1200;
+  const viewportHeight = typeof window === "undefined" ? 800 : window.innerHeight || 800;
+  const left = Math.round(Math.max(12, Math.min(event.clientX || rect?.left || 12, viewportWidth - 340)));
+  const top = Math.round(Math.max(12, Math.min((rect?.top ?? event.clientY) + 12, viewportHeight - 420)));
+  return { left, top };
+}
+
+function scrollSelfEmploymentKanbanTodoIntoView(projectId: string, cardId: string, todoId: string): void {
+  if (typeof document === "undefined") return;
+  const selector = `[data-self-employment-kanban-todo-key="${cssEscape(`${projectId}:${cardId}:${todoId}`)}"]`;
+  const element = document.querySelector<HTMLElement>(selector);
+  if (!element) return;
+  element.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+  element.classList.add("jump-highlight");
+  globalThis.setTimeout(() => element.classList.remove("jump-highlight"), 900);
+}
+
+function cssEscape(value: string): string {
+  const css = (globalThis as typeof globalThis & { CSS?: { escape?: (input: string) => string } }).CSS;
+  return typeof css?.escape === "function" ? css.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+}
+
+function closeSelfEmploymentTaskContextPopup(): void {
+  selfEmploymentUiState.taskContextPopup = null;
+  if (typeof document === "undefined") return;
+  document.querySelector<HTMLElement>("[data-self-employment-task-context-popup]")?.remove();
 }
 
 function moveSelectedSelfEmploymentKanbanCardToColumn(column: HTMLElement): boolean {

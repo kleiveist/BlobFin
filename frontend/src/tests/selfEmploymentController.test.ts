@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
 import type { IncomePlanningModel } from "../domain/incomePlanning";
+import { normalizeSelfEmploymentGanttPlan } from "../domain/selfEmploymentGantt";
 import {
   addSelfEmploymentProject,
   configureSelfEmploymentHost,
@@ -11,12 +12,19 @@ import {
   updateSelfEmploymentProject
 } from "../features/self-employment/controller";
 import { onSelfEmploymentClick } from "../features/self-employment/events";
+import { evaluateSelfEmploymentProject } from "../features/self-employment/feasibilityController";
+import { selfEmploymentProjectDetails } from "../features/self-employment/renderProjectDetails";
 import { selfEmploymentUiState } from "../features/self-employment/uiState";
 
 afterEach(() => {
   selfEmploymentUiState.kanbanSelectedCard = null;
   selfEmploymentUiState.kanbanDrag = null;
+  selfEmploymentUiState.taskContextPopup = null;
+  selfEmploymentUiState.taskEisenhowerFilter = "all";
+  selfEmploymentUiState.kanbanPhaseFilterIds = [];
+  selfEmploymentUiState.kanbanLabelFilterIds = [];
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("self employment controller persistence", () => {
@@ -96,6 +104,79 @@ describe("self employment controller persistence", () => {
     expect(updatedTodo?.completed).toBe(false);
     expect(host.calls).toEqual(["sync", "render"]);
   });
+
+  it("opens the related todo popup with ctrl-click while normal clicks still select cards", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const project = host.state.selfEmployment.projects[0];
+    const plan = project.gantt.cardPlans.find((item) => item.todos.length > 0)!;
+    const todo = plan.todos[0];
+    const scheduler = { request: vi.fn() };
+    const card = fakeKanbanCard(project.id, plan.cardId, todo.id);
+
+    onSelfEmploymentClick(fakeMouseEvent(card, { ctrlKey: true, button: 0, clientX: 440, clientY: 120 }), fakeAppContext(host.state, scheduler));
+
+    expect(selfEmploymentUiState.taskContextPopup).toMatchObject({ projectId: project.id, cardId: plan.cardId, todoId: todo.id });
+    expect(selfEmploymentUiState.kanbanSelectedCard).toEqual({ projectId: project.id, cardId: plan.cardId, todoId: todo.id });
+    expect(scheduler.request).toHaveBeenCalledTimes(1);
+
+    onSelfEmploymentClick(fakeMouseEvent(card), fakeAppContext(host.state, scheduler));
+
+    expect(selfEmploymentUiState.taskContextPopup).toBeNull();
+    expect(scheduler.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders related todos in the popup and excludes todos from other cards", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const project = projectWithRelatedTodos(host.state);
+    selfEmploymentUiState.taskContextPopup = {
+      projectId: project.id,
+      cardId: "card-a",
+      todoId: "todo-a-2",
+      left: 100,
+      top: 80
+    };
+
+    const html = selfEmploymentProjectDetails(
+      evaluateSelfEmploymentProject(project, { availableTimeHours: 40, availableReserve: 5000 }),
+      "tasks",
+      fakeIncomePlanningModel()
+    );
+    const popupHtml = extractTaskContextPopup(html);
+
+    expect(popupHtml).toContain("self-employment-task-context-popup");
+    expect(popupHtml).toContain("Erstes Todo");
+    expect(popupHtml).toContain("Zweites Todo");
+    expect(popupHtml).not.toContain("Fremdes Todo");
+    expect(popupHtml).toContain('aria-current="true"');
+  });
+
+  it("jumps from the popup to another kanban todo and clears blocking filters", () => {
+    vi.useFakeTimers();
+    const host = configureFakeSelfEmploymentHost();
+    const project = projectWithRelatedTodos(host.state);
+    const scrollIntoView = vi.fn();
+    const classList = { add: vi.fn(), remove: vi.fn() };
+    vi.stubGlobal("document", {
+      querySelector: vi.fn(() => ({ scrollIntoView, classList }))
+    });
+    selfEmploymentUiState.taskContextPopup = { projectId: project.id, cardId: "card-a", todoId: "todo-a-1", left: 100, top: 80 };
+    selfEmploymentUiState.taskEisenhowerFilter = "important_urgent";
+    selfEmploymentUiState.kanbanPhaseFilterIds = ["phase-9"];
+    selfEmploymentUiState.kanbanLabelFilterIds = ["goal"];
+
+    const scheduler = { request: vi.fn() };
+    onSelfEmploymentClick(fakeMouseEvent(fakePopupTodoButton(project.id, "card-a", "todo-a-2")), fakeAppContext(host.state, scheduler));
+    vi.runAllTimers();
+
+    expect(selfEmploymentUiState.kanbanSelectedCard).toEqual({ projectId: project.id, cardId: "card-a", todoId: "todo-a-2" });
+    expect(selfEmploymentUiState.taskContextPopup).toBeNull();
+    expect(selfEmploymentUiState.taskEisenhowerFilter).toBe("all");
+    expect(selfEmploymentUiState.kanbanPhaseFilterIds).toEqual([]);
+    expect(selfEmploymentUiState.kanbanLabelFilterIds).toEqual([]);
+    expect(scheduler.request).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center", inline: "nearest", behavior: "smooth" });
+    expect(classList.add).toHaveBeenCalledWith("jump-highlight");
+  });
 });
 
 function configureFakeSelfEmploymentHost(): {
@@ -164,9 +245,16 @@ function fakeAppContext(
   } as Parameters<typeof onSelfEmploymentClick>[1];
 }
 
-function fakeMouseEvent(target: HTMLElement): MouseEvent & { preventDefault: ReturnType<typeof vi.fn> } {
+function fakeMouseEvent(
+  target: HTMLElement,
+  overrides: Partial<Pick<MouseEvent, "ctrlKey" | "button" | "clientX" | "clientY">> = {}
+): MouseEvent & { preventDefault: ReturnType<typeof vi.fn> } {
   return {
     target,
+    ctrlKey: overrides.ctrlKey ?? false,
+    button: overrides.button ?? 0,
+    clientX: overrides.clientX ?? 0,
+    clientY: overrides.clientY ?? 0,
     preventDefault: vi.fn()
   } as unknown as MouseEvent & { preventDefault: ReturnType<typeof vi.fn> };
 }
@@ -178,6 +266,7 @@ function fakeKanbanCard(projectId: string, cardId: string, todoId: string): HTML
       selfEmploymentGanttCardId: cardId,
       selfEmploymentGanttTodoId: todoId
     },
+    getBoundingClientRect: () => ({ left: 420, top: 90, right: 620, bottom: 150, width: 200, height: 60 }),
     closest: (selector: string) => (selector === "[data-self-employment-kanban-card]" ? card : null)
   } as unknown as HTMLElement;
   return card;
@@ -193,4 +282,74 @@ function fakeKanbanColumn(projectId: string, status: string): HTMLElement {
       selector === ".self-employment-kanban-column[data-self-employment-kanban-status]" ? column : null
   } as unknown as HTMLElement;
   return column;
+}
+
+function fakePopupTodoButton(projectId: string, cardId: string, todoId: string): HTMLElement {
+  let button: HTMLElement;
+  button = {
+    dataset: {
+      action: "self-employment-jump-kanban-todo",
+      selfEmploymentProjectId: projectId,
+      selfEmploymentGanttCardId: cardId,
+      selfEmploymentGanttTodoId: todoId
+    },
+    closest: (selector: string) => (selector === "button[data-action]" ? button : null)
+  } as unknown as HTMLElement;
+  return button;
+}
+
+function extractTaskContextPopup(html: string): string {
+  const start = html.indexOf("self-employment-task-context-popup");
+  if (start === -1) return "";
+  const end = html.indexOf("</div>\n   \n    </div>", start);
+  return html.slice(start, end === -1 ? start + 3000 : end);
+}
+
+function projectWithRelatedTodos(state: ReturnType<typeof defaultAppState>): ReturnType<typeof defaultAppState>["selfEmployment"]["projects"][number] {
+  const project = state.selfEmployment.projects[0];
+  const canvas = {
+    nodes: [
+      { id: "card-a", type: "text" as const, text: "Karte A", x: 0, y: 0, width: 100, height: 80 },
+      { id: "card-b", type: "text" as const, text: "Karte B", x: 120, y: 0, width: 100, height: 80 }
+    ],
+    edges: []
+  };
+  const nextProject = {
+    ...project,
+    businessIdeaCanvas: canvas,
+    businessIdeaCanvasMeta: {
+      ...project.businessIdeaCanvasMeta,
+      nodeMeta: {
+        "card-a": { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" as const },
+        "card-b": { labelId: "goal", phaseId: "phase-2", shape: "rounded-rectangle" as const }
+      }
+    }
+  };
+  const gantt = normalizeSelfEmploymentGanttPlan(
+    {
+      cardPlans: [
+        {
+          cardId: "card-a",
+          timeBudgetHours: 4,
+          completed: false,
+          todos: [
+            { id: "todo-a-1", title: "Erstes Todo", eisenhowerQuadrant: "important_not_urgent", status: "planned", completed: false },
+            { id: "todo-a-2", title: "Zweites Todo", eisenhowerQuadrant: "important_urgent", status: "in_progress", completed: false }
+          ]
+        },
+        {
+          cardId: "card-b",
+          timeBudgetHours: 2,
+          completed: false,
+          todos: [{ id: "todo-b-1", title: "Fremdes Todo", eisenhowerQuadrant: "important_not_urgent", status: "planned", completed: false }]
+        }
+      ]
+    },
+    nextProject.businessIdeaCanvas,
+    nextProject.businessIdeaCanvasMeta
+  );
+  const updated = { ...nextProject, gantt };
+  state.selfEmployment.projects = [updated];
+  state.selfEmployment.selectedProjectId = updated.id;
+  return updated;
 }

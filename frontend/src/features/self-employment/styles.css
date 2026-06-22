@@ -1024,6 +1024,10 @@
     0 10px 24px rgba(15, 23, 42, 0.1);
 }
 
+.self-employment-task-dashboard-item.jump-highlight {
+  animation: self-employment-kanban-jump-highlight 900ms ease;
+}
+
 .self-employment-task-dashboard-item.completed {
   opacity: 0.72;
 }
@@ -1055,6 +1059,92 @@
   border-color: var(--self-employment-gantt-color);
   background: color-mix(in srgb, var(--self-employment-gantt-color) 14%, var(--surface));
   color: var(--text);
+}
+
+.self-employment-task-context-popup {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  gap: 10px;
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(420px, calc(100vh - 24px));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+  padding: 12px;
+}
+
+.self-employment-task-context-popup > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.self-employment-task-context-popup > header div,
+.self-employment-task-context-list,
+.self-employment-task-context-item {
+  display: grid;
+  gap: 5px;
+}
+
+.self-employment-task-context-popup > header span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.self-employment-task-context-popup > header strong {
+  font-size: 0.9rem;
+}
+
+.self-employment-task-context-item {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--self-employment-gantt-color);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.self-employment-task-context-item:hover,
+.self-employment-task-context-item:focus-visible,
+.self-employment-task-context-item.active {
+  border-color: color-mix(in srgb, var(--self-employment-gantt-color) 56%, var(--border));
+  background: color-mix(in srgb, var(--self-employment-gantt-color) 10%, var(--surface));
+}
+
+.self-employment-task-context-item.completed strong {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.self-employment-task-context-status,
+.self-employment-task-context-item small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+@keyframes self-employment-kanban-jump-highlight {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  20%,
+  70% {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 0 0 2px color-mix(in srgb, var(--self-employment-gantt-color) 78%, var(--accent)),
+      0 14px 30px rgba(15, 23, 42, 0.16);
+  }
 }
 
 .self-employment-time-source {

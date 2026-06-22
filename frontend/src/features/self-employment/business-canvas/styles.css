@@ -123,6 +123,11 @@
   overflow: visible;
 }
 
+.business-canvas-workbench.gantt-collapsed {
+  grid-template-columns: minmax(0, 1fr) 18px;
+  gap: 0;
+}
+
 .business-canvas-viewport {
   position: relative;
   height: clamp(460px, calc(100vh - 260px), 760px);
@@ -847,6 +852,17 @@
   width: 130px;
 }
 
+.business-canvas-gantt-shell {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+.business-canvas-gantt-shell.collapsed {
+  width: 18px;
+}
+
 .business-canvas-gantt {
   display: grid;
   align-content: start;
@@ -861,14 +877,61 @@
 .business-canvas-gantt-head,
 .business-canvas-gantt-row {
   display: grid;
-  grid-template-columns: minmax(92px, 1fr) minmax(110px, 1.5fr) auto;
   align-items: center;
   gap: 8px;
+}
+
+.business-canvas-gantt-head {
+  grid-template-columns: minmax(92px, 1fr) auto;
+}
+
+.business-canvas-gantt-row {
+  grid-template-columns: minmax(92px, 1fr) minmax(110px, 1.5fr) auto;
 }
 
 .business-canvas-gantt-head h4 {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.business-canvas-gantt-toggle {
+  position: absolute;
+  top: 50%;
+  left: -9px;
+  z-index: 14;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  min-height: 112px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0;
+  padding: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+
+.business-canvas-gantt-shell.collapsed .business-canvas-gantt-toggle {
+  left: 0;
+}
+
+.business-canvas-workbench:hover .business-canvas-gantt-toggle,
+.business-canvas-gantt-shell:hover .business-canvas-gantt-toggle,
+.business-canvas-gantt-toggle:focus-visible {
+  opacity: 1;
+}
+
+.business-canvas-gantt-toggle:hover,
+.business-canvas-gantt-toggle:focus-visible {
+  background: var(--surface-soft);
+  border-color: var(--accent);
 }
 
 .business-canvas-gantt-head span,
@@ -920,7 +983,11 @@
   }
 
   .business-canvas-workbench {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  }
+
+  .business-canvas-workbench.gantt-collapsed {
+    grid-template-columns: minmax(0, 1fr) 18px;
   }
 
   .business-canvas-viewport {
