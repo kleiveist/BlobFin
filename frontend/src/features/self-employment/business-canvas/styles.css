@@ -293,6 +293,16 @@
   z-index: 10;
 }
 
+.business-canvas-node.completed {
+  border-color: color-mix(in srgb, #15803d 65%, var(--border));
+  background: color-mix(in srgb, #16a34a 13%, var(--surface));
+}
+
+.business-canvas-node.completed .business-canvas-node-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
 .business-canvas-group-node {
   align-content: start;
   grid-template-rows: auto;
@@ -420,6 +430,13 @@
   font-size: 0.72rem;
   line-height: 1;
   padding: 0;
+}
+
+.business-canvas-node-badges .business-canvas-completed-badge {
+  flex: 0 0 auto;
+  max-width: none;
+  background: #dcfce7;
+  color: #166534;
 }
 
 .business-canvas-node-text {
@@ -910,4 +927,3 @@
     height: clamp(420px, 70vh, 620px);
   }
 }
-

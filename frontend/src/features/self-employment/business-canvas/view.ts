@@ -11,6 +11,7 @@ import {
   businessIdeaCanvasPaletteRows,
   canvasAnchorPoint
 } from "../../../domain/businessIdeaCanvas";
+import { normalizeSelfEmploymentGanttPlan } from "../../../domain/selfEmploymentGantt";
 import { escapeHtml, intNumber } from "../../../lib/format";
 import type {
   BusinessIdeaCanvasEdgeDirection,
@@ -101,6 +102,7 @@ export function renderBusinessIdeaCanvasEditor(
   const viewport = meta.viewport;
   const groupNodes = project.businessIdeaCanvas.nodes.filter((node) => node.type === "group");
   const cardNodes = project.businessIdeaCanvas.nodes.filter((node) => node.type !== "group");
+  const completedCardIds = businessIdeaCanvasCompletedCardIds(project);
   const lineMenu =
     renderState.lineMenu?.projectId === project.id
       ? renderBusinessIdeaCanvasLineMenu(project.id, renderState.lineMenu)
@@ -119,9 +121,9 @@ export function renderBusinessIdeaCanvasEditor(
             data-business-canvas-content
             style="width:${BUSINESS_IDEA_CANVAS_WIDTH}px;height:${BUSINESS_IDEA_CANVAS_HEIGHT}px;transform:translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom});"
           >
-            ${groupNodes.map((node) => renderBusinessIdeaCanvasNode(project, node, renderState)).join("")}
+            ${groupNodes.map((node) => renderBusinessIdeaCanvasNode(project, node, renderState, completedCardIds)).join("")}
             ${renderBusinessIdeaCanvasSvg(project, renderState)}
-            ${cardNodes.map((node) => renderBusinessIdeaCanvasNode(project, node, renderState)).join("")}
+            ${cardNodes.map((node) => renderBusinessIdeaCanvasNode(project, node, renderState, completedCardIds)).join("")}
             ${renderBusinessIdeaCanvasSelectionRect(renderState)}
             ${lineMenu}
           </div>
@@ -282,12 +284,14 @@ function renderBusinessIdeaCanvasEdgeLabel(
 function renderBusinessIdeaCanvasNode(
   project: SelfEmploymentProject,
   node: JsonCanvasNode,
-  renderState: BusinessIdeaCanvasRenderState
+  renderState: BusinessIdeaCanvasRenderState,
+  completedCardIds: Set<string>
 ): string {
   const meta = project.businessIdeaCanvasMeta.nodeMeta[node.id];
   const selected = renderState.selectedNodeIds.includes(node.id);
   const editing = renderState.editingNodeId === node.id;
   const armed = renderState.armedNodeId === node.id;
+  const completed = node.type !== "group" && completedCardIds.has(node.id);
   const label = project.businessIdeaCanvasMeta.labels.find((item) => item.id === meta?.labelId);
   const phase = project.businessIdeaCanvasMeta.phases.find((item) => item.id === meta?.phaseId);
   const shape = node.type === "group" ? "rectangle" : meta?.shape ?? "rounded-rectangle";
@@ -295,7 +299,7 @@ function renderBusinessIdeaCanvasNode(
   const text = businessIdeaCanvasNodeText(node);
   return `
     <article
-      class="business-canvas-node ${node.type === "group" ? "business-canvas-group-node" : ""} business-canvas-shape-${shape} ${colorClass}${selected ? " selected" : ""}${editing ? " editing" : ""}${armed ? " armed" : ""}"
+      class="business-canvas-node ${node.type === "group" ? "business-canvas-group-node" : ""} business-canvas-shape-${shape} ${colorClass}${selected ? " selected" : ""}${editing ? " editing" : ""}${armed ? " armed" : ""}${completed ? " completed" : ""}"
       data-business-canvas-node-id="${escapeHtml(node.id)}"
       data-business-canvas-node-kind="${node.type === "group" ? "group" : "card"}"
       style="left:${node.x + BUSINESS_IDEA_CANVAS_ORIGIN}px;top:${node.y + BUSINESS_IDEA_CANVAS_ORIGIN}px;width:${node.width}px;height:${node.height}px;${businessIdeaColorStyle(
@@ -311,6 +315,7 @@ function renderBusinessIdeaCanvasNode(
               <span class="business-canvas-phase-badge" title="${escapeHtml(phase?.name ?? "Phase 1")}">${escapeHtml(
                 phaseBadgeLabel(phase?.order ?? 1)
               )}</span>
+              ${completed ? `<span class="business-canvas-completed-badge">Erledigt</span>` : ""}
             </div>
             <div
               class="business-canvas-node-text"
@@ -322,6 +327,11 @@ function renderBusinessIdeaCanvasNode(
       ${selected ? `<span class="business-canvas-resize-handle" data-business-canvas-resize="${escapeHtml(node.id)}"></span>` : ""}
     </article>
   `;
+}
+
+function businessIdeaCanvasCompletedCardIds(project: SelfEmploymentProject): Set<string> {
+  const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+  return new Set(gantt.cardPlans.filter((plan) => plan.completed).map((plan) => plan.cardId));
 }
 
 function renderBusinessIdeaCanvasAnchors(nodeId: string): string {

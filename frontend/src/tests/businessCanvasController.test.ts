@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
 import { defaultBusinessIdeaCanvasForProject, normalizeBusinessIdeaCanvasMeta } from "../domain/businessIdeaCanvas";
+import { normalizeSelfEmploymentGanttPlan } from "../domain/selfEmploymentGantt";
 import { handleBusinessIdeaCanvasKeyDown } from "../features/self-employment/business-canvas/controller";
 import { configureBusinessCanvasHost } from "../features/self-employment/business-canvas/host";
 import {
@@ -78,6 +79,81 @@ describe("business canvas controller", () => {
 
     expect(toolbar).not.toContain("business-canvas-label-dropdown");
     expect(toolbar).not.toContain("business-canvas-phase-dropdown");
+  });
+
+  it("renders completed gantt cards as completed business canvas cards", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "done-card", type: "text", text: "Fertige Karte", x: 0, y: 0, width: 100, height: 80 },
+      { id: "open-card", type: "text", text: "Offene Karte", x: 120, y: 20, width: 100, height: 80 }
+    ]);
+    const project = host.project();
+    project.gantt = normalizeSelfEmploymentGanttPlan(
+      {
+        cardPlans: [
+          {
+            cardId: "done-card",
+            timeBudgetHours: 1,
+            completed: true,
+            todos: [{ id: "todo-done", title: "Fertig", eisenhowerQuadrant: "important_not_urgent", status: "done", completed: true }]
+          },
+          {
+            cardId: "open-card",
+            timeBudgetHours: 1,
+            completed: false,
+            todos: [{ id: "todo-open", title: "Offen", eisenhowerQuadrant: "important_not_urgent", status: "planned", completed: false }]
+          }
+        ]
+      },
+      project.businessIdeaCanvas,
+      project.businessIdeaCanvasMeta
+    );
+
+    const html = renderBusinessIdeaCanvasEditor(project, blankBusinessIdeaCanvasRenderState());
+    const completedArticle = renderBusinessCanvasNodeArticle(html, "done-card");
+    const openArticle = renderBusinessCanvasNodeArticle(html, "open-card");
+
+    expect(completedArticle).toContain(" completed");
+    expect(completedArticle).toContain("business-canvas-completed-badge");
+    expect(completedArticle).toContain("Erledigt");
+    expect(openArticle).not.toContain("business-canvas-completed-badge");
+    expect(openArticle).not.toContain(" completed");
+  });
+
+  it("does not render completed badges for open cards or groups", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "open-card", type: "text", text: "Offene Karte", x: 0, y: 0, width: 100, height: 80 },
+      { id: "group", type: "group", label: "Gruppe", x: -20, y: -20, width: 260, height: 180 }
+    ]);
+    const project = host.project();
+    project.gantt = normalizeSelfEmploymentGanttPlan(
+      {
+        cardPlans: [
+          {
+            cardId: "open-card",
+            timeBudgetHours: 1,
+            completed: false,
+            todos: [{ id: "todo-open", title: "Offen", eisenhowerQuadrant: "important_not_urgent", status: "planned", completed: false }]
+          },
+          {
+            cardId: "group",
+            timeBudgetHours: 1,
+            completed: true,
+            todos: [{ id: "todo-group", title: "Gruppe", eisenhowerQuadrant: "important_not_urgent", status: "done", completed: true }]
+          }
+        ]
+      },
+      project.businessIdeaCanvas,
+      project.businessIdeaCanvasMeta
+    );
+
+    const html = renderBusinessIdeaCanvasEditor(project, blankBusinessIdeaCanvasRenderState());
+    const openArticle = renderBusinessCanvasNodeArticle(html, "open-card");
+    const groupArticle = renderBusinessCanvasNodeArticle(html, "group");
+
+    expect(openArticle).not.toContain("business-canvas-completed-badge");
+    expect(openArticle).not.toContain(" completed");
+    expect(groupArticle).not.toContain("business-canvas-completed-badge");
+    expect(groupArticle).not.toContain(" completed");
   });
 
   it("updates label and phase for all selected cards while leaving groups unchanged", () => {
@@ -237,7 +313,33 @@ function renderSelectedMultiToolbar(project: SelfEmploymentProject, selectedNode
   } satisfies BusinessIdeaCanvasRenderState);
   const start = html.indexOf("data-business-canvas-multi-toolbar");
   if (start === -1) return "";
-  return html.slice(start, start + 4000);
+  return html.slice(start, start + 10000);
+}
+
+function blankBusinessIdeaCanvasRenderState(): BusinessIdeaCanvasRenderState {
+  return {
+    selectedNodeIds: [],
+    selectedEdgeId: null,
+    editingNodeId: null,
+    editingEdgeLabelId: null,
+    editingEdgeLabelDraft: "",
+    armedNodeId: null,
+    lineMenu: null,
+    selectionRect: null,
+    contextMenu: null,
+    palettePopover: null,
+    paletteEditor: null,
+    clipboardAvailable: false
+  };
+}
+
+function renderBusinessCanvasNodeArticle(html: string, nodeId: string): string {
+  const markerIndex = html.indexOf(`data-business-canvas-node-id="${nodeId}"`);
+  if (markerIndex === -1) return "";
+  const articleStart = html.lastIndexOf("<article", markerIndex);
+  const articleEnd = html.indexOf("</article>", markerIndex);
+  if (articleStart === -1 || articleEnd === -1) return "";
+  return html.slice(articleStart, articleEnd + "</article>".length);
 }
 
 function keyboardEvent(
