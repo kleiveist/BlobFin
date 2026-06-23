@@ -329,7 +329,7 @@ describe("vault storage", () => {
     ]);
     expect(recoveredStudyProject).toMatchObject({
       name: "IUFS",
-      status: "idea",
+      status: "open",
       labels: [],
       milestones: [],
       businessIdeaCanvasFile: "planning/projects/8b304256-7dcd-4ee7-8722-bfd97ed5ebd8/canvas-geschaeftsidee.canvas"

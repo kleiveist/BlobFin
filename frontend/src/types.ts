@@ -68,6 +68,9 @@ export type IncomePlanningHabitDurationUnit = "day" | "week";
 export type IncomePlanningManualBlockType = "private_commitment" | "free_time" | "buffer" | "other_event";
 export type IncomePlanningWeekScenarioId = string;
 export type SelfEmploymentProjectStatus =
+  | "open"
+  | "in_progress"
+  | "cancelled"
   | "idea"
   | "review"
   | "preparation"
@@ -75,6 +78,7 @@ export type SelfEmploymentProjectStatus =
   | "paused"
   | "completed"
   | "discarded";
+export type SelfEmploymentProjectType = "revenue" | "human_capital" | "mandatory" | "strategic" | "private";
 export type SelfEmploymentRiskLevel = "low" | "medium" | "high";
 export type SelfEmploymentFeasibility = "realistic" | "borderline" | "unrealistic";
 export type SelfEmploymentTaskPriority = "low" | "medium" | "high";
@@ -86,7 +90,15 @@ export type SelfEmploymentGanttTodoEisenhowerQuadrant =
   | "not_important_urgent"
   | "not_important_not_urgent";
 export type SelfEmploymentContactStatus = "lead" | "first_contact" | "offer_sent" | "customer" | "paused";
-export type SelfEmploymentInvoiceStatus = "offer_open" | "offer_accepted" | "invoice_created" | "paid";
+export type SelfEmploymentInvoiceStatus =
+  | "offer_open"
+  | "offer_accepted"
+  | "invoice_created"
+  | "draft"
+  | "open"
+  | "paid"
+  | "cancelled"
+  | "overdue";
 export type SelfEmploymentRoadmapAreaId =
   | "idea"
   | "planning"
@@ -411,12 +423,36 @@ export interface SelfEmploymentProjectTimeSource {
   ownerId: string;
 }
 
+export interface SelfEmploymentProjectModules {
+  invoices: boolean;
+  budget: boolean;
+  contacts: boolean;
+  profit: boolean;
+  metrics: boolean;
+}
+
+export interface SelfEmploymentOfferSettings {
+  baseHourlyRate: number;
+  usePhaseFactors: boolean;
+  useLabelFactors: boolean;
+  useTodoTimes: boolean;
+  useBuffer: boolean;
+  useRounding: boolean;
+  bufferPercent: number;
+  taxPercent: number;
+}
+
 export interface SelfEmploymentProject {
   id: string;
   name: string;
   icon: string;
   labels: string[];
   status: SelfEmploymentProjectStatus;
+  dashboardEnabled: boolean;
+  projectType: SelfEmploymentProjectType;
+  priority: SelfEmploymentTaskPriority;
+  enabledModules: SelfEmploymentProjectModules;
+  offerSettings: SelfEmploymentOfferSettings;
   idea: string;
   problem: string;
   targetGroup: string;

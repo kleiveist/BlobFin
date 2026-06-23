@@ -25,6 +25,66 @@
   gap: 8px;
 }
 
+.self-employment-project-list-popup,
+.self-employment-offer-overview-popup {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+
+.self-employment-project-list-popup > header,
+.self-employment-offer-overview-popup > header,
+.self-employment-project-list-item,
+.self-employment-billing-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.self-employment-project-list-popup > header span,
+.self-employment-offer-overview-popup > header span,
+.self-employment-project-list-item span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.self-employment-project-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.self-employment-project-list-item {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.self-employment-project-list-item.borderline {
+  border-left-color: var(--gold);
+}
+
+.self-employment-project-list-item.unrealistic {
+  border-left-color: var(--danger);
+}
+
+.self-employment-project-list-fields,
+.self-employment-project-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.self-employment-inline-field {
+  min-width: 130px;
+  margin: 0;
+}
+
 .self-employment-metrics,
 .self-employment-analysis,
 .self-employment-tables {
@@ -323,6 +383,95 @@
   background: var(--accent-soft);
   color: var(--accent-strong);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-strong) 18%, transparent);
+}
+
+.self-employment-project-control-panel,
+.self-employment-billing-editor,
+.self-employment-offer-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.self-employment-project-control-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.self-employment-module-toggle-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.self-employment-check-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 0.86rem;
+}
+
+.self-employment-billing-tabs {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.self-employment-billing-tab {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.self-employment-billing-tab.active {
+  border-color: var(--accent-strong);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.self-employment-offer-table-wrap {
+  overflow-x: auto;
+}
+
+.self-employment-offer-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.self-employment-offer-table th,
+.self-employment-offer-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.self-employment-offer-table th {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.self-employment-offer-table td small {
+  display: block;
+  color: var(--danger);
+  margin-top: 3px;
+}
+
+.self-employment-offer-table tr.warning {
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
 }
 
 @media (max-width: 640px) {

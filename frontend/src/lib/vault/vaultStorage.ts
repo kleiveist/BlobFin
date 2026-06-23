@@ -240,7 +240,7 @@ function recoveredSelfEmploymentProject(relativePath: string, canvasValue: unkno
     id: projectId,
     name: projectName,
     labels: [],
-    status: "idea",
+    status: "open",
     idea: projectName,
     problem: "",
     targetGroup: "",

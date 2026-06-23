@@ -47,7 +47,7 @@ export function selfEmploymentBarChart(
   const maxValue = Math.max(
     1,
     ...evaluations.map((evaluation) =>
-      kind === "time" ? evaluation.project.requiredHoursPerWeek : Math.max(0, evaluation.monthlyProfitAfterReserve)
+      kind === "time" ? evaluation.weeklyTimeDemand : Math.max(0, evaluation.monthlyProfitAfterReserve)
     )
   );
   return `
@@ -57,7 +57,7 @@ export function selfEmploymentBarChart(
         ${evaluations
           .map((evaluation) => {
             const value =
-              kind === "time" ? evaluation.project.requiredHoursPerWeek : Math.max(0, evaluation.monthlyProfitAfterReserve);
+              kind === "time" ? evaluation.weeklyTimeDemand : Math.max(0, evaluation.monthlyProfitAfterReserve);
             const width = Math.max(4, Math.min(100, (value / maxValue) * 100));
             return `
               <div class="self-employment-bar-row">

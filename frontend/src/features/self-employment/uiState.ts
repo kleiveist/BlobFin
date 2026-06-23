@@ -9,6 +9,9 @@ export interface SelfEmploymentUiState {
   ganttEditor: SelfEmploymentGanttEditor;
   labelPickerProjectId: string | null;
   iconPicker: { projectId: string; top: number; left: number } | null;
+  projectListPopupOpen: boolean;
+  billingTabByProjectId: Record<string, "offers" | "invoices">;
+  offerOverviewProjectId: string | null;
   taskContextPopup: { projectId: string; cardId: string; todoId: string; top: number; left: number } | null;
   taskEisenhowerFilter: "all" | SelfEmploymentGanttTodoEisenhowerQuadrant;
   kanbanPhaseFilterIds: string[];
@@ -21,6 +24,9 @@ export const selfEmploymentUiState: SelfEmploymentUiState = {
   ganttEditor: null,
   labelPickerProjectId: null,
   iconPicker: null,
+  projectListPopupOpen: false,
+  billingTabByProjectId: {},
+  offerOverviewProjectId: null,
   taskContextPopup: null,
   taskEisenhowerFilter: "all",
   kanbanPhaseFilterIds: [],

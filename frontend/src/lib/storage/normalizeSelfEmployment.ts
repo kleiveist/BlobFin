@@ -13,8 +13,11 @@ import type {
   SelfEmploymentContactStatus,
   SelfEmploymentInvoice,
   SelfEmploymentInvoiceStatus,
+  SelfEmploymentOfferSettings,
   SelfEmploymentProject,
+  SelfEmploymentProjectModules,
   SelfEmploymentProjectStatus,
+  SelfEmploymentProjectType,
   SelfEmploymentProjectTimeSource,
   SelfEmploymentRiskLevel,
   SelfEmploymentRoadmapAreaId,
@@ -77,6 +80,14 @@ export function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentPr
     icon: normalizePositionIcon(value.icon, fallback.icon),
     labels: stringArrayOrDefault(value.labels, []),
     status: normalizeSelfEmploymentProjectStatus(value.status, fallback.status),
+    dashboardEnabled: typeof value.dashboardEnabled === "boolean" ? value.dashboardEnabled : false,
+    projectType: normalizeSelfEmploymentProjectType(value.projectType, fallback.projectType),
+    priority: normalizeSelfEmploymentTaskPriority(value.priority, fallback.priority),
+    enabledModules: normalizeSelfEmploymentProjectModules(
+      value.enabledModules,
+      normalizeSelfEmploymentProjectType(value.projectType, fallback.projectType)
+    ),
+    offerSettings: normalizeSelfEmploymentOfferSettings(value.offerSettings, fallback.offerSettings),
     idea: String(value.idea ?? ""),
     problem: String(value.problem ?? ""),
     targetGroup: String(value.targetGroup ?? ""),
@@ -216,18 +227,69 @@ export function normalizeSelfEmploymentProjectStatus(
   value: unknown,
   fallback: SelfEmploymentProjectStatus
 ): SelfEmploymentProjectStatus {
-  if (
-    value === "idea" ||
-    value === "review" ||
-    value === "preparation" ||
-    value === "active" ||
-    value === "paused" ||
-    value === "completed" ||
-    value === "discarded"
-  ) {
-    return value;
+  if (value === "open" || value === "in_progress" || value === "completed" || value === "cancelled") return value;
+  if (value === "active") return "in_progress";
+  if (value === "discarded") return "cancelled";
+  if (value === "idea" || value === "review" || value === "preparation" || value === "paused") return "open";
+  return fallback === "active" ? "in_progress" : fallback === "discarded" ? "cancelled" : fallback;
+}
+
+export function normalizeSelfEmploymentProjectType(value: unknown, fallback: SelfEmploymentProjectType): SelfEmploymentProjectType {
+  return value === "revenue" ||
+    value === "human_capital" ||
+    value === "mandatory" ||
+    value === "strategic" ||
+    value === "private"
+    ? value
+    : fallback;
+}
+
+export function defaultSelfEmploymentModulesForType(projectType: SelfEmploymentProjectType): SelfEmploymentProjectModules {
+  if (projectType === "human_capital") {
+    return { invoices: false, budget: false, contacts: false, profit: false, metrics: true };
   }
-  return fallback;
+  if (projectType === "mandatory") {
+    return { invoices: false, budget: false, contacts: false, profit: false, metrics: false };
+  }
+  if (projectType === "strategic") {
+    return { invoices: false, budget: true, contacts: false, profit: false, metrics: true };
+  }
+  if (projectType === "private") {
+    return { invoices: false, budget: false, contacts: false, profit: false, metrics: true };
+  }
+  return { invoices: true, budget: true, contacts: true, profit: true, metrics: true };
+}
+
+export function normalizeSelfEmploymentProjectModules(
+  value: unknown,
+  projectType: SelfEmploymentProjectType
+): SelfEmploymentProjectModules {
+  const fallback = defaultSelfEmploymentModulesForType(projectType);
+  if (!isRecord(value)) return fallback;
+  return {
+    invoices: typeof value.invoices === "boolean" ? value.invoices : fallback.invoices,
+    budget: typeof value.budget === "boolean" ? value.budget : fallback.budget,
+    contacts: typeof value.contacts === "boolean" ? value.contacts : fallback.contacts,
+    profit: typeof value.profit === "boolean" ? value.profit : fallback.profit,
+    metrics: typeof value.metrics === "boolean" ? value.metrics : fallback.metrics
+  };
+}
+
+export function normalizeSelfEmploymentOfferSettings(
+  value: unknown,
+  fallback: SelfEmploymentOfferSettings
+): SelfEmploymentOfferSettings {
+  const source = isRecord(value) ? value : {};
+  return {
+    baseHourlyRate: clampNumber(numberOrDefault(source.baseHourlyRate, fallback.baseHourlyRate), 0, 100000),
+    usePhaseFactors: typeof source.usePhaseFactors === "boolean" ? source.usePhaseFactors : fallback.usePhaseFactors,
+    useLabelFactors: typeof source.useLabelFactors === "boolean" ? source.useLabelFactors : fallback.useLabelFactors,
+    useTodoTimes: typeof source.useTodoTimes === "boolean" ? source.useTodoTimes : fallback.useTodoTimes,
+    useBuffer: typeof source.useBuffer === "boolean" ? source.useBuffer : fallback.useBuffer,
+    useRounding: typeof source.useRounding === "boolean" ? source.useRounding : fallback.useRounding,
+    bufferPercent: clampNumber(numberOrDefault(source.bufferPercent, fallback.bufferPercent), 0, 100),
+    taxPercent: clampNumber(numberOrDefault(source.taxPercent, fallback.taxPercent), 0, 100)
+  };
 }
 
 export function normalizeSelfEmploymentRiskLevel(value: unknown, fallback: SelfEmploymentRiskLevel): SelfEmploymentRiskLevel {
@@ -248,7 +310,16 @@ export function normalizeSelfEmploymentInvoiceStatus(
   value: unknown,
   fallback: SelfEmploymentInvoiceStatus
 ): SelfEmploymentInvoiceStatus {
-  if (value === "offer_open" || value === "offer_accepted" || value === "invoice_created" || value === "paid") {
+  if (
+    value === "offer_open" ||
+    value === "offer_accepted" ||
+    value === "invoice_created" ||
+    value === "draft" ||
+    value === "open" ||
+    value === "paid" ||
+    value === "cancelled" ||
+    value === "overdue"
+  ) {
     return value;
   }
   return fallback;

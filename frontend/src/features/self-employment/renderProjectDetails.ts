@@ -5,6 +5,8 @@ import type { IncomePlanningModel } from "../../domain/incomePlanning";
 import {
   SELF_EMPLOYMENT_EISENHOWER_QUADRANTS,
   buildSelfEmploymentProjectWorkPlan,
+  normalizeSelfEmploymentGanttPlan,
+  normalizedGanttLabelId,
   orderedGanttLabels,
   selfEmploymentEisenhowerQuadrantDetails,
   selfEmploymentEisenhowerQuadrantRank,
@@ -18,6 +20,9 @@ import type { SelfEmploymentProjectEvaluation } from "./feasibilityController";
 import {
   hoursLabel,
   selfEmploymentFeasibilityLabel,
+  selfEmploymentPriorityLabel,
+  selfEmploymentProjectTypeBenefitLabel,
+  selfEmploymentProjectTypeLabel,
   selfEmploymentRoadmapAreaIdFromValue
 } from "./feasibilityController";
 import { SELF_EMPLOYMENT_ROADMAP_AREAS } from "./config";
@@ -34,8 +39,9 @@ export function selfEmploymentProjectDetails(
   incomePlanningState?: IncomePlanningState
 ): string {
   const { project } = evaluation;
+  const activeAreas = selfEmploymentActiveRoadmapAreas(project);
   const selectedArea = selfEmploymentRoadmapAreaIdFromValue(selectedRoadmapAreaId) ?? "idea";
-  const activeArea = SELF_EMPLOYMENT_ROADMAP_AREAS.find((area) => area.id === selectedArea) ?? SELF_EMPLOYMENT_ROADMAP_AREAS[0];
+  const activeArea = activeAreas.find((area) => area.id === selectedArea) ?? activeAreas[0] ?? SELF_EMPLOYMENT_ROADMAP_AREAS[0];
   return `
     <section class="self-employment-detail" aria-label="Projekt-Detailbereich">
       <div class="self-employment-detail-head">
@@ -47,16 +53,17 @@ export function selfEmploymentProjectDetails(
           selfEmploymentFeasibilityLabel(evaluation.feasibility)
         )}</span>
       </div>
-      ${selfEmploymentRoadmap(selectedArea)}
+      ${selfEmploymentProjectControlPanel(project)}
+      ${selfEmploymentRoadmap(activeArea.id, activeAreas)}
       <article class="self-employment-roadmap-panel">
         <header>
           <div class="self-employment-roadmap-panel-title">
             ${positionIconSvg(activeArea.icon, "position-icon-svg self-employment-roadmap-panel-icon")}
             <h3>${escapeHtml(activeArea.title)}</h3>
           </div>
-          ${selectedArea === "planning" ? renderSelfEmploymentGanttPhaseFilter(project) : ""}
+          ${activeArea.id === "planning" ? renderSelfEmploymentGanttPhaseFilter(project) : ""}
         </header>
-        ${selfEmploymentRoadmapPanel(selectedArea, evaluation, incomePlanningModel, incomePlanningState)}
+        ${selfEmploymentRoadmapPanel(activeArea.id, evaluation, incomePlanningModel, incomePlanningState)}
       </article>
     </section>
   `;
@@ -90,10 +97,13 @@ function renderSelfEmploymentGanttPhaseFilter(project: SelfEmploymentProject): s
   `;
 }
 
-function selfEmploymentRoadmap(selectedArea: SelfEmploymentRoadmapAreaId): string {
+function selfEmploymentRoadmap(
+  selectedArea: SelfEmploymentRoadmapAreaId,
+  areas: typeof SELF_EMPLOYMENT_ROADMAP_AREAS
+): string {
   return `
     <div class="self-employment-roadmap" aria-label="Projekt-Roadmap">
-      ${SELF_EMPLOYMENT_ROADMAP_AREAS.map((area) => {
+      ${areas.map((area) => {
         const active = area.id === selectedArea;
         return `
           <button
@@ -112,6 +122,52 @@ function selfEmploymentRoadmap(selectedArea: SelfEmploymentRoadmapAreaId): strin
   `;
 }
 
+function selfEmploymentActiveRoadmapAreas(project: SelfEmploymentProject): typeof SELF_EMPLOYMENT_ROADMAP_AREAS {
+  return SELF_EMPLOYMENT_ROADMAP_AREAS.filter((area) => {
+    if (area.id === "contacts") return project.enabledModules.contacts;
+    if (area.id === "invoices") return project.enabledModules.invoices;
+    if (area.id === "budget") return project.enabledModules.budget;
+    if (area.id === "profit") return project.enabledModules.profit;
+    if (area.id === "metrics") return project.enabledModules.metrics;
+    return true;
+  });
+}
+
+function selfEmploymentProjectControlPanel(project: SelfEmploymentProject): string {
+  return `
+    <section class="self-employment-project-control-panel" aria-label="Projektsteuerung">
+      <div class="self-employment-edit-grid compact">
+        ${selfEmploymentSelectField(project, "status", "Projektstatus", project.status, [
+          ["open", "Offen"],
+          ["in_progress", "In Arbeit"],
+          ["completed", "Erledigt"],
+          ["cancelled", "Cancel"]
+        ])}
+        ${selfEmploymentSelectField(project, "projectType", "Projektart", project.projectType, [
+          ["revenue", "Umsatzprojekt"],
+          ["human_capital", "Humankapital-Projekt"],
+          ["mandatory", "Pflichtprojekt"],
+          ["strategic", "Strategisches Projekt"],
+          ["private", "Privates Projekt"]
+        ])}
+        ${selfEmploymentSelectField(project, "priority", "Prioritaet", project.priority, [
+          ["high", "Hoch"],
+          ["medium", "Mittel"],
+          ["low", "Niedrig"]
+        ])}
+        ${selfEmploymentReadOnlyField("Status-Zusammenfassung", `${selfEmploymentProjectTypeLabel(project.projectType)} · ${selfEmploymentPriorityLabel(project.priority)}`)}
+      </div>
+      <div class="self-employment-module-toggle-grid" aria-label="Aktive Projektmodule">
+        ${selfEmploymentModuleToggle(project, "invoices", "Angebote & Rechnungen")}
+        ${selfEmploymentModuleToggle(project, "budget", "Budget & Investitionen")}
+        ${selfEmploymentModuleToggle(project, "contacts", "Kundenkontakte")}
+        ${selfEmploymentModuleToggle(project, "profit", "Gewinnschaetzung")}
+        ${selfEmploymentModuleToggle(project, "metrics", "Kennzahlen")}
+      </div>
+    </section>
+  `;
+}
+
 function selfEmploymentRoadmapPanel(
   areaId: SelfEmploymentRoadmapAreaId,
   evaluation: SelfEmploymentProjectEvaluation,
@@ -127,7 +183,7 @@ function selfEmploymentRoadmapPanel(
     return renderSelfEmploymentProjectGantt(project);
   }
   if (areaId === "contacts") return selfEmploymentContactsEditor(project);
-  if (areaId === "invoices") return selfEmploymentInvoicesEditor(project);
+  if (areaId === "invoices") return selfEmploymentBillingEditor(project);
   if (areaId === "tasks") return selfEmploymentTasksDashboard(project, workPlan);
   if (areaId === "time") {
     return selfEmploymentTimeDashboard(project, workPlan, evaluation);
@@ -202,6 +258,55 @@ function selfEmploymentNumberField(
   `;
 }
 
+function selfEmploymentSelectField(
+  project: SelfEmploymentProject,
+  field: string,
+  label: string,
+  value: string,
+  options: Array<[string, string]>
+): string {
+  return `
+    <label class="field self-employment-edit-field">
+      <span>${escapeHtml(label)}</span>
+      <select data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-field="${escapeHtml(field)}">
+        ${options
+          .map(
+            ([optionValue, optionLabel]) =>
+              `<option value="${escapeHtml(optionValue)}" ${optionValue === value ? "selected" : ""}>${escapeHtml(optionLabel)}</option>`
+          )
+          .join("")}
+      </select>
+    </label>
+  `;
+}
+
+function selfEmploymentCheckboxField(
+  project: SelfEmploymentProject,
+  field: string,
+  label: string,
+  checked: boolean
+): string {
+  return `
+    <label class="self-employment-check-field">
+      <input
+        type="checkbox"
+        ${checked ? "checked" : ""}
+        data-self-employment-project-id="${escapeHtml(project.id)}"
+        data-self-employment-field="${escapeHtml(field)}"
+      />
+      <span>${escapeHtml(label)}</span>
+    </label>
+  `;
+}
+
+function selfEmploymentModuleToggle(
+  project: SelfEmploymentProject,
+  module: keyof SelfEmploymentProject["enabledModules"],
+  label: string
+): string {
+  return selfEmploymentCheckboxField(project, `module.${module}`, label, project.enabledModules[module]);
+}
+
 function selfEmploymentReadOnlyField(label: string, value: string): string {
   return `
     <div class="field self-employment-readonly-field">
@@ -258,15 +363,84 @@ function selfEmploymentContactsEditor(project: SelfEmploymentProject): string {
   `;
 }
 
-function selfEmploymentInvoicesEditor(project: SelfEmploymentProject): string {
+function selfEmploymentBillingEditor(project: SelfEmploymentProject): string {
+  const activeTab = selfEmploymentUiState.billingTabByProjectId[project.id] ?? "offers";
   return `
-    <div class="self-employment-collection-editor">
+    <div class="self-employment-billing-editor">
+      <div class="self-employment-billing-tabs" role="tablist" aria-label="Angebote und Rechnungen">
+        ${selfEmploymentBillingTab(project, "offers", "Angebote", activeTab)}
+        ${selfEmploymentBillingTab(project, "invoices", "Rechnungen", activeTab)}
+      </div>
+      ${activeTab === "invoices" ? selfEmploymentInvoiceTool(project) : selfEmploymentOffersEditor(project)}
+    </div>
+  `;
+}
+
+function selfEmploymentBillingTab(
+  project: SelfEmploymentProject,
+  tab: "offers" | "invoices",
+  label: string,
+  activeTab: "offers" | "invoices"
+): string {
+  const active = tab === activeTab;
+  return `
+    <button
+      class="self-employment-billing-tab${active ? " active" : ""}"
+      type="button"
+      role="tab"
+      data-action="self-employment-select-billing-tab"
+      data-self-employment-project-id="${escapeHtml(project.id)}"
+      data-self-employment-billing-tab="${escapeHtml(tab)}"
+      aria-selected="${active}"
+    >${escapeHtml(label)}</button>
+  `;
+}
+
+function selfEmploymentOffersEditor(project: SelfEmploymentProject): string {
+  const calculation = selfEmploymentOfferCalculation(project);
+  return `
+    <div class="self-employment-offer-editor" role="tabpanel" aria-label="Angebote">
+      <div class="self-employment-edit-grid compact">
+        ${selfEmploymentNumberField(project, "offerBaseHourlyRate", "Basis-Stundensatz EUR / h", project.offerSettings.baseHourlyRate, 0, 100000, 1)}
+        ${selfEmploymentNumberField(project, "offerBufferPercent", "Puffer in %", project.offerSettings.bufferPercent, 0, 100, 1)}
+        ${selfEmploymentNumberField(project, "offerTaxPercent", "Steuer in %", project.offerSettings.taxPercent, 0, 100, 1)}
+      </div>
+      <div class="self-employment-module-toggle-grid">
+        ${selfEmploymentCheckboxField(project, "offer.usePhaseFactors", "Phasenfaktoren verwenden", project.offerSettings.usePhaseFactors)}
+        ${selfEmploymentCheckboxField(project, "offer.useLabelFactors", "Labelfaktoren verwenden", project.offerSettings.useLabelFactors)}
+        ${selfEmploymentCheckboxField(project, "offer.useTodoTimes", "Todo-Zeiten verwenden", project.offerSettings.useTodoTimes)}
+        ${selfEmploymentCheckboxField(project, "offer.useBuffer", "Puffer verwenden", project.offerSettings.useBuffer)}
+        ${selfEmploymentCheckboxField(project, "offer.useRounding", "Rundung verwenden", project.offerSettings.useRounding)}
+      </div>
+      <div class="self-employment-dashboard-metrics">
+        ${selfEmploymentDashboardMetric("Angebotsstunden", hoursLabel(calculation.totalHours), `${intNumber(calculation.lines.length)} Kartenpositionen`)}
+        ${selfEmploymentDashboardMetric("Zwischensumme", money(calculation.subtotal), "vor Puffer und Steuer")}
+        ${selfEmploymentDashboardMetric("Gesamt", money(calculation.total), `${money(calculation.tax)} Steuer`)}
+      </div>
+      ${selfEmploymentOfferTable(calculation)}
+      <button class="button secondary" type="button" data-action="self-employment-toggle-offer-overview" data-self-employment-project-id="${escapeHtml(project.id)}">Angebotsuebersicht anzeigen</button>
+      ${selfEmploymentUiState.offerOverviewProjectId === project.id ? selfEmploymentOfferOverviewPopup(project, calculation) : ""}
+    </div>
+  `;
+}
+
+function selfEmploymentInvoiceTool(project: SelfEmploymentProject): string {
+  const calculation = selfEmploymentOfferCalculation(project);
+  return `
+    <div class="self-employment-collection-editor" role="tabpanel" aria-label="Rechnungen">
       <div class="self-employment-collection-head">
-        <span>${project.invoices.length ? `${intNumber(project.invoices.length)} Angebote / Rechnungen` : "Noch keine Angebote"}</span>
+        <span>${project.invoices.length ? `${intNumber(project.invoices.length)} Rechnungen / Angebote` : "Noch keine Rechnungen"}</span>
         <button class="button mini secondary" type="button" data-action="self-employment-add-invoice" data-self-employment-project-id="${escapeHtml(
           project.id
-        )}">Angebot hinzufuegen</button>
+        )}">Rechnung hinzufuegen</button>
       </div>
+      <section class="self-employment-dashboard-section">
+        <header>
+          <strong>Angebot uebernehmen</strong>
+          <span>${escapeHtml(`${hoursLabel(calculation.totalHours)} · ${money(calculation.total)}`)}</span>
+        </header>
+        ${selfEmploymentOfferTable(calculation)}
+      </section>
       <div class="self-employment-collection-list">
         ${
           project.invoices.length
@@ -286,7 +460,11 @@ function selfEmploymentInvoicesEditor(project: SelfEmploymentProject): string {
                           ["offer_open", "Angebot offen"],
                           ["offer_accepted", "Angebot angenommen"],
                           ["invoice_created", "Rechnung erstellt"],
-                          ["paid", "Bezahlt"]
+                          ["draft", "Entwurf"],
+                          ["open", "Offen"],
+                          ["paid", "Bezahlt"],
+                          ["cancelled", "Storniert"],
+                          ["overdue", "Ueberfaellig"]
                         ])}
                         ${selfEmploymentCollectionTextField(project, "invoices", invoice.id, "dueDate", "Zieldatum", invoice.dueDate, "date")}
                         ${selfEmploymentCollectionNumberField(project, "invoices", invoice.id, "amount", "Betrag", invoice.amount, 0, 999999999, 50)}
@@ -295,11 +473,172 @@ function selfEmploymentInvoicesEditor(project: SelfEmploymentProject): string {
                   `
                 )
                 .join("")
-            : `<p class="self-employment-empty-note">Offene Angebote und Rechnungen erscheinen hier</p>`
+            : `<p class="self-employment-empty-note">Rechnungsposten koennen aus der Angebotskalkulation abgeleitet und hier gepflegt werden.</p>`
         }
       </div>
     </div>
   `;
+}
+
+interface SelfEmploymentOfferLine {
+  cardId: string;
+  title: string;
+  phaseName: string;
+  phaseFactor: number;
+  labelName: string;
+  labelFactor: number;
+  hours: number;
+  hourlyRate: number;
+  total: number;
+  warning: string | null;
+}
+
+interface SelfEmploymentOfferCalculation {
+  lines: SelfEmploymentOfferLine[];
+  totalHours: number;
+  subtotal: number;
+  buffer: number;
+  tax: number;
+  total: number;
+}
+
+function selfEmploymentOfferCalculation(project: SelfEmploymentProject): SelfEmploymentOfferCalculation {
+  const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
+  const planByCardId = new Map(gantt.cardPlans.map((plan) => [plan.cardId, plan]));
+  const labels = orderedGanttLabels(project.businessIdeaCanvasMeta);
+  const labelById = new Map(labels.map((label) => [label.id, label]));
+  const phases = [...project.businessIdeaCanvasMeta.phases].sort((first, second) => first.order - second.order);
+  const phaseById = new Map(phases.map((phase) => [phase.id, phase]));
+  const lines = project.businessIdeaCanvas.nodes
+    .filter((node) => node.type !== "group")
+    .map((node): SelfEmploymentOfferLine => {
+      const plan = planByCardId.get(node.id);
+      const nodeMeta = project.businessIdeaCanvasMeta.nodeMeta[node.id];
+      const labelId = normalizedGanttLabelId(nodeMeta?.labelId ?? project.businessIdeaCanvasMeta.activeLabelId);
+      const label = labelById.get(labelId) ?? labels[0] ?? { id: labelId, name: labelId };
+      const phase = phaseById.get(nodeMeta?.phaseId ?? project.businessIdeaCanvasMeta.activePhaseId) ?? phases[0] ?? null;
+      const hours = selfEmploymentOfferCardHours(plan?.timeBudgetHours ?? 0, plan?.todos.length ?? 0, project.offerSettings.useTodoTimes);
+      const phaseFactor = project.offerSettings.usePhaseFactors ? selfEmploymentOfferPhaseFactor(phase?.name ?? "", phase?.order ?? 1) : 1;
+      const labelFactor = project.offerSettings.useLabelFactors ? selfEmploymentOfferLabelFactor(label.id) : 1;
+      const hourlyRate = project.offerSettings.baseHourlyRate * phaseFactor * labelFactor;
+      return {
+        cardId: node.id,
+        title: selfEmploymentCanvasNodeTitle(node),
+        phaseName: phase?.name ?? "Phase",
+        phaseFactor,
+        labelName: label.name,
+        labelFactor,
+        hours,
+        hourlyRate,
+        total: hours * hourlyRate,
+        warning: hours > 0 ? null : "Zeit fehlt"
+      };
+    });
+  const totalHours = lines.reduce((sum, line) => sum + line.hours, 0);
+  const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
+  const buffer = project.offerSettings.useBuffer ? subtotal * (project.offerSettings.bufferPercent / 100) : 0;
+  const taxable = subtotal + buffer;
+  const tax = taxable * (project.offerSettings.taxPercent / 100);
+  const rawTotal = taxable + tax;
+  const total = project.offerSettings.useRounding ? Math.round(rawTotal) : rawTotal;
+  return { lines, totalHours, subtotal, buffer, tax, total };
+}
+
+function selfEmploymentOfferTable(calculation: SelfEmploymentOfferCalculation): string {
+  return `
+    <div class="self-employment-offer-table-wrap">
+      <table class="self-employment-offer-table">
+        <thead>
+          <tr>
+            <th>Karte</th>
+            <th>Phase</th>
+            <th>Label</th>
+            <th>Stunden</th>
+            <th>Satz</th>
+            <th>Kosten</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            calculation.lines.length
+              ? calculation.lines.map(selfEmploymentOfferTableRow).join("")
+              : `<tr><td colspan="6">Keine Kartenpositionen vorhanden.</td></tr>`
+          }
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function selfEmploymentOfferTableRow(line: SelfEmploymentOfferLine): string {
+  return `
+    <tr class="${line.warning ? "warning" : ""}">
+      <td><strong>${escapeHtml(line.title)}</strong>${line.warning ? `<small>${escapeHtml(line.warning)}</small>` : ""}</td>
+      <td>${escapeHtml(`${line.phaseName} · ${formatSelfEmploymentFactor(line.phaseFactor)}`)}</td>
+      <td>${escapeHtml(`${line.labelName} · ${formatSelfEmploymentFactor(line.labelFactor)}`)}</td>
+      <td>${escapeHtml(hoursLabel(line.hours))}</td>
+      <td>${money(line.hourlyRate)}</td>
+      <td>${money(line.total)}</td>
+    </tr>
+  `;
+}
+
+function selfEmploymentOfferOverviewPopup(
+  project: SelfEmploymentProject,
+  calculation: SelfEmploymentOfferCalculation
+): string {
+  return `
+    <div class="self-employment-offer-overview-popup" role="dialog" aria-label="Angebotsuebersicht">
+      <header>
+        <div>
+          <span>Angebotsuebersicht</span>
+          <strong>${escapeHtml(project.name)}</strong>
+        </div>
+        <button class="icon-button" type="button" data-action="self-employment-close-offer-overview" data-self-employment-project-id="${escapeHtml(project.id)}" aria-label="Angebotsuebersicht schliessen">x</button>
+      </header>
+      <div class="self-employment-dashboard-metrics">
+        ${selfEmploymentDashboardMetric("Kunde", project.contacts[0]?.name || project.targetGroup || "Nicht gesetzt", "aus Kontakt/Zielgruppe")}
+        ${selfEmploymentDashboardMetric("Basis-Stundensatz", `${money(project.offerSettings.baseHourlyRate)} / h`, `${escapeHtml(selfEmploymentProjectTypeBenefitLabel(project.projectType))}`)}
+        ${selfEmploymentDashboardMetric("Zwischensumme", money(calculation.subtotal), `${hoursLabel(calculation.totalHours)} Gesamtzeit`)}
+        ${selfEmploymentDashboardMetric("Puffer", money(calculation.buffer), `${project.offerSettings.useBuffer ? project.offerSettings.bufferPercent : 0} %`)}
+        ${selfEmploymentDashboardMetric("Steuer", money(calculation.tax), `${project.offerSettings.taxPercent} %`)}
+        ${selfEmploymentDashboardMetric("Gesamt", money(calculation.total), project.offerSettings.useRounding ? "gerundet" : "exakt")}
+      </div>
+      ${selfEmploymentOfferTable(calculation)}
+    </div>
+  `;
+}
+
+function selfEmploymentOfferPhaseFactor(phaseName: string, order: number): number {
+  const phaseNumber = Number((phaseName.match(/\d+/)?.[0] ?? "").trim());
+  const normalized = Number.isFinite(phaseNumber) && phaseNumber > 0 ? phaseNumber : order;
+  if (normalized <= 1) return 0.7;
+  if (normalized === 2) return 1;
+  return 1.2;
+}
+
+function selfEmploymentOfferLabelFactor(labelId: string): number {
+  if (labelId === "idea") return 0.8;
+  if (labelId === "knowledge") return 0.9;
+  if (labelId === "goal") return 1.3;
+  return 1;
+}
+
+function selfEmploymentOfferCardHours(timeBudgetHours: number, todoCount: number, useTodoTimes: boolean): number {
+  const safeHours = Math.max(0, timeBudgetHours);
+  if (!useTodoTimes || todoCount <= 0) return safeHours;
+  return (safeHours / todoCount) * todoCount;
+}
+
+function selfEmploymentCanvasNodeTitle(node: SelfEmploymentProject["businessIdeaCanvas"]["nodes"][number]): string {
+  if (node.type === "text") return node.text.trim() || "Karte";
+  if (node.type === "file") return node.file.trim() || "Datei";
+  if (node.type === "link") return node.url.trim() || "Link";
+  return "Karte";
+}
+
+function formatSelfEmploymentFactor(value: number): string {
+  return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 }).format(value);
 }
 
 function selfEmploymentTasksDashboard(project: SelfEmploymentProject, workPlan: SelfEmploymentProjectWorkPlan): string {

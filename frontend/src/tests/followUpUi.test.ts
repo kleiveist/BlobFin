@@ -302,8 +302,10 @@ describe("follow-up ui rendering", () => {
     expect(selfEmploymentConfigSource).toContain('"Kennzahlen"');
     expect(selfEmploymentConfigSource.indexOf('"Projektplanung"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Aufgaben"'));
     expect(selfEmploymentConfigSource.indexOf('"Aufgaben"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Zeitmanagement & Habits"'));
-    expect(selfEmploymentConfigSource.indexOf('"Zeitmanagement & Habits"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Kundenkontakte"'));
-    expect(selfEmploymentConfigSource.indexOf('"Kundenkontakte"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Angebote & Rechnungen"'));
+    expect(selfEmploymentConfigSource.indexOf('"Zeitmanagement & Habits"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Angebote & Rechnungen"'));
+    expect(selfEmploymentConfigSource.indexOf('"Angebote & Rechnungen"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Budget & Investitionen"'));
+    expect(selfEmploymentConfigSource.indexOf('"Budget & Investitionen"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Kundenkontakte"'));
+    expect(selfEmploymentConfigSource.indexOf('"Kundenkontakte"')).toBeLessThan(selfEmploymentConfigSource.indexOf('"Gewinnschaetzung"'));
     expect(selfEmploymentFeatureSource).toContain("renderBusinessCanvas");
     expect(mainSource).not.toContain('action === "business-canvas-');
     expect(mainSource).not.toContain("businessIdeaCanvasSelectedEdge");
@@ -350,6 +352,10 @@ describe("follow-up ui rendering", () => {
     expect(selfEmploymentFeatureSource).toContain("selfEmploymentLabelDonutChart");
     expect(selfEmploymentFeatureSource).toContain("Benoetigte Wochen");
     expect(selfEmploymentFeatureSource).toContain("formatSelfEmploymentWeeks");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-project-list-popup");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-toggle-dashboard-project");
+    expect(selfEmploymentFeatureSource).toContain("self-employment-billing-tabs");
+    expect(selfEmploymentFeatureSource).toContain("selfEmploymentOfferCalculation");
     expect(selfEmploymentFeatureSource).not.toContain("Groesstes Label");
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button");
     expect(stylesSource).toContain(".self-employment-gantt-phase-filter-button.active");

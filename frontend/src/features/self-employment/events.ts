@@ -11,12 +11,16 @@ import {
   removeSelfEmploymentGanttTodo,
   removeSelfEmploymentCollectionItem,
   renameSelfEmploymentProject,
+  selectSelfEmploymentBillingTab,
   selectSelfEmploymentIcon,
   selectSelfEmploymentProject,
   selectSelfEmploymentRoadmapArea,
   selfEmploymentControlValue,
   showSelfEmploymentIconPicker,
+  toggleSelfEmploymentDashboardProject,
   toggleSelfEmploymentLabelPicker,
+  toggleSelfEmploymentOfferOverview,
+  toggleSelfEmploymentProjectListPopup,
   toggleSelfEmploymentProjectLabel,
   toggleSelfEmploymentTimeSource,
   updateSelfEmploymentCollectionItemField,
@@ -79,7 +83,7 @@ export function onSelfEmploymentInput(event: Event, context: AppContext): boolea
     updateSelfEmploymentProjectField(
       target.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
       target.dataset.selfEmploymentField,
-      target.value,
+      selfEmploymentControlValue(target),
       false
     );
     return true;
@@ -125,7 +129,7 @@ export function onSelfEmploymentChange(event: Event, context: AppContext): boole
     updateSelfEmploymentProjectField(
       target.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
       target.dataset.selfEmploymentField,
-      target.value,
+      selfEmploymentControlValue(target),
       true
     );
     return true;
@@ -194,8 +198,25 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
 
   event.preventDefault();
   if (action === "self-employment-add-project") addSelfEmploymentProject();
+  if (action === "self-employment-toggle-project-list") toggleSelfEmploymentProjectListPopup();
+  if (action === "self-employment-close-project-list") toggleSelfEmploymentProjectListPopup(false);
+  if (action === "self-employment-toggle-dashboard-project") {
+    toggleSelfEmploymentDashboardProject(button.dataset.selfEmploymentProjectId || "");
+  }
   if (action === "self-employment-select-project") selectSelfEmploymentProject(button.dataset.selfEmploymentProjectId || "");
   if (action === "self-employment-select-roadmap-area") selectSelfEmploymentRoadmapArea(button.dataset.selfEmploymentRoadmapArea || "");
+  if (action === "self-employment-select-billing-tab") {
+    selectSelfEmploymentBillingTab(
+      button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
+      button.dataset.selfEmploymentBillingTab === "invoices" ? "invoices" : "offers"
+    );
+  }
+  if (action === "self-employment-toggle-offer-overview") {
+    toggleSelfEmploymentOfferOverview(button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId);
+  }
+  if (action === "self-employment-close-offer-overview") {
+    toggleSelfEmploymentOfferOverview(button.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId, false);
+  }
   if (action === "self-employment-open-icon-picker") showSelfEmploymentIconPicker(button);
   if (action === "self-employment-close-icon-picker") hideSelfEmploymentIconPicker();
   if (action === "self-employment-select-icon") {
@@ -337,6 +358,8 @@ export function closeSelfEmploymentOverlays(): void {
   hideSelfEmploymentIconPicker();
   closeSelfEmploymentGanttEditor();
   closeSelfEmploymentTaskContextPopup();
+  selfEmploymentUiState.projectListPopupOpen = false;
+  selfEmploymentUiState.offerOverviewProjectId = null;
 }
 
 function closeSelfEmploymentOverlaysForTarget(target: HTMLElement | null): void {
@@ -348,6 +371,12 @@ function closeSelfEmploymentOverlaysForTarget(target: HTMLElement | null): void 
   }
   if (selfEmploymentUiState.taskContextPopup && !target?.closest("[data-self-employment-task-context-popup]")) {
     closeSelfEmploymentTaskContextPopup();
+  }
+  if (selfEmploymentUiState.projectListPopupOpen && !target?.closest(".self-employment-project-list-popup")) {
+    selfEmploymentUiState.projectListPopupOpen = false;
+  }
+  if (selfEmploymentUiState.offerOverviewProjectId && !target?.closest(".self-employment-offer-overview-popup")) {
+    selfEmploymentUiState.offerOverviewProjectId = null;
   }
 }
 

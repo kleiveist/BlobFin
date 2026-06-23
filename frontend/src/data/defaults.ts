@@ -442,7 +442,27 @@ export function defaultSelfEmploymentState(): SelfEmploymentState {
         name: "Beispielprojekt",
         icon: "briefcase",
         labels: ["Beratung", "Pruefung"],
-        status: "review",
+        status: "in_progress",
+        dashboardEnabled: true,
+        projectType: "revenue",
+        priority: "high",
+        enabledModules: {
+          invoices: true,
+          budget: true,
+          contacts: true,
+          profit: true,
+          metrics: true
+        },
+        offerSettings: {
+          baseHourlyRate: 60,
+          usePhaseFactors: true,
+          useLabelFactors: true,
+          useTodoTimes: true,
+          useBuffer: false,
+          useRounding: false,
+          bufferPercent: 10,
+          taxPercent: 19
+        },
         idea: "Nebenprojekt Beratung",
         problem: "Kleine Selbststaendige brauchen einfache Finanz- und Prozessstruktur.",
         targetGroup: "kleine Selbststaendige",

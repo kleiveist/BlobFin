@@ -5,6 +5,9 @@ import type { SelfEmploymentProjectEvaluation } from "./feasibilityController";
 import {
   hoursLabel,
   selfEmploymentFeasibilityLabel,
+  selfEmploymentPriorityLabel,
+  selfEmploymentProjectTypeBenefitLabel,
+  selfEmploymentProjectTypeLabel,
   selfEmploymentStatusLabel
 } from "./feasibilityController";
 import { SELF_EMPLOYMENT_LABEL_OPTIONS } from "./config";
@@ -45,10 +48,9 @@ export function selfEmploymentProjectCard(evaluation: SelfEmploymentProjectEvalu
           <span class="self-employment-project-title">
             <strong>${escapeHtml(project.name)}</strong>
           </span>
-          <span>Status: ${escapeHtml(selfEmploymentStatusLabel(project.status))}</span>
-          <span>Zeitbedarf: ${hoursLabel(project.requiredHoursPerWeek)} / Woche</span>
-          <span>Startkapital: ${money(project.startCapitalRequired)}</span>
-          <span>Gewinnpotenzial: ${money(evaluation.monthlyProfitAfterReserve)} / Monat</span>
+          <span>${escapeHtml(`${selfEmploymentStatusLabel(project.status)} · ${selfEmploymentProjectTypeLabel(project.projectType)} · ${selfEmploymentPriorityLabel(project.priority)}`)}</span>
+          <span>Zeitbedarf: ${hoursLabel(evaluation.weeklyTimeDemand)} / Woche</span>
+          <span>${escapeHtml(selfEmploymentProjectPotentialLabel(evaluation))}</span>
           <span>Machbarkeit: ${escapeHtml(selfEmploymentFeasibilityLabel(evaluation.feasibility))}</span>
         </button>
       </div>
@@ -61,6 +63,16 @@ export function selfEmploymentProjectCard(evaluation: SelfEmploymentProjectEvalu
       ${selfEmploymentUiState.labelPickerProjectId === project.id ? selfEmploymentLabelPicker(project) : ""}
     </article>
   `;
+}
+
+function selfEmploymentProjectPotentialLabel(evaluation: SelfEmploymentProjectEvaluation): string {
+  if (evaluation.project.projectType === "revenue") {
+    return `Gewinnpotenzial: ${money(evaluation.monthlyProfitAfterReserve)} / Monat`;
+  }
+  if (evaluation.project.projectType === "human_capital") {
+    return `Kein direkter Gewinn · ${selfEmploymentProjectTypeBenefitLabel(evaluation.project.projectType)}`;
+  }
+  return `${selfEmploymentProjectTypeBenefitLabel(evaluation.project.projectType)} · direkt ${money(evaluation.monthlyProfitAfterReserve)} / Monat`;
 }
 
 function selfEmploymentLabelPicker(project: SelfEmploymentProject): string {

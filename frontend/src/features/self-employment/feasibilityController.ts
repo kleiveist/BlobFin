@@ -4,6 +4,7 @@ import type {
   SelfEmploymentFeasibility,
   SelfEmploymentInvoice,
   SelfEmploymentProject,
+  SelfEmploymentProjectType,
   SelfEmploymentProjectStatus,
   SelfEmploymentRiskLevel,
   SelfEmploymentRoadmapAreaId,
@@ -23,11 +24,13 @@ export interface SelfEmploymentProjectEvaluation {
   effectiveHourlyValue: number;
   openInvoiceAmount: number;
   openTaskHours: number;
+  weeklyTimeDemand: number;
+  benefitLabel: string;
 }
 
 export function evaluateSelfEmploymentProject(
   project: SelfEmploymentProject,
-  context: { availableTimeHours: number; availableReserve: number }
+  context: { availableTimeHours: number; availableReserve: number; weeklyTimeDemand?: number; openTaskHours?: number; blockingTaskCount?: number }
 ): SelfEmploymentProjectEvaluation {
   const availableReserve = Math.max(0, project.availableReserveOverride ?? context.availableReserve);
   const fundingGap = Math.max(0, project.startCapitalRequired - availableReserve);
@@ -43,30 +46,53 @@ export function evaluateSelfEmploymentProject(
     const todoHours = plan.todos.length > 0 ? plan.timeBudgetHours / plan.todos.length : plan.timeBudgetHours;
     return plan.todos.filter((todo) => !todo.completed).map((todo) => ({ todo, hours: todoHours }));
   });
-  const openTaskHours = openTasks.reduce((sum, task) => sum + task.hours, 0);
+  const openTaskHours = context.openTaskHours ?? openTasks.reduce((sum, task) => sum + task.hours, 0);
+  const weeklyTimeDemand = Math.max(
+    0,
+    context.weeklyTimeDemand ?? project.requiredHoursPerWeek ?? project.fixedProjectHoursPerWeek + project.flexibleProjectHoursPerWeek
+  );
+  const blockingTaskCount = context.blockingTaskCount ?? openTasks.filter((task) => task.todo.eisenhowerQuadrant === "important_urgent").length;
+  const projectType = selfEmploymentProjectTypeFromValue(project.projectType);
+  const needsProfit = projectType === "revenue";
+  const hasStrategicBenefit =
+    projectType === "human_capital" ||
+    projectType === "mandatory" ||
+    projectType === "strategic" ||
+    Boolean(project.projectGoal.trim() || project.motivation.trim() || project.milestones.length || project.nextSteps.length);
+  const hasFinancialUpside = monthlyProfitAfterReserve > 0 || project.monthlyRevenueExpected > 0;
+  const hasClearBenefit = needsProfit ? hasFinancialUpside : hasStrategicBenefit || hasFinancialUpside;
+  const criticalFundingGap = fundingGap > Math.max(500, project.startCapitalRequired * 0.4);
+  const timeOverReserve = weeklyTimeDemand > context.availableTimeHours;
+  const nearReserve = context.availableTimeHours > 0 && weeklyTimeDemand > context.availableTimeHours * 0.85;
   const reasons: string[] = [];
 
-  if (project.requiredHoursPerWeek > context.availableTimeHours) {
+  if (timeOverReserve) {
     reasons.push(
-      `Zeitbedarf liegt ${hoursLabel(project.requiredHoursPerWeek - context.availableTimeHours)} ueber der freien Reserve.`
+      `Zeitbedarf liegt ${hoursLabel(weeklyTimeDemand - context.availableTimeHours)} ueber der freien Reserve.`
     );
   }
   if (fundingGap > 0) reasons.push(`Startkapital-Luecke von ${money(fundingGap)} offen.`);
-  if (monthlyProfitAfterReserve <= 0) reasons.push("Gewinn nach Ruecklage/Steuer ist nicht positiv.");
-  if (openTasks.length > 6 || openTaskHours > project.requiredHoursPerWeek * 2) {
+  if (needsProfit && monthlyProfitAfterReserve <= 0) reasons.push("Umsatzprojekt hat noch keinen positiven Gewinn nach Ruecklage/Steuer.");
+  if (!needsProfit && hasStrategicBenefit) {
+    reasons.push(`${selfEmploymentProjectTypeLabel(projectType)} wird ueber Nutzen statt direkten Gewinn bewertet.`);
+  }
+  if (!hasClearBenefit) reasons.push("Nutzen, Gewinn oder strategische Relevanz sind noch nicht klar.");
+  if (openTasks.length > 6 || openTaskHours > Math.max(weeklyTimeDemand, 1) * 2 || blockingTaskCount > 3) {
     reasons.push("Aufgabenmenge ist fuer die aktuelle Wochenzeit hoch.");
   }
   if (project.risk === "high") reasons.push("Risiko ist hoch eingestuft.");
 
   const feasibility =
-    project.requiredHoursPerWeek > context.availableTimeHours ||
-    fundingGap > Math.max(500, project.startCapitalRequired * 0.4) ||
-    monthlyProfitAfterReserve <= 0
+    timeOverReserve ||
+    criticalFundingGap ||
+    (needsProfit && monthlyProfitAfterReserve <= 0) ||
+    (!hasClearBenefit && openTaskHours > 0)
       ? "unrealistic"
-      : project.requiredHoursPerWeek > context.availableTimeHours * 0.85 ||
+      : nearReserve ||
           fundingGap > 0 ||
           project.risk === "high" ||
-          openTaskHours > project.requiredHoursPerWeek
+          openTaskHours > Math.max(weeklyTimeDemand, 1) ||
+          blockingTaskCount > 0
         ? "borderline"
         : "realistic";
 
@@ -81,7 +107,13 @@ export function evaluateSelfEmploymentProject(
     monthlyProfitAfterReserve,
     effectiveHourlyValue,
     openInvoiceAmount,
-    openTaskHours
+    openTaskHours,
+    weeklyTimeDemand,
+    benefitLabel: hasStrategicBenefit
+      ? selfEmploymentProjectTypeBenefitLabel(projectType)
+      : hasFinancialUpside
+        ? "finanzieller Nutzen"
+        : "Nutzen offen"
   };
 }
 
@@ -104,11 +136,11 @@ export function selfEmploymentTotals(
   return {
     totalProjects: evaluations.length,
     activeProjects: activeEvaluations.length,
-    realisticProjects: evaluations.filter((evaluation) => evaluation.feasibility === "realistic").length,
-    unrealisticProjects: evaluations.filter((evaluation) => evaluation.feasibility === "unrealistic").length,
+    realisticProjects: activeEvaluations.filter((evaluation) => evaluation.feasibility === "realistic").length,
+    unrealisticProjects: activeEvaluations.filter((evaluation) => evaluation.feasibility === "unrealistic").length,
     monthlyRevenue: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.project.monthlyRevenueExpected, 0),
     monthlyProfit: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.monthlyProfitAfterReserve, 0),
-    requiredHours: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.project.requiredHoursPerWeek, 0),
+    requiredHours: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.weeklyTimeDemand, 0),
     availableTimeHours,
     fundingGap: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.fundingGap, 0),
     openInvoiceAmount: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.openInvoiceAmount, 0)
@@ -116,11 +148,15 @@ export function selfEmploymentTotals(
 }
 
 export function selfEmploymentProjectIsActive(project: SelfEmploymentProject): boolean {
-  return project.status !== "completed" && project.status !== "discarded" && project.status !== "paused";
+  const status = canonicalSelfEmploymentProjectStatus(project.status);
+  return status === "open" || status === "in_progress";
 }
 
 export function selfEmploymentStatusLabel(status: SelfEmploymentProjectStatus): string {
   const labels: Record<SelfEmploymentProjectStatus, string> = {
+    open: "Offen",
+    in_progress: "In Arbeit",
+    cancelled: "Cancel",
     idea: "Idee",
     review: "In Pruefung",
     preparation: "Vorbereitung",
@@ -129,6 +165,11 @@ export function selfEmploymentStatusLabel(status: SelfEmploymentProjectStatus): 
     completed: "Abgeschlossen",
     discarded: "Verworfen"
   };
+  const canonical = canonicalSelfEmploymentProjectStatus(status);
+  if (canonical === "open") return "Offen";
+  if (canonical === "in_progress") return "In Arbeit";
+  if (canonical === "completed") return "Erledigt";
+  if (canonical === "cancelled") return "Cancel";
   return labels[status];
 }
 
@@ -142,6 +183,45 @@ export function selfEmploymentFeasibilityLabel(feasibility: SelfEmploymentFeasib
   if (feasibility === "realistic") return "Realistisch";
   if (feasibility === "borderline") return "Grenzwertig";
   return "Unrealistisch";
+}
+
+export function canonicalSelfEmploymentProjectStatus(status: SelfEmploymentProjectStatus): "open" | "in_progress" | "completed" | "cancelled" {
+  if (status === "active" || status === "in_progress") return "in_progress";
+  if (status === "completed") return "completed";
+  if (status === "discarded" || status === "cancelled") return "cancelled";
+  return "open";
+}
+
+export function selfEmploymentProjectTypeFromValue(value: unknown, fallback: SelfEmploymentProjectType = "revenue"): SelfEmploymentProjectType {
+  return value === "revenue" ||
+    value === "human_capital" ||
+    value === "mandatory" ||
+    value === "strategic" ||
+    value === "private"
+    ? value
+    : fallback;
+}
+
+export function selfEmploymentProjectTypeLabel(projectType: SelfEmploymentProjectType): string {
+  if (projectType === "human_capital") return "Humankapital";
+  if (projectType === "mandatory") return "Pflichtprojekt";
+  if (projectType === "strategic") return "Strategisch";
+  if (projectType === "private") return "Privat";
+  return "Umsatzprojekt";
+}
+
+export function selfEmploymentProjectTypeBenefitLabel(projectType: SelfEmploymentProjectType): string {
+  if (projectType === "human_capital") return "Humankapital-Wert hoch";
+  if (projectType === "mandatory") return "Pflichtnutzen wichtig";
+  if (projectType === "strategic") return "strategischer Nutzen hoch";
+  if (projectType === "private") return "individueller Nutzen";
+  return "Gewinnpotenzial";
+}
+
+export function selfEmploymentPriorityLabel(priority: SelfEmploymentTask["priority"]): string {
+  if (priority === "high") return "Hoch";
+  if (priority === "low") return "Niedrig";
+  return "Mittel";
 }
 
 export function selfEmploymentRoadmapAreaIdFromValue(value: unknown): SelfEmploymentRoadmapAreaId | null {
@@ -161,15 +241,11 @@ export function selfEmploymentTextToList(rawValue: string): string[] {
 }
 
 export function selfEmploymentStatusFromValue(value: string, fallback: SelfEmploymentProjectStatus): SelfEmploymentProjectStatus {
-  return value === "idea" ||
-    value === "review" ||
-    value === "preparation" ||
-    value === "active" ||
-    value === "paused" ||
-    value === "completed" ||
-    value === "discarded"
-    ? value
-    : fallback;
+  if (value === "open" || value === "in_progress" || value === "completed" || value === "cancelled") return value;
+  if (value === "active") return "in_progress";
+  if (value === "discarded") return "cancelled";
+  if (value === "idea" || value === "review" || value === "preparation" || value === "paused") return "open";
+  return fallback;
 }
 
 export function selfEmploymentRiskFromValue(value: string, fallback: SelfEmploymentRiskLevel): SelfEmploymentRiskLevel {

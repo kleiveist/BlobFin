@@ -7,7 +7,9 @@ import {
   addSelfEmploymentProject,
   configureSelfEmploymentHost,
   deleteSelfEmploymentProject,
+  renderSelfEmploymentDashboard,
   renameSelfEmploymentProject,
+  toggleSelfEmploymentDashboardProject,
   toggleSelfEmploymentProjectLabel,
   updateSelfEmploymentProject
 } from "../features/self-employment/controller";
@@ -20,6 +22,9 @@ afterEach(() => {
   selfEmploymentUiState.kanbanSelectedCard = null;
   selfEmploymentUiState.kanbanDrag = null;
   selfEmploymentUiState.taskContextPopup = null;
+  selfEmploymentUiState.projectListPopupOpen = false;
+  selfEmploymentUiState.billingTabByProjectId = {};
+  selfEmploymentUiState.offerOverviewProjectId = null;
   selfEmploymentUiState.taskEisenhowerFilter = "all";
   selfEmploymentUiState.kanbanPhaseFilterIds = [];
   selfEmploymentUiState.kanbanLabelFilterIds = [];
@@ -177,6 +182,110 @@ describe("self employment controller persistence", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "center", inline: "nearest", behavior: "smooth" });
     expect(classList.add).toHaveBeenCalledWith("jump-highlight");
   });
+
+  it("rates human-capital projects as realistic without direct profit when time and benefit fit", () => {
+    const project = {
+      ...defaultAppState().selfEmployment.projects[0],
+      projectType: "human_capital" as const,
+      status: "in_progress" as const,
+      name: "Uni",
+      projectGoal: "Abschluss erreichen",
+      motivation: "Wissen und Karriereeffekt aufbauen",
+      monthlyRevenueExpected: 0,
+      monthlyRunningCosts: 0,
+      startCapitalRequired: 0,
+      requiredHoursPerWeek: 12,
+      fixedProjectHoursPerWeek: 12,
+      flexibleProjectHoursPerWeek: 0
+    };
+
+    const evaluation = evaluateSelfEmploymentProject(project, { availableTimeHours: 19.4, availableReserve: 0, weeklyTimeDemand: 12 });
+
+    expect(evaluation.feasibility).toBe("realistic");
+    expect(evaluation.benefitLabel).toBe("Humankapital-Wert hoch");
+    expect(evaluation.reasons.join(" ")).not.toContain("Umsatzprojekt hat noch keinen positiven Gewinn");
+  });
+
+  it("renders at most three selected active dashboard projects and keeps all projects in the list popup", () => {
+    const host = configureFakeSelfEmploymentHost();
+    host.state.selfEmployment.projects = Array.from({ length: 5 }, (_, index) => ({
+      ...host.state.selfEmployment.projects[0],
+      id: `project-${index + 1}`,
+      name: `Projekt ${index + 1}`,
+      status: "in_progress" as const,
+      dashboardEnabled: true
+    }));
+    host.state.selfEmployment.selectedProjectId = "project-1";
+    selfEmploymentUiState.projectListPopupOpen = true;
+    const container = { innerHTML: "" };
+    vi.stubGlobal("document", {
+      querySelector: (selector: string) => (selector === "#selfEmploymentDashboard" ? container : null)
+    });
+
+    renderSelfEmploymentDashboard();
+
+    expect(count(container.innerHTML, 'class="self-employment-project-card')).toBe(3);
+    expect(container.innerHTML).toContain("Projektliste");
+    expect(container.innerHTML).toContain("Projekt 5");
+    expect(container.innerHTML).not.toContain("Geplanter Monatsumsatz");
+    expect(container.innerHTML).not.toContain("Geschaetzter Monatsgewinn");
+    expect(container.innerHTML).not.toContain("Offene Investitionsluecke");
+  });
+
+  it("does not allow more than three projects to be marked for the dashboard", () => {
+    const host = configureFakeSelfEmploymentHost();
+    host.state.selfEmployment.projects = Array.from({ length: 4 }, (_, index) => ({
+      ...host.state.selfEmployment.projects[0],
+      id: `project-${index + 1}`,
+      name: `Projekt ${index + 1}`,
+      dashboardEnabled: index < 3
+    }));
+
+    toggleSelfEmploymentDashboardProject("project-4");
+
+    expect(host.state.selfEmployment.projects.filter((project) => project.dashboardEnabled)).toHaveLength(3);
+    expect(host.calls).toEqual([]);
+  });
+
+  it("renders separated offer and invoice tabs with card-based offer calculation", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const project = {
+      ...projectWithRelatedTodos(host.state),
+      offerSettings: {
+        ...host.state.selfEmployment.projects[0].offerSettings,
+        baseHourlyRate: 60,
+        usePhaseFactors: true,
+        useLabelFactors: true,
+        useTodoTimes: true,
+        useBuffer: false,
+        useRounding: false,
+        taxPercent: 0
+      }
+    };
+
+    const offerHtml = selfEmploymentProjectDetails(
+      evaluateSelfEmploymentProject(project, { availableTimeHours: 40, availableReserve: 5000, weeklyTimeDemand: 4 }),
+      "invoices",
+      fakeIncomePlanningModel()
+    );
+
+    expect(offerHtml).toContain("Phasenfaktoren verwenden");
+    expect(offerHtml).toContain("Labelfaktoren verwenden");
+    expect(offerHtml).toContain("Angebotsuebersicht anzeigen");
+    expect(offerHtml).toContain("Karte A");
+    expect(offerHtml).toContain("33,60");
+
+    selfEmploymentUiState.billingTabByProjectId = { [project.id]: "invoices" };
+    const invoiceHtml = selfEmploymentProjectDetails(
+      evaluateSelfEmploymentProject(project, { availableTimeHours: 40, availableReserve: 5000, weeklyTimeDemand: 4 }),
+      "invoices",
+      fakeIncomePlanningModel()
+    );
+
+    expect(invoiceHtml).toContain("Angebot uebernehmen");
+    expect(invoiceHtml).toContain("Rechnung hinzufuegen");
+    expect(invoiceHtml).toContain("Ueberfaellig");
+  });
 });
 
 function configureFakeSelfEmploymentHost(): {
@@ -303,6 +412,10 @@ function extractTaskContextPopup(html: string): string {
   if (start === -1) return "";
   const end = html.indexOf("</div>\n   \n    </div>", start);
   return html.slice(start, end === -1 ? start + 3000 : end);
+}
+
+function count(value: string, needle: string): number {
+  return value.split(needle).length - 1;
 }
 
 function projectWithRelatedTodos(state: ReturnType<typeof defaultAppState>): ReturnType<typeof defaultAppState>["selfEmployment"]["projects"][number] {
