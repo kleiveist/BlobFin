@@ -320,6 +320,11 @@ function setActiveSection(section: AppSectionId, options: { updateHistory?: bool
 
 function updateModuleVisibility(): void {
   const activeSection = runtimeHost.state.ui.activeSection;
+  const isHomeActive = activeSection === "home";
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-home-return-button]")) {
+    button.disabled = isHomeActive;
+    button.setAttribute("aria-disabled", String(isHomeActive));
+  }
   for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-section-id]")) {
     const sectionId = button.dataset.sectionId;
     const isActive = sectionId === activeSection;

@@ -240,6 +240,32 @@ describe("follow-up ui rendering", () => {
     expect(html).not.toContain("Vorsorge oeffnen");
   });
 
+  it("renders a global icon-only return button to the landing page", () => {
+    const html = renderAppShell();
+    const header = html.slice(html.indexOf('<header class="app-header">'), html.indexOf("</header>"));
+    const buttonMarkerStart = header.indexOf("data-home-return-button");
+    expect(buttonMarkerStart).toBeGreaterThanOrEqual(0);
+    const buttonStart = header.lastIndexOf("<button", buttonMarkerStart);
+    const buttonEnd = header.indexOf("</button>", buttonMarkerStart);
+    expect(buttonStart).toBeGreaterThanOrEqual(0);
+    expect(buttonEnd).toBeGreaterThan(buttonStart);
+    const button = header.slice(buttonStart, buttonEnd);
+    const buttonInner = button.slice(button.indexOf(">") + 1);
+
+    expect(header).toContain('class="app-header-brand"');
+    expect(header).toContain('class="app-home-return-button"');
+    expect(button).toContain('data-action="open-section-home"');
+    expect(button).toContain("data-home-return-button");
+    expect(button).toContain('aria-label="Zur Startseite"');
+    expect(button).toContain("<svg");
+    expect(buttonInner.replace(/<[^>]*>/g, "").trim()).toBe("");
+    expect(html).toContain(
+      '<button class="button secondary" type="button" data-action="open-section-home">Startseite</button>'
+    );
+    expect(stylesSource).toContain(".app-header-brand");
+    expect(stylesSource).toContain(".app-home-return-button");
+  });
+
   it("renders the self employment dashboard as an independent page", () => {
     const html = renderAppShell();
     const selfEmploymentStart = html.indexOf('data-module-section="self_employment_dashboard"');

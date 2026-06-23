@@ -25,9 +25,25 @@ export {
 export function renderAppShell(): string {
   return `
     <header class="app-header">
-      <div>
-        <p class="eyebrow">BlobFin Planung</p>
-        <h1>Modularer Finanzplaner fuer Konten, Investment und Immobilien</h1>
+      <div class="app-header-brand">
+        <button
+          class="app-home-return-button"
+          type="button"
+          data-action="open-section-home"
+          data-home-return-button
+          disabled
+          aria-label="Zur Startseite"
+          aria-disabled="true"
+          title="Zur Startseite"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M11.5 5.5 5 12l6.5 6.5 1.4-1.4L8.8 13H19v-2H8.8l4.1-4.1-1.4-1.4Z" />
+          </svg>
+        </button>
+        <div class="app-header-title">
+          <p class="eyebrow">BlobFin Planung</p>
+          <h1>Modularer Finanzplaner fuer Konten, Investment und Immobilien</h1>
+        </div>
       </div>
       <div class="header-actions">
         <div class="app-settings">

@@ -9,6 +9,8 @@ import { bindAppEvents } from "../app/events";
 import { appSectionIdFromValue, createAppRouter, sectionFromLocationHash } from "../app/router";
 import { createRenderScheduler, DEFAULT_RENDER_DEBOUNCE_MS } from "../app/renderScheduler";
 import { createAppStore } from "../app/store/appStore";
+import { configureRouteRuntime } from "../features/runtime-host/routeRuntime";
+import { runtimeApi, runtimeHost } from "../features/runtime-host/hostContext";
 import { featureModules } from "../features";
 import type { AppState } from "../types";
 
@@ -156,6 +158,45 @@ describe("app shell", () => {
     expect(pushedUrls).toEqual(["/planner?profile=default#income"]);
     expect(replacedUrls).toEqual(["/planner?profile=default#combined_wealth"]);
     expect(router.currentSection()).toBe("combined_wealth");
+  });
+
+  it("disables the global home return button only on the landing page", () => {
+    const initialState = runtimeHost.state;
+    const attributes = new Map<string, string>();
+    const homeReturnButton = {
+      disabled: false,
+      setAttribute: (name: string, value: string) => attributes.set(name, value)
+    } as unknown as HTMLButtonElement;
+    const sectionButton = {
+      dataset: { sectionId: "income" },
+      classList: { toggle: vi.fn() },
+      setAttribute: vi.fn()
+    } as unknown as HTMLButtonElement;
+    const homeSection = { dataset: { moduleSection: "home" }, hidden: false } as unknown as HTMLElement;
+    const incomeSection = { dataset: { moduleSection: "income" }, hidden: true } as unknown as HTMLElement;
+
+    vi.stubGlobal("document", {
+      querySelectorAll: (selector: string) => {
+        if (selector === "button[data-home-return-button]") return [homeReturnButton];
+        if (selector === "button[data-section-id]") return [sectionButton];
+        if (selector === "[data-module-section]") return [homeSection, incomeSection];
+        return [];
+      }
+    });
+
+    configureRouteRuntime();
+    runtimeHost.state = { ...defaultAppState(), ui: { ...defaultAppState().ui, activeSection: "home" } };
+    runtimeApi.updateModuleVisibility();
+
+    expect(homeReturnButton.disabled).toBe(true);
+    expect(attributes.get("aria-disabled")).toBe("true");
+
+    runtimeHost.state = { ...defaultAppState(), ui: { ...defaultAppState().ui, activeSection: "income" } };
+    runtimeApi.updateModuleVisibility();
+
+    expect(homeReturnButton.disabled).toBe(false);
+    expect(attributes.get("aria-disabled")).toBe("false");
+    runtimeHost.state = initialState;
   });
 
   it("debounces and flushes full renders", () => {
