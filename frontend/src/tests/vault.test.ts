@@ -5,7 +5,7 @@ import { getVaultStatus, initializeStorage, loadState, normalizeStoredState, sav
 import { readVaultFallbackMetadata, saveVaultFallbackMetadata } from "../lib/vault/vaultFallback";
 import { createVaultManifest, parseVaultManifest } from "../lib/vault/vaultManifest";
 import { deserializeVaultState, serializeVaultState } from "../lib/vault/vaultSerializer";
-import { joinVaultPath, manifestPath, profilePath, readVault, readVaultState, writeVaultState } from "../lib/vault/vaultStorage";
+import { createVaultSnapshot, joinVaultPath, manifestPath, profilePath, readVault, readVaultState, writeVaultState } from "../lib/vault/vaultStorage";
 
 const tauriInvokeMock = vi.hoisted(() => vi.fn());
 
@@ -55,6 +55,11 @@ class MemoryVaultFiles {
     }
     if (command === "vault_create_dir_all") return undefined;
     if (command === "vault_list_project_canvas_files") return this.listProjectCanvasFiles(path);
+    if (command === "vault_list_project_dirs") return this.listProjectDirs(path);
+    if (command === "vault_remove_dir_all") {
+      this.removeDirAll(path);
+      return undefined;
+    }
     throw new Error(`Unexpected vault command: ${command}`);
   }
 
@@ -62,6 +67,10 @@ class MemoryVaultFiles {
     const contents = this.values.get(path);
     if (!contents) throw new Error(`Missing memory vault file: ${path}`);
     return JSON.parse(contents);
+  }
+
+  has(path: string): boolean {
+    return this.values.has(path);
   }
 
   writeJson(path: string, value: unknown): void {
@@ -75,6 +84,24 @@ class MemoryVaultFiles {
       .map((item) => item.slice(prefix.length))
       .filter((item) => item.split(/[\\/]/).length === 2)
       .sort();
+  }
+
+  private listProjectDirs(path: string): string[] {
+    const prefix = `${path.replace(/[\\/]+$/, "")}/`;
+    const dirs = new Set<string>();
+    for (const item of this.values.keys()) {
+      if (!item.startsWith(prefix)) continue;
+      const [projectId] = item.slice(prefix.length).split(/[\\/]/);
+      if (projectId) dirs.add(projectId);
+    }
+    return [...dirs].sort();
+  }
+
+  private removeDirAll(path: string): void {
+    const prefix = `${path.replace(/[\\/]+$/, "")}/`;
+    for (const item of [...this.values.keys()]) {
+      if (item === path || item.startsWith(prefix)) this.values.delete(item);
+    }
   }
 }
 
@@ -125,6 +152,7 @@ describe("vault serializer", () => {
     };
     const serialized = serializeVaultState(state);
     const serializedCanvas = serialized.selfEmploymentCanvasFiles?.[state.selfEmployment.projects[0].businessIdeaCanvasFile];
+    const projectFiles = serialized.selfEmploymentProjectFiles?.[state.selfEmployment.projects[0].id];
     const loaded = normalizeStoredState(deserializeVaultState(serialized));
 
     expect(loaded.ui.activeSection).toBe("combined_wealth");
@@ -148,6 +176,22 @@ describe("vault serializer", () => {
       todos: [{ id: "vault-todo", title: "Nur Sidecar", eisenhowerQuadrant: "important_not_urgent", status: "planned", completed: false }]
     });
     expect(serializedCanvas).toBeDefined();
+    expect(serialized.selfEmploymentState).toEqual({
+      selectedProjectId: state.selfEmployment.selectedProjectId,
+      selectedRoadmapAreaId: state.selfEmployment.selectedRoadmapAreaId
+    });
+    expect(projectFiles?.["project.json"]).toMatchObject({ name: "Vault-Projekt", status: "in_progress" });
+    expect(projectFiles?.["cards.json"]).toBeDefined();
+    expect(projectFiles?.["phases.json"]).toBeDefined();
+    expect(projectFiles?.["labels.json"]).toBeDefined();
+    expect(projectFiles?.["todos.json"]).toBeDefined();
+    expect(projectFiles?.["time.json"]).toBeDefined();
+    expect(projectFiles?.["modules.json"]).toBeDefined();
+    expect(projectFiles?.["kanban.json"]).toBeDefined();
+    expect(projectFiles?.["gantt.json"]).toBeDefined();
+    expect(projectFiles?.["offers.json"]).toBeDefined();
+    expect(projectFiles?.["invoices.json"]).toBeDefined();
+    expect(projectFiles?.["contacts.json"]).toBeDefined();
     expect(JSON.stringify(serializedCanvas)).not.toContain("gantt");
     expect(JSON.stringify(serializedCanvas)).not.toContain("timeBudgetHours");
     expect(loaded.positionTableView.savings.selectedLabels).toEqual(["tag"]);
@@ -244,6 +288,107 @@ describe("vault storage", () => {
         }
       ]
     });
+    expect(vault.readJson(joinVaultPath(profilePath(rootPath), "self-employment/state.json"))).toEqual({
+      selectedProjectId: state.selfEmployment.selectedProjectId,
+      selectedRoadmapAreaId: "planning"
+    });
+    expect(vault.readJson(joinVaultPath(profilePath(rootPath), "planning/projects/self-project-example/project.json"))).toMatchObject({
+      id: "self-project-example",
+      name: "Roundtrip-Projekt",
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String)
+    });
+    for (const fileName of [
+      "canvas-geschaeftsidee.canvas",
+      "cards.json",
+      "phases.json",
+      "labels.json",
+      "todos.json",
+      "time.json",
+      "modules.json",
+      "kanban.json",
+      "gantt.json",
+      "offers.json",
+      "invoices.json",
+      "contacts.json"
+    ]) {
+      expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/self-project-example", fileName))).toBe(true);
+    }
+  });
+
+  it("removes deleted self employment project folders from the vault", async () => {
+    const vault = useMemoryVaultFiles();
+    const rootPath = "/tmp/blobfin-delete-vault";
+    const state = stateWithPersistentSelfEmploymentProject();
+    const secondProject = {
+      ...state.selfEmployment.projects[0],
+      id: "deleted-project",
+      name: "Wird geloescht",
+      businessIdeaCanvasFile: "planning/projects/deleted-project/canvas-geschaeftsidee.canvas"
+    };
+    const stateWithTwoProjects = {
+      ...state,
+      selfEmployment: {
+        ...state.selfEmployment,
+        projects: [...state.selfEmployment.projects, secondProject]
+      }
+    };
+
+    await writeVaultState(rootPath, stateWithTwoProjects);
+    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/deleted-project/project.json"))).toBe(true);
+
+    await writeVaultState(rootPath, state);
+    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/deleted-project/project.json"))).toBe(false);
+    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/deleted-project/canvas-geschaeftsidee.canvas"))).toBe(false);
+
+    const loaded = normalizeStoredState(await readVaultState(rootPath));
+    expect(loaded.selfEmployment.projects.map((project) => project.id)).toEqual(["self-project-example"]);
+  });
+
+  it("loads partial self employment project folders with safe defaults", async () => {
+    const vault = useMemoryVaultFiles();
+    const rootPath = "/tmp/blobfin-partial-project-vault";
+    const manifest = createVaultManifest("2026-06-18T00:00:00.000Z");
+
+    vault.writeJson(manifestPath(rootPath), manifest);
+    vault.writeJson(joinVaultPath(profilePath(rootPath), manifest.dataFiles.selfEmploymentState), {
+      selectedProjectId: "partial-project",
+      selectedRoadmapAreaId: "planning"
+    });
+    vault.writeJson(joinVaultPath(profilePath(rootPath), "planning/projects/partial-project/project.json"), {
+      id: "partial-project",
+      name: "Teilprojekt",
+      status: "open",
+      projectType: "human_capital",
+      priority: "medium"
+    });
+
+    const loaded = normalizeStoredState(await readVaultState(rootPath));
+    const project = loaded.selfEmployment.projects[0];
+
+    expect(project).toMatchObject({
+      id: "partial-project",
+      name: "Teilprojekt",
+      status: "open",
+      projectType: "human_capital"
+    });
+    expect(project.businessIdeaCanvas.nodes.length).toBeGreaterThan(0);
+    expect(project.gantt.cardPlans.length).toBeGreaterThan(0);
+    expect(project.enabledModules.metrics).toBe(true);
+  });
+
+  it("copies self employment project folders into vault snapshots", async () => {
+    const vault = useMemoryVaultFiles();
+    const rootPath = "/tmp/blobfin-snapshot-vault";
+    const state = stateWithPersistentSelfEmploymentProject();
+
+    await writeVaultState(rootPath, state);
+    const snapshot = await createVaultSnapshot(rootPath);
+
+    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/self-project-example/project.json"))).toBe(true);
+    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/self-project-example/cards.json"))).toBe(true);
+    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/self-project-example/gantt.json"))).toBe(true);
+    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/self-project-example/invoices.json"))).toBe(true);
   });
 
   it("merges self employment sidecar canvases into raw vault state before normalization", async () => {
@@ -431,6 +576,7 @@ function stateWithPersistentSelfEmploymentProject(): ReturnType<typeof defaultAp
 function replaceEmbeddedSelfEmploymentCanvasWithStaleData(vault: MemoryVaultFiles, rootPath: string): void {
   const path = joinVaultPath(profilePath(rootPath), "self-employment/state.json");
   const selfEmploymentState = vault.readJson(path) as ReturnType<typeof defaultAppState>["selfEmployment"];
+  if (!Array.isArray(selfEmploymentState.projects)) return;
   vault.writeJson(path, {
     ...selfEmploymentState,
     projects: selfEmploymentState.projects.map((project) => ({

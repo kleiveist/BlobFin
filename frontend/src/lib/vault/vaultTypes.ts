@@ -35,6 +35,7 @@ export type VaultDataFileKey =
 
 export interface VaultDataFiles extends Partial<Record<VaultDataFileKey, unknown>> {
   selfEmploymentCanvasFiles?: Record<string, unknown>;
+  selfEmploymentProjectFiles?: Record<string, Record<string, unknown>>;
 }
 
 export interface VaultManifest {

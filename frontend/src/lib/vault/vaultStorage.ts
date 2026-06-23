@@ -10,6 +10,13 @@ import { createVaultManifest, updateVaultManifestTimestamp } from "./vaultManife
 import { migrateVaultManifest } from "./vaultMigration";
 import { deserializeVaultState, serializeVaultState } from "./vaultSerializer";
 import {
+  SELF_EMPLOYMENT_PROJECT_FILE_NAMES,
+  safeSelfEmploymentProjectId,
+  selfEmploymentProjectFilePaths,
+  selfEmploymentProjectRelativeFilePath,
+  type SelfEmploymentProjectFilesById
+} from "./selfEmploymentProjectFiles";
+import {
   VAULT_DATA_FILE_KEYS,
   VAULT_MANIFEST_FILENAME,
   VAULT_PROFILE_FOLDER,
@@ -55,6 +62,7 @@ export async function readVault(rootPath: string): Promise<VaultReadResult> {
     if (!contents) continue;
     dataFiles[key] = parseJson(contents, manifest.dataFiles[key]);
   }
+  dataFiles.selfEmploymentProjectFiles = await readSelfEmploymentProjectFiles(rootPath);
   dataFiles.selfEmploymentCanvasFiles = await readSelfEmploymentCanvasFiles(rootPath, dataFiles.selfEmploymentState);
   dataFiles.selfEmploymentState = withExternalSelfEmploymentCanvases(
     dataFiles.selfEmploymentState,
@@ -70,16 +78,17 @@ export async function writeVaultState(rootPath: string, state: AppState): Promis
   const savedAt = new Date().toISOString();
   const manifest = updateVaultManifestTimestamp(existingManifest ?? createVaultManifest(savedAt), savedAt);
   const dataFiles = serializeVaultState(state);
+  const existingProjectIds = await listSelfEmploymentProjectDirs(rootPath);
 
   for (const key of VAULT_DATA_FILE_KEYS) {
     await writeJsonFile(vaultDataFilePath(rootPath, manifest, key), dataFiles[key] ?? null);
   }
-  for (const project of state.selfEmployment.projects) {
-    await writeJsonFile(
-      joinVaultPath(profilePath(rootPath), project.businessIdeaCanvasFile),
-      serializeBusinessIdeaCanvas(project.businessIdeaCanvas)
-    );
-  }
+  await writeSelfEmploymentProjectFiles(rootPath, dataFiles.selfEmploymentProjectFiles ?? {});
+  await removeDeletedSelfEmploymentProjectFolders(
+    rootPath,
+    existingProjectIds,
+    state.selfEmployment.projects.map((project) => project.id)
+  );
   await writeJsonFile(manifestPath(rootPath), manifest);
 
   return { manifest, savedAt };
@@ -99,6 +108,13 @@ export async function createVaultSnapshot(rootPath: string): Promise<VaultSnapsh
     );
   }
   const dataFiles = await readVault(rootPath);
+  const projectFiles = dataFiles.dataFiles.selfEmploymentProjectFiles ?? {};
+  for (const relativePath of selfEmploymentProjectFilePaths(projectFiles)) {
+    await copyTextFileIfExists(
+      joinVaultPath(profilePath(rootPath), relativePath),
+      joinVaultPath(backupPath, relativePath)
+    );
+  }
   const canvasFiles = dataFiles.dataFiles.selfEmploymentCanvasFiles ?? {};
   for (const relativePath of Object.keys(canvasFiles)) {
     await copyTextFileIfExists(
@@ -129,7 +145,7 @@ export function joinVaultPath(basePath: string, ...segments: string[]): string {
 
 async function ensureVaultStructure(rootPath: string): Promise<void> {
   await createDirAll(profilePath(rootPath));
-  const directories = new Set<string>(["backups"]);
+  const directories = new Set<string>(["backups", "planning/projects"]);
   for (const relativePath of Object.values(createVaultManifest().dataFiles)) {
     const slashIndex = Math.max(relativePath.lastIndexOf("/"), relativePath.lastIndexOf("\\"));
     if (slashIndex > 0) directories.add(relativePath.slice(0, slashIndex));
@@ -166,6 +182,61 @@ async function readSelfEmploymentCanvasFiles(
     canvasFiles[relativePath] = parseBusinessIdeaCanvasFile(parseJson(contents, relativePath), relativePath);
   }
   return canvasFiles;
+}
+
+async function readSelfEmploymentProjectFiles(rootPath: string): Promise<SelfEmploymentProjectFilesById> {
+  const projectIds = await listSelfEmploymentProjectDirs(rootPath);
+  const projectFiles: SelfEmploymentProjectFilesById = {};
+  for (const projectId of projectIds) {
+    if (!isSafeProjectId(projectId)) continue;
+    const files: Record<string, unknown> = {};
+    for (const fileName of SELF_EMPLOYMENT_PROJECT_FILE_NAMES) {
+      const relativePath = selfEmploymentProjectRelativeFilePath(projectId, fileName);
+      const contents = await readTextFile(joinVaultPath(profilePath(rootPath), relativePath));
+      if (!contents) continue;
+      files[fileName] =
+        fileName === "canvas-geschaeftsidee.canvas"
+          ? parseBusinessIdeaCanvasFile(parseJson(contents, relativePath), relativePath)
+          : parseJson(contents, relativePath);
+    }
+    if (files["project.json"]) {
+      projectFiles[projectId] = files;
+    }
+  }
+  return projectFiles;
+}
+
+async function writeSelfEmploymentProjectFiles(rootPath: string, projectFilesById: SelfEmploymentProjectFilesById): Promise<void> {
+  for (const [projectId, files] of Object.entries(projectFilesById)) {
+    const safeProjectId = safeSelfEmploymentProjectId(projectId);
+    await createDirAll(joinVaultPath(profilePath(rootPath), "planning", "projects", safeProjectId));
+    for (const fileName of SELF_EMPLOYMENT_PROJECT_FILE_NAMES) {
+      if (!(fileName in files)) continue;
+      await writeJsonFile(
+        joinVaultPath(profilePath(rootPath), selfEmploymentProjectRelativeFilePath(safeProjectId, fileName)),
+        files[fileName]
+      );
+    }
+  }
+}
+
+async function removeDeletedSelfEmploymentProjectFolders(
+  rootPath: string,
+  existingProjectIds: string[],
+  currentProjectIds: string[]
+): Promise<void> {
+  const current = new Set(currentProjectIds.map(safeSelfEmploymentProjectId));
+  for (const projectId of existingProjectIds) {
+    if (!isSafeProjectId(projectId) || current.has(projectId)) continue;
+    await removeDirAll(joinVaultPath(profilePath(rootPath), "planning", "projects", projectId));
+  }
+}
+
+async function listSelfEmploymentProjectDirs(rootPath: string): Promise<string[]> {
+  const projectRootPath = joinVaultPath(profilePath(rootPath), "planning", "projects");
+  const discovered = await invokeCommand<unknown>("vault_list_project_dirs", { path: projectRootPath });
+  if (!Array.isArray(discovered)) return [];
+  return discovered.filter((value): value is string => typeof value === "string" && isSafeProjectId(value)).sort();
 }
 
 function selfEmploymentCanvasPaths(selfEmploymentState: unknown): string[] {
@@ -324,6 +395,10 @@ async function createDirAll(path: string): Promise<void> {
   await invokeCommand("vault_create_dir_all", { path });
 }
 
+async function removeDirAll(path: string): Promise<void> {
+  await invokeCommand("vault_remove_dir_all", { path });
+}
+
 async function invokeCommand<T = void>(command: string, args: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
   return await invoke<T>(command, args);
@@ -341,6 +416,10 @@ function isSafeRelativeCanvasPath(value: string): boolean {
     !value.startsWith("\\") &&
     !value.includes("..")
   );
+}
+
+function isSafeProjectId(value: string): boolean {
+  return value.length > 0 && value === safeSelfEmploymentProjectId(value) && !value.includes("..");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

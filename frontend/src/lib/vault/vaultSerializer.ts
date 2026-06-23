@@ -1,6 +1,11 @@
 import { defaultAppState } from "../../data/defaults";
 import { serializeBusinessIdeaCanvas } from "../../domain/businessIdeaCanvas";
 import type { AppState, IncomePlanningState, IncomeTrackerState } from "../../types";
+import {
+  serializeSelfEmploymentProjectFilesById,
+  serializeSelfEmploymentStateShell,
+  withSelfEmploymentProjectFiles
+} from "./selfEmploymentProjectFiles";
 import type { VaultDataFiles } from "./vaultTypes";
 
 export function serializeVaultState(state: AppState): VaultDataFiles {
@@ -63,7 +68,8 @@ export function serializeVaultState(state: AppState): VaultDataFiles {
       calendarStamps: state.incomePlanning.calendarStamps,
       plannedStamps: state.incomePlanning.plannedStamps
     },
-    selfEmploymentState: state.selfEmployment,
+    selfEmploymentState: serializeSelfEmploymentStateShell(state.selfEmployment),
+    selfEmploymentProjectFiles: serializeSelfEmploymentProjectFilesById(state.selfEmployment),
     selfEmploymentCanvasFiles: Object.fromEntries(
       state.selfEmployment.projects.map((project) => [
         project.businessIdeaCanvasFile,
@@ -87,9 +93,9 @@ export function deserializeVaultState(files: VaultDataFiles): AppState {
   const timeHabitsFile = record(files.timeHabits);
   const timeWeekScenariosFile = record(files.timeWeekScenarios);
   const timeStampPlannerFile = record(files.timeStampPlanner);
-  const selfEmploymentStateFile = withExternalSelfEmploymentCanvases(
-    files.selfEmploymentState,
-    files.selfEmploymentCanvasFiles
+  const selfEmploymentStateFile = withSelfEmploymentProjectFiles(
+    withExternalSelfEmploymentCanvases(files.selfEmploymentState, files.selfEmploymentCanvasFiles),
+    files.selfEmploymentProjectFiles
   );
 
   const incomeTracker: IncomeTrackerState = {

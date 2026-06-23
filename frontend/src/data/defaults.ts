@@ -446,6 +446,8 @@ export function defaultSelfEmploymentState(): SelfEmploymentState {
         dashboardEnabled: true,
         projectType: "revenue",
         priority: "high",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:00.000Z",
         enabledModules: {
           invoices: true,
           budget: true,

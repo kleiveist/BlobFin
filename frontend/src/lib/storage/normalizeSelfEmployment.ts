@@ -83,6 +83,8 @@ export function normalizeSelfEmploymentProject(value: unknown): SelfEmploymentPr
     dashboardEnabled: typeof value.dashboardEnabled === "boolean" ? value.dashboardEnabled : false,
     projectType: normalizeSelfEmploymentProjectType(value.projectType, fallback.projectType),
     priority: normalizeSelfEmploymentTaskPriority(value.priority, fallback.priority),
+    createdAt: isoStringOrDefault(value.createdAt, fallback.createdAt),
+    updatedAt: isoStringOrDefault(value.updatedAt, isoStringOrDefault(value.createdAt, fallback.updatedAt)),
     enabledModules: normalizeSelfEmploymentProjectModules(
       value.enabledModules,
       normalizeSelfEmploymentProjectType(value.projectType, fallback.projectType)
@@ -335,4 +337,10 @@ export function normalizeSelfEmploymentTaskPriority(
 
 export function normalizeSelfEmploymentTaskStatus(value: unknown, fallback: SelfEmploymentTaskStatus): SelfEmploymentTaskStatus {
   return value === "open" || value === "in_progress" || value === "done" ? value : fallback;
+}
+
+function isoStringOrDefault(value: unknown, fallback: string): string {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : fallback;
 }

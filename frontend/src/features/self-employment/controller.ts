@@ -261,24 +261,9 @@ function selfEmploymentProjectListItemDetails(project: SelfEmploymentProject, da
   return `
     <div class="self-employment-project-list-details">
       <div class="self-employment-project-list-fields">
-        ${selfEmploymentInlineSelect(project, "status", project.status, [
-          ["open", selfEmploymentStatusLabel("open")],
-          ["in_progress", selfEmploymentStatusLabel("in_progress")],
-          ["completed", selfEmploymentStatusLabel("completed")],
-          ["cancelled", selfEmploymentStatusLabel("cancelled")]
-        ])}
-        ${selfEmploymentInlineSelect(project, "projectType", project.projectType, [
-          ["revenue", "Umsatzprojekt"],
-          ["human_capital", "Humankapital"],
-          ["mandatory", "Pflichtprojekt"],
-          ["strategic", "Strategisch"],
-          ["private", "Privat"]
-        ])}
-        ${selfEmploymentInlineSelect(project, "priority", project.priority, [
-          ["high", "Hoch"],
-          ["medium", "Mittel"],
-          ["low", "Niedrig"]
-        ])}
+        ${selfEmploymentInlineSelect(project, "status", project.status, [["open", selfEmploymentStatusLabel("open")], ["in_progress", selfEmploymentStatusLabel("in_progress")], ["completed", selfEmploymentStatusLabel("completed")], ["cancelled", selfEmploymentStatusLabel("cancelled")]])}
+        ${selfEmploymentInlineSelect(project, "projectType", project.projectType, [["revenue", "Umsatzprojekt"], ["human_capital", "Humankapital"], ["mandatory", "Pflichtprojekt"], ["strategic", "Strategisch"], ["private", "Privat"]])}
+        ${selfEmploymentInlineSelect(project, "priority", project.priority, [["high", "Hoch"], ["medium", "Mittel"], ["low", "Niedrig"]])}
       </div>
       <div class="self-employment-project-list-actions">
         <button
@@ -295,33 +280,26 @@ function selfEmploymentProjectListItemDetails(project: SelfEmploymentProject, da
       <div class="self-employment-project-list-modules">
         <span>Module:</span>
         <div class="self-employment-project-module-grid">
-          ${selfEmploymentProjectListModuleToggle(project, "invoices", "Angebote & Rechnungen")}
-          ${selfEmploymentProjectListModuleToggle(project, "budget", "Budget & Investitionen")}
-          ${selfEmploymentProjectListModuleToggle(project, "contacts", "Kundenkontakte")}
-          ${selfEmploymentProjectListModuleToggle(project, "profit", "Gewinnschaetzung")}
-          ${selfEmploymentProjectListModuleToggle(project, "metrics", "Kennzahlen")}
+          ${(["invoices", "budget", "contacts", "profit", "metrics"] as const)
+            .map((module) => selfEmploymentProjectListModuleToggle(project, module, selfEmploymentModuleLabel(module)))
+            .join("")}
         </div>
       </div>
     </div>
   `;
 }
 
-function selfEmploymentProjectListModuleToggle(
-  project: SelfEmploymentProject,
-  module: keyof SelfEmploymentProjectModules,
-  label: string
-): string {
+function selfEmploymentProjectListModuleToggle(project: SelfEmploymentProject, module: keyof SelfEmploymentProjectModules, label: string): string {
   return `
     <label class="self-employment-check-field">
-      <input
-        type="checkbox"
-        ${project.enabledModules[module] ? "checked" : ""}
-        data-self-employment-project-id="${escapeHtml(project.id)}"
-        data-self-employment-field="${escapeHtml(`module.${module}`)}"
-      />
+      <input type="checkbox" ${project.enabledModules[module] ? "checked" : ""} data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-field="${escapeHtml(`module.${module}`)}" />
       <span>${escapeHtml(label)}</span>
     </label>
   `;
+}
+
+function selfEmploymentModuleLabel(module: keyof SelfEmploymentProjectModules): string {
+  return { invoices: "Angebote & Rechnungen", budget: "Budget & Investitionen", contacts: "Kundenkontakte", profit: "Gewinnschaetzung", metrics: "Kennzahlen" }[module];
 }
 
 function selfEmploymentInlineSelect(
@@ -424,6 +402,7 @@ export function selectSelfEmploymentProject(projectId: string): void {
 export function addSelfEmploymentProject(): void {
   const index = host.getState().selfEmployment.projects.length + 1;
   const id = createId();
+  const now = new Date().toISOString();
   const canvasDefaults = defaultBusinessIdeaCanvasForProject(id, { idea: "Neue Geschaeftsidee" });
   const project: SelfEmploymentProject = {
     ...defaultSelfEmploymentState().projects[0],
@@ -435,6 +414,8 @@ export function addSelfEmploymentProject(): void {
     dashboardEnabled: host.getState().selfEmployment.projects.filter((project) => project.dashboardEnabled).length < 3,
     projectType: "revenue",
     priority: "medium",
+    createdAt: now,
+    updatedAt: now,
     enabledModules: selfEmploymentDefaultModulesForType("revenue"),
     offerSettings: {
       baseHourlyRate: 60,
@@ -1186,9 +1167,12 @@ export function updateSelfEmploymentProject(
   renderAfterUpdate: boolean
 ): void {
   if (!projectId || !host.getState().selfEmployment.projects.some((project) => project.id === projectId)) return;
+  const updatedAt = new Date().toISOString();
   commitSelfEmploymentState({
     ...host.getState().selfEmployment,
-    projects: host.getState().selfEmployment.projects.map((project) => (project.id === projectId ? updater(project) : project))
+    projects: host.getState().selfEmployment.projects.map((project) =>
+      project.id === projectId ? { ...updater(project), updatedAt } : project
+    )
   }, { render: renderAfterUpdate, persist: !renderAfterUpdate });
 }
 

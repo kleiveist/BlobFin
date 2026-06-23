@@ -451,6 +451,8 @@ export interface SelfEmploymentProject {
   dashboardEnabled: boolean;
   projectType: SelfEmploymentProjectType;
   priority: SelfEmploymentTaskPriority;
+  createdAt: string;
+  updatedAt: string;
   enabledModules: SelfEmploymentProjectModules;
   offerSettings: SelfEmploymentOfferSettings;
   idea: string;
