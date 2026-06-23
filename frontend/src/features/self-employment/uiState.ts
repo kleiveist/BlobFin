@@ -10,6 +10,7 @@ export interface SelfEmploymentUiState {
   labelPickerProjectId: string | null;
   iconPicker: { projectId: string; top: number; left: number } | null;
   projectListPopupOpen: boolean;
+  projectListExpandedProjectId: string | null;
   billingTabByProjectId: Record<string, "offers" | "invoices">;
   offerOverviewProjectId: string | null;
   taskContextPopup: { projectId: string; cardId: string; todoId: string; top: number; left: number } | null;
@@ -25,6 +26,7 @@ export const selfEmploymentUiState: SelfEmploymentUiState = {
   labelPickerProjectId: null,
   iconPicker: null,
   projectListPopupOpen: false,
+  projectListExpandedProjectId: null,
   billingTabByProjectId: {},
   offerOverviewProjectId: null,
   taskContextPopup: null,

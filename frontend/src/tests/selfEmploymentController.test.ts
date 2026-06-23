@@ -11,10 +11,15 @@ import {
   renameSelfEmploymentProject,
   toggleSelfEmploymentDashboardProject,
   toggleSelfEmploymentProjectLabel,
-  updateSelfEmploymentProject
+  updateSelfEmploymentProject,
+  updateSelfEmploymentProjectField
 } from "../features/self-employment/controller";
-import { onSelfEmploymentClick } from "../features/self-employment/events";
-import { evaluateSelfEmploymentProject } from "../features/self-employment/feasibilityController";
+import { onSelfEmploymentChange, onSelfEmploymentClick } from "../features/self-employment/events";
+import {
+  evaluateSelfEmploymentProject,
+  selfEmploymentProjectIsActive,
+  selfEmploymentStatusFromValue
+} from "../features/self-employment/feasibilityController";
 import { selfEmploymentProjectDetails } from "../features/self-employment/renderProjectDetails";
 import { selfEmploymentUiState } from "../features/self-employment/uiState";
 
@@ -23,6 +28,7 @@ afterEach(() => {
   selfEmploymentUiState.kanbanDrag = null;
   selfEmploymentUiState.taskContextPopup = null;
   selfEmploymentUiState.projectListPopupOpen = false;
+  selfEmploymentUiState.projectListExpandedProjectId = null;
   selfEmploymentUiState.billingTabByProjectId = {};
   selfEmploymentUiState.offerOverviewProjectId = null;
   selfEmploymentUiState.taskEisenhowerFilter = "all";
@@ -208,11 +214,12 @@ describe("self employment controller persistence", () => {
 
   it("renders at most three selected active dashboard projects and keeps all projects in the list popup", () => {
     const host = configureFakeSelfEmploymentHost();
+    const statuses = ["open", "in_progress", "completed", "cancelled", "in_progress"] as const;
     host.state.selfEmployment.projects = Array.from({ length: 5 }, (_, index) => ({
       ...host.state.selfEmployment.projects[0],
       id: `project-${index + 1}`,
       name: `Projekt ${index + 1}`,
-      status: "in_progress" as const,
+      status: statuses[index],
       dashboardEnabled: true
     }));
     host.state.selfEmployment.selectedProjectId = "project-1";
@@ -224,12 +231,128 @@ describe("self employment controller persistence", () => {
 
     renderSelfEmploymentDashboard();
 
+    const managementHtml = extractProjectManagement(container.innerHTML);
     expect(count(container.innerHTML, 'class="self-employment-project-card')).toBe(3);
+    expect(managementHtml).toContain("Projektverwaltung");
+    expect(managementHtml).toContain("Projekt anlegen");
+    expect(managementHtml).toContain("Projektliste");
+    expect(managementHtml.indexOf("Projekt anlegen")).toBeLessThan(managementHtml.indexOf("Projektliste"));
+    expect(container.innerHTML).toContain("self-employment-project-list-popup");
+    expect(container.innerHTML).toContain('aria-label="Projektliste schliessen"');
+    expect(container.innerHTML).toContain("self-employment-project-list-summary");
+    expect(container.innerHTML).toContain('data-action="self-employment-toggle-project-list-item"');
+    expect(container.innerHTML).toContain('aria-expanded="false"');
+    expect(container.innerHTML).not.toContain("self-employment-project-module-grid");
+    expect(container.innerHTML).not.toContain('data-self-employment-field="module.invoices"');
+    expect(container.innerHTML).not.toContain("Dashboard: aktiv");
+    expect(container.innerHTML).toContain("⚪ Offen");
+    expect(container.innerHTML).toContain("🔵 In Arbeit");
+    expect(container.innerHTML).toContain("✔️ Erledigt");
+    expect(container.innerHTML).toContain("❌ Cancel");
     expect(container.innerHTML).toContain("Projektliste");
     expect(container.innerHTML).toContain("Projekt 5");
     expect(container.innerHTML).not.toContain("Geplanter Monatsumsatz");
     expect(container.innerHTML).not.toContain("Geschaetzter Monatsgewinn");
     expect(container.innerHTML).not.toContain("Offene Investitionsluecke");
+  });
+
+  it("renders expanded project details only for the active project list item", () => {
+    const host = configureFakeSelfEmploymentHost();
+    host.state.selfEmployment.projects = Array.from({ length: 2 }, (_, index) => ({
+      ...host.state.selfEmployment.projects[0],
+      id: `project-${index + 1}`,
+      name: `Projekt ${index + 1}`,
+      dashboardEnabled: true
+    }));
+    host.state.selfEmployment.selectedProjectId = "project-1";
+    selfEmploymentUiState.projectListPopupOpen = true;
+    selfEmploymentUiState.projectListExpandedProjectId = "project-2";
+    const container = { innerHTML: "" };
+    vi.stubGlobal("document", {
+      querySelector: (selector: string) => (selector === "#selfEmploymentDashboard" ? container : null)
+    });
+
+    renderSelfEmploymentDashboard();
+
+    const collapsedItem = extractProjectListItem(container.innerHTML, "project-1");
+    const expandedItem = extractProjectListItem(container.innerHTML, "project-2");
+    expect(collapsedItem).toContain('aria-expanded="false"');
+    expect(collapsedItem).not.toContain("self-employment-project-module-grid");
+    expect(expandedItem).toContain('aria-expanded="true"');
+    expect(expandedItem).toContain("self-employment-project-list-details");
+    expect(expandedItem).toContain("self-employment-project-module-grid");
+    expect(expandedItem).toContain('data-self-employment-field="module.metrics"');
+  });
+
+  it("toggles exactly one project list item open at a time", () => {
+    const host = configureFakeSelfEmploymentHost();
+    host.state.selfEmployment.projects = Array.from({ length: 2 }, (_, index) => ({
+      ...host.state.selfEmployment.projects[0],
+      id: `project-${index + 1}`,
+      name: `Projekt ${index + 1}`
+    }));
+    const scheduler = { request: vi.fn() };
+    vi.stubGlobal("document", {
+      querySelector: () => null
+    });
+
+    onSelfEmploymentClick(fakeMouseEvent(fakeProjectListButton("self-employment-toggle-project-list-item", "project-1")), fakeAppContext(host.state, scheduler));
+    expect(selfEmploymentUiState.projectListExpandedProjectId).toBe("project-1");
+    expect(host.calls).toEqual([]);
+
+    onSelfEmploymentClick(fakeMouseEvent(fakeProjectListButton("self-employment-toggle-project-list-item", "project-2")), fakeAppContext(host.state, scheduler));
+    expect(selfEmploymentUiState.projectListExpandedProjectId).toBe("project-2");
+    expect(host.calls).toEqual([]);
+
+    onSelfEmploymentClick(fakeMouseEvent(fakeProjectListButton("self-employment-toggle-project-list-item", "project-2")), fakeAppContext(host.state, scheduler));
+    expect(selfEmploymentUiState.projectListExpandedProjectId).toBeNull();
+    expect(host.calls).toEqual([]);
+  });
+
+  it("updates project list popup fields locally without a full dashboard render", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const projectId = host.state.selfEmployment.projects[0].id;
+    selfEmploymentUiState.projectListPopupOpen = true;
+    selfEmploymentUiState.projectListExpandedProjectId = projectId;
+    const focus = vi.fn();
+    const popup = fakeProjectListPopup(focus);
+    const target = fakeProjectListSelect(projectId, "status", "completed", popup);
+    vi.stubGlobal("HTMLInputElement", class HTMLInputElement {});
+    vi.stubGlobal("document", {
+      activeElement: target,
+      querySelector: (selector: string) => (selector === ".self-employment-project-list-popup" ? popup : null)
+    });
+
+    popup.scrollTop = 180;
+    onSelfEmploymentChange({ target } as unknown as Event, fakeAppContext(host.state, { request: vi.fn() }));
+
+    expect(host.state.selfEmployment.projects[0].status).toBe("completed");
+    expect(host.calls).toEqual(["sync", "persist"]);
+    expect(popup.innerHTML).toContain("✔️ Erledigt");
+    expect(popup.scrollTop).toBe(180);
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(selfEmploymentUiState.projectListExpandedProjectId).toBe(projectId);
+  });
+
+  it("updates dashboard selection inside the project list popup without a full render", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const projectId = host.state.selfEmployment.projects[0].id;
+    host.state.selfEmployment.projects[0].dashboardEnabled = false;
+    selfEmploymentUiState.projectListPopupOpen = true;
+    selfEmploymentUiState.projectListExpandedProjectId = projectId;
+    const popup = fakeProjectListPopup();
+    vi.stubGlobal("document", {
+      querySelector: (selector: string) => (selector === ".self-employment-project-list-popup" ? popup : null),
+      activeElement: null
+    });
+
+    onSelfEmploymentClick(fakeMouseEvent(fakeProjectListButton("self-employment-toggle-dashboard-project", projectId)), fakeAppContext(host.state, { request: vi.fn() }));
+
+    expect(host.state.selfEmployment.projects[0].dashboardEnabled).toBe(true);
+    expect(host.calls).toEqual(["sync", "persist"]);
+    expect(popup.innerHTML).toContain("Dashboard: aktiv");
+    expect(popup.innerHTML).toContain("1/3 im Dashboard");
+    expect(selfEmploymentUiState.projectListExpandedProjectId).toBe(projectId);
   });
 
   it("does not allow more than three projects to be marked for the dashboard", () => {
@@ -245,6 +368,59 @@ describe("self employment controller persistence", () => {
 
     expect(host.state.selfEmployment.projects.filter((project) => project.dashboardEnabled)).toHaveLength(3);
     expect(host.calls).toEqual([]);
+  });
+
+  it("keeps project module controls in the project list and filters the detail roadmap", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const project = {
+      ...host.state.selfEmployment.projects[0],
+      enabledModules: { invoices: false, budget: false, contacts: false, profit: false, metrics: true }
+    };
+
+    const disabledHtml = selfEmploymentProjectDetails(
+      evaluateSelfEmploymentProject(project, { availableTimeHours: 40, availableReserve: 5000 }),
+      "budget",
+      fakeIncomePlanningModel()
+    );
+    const enabledHtml = selfEmploymentProjectDetails(
+      evaluateSelfEmploymentProject({ ...project, enabledModules: { ...project.enabledModules, budget: true } }, {
+        availableTimeHours: 40,
+        availableReserve: 5000
+      }),
+      "budget",
+      fakeIncomePlanningModel()
+    );
+
+    expect(disabledHtml).not.toContain("self-employment-module-toggle-grid");
+    expect(disabledHtml).not.toContain('data-self-employment-field="module.budget"');
+    expect(disabledHtml).not.toContain('data-self-employment-roadmap-area="budget"');
+    expect(disabledHtml).not.toContain("Budget &amp; Investitionen");
+    expect(enabledHtml).toContain('data-self-employment-roadmap-area="budget"');
+    expect(enabledHtml).toContain("Budget &amp; Investitionen");
+  });
+
+  it("normalizes done project status aliases and updates project modules through saved fields", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const projectId = host.state.selfEmployment.projects[0].id;
+    host.state.selfEmployment.projects[0].enabledModules.contacts = false;
+
+    expect(selfEmploymentStatusFromValue("done", "open")).toBe("completed");
+
+    updateSelfEmploymentProjectField(projectId, "status", "done", false);
+    updateSelfEmploymentProjectField(projectId, "module.contacts", true, false);
+
+    expect(host.state.selfEmployment.projects[0].status).toBe("completed");
+    expect(host.state.selfEmployment.projects[0].enabledModules.contacts).toBe(true);
+    expect(host.calls).toEqual(["sync", "persist", "sync", "persist"]);
+  });
+
+  it("excludes completed and cancelled projects from active project statistics", () => {
+    const project = defaultAppState().selfEmployment.projects[0];
+
+    expect(selfEmploymentProjectIsActive({ ...project, status: "open" })).toBe(true);
+    expect(selfEmploymentProjectIsActive({ ...project, status: "in_progress" })).toBe(true);
+    expect(selfEmploymentProjectIsActive({ ...project, status: "completed" })).toBe(false);
+    expect(selfEmploymentProjectIsActive({ ...project, status: "cancelled" })).toBe(false);
   });
 
   it("renders separated offer and invoice tabs with card-based offer calculation", () => {
@@ -407,6 +583,59 @@ function fakePopupTodoButton(projectId: string, cardId: string, todoId: string):
   return button;
 }
 
+function fakeProjectListButton(action: string, projectId: string): HTMLElement {
+  const popup = { nodeType: 1 };
+  let button: HTMLElement;
+  button = {
+    dataset: {
+      action,
+      selfEmploymentProjectId: projectId
+    },
+    closest: (selector: string) => {
+      if (selector === "button[data-action]") return button;
+      if (selector === ".self-employment-project-list-popup") return popup;
+      return null;
+    }
+  } as unknown as HTMLElement;
+  return button;
+}
+
+function fakeProjectListSelect(projectId: string, field: string, value: string, popup: HTMLElement): HTMLSelectElement {
+  const target = {
+    dataset: {
+      selfEmploymentProjectId: projectId,
+      selfEmploymentField: field
+    },
+    value,
+    tagName: "SELECT",
+    closest: (selector: string) => (selector === ".self-employment-project-list-popup" ? popup : null)
+  } as unknown as HTMLSelectElement;
+  return target;
+}
+
+function fakeProjectListPopup(focus: ReturnType<typeof vi.fn> = vi.fn()): HTMLElement {
+  let html = "";
+  let scrollTop = 0;
+  const popup = {
+    get scrollTop() {
+      return scrollTop;
+    },
+    set scrollTop(value: number) {
+      scrollTop = value;
+    },
+    contains: () => true,
+    querySelector: (selector: string) => (selector.includes('data-self-employment-field="status"') ? { focus } : null),
+    get innerHTML() {
+      return html;
+    },
+    set innerHTML(value: string) {
+      html = value;
+      scrollTop = 0;
+    }
+  } as unknown as HTMLElement;
+  return popup;
+}
+
 function extractTaskContextPopup(html: string): string {
   const start = html.indexOf("self-employment-task-context-popup");
   if (start === -1) return "";
@@ -416,6 +645,21 @@ function extractTaskContextPopup(html: string): string {
 
 function count(value: string, needle: string): number {
   return value.split(needle).length - 1;
+}
+
+function extractProjectManagement(html: string): string {
+  const start = html.indexOf("self-employment-project-management");
+  if (start === -1) return "";
+  const end = html.indexOf("</section>", start);
+  return html.slice(start, end === -1 ? start + 1200 : end);
+}
+
+function extractProjectListItem(html: string, projectId: string): string {
+  const start = html.indexOf(`data-self-employment-project-id="${projectId}"`);
+  if (start === -1) return "";
+  const articleStart = html.lastIndexOf("<article", start);
+  const articleEnd = html.indexOf("</article>", start);
+  return html.slice(articleStart === -1 ? start : articleStart, articleEnd === -1 ? start + 2000 : articleEnd);
 }
 
 function projectWithRelatedTodos(state: ReturnType<typeof defaultAppState>): ReturnType<typeof defaultAppState>["selfEmployment"]["projects"][number] {

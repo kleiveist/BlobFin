@@ -1,4 +1,5 @@
 .self-employment-dashboard {
+  position: relative;
   display: grid;
   gap: 16px;
 }
@@ -20,14 +21,26 @@
 
 .self-employment-hero-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  width: 100%;
+}
+
+.self-employment-project-management {
+  display: grid;
+  gap: 8px;
+}
+
+.self-employment-project-management-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .self-employment-project-list-popup,
 .self-employment-offer-overview-popup {
-  position: relative;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -35,9 +48,23 @@
   padding: 14px;
 }
 
+.self-employment-project-list-popup {
+  position: absolute;
+  top: 76px;
+  right: 0;
+  z-index: 30;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(760px, calc(100vh - 120px));
+  overflow: auto;
+  animation: self-employment-project-list-slide-in 160ms ease-out;
+}
+
+.self-employment-offer-overview-popup {
+  position: relative;
+}
+
 .self-employment-project-list-popup > header,
 .self-employment-offer-overview-popup > header,
-.self-employment-project-list-item,
 .self-employment-billing-tabs {
   display: flex;
   align-items: center;
@@ -59,6 +86,7 @@
 }
 
 .self-employment-project-list-item {
+  display: grid;
   border: 1px solid var(--border);
   border-left: 4px solid var(--accent);
   border-radius: 8px;
@@ -73,16 +101,84 @@
   border-left-color: var(--danger);
 }
 
+.self-employment-project-list-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.self-employment-project-list-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.self-employment-project-list-summary-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.self-employment-project-list-summary-main strong,
+.self-employment-project-list-summary-main span {
+  overflow-wrap: anywhere;
+}
+
+.self-employment-project-list-chevron {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.self-employment-project-list-details {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
 .self-employment-project-list-fields,
-.self-employment-project-list-actions {
+.self-employment-project-list-actions,
+.self-employment-project-module-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
+.self-employment-project-list-modules {
+  display: grid;
+  gap: 6px;
+}
+
 .self-employment-inline-field {
   min-width: 130px;
   margin: 0;
+}
+
+@keyframes self-employment-project-list-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .self-employment-metrics,
@@ -399,7 +495,8 @@
   padding: 12px;
 }
 
-.self-employment-module-toggle-grid {
+.self-employment-project-module-grid,
+.self-employment-offer-option-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

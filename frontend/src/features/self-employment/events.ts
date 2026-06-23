@@ -11,6 +11,7 @@ import {
   removeSelfEmploymentGanttTodo,
   removeSelfEmploymentCollectionItem,
   renameSelfEmploymentProject,
+  refreshSelfEmploymentProjectListPopup,
   selectSelfEmploymentBillingTab,
   selectSelfEmploymentIcon,
   selectSelfEmploymentProject,
@@ -20,6 +21,7 @@ import {
   toggleSelfEmploymentDashboardProject,
   toggleSelfEmploymentLabelPicker,
   toggleSelfEmploymentOfferOverview,
+  toggleSelfEmploymentProjectListItem,
   toggleSelfEmploymentProjectListPopup,
   toggleSelfEmploymentProjectLabel,
   toggleSelfEmploymentTimeSource,
@@ -124,14 +126,16 @@ export function onSelfEmploymentInput(event: Event, context: AppContext): boolea
 export function onSelfEmploymentChange(event: Event, context: AppContext): boolean | void {
   const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
   if (!target) return;
+  const inProjectListPopup = isInsideSelfEmploymentProjectListPopup(target);
 
   if (target.dataset.selfEmploymentField) {
     updateSelfEmploymentProjectField(
       target.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
       target.dataset.selfEmploymentField,
       selfEmploymentControlValue(target),
-      true
+      !inProjectListPopup
     );
+    if (inProjectListPopup) refreshSelfEmploymentProjectListPopup();
     return true;
   }
   if (target.dataset.selfEmploymentListField) {
@@ -139,8 +143,9 @@ export function onSelfEmploymentChange(event: Event, context: AppContext): boole
       target.dataset.selfEmploymentProjectId || context.store.getState().selfEmployment.selectedProjectId,
       target.dataset.selfEmploymentListField,
       target.value,
-      true
+      !inProjectListPopup
     );
+    if (inProjectListPopup) refreshSelfEmploymentProjectListPopup();
     return true;
   }
   if (target.dataset.selfEmploymentCollection && target.dataset.selfEmploymentItemId && target.dataset.selfEmploymentItemField) {
@@ -182,11 +187,24 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
   }
 
   if (!button) {
-    closeSelfEmploymentOverlaysForTarget(target);
+    const closed = closeSelfEmploymentOverlaysForTarget(target);
+    if (closed) {
+      context.scheduler.request();
+      return true;
+    }
     return;
   }
 
   const action = button.dataset.action;
+  const inProjectListPopup = isInsideSelfEmploymentProjectListPopup(button);
+  const closedByButtonOutsideClick =
+    selfEmploymentUiState.projectListPopupOpen &&
+    action !== "self-employment-toggle-project-list" &&
+    !button.closest(".self-employment-project-list-popup");
+  if (closedByButtonOutsideClick) {
+    selfEmploymentUiState.projectListPopupOpen = false;
+    selfEmploymentUiState.projectListExpandedProjectId = null;
+  }
   if (selfEmploymentUiState.ganttEditor && !isSelfEmploymentGanttAction(action) && !button.closest("[data-self-employment-gantt-popover]")) {
     closeSelfEmploymentGanttEditor();
   }
@@ -194,14 +212,21 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
     hideSelfEmploymentIconPicker();
   }
 
-  if (!action || (!action.startsWith("self-employment-") && action !== "self-employment-gantt-close-editor")) return;
+  if (!action || (!action.startsWith("self-employment-") && action !== "self-employment-gantt-close-editor")) {
+    if (closedByButtonOutsideClick) context.scheduler.request();
+    return;
+  }
 
   event.preventDefault();
   if (action === "self-employment-add-project") addSelfEmploymentProject();
   if (action === "self-employment-toggle-project-list") toggleSelfEmploymentProjectListPopup();
   if (action === "self-employment-close-project-list") toggleSelfEmploymentProjectListPopup(false);
+  if (action === "self-employment-toggle-project-list-item") {
+    toggleSelfEmploymentProjectListItem(button.dataset.selfEmploymentProjectId || "");
+  }
   if (action === "self-employment-toggle-dashboard-project") {
-    toggleSelfEmploymentDashboardProject(button.dataset.selfEmploymentProjectId || "");
+    const changed = toggleSelfEmploymentDashboardProject(button.dataset.selfEmploymentProjectId || "", !inProjectListPopup);
+    if (changed && inProjectListPopup) refreshSelfEmploymentProjectListPopup();
   }
   if (action === "self-employment-select-project") selectSelfEmploymentProject(button.dataset.selfEmploymentProjectId || "");
   if (action === "self-employment-select-roadmap-area") selectSelfEmploymentRoadmapArea(button.dataset.selfEmploymentRoadmapArea || "");
@@ -359,25 +384,44 @@ export function closeSelfEmploymentOverlays(): void {
   closeSelfEmploymentGanttEditor();
   closeSelfEmploymentTaskContextPopup();
   selfEmploymentUiState.projectListPopupOpen = false;
+  selfEmploymentUiState.projectListExpandedProjectId = null;
   selfEmploymentUiState.offerOverviewProjectId = null;
+  if (typeof document !== "undefined") {
+    document.querySelector<HTMLElement>(".self-employment-project-list-popup")?.remove();
+    document.querySelector<HTMLElement>(".self-employment-offer-overview-popup")?.remove();
+  }
 }
 
-function closeSelfEmploymentOverlaysForTarget(target: HTMLElement | null): void {
+function closeSelfEmploymentOverlaysForTarget(target: HTMLElement | null): boolean {
+  let closed = false;
   if (selfEmploymentUiState.iconPicker && !target?.closest("#selfEmploymentIconPicker")) {
     hideSelfEmploymentIconPicker();
+    closed = true;
   }
   if (selfEmploymentUiState.ganttEditor && !target?.closest("[data-self-employment-gantt-popover]")) {
     closeSelfEmploymentGanttEditor();
+    closed = true;
   }
   if (selfEmploymentUiState.taskContextPopup && !target?.closest("[data-self-employment-task-context-popup]")) {
     closeSelfEmploymentTaskContextPopup();
+    closed = true;
   }
   if (selfEmploymentUiState.projectListPopupOpen && !target?.closest(".self-employment-project-list-popup")) {
     selfEmploymentUiState.projectListPopupOpen = false;
+    selfEmploymentUiState.projectListExpandedProjectId = null;
+    if (typeof document !== "undefined") document.querySelector<HTMLElement>(".self-employment-project-list-popup")?.remove();
+    closed = true;
   }
   if (selfEmploymentUiState.offerOverviewProjectId && !target?.closest(".self-employment-offer-overview-popup")) {
     selfEmploymentUiState.offerOverviewProjectId = null;
+    if (typeof document !== "undefined") document.querySelector<HTMLElement>(".self-employment-offer-overview-popup")?.remove();
+    closed = true;
   }
+  return closed;
+}
+
+function isInsideSelfEmploymentProjectListPopup(target: HTMLElement | null): boolean {
+  return Boolean(target?.closest(".self-employment-project-list-popup"));
 }
 
 function isSelfEmploymentIconAction(action: string | undefined): boolean {

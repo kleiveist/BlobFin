@@ -106,18 +106,10 @@ export function renderSelfEmploymentDashboard(): void {
   const container = document.querySelector<HTMLDivElement>("#selfEmploymentDashboard");
   if (!container) return;
   normalizeSelfEmploymentSelection();
+  const evaluations = selfEmploymentProjectEvaluations();
   const context = selfEmploymentEvaluationContext();
-  const incomePlanningModel = host.incomePlanningModelForActiveWeek();
   const incomePlanningState = host.getState().incomePlanning;
-  const evaluations = host.getState().selfEmployment.projects.map((project) => {
-    const workPlan = buildSelfEmploymentProjectWorkPlan(project, incomePlanningModel, new Date(), incomePlanningState);
-    return evaluateSelfEmploymentProject(project, {
-      ...context,
-      weeklyTimeDemand: selfEmploymentWeeklyTimeDemand(project, workPlan.availableHoursPerWeek),
-      openTaskHours: workPlan.openHours,
-      blockingTaskCount: workPlan.tasks.filter((task) => !task.completed && task.eisenhowerQuadrant === "important_urgent").length
-    });
-  });
+  const incomePlanningModel = host.incomePlanningModelForActiveWeek();
   const selected = evaluations.find((item) => item.project.id === host.getState().selfEmployment.selectedProjectId) ?? evaluations[0];
   const totals = selfEmploymentTotals(evaluations, context.availableTimeHours);
   const activeEvaluations = evaluations.filter((evaluation) => selfEmploymentProjectIsActive(evaluation.project));
@@ -153,6 +145,9 @@ export function renderSelfEmploymentDashboard(): void {
   container.innerHTML = `
     <section class="self-employment-hero">
       <h2>Selbststaendigkeits-Dashboard</h2>
+    </section>
+    <section class="self-employment-project-management" aria-label="Projektverwaltung">
+      <span class="self-employment-project-management-label">Projektverwaltung</span>
       <div class="self-employment-hero-actions">
         <button class="button" type="button" data-action="self-employment-add-project">Projekt anlegen</button>
         <button class="button secondary" type="button" data-action="self-employment-toggle-project-list" aria-expanded="${selfEmploymentUiState.projectListPopupOpen}">Projektliste</button>
@@ -188,44 +183,89 @@ function selfEmploymentWeeklyTimeDemand(project: SelfEmploymentProject, availabl
   return Math.max(project.requiredHoursPerWeek, configuredHours, availableHoursPerWeek);
 }
 
+function selfEmploymentProjectEvaluations(): ReturnType<typeof evaluateSelfEmploymentProject>[] {
+  const context = selfEmploymentEvaluationContext();
+  const incomePlanningModel = host.incomePlanningModelForActiveWeek();
+  const incomePlanningState = host.getState().incomePlanning;
+  return host.getState().selfEmployment.projects.map((project) => {
+    const workPlan = buildSelfEmploymentProjectWorkPlan(project, incomePlanningModel, new Date(), incomePlanningState);
+    return evaluateSelfEmploymentProject(project, {
+      ...context,
+      weeklyTimeDemand: selfEmploymentWeeklyTimeDemand(project, workPlan.availableHoursPerWeek),
+      openTaskHours: workPlan.openHours,
+      blockingTaskCount: workPlan.tasks.filter((task) => !task.completed && task.eisenhowerQuadrant === "important_urgent").length
+    });
+  });
+}
+
 function selfEmploymentProjectListPopup(evaluations: ReturnType<typeof evaluateSelfEmploymentProject>[]): string {
   if (!selfEmploymentUiState.projectListPopupOpen) return "";
-  const dashboardCount = evaluations.filter((evaluation) => evaluation.project.dashboardEnabled).length;
   return `
     <section class="self-employment-project-list-popup" role="dialog" aria-label="Projektliste">
-      <header>
-        <div>
-          <span>Projektliste</span>
-          <strong>${escapeHtml(`${intNumber(evaluations.length)} Projekte · ${intNumber(Math.min(3, dashboardCount))}/3 im Dashboard`)}</strong>
-        </div>
-        <button class="icon-button" type="button" data-action="self-employment-close-project-list" aria-label="Projektliste schliessen">x</button>
-      </header>
-      <div class="self-employment-project-list">
-        ${
-          evaluations.length
-            ? evaluations.map((evaluation) => selfEmploymentProjectListItem(evaluation, dashboardCount)).join("")
-            : `<p class="self-employment-empty-note">Noch keine Projekte vorhanden.</p>`
-        }
-      </div>
+      ${selfEmploymentProjectListPopupContent(evaluations)}
     </section>
+  `;
+}
+
+function selfEmploymentProjectListPopupContent(evaluations: ReturnType<typeof evaluateSelfEmploymentProject>[]): string {
+  const dashboardCount = evaluations.filter((evaluation) => evaluation.project.dashboardEnabled).length;
+  if (
+    selfEmploymentUiState.projectListExpandedProjectId &&
+    !evaluations.some((evaluation) => evaluation.project.id === selfEmploymentUiState.projectListExpandedProjectId)
+  ) {
+    selfEmploymentUiState.projectListExpandedProjectId = null;
+  }
+  return `
+    <header>
+      <div>
+        <span>Projektliste</span>
+        <strong>${escapeHtml(`${intNumber(evaluations.length)} Projekte · ${intNumber(Math.min(3, dashboardCount))}/3 im Dashboard`)}</strong>
+      </div>
+      <button class="icon-button" type="button" data-action="self-employment-close-project-list" aria-label="Projektliste schliessen">x</button>
+    </header>
+    <div class="self-employment-project-list">
+      ${
+        evaluations.length
+          ? evaluations.map((evaluation) => selfEmploymentProjectListItem(evaluation, dashboardCount)).join("")
+          : `<p class="self-employment-empty-note">Noch keine Projekte vorhanden.</p>`
+      }
+    </div>
   `;
 }
 
 function selfEmploymentProjectListItem(evaluation: ReturnType<typeof evaluateSelfEmploymentProject>, dashboardCount: number): string {
   const project = evaluation.project;
   const dashboardDisabled = !project.dashboardEnabled && dashboardCount >= 3;
+  const expanded = selfEmploymentUiState.projectListExpandedProjectId === project.id;
   return `
-    <article class="self-employment-project-list-item ${escapeHtml(evaluation.feasibility)}">
-      <div>
-        <strong>${escapeHtml(project.name)}</strong>
-        <span>${escapeHtml(`${selfEmploymentStatusLabel(project.status)} · ${selfEmploymentProjectTypeLabel(project.projectType)} · ${selfEmploymentPriorityLabel(project.priority)}`)}</span>
-      </div>
+    <article class="self-employment-project-list-item ${escapeHtml(evaluation.feasibility)}${expanded ? " expanded" : ""}" data-self-employment-project-id="${escapeHtml(project.id)}">
+      <button
+        class="self-employment-project-list-summary"
+        type="button"
+        data-action="self-employment-toggle-project-list-item"
+        data-self-employment-project-id="${escapeHtml(project.id)}"
+        aria-expanded="${expanded}"
+      >
+        <span class="self-employment-project-list-summary-main">
+          <strong>${escapeHtml(project.name)}</strong>
+          <span>${escapeHtml(`${selfEmploymentStatusLabel(project.status)} · ${selfEmploymentProjectTypeLabel(project.projectType)} · ${selfEmploymentPriorityLabel(project.priority)}`)}</span>
+        </span>
+        <span class="self-employment-project-list-chevron" aria-hidden="true">${expanded ? "-" : "+"}</span>
+      </button>
+      ${expanded ? selfEmploymentProjectListItemDetails(project, dashboardDisabled) : ""}
+    </article>
+  `;
+}
+
+function selfEmploymentProjectListItemDetails(project: SelfEmploymentProject, dashboardDisabled: boolean): string {
+  return `
+    <div class="self-employment-project-list-details">
       <div class="self-employment-project-list-fields">
         ${selfEmploymentInlineSelect(project, "status", project.status, [
-          ["open", "Offen"],
-          ["in_progress", "In Arbeit"],
-          ["completed", "Erledigt"],
-          ["cancelled", "Cancel"]
+          ["open", selfEmploymentStatusLabel("open")],
+          ["in_progress", selfEmploymentStatusLabel("in_progress")],
+          ["completed", selfEmploymentStatusLabel("completed")],
+          ["cancelled", selfEmploymentStatusLabel("cancelled")]
         ])}
         ${selfEmploymentInlineSelect(project, "projectType", project.projectType, [
           ["revenue", "Umsatzprojekt"],
@@ -248,11 +288,39 @@ function selfEmploymentProjectListItem(evaluation: ReturnType<typeof evaluateSel
           data-self-employment-project-id="${escapeHtml(project.id)}"
           aria-pressed="${project.dashboardEnabled}"
           ${dashboardDisabled ? "disabled" : ""}
-        >Dashboard</button>
+        >${escapeHtml(project.dashboardEnabled ? "Dashboard: aktiv" : "Dashboard: nicht aktiv")}</button>
         <button class="button mini secondary" type="button" data-action="self-employment-select-project" data-self-employment-project-id="${escapeHtml(project.id)}">Oeffnen</button>
         <button class="button mini secondary" type="button" data-action="self-employment-rename-project" data-self-employment-project-id="${escapeHtml(project.id)}">Umbenennen</button>
       </div>
-    </article>
+      <div class="self-employment-project-list-modules">
+        <span>Module:</span>
+        <div class="self-employment-project-module-grid">
+          ${selfEmploymentProjectListModuleToggle(project, "invoices", "Angebote & Rechnungen")}
+          ${selfEmploymentProjectListModuleToggle(project, "budget", "Budget & Investitionen")}
+          ${selfEmploymentProjectListModuleToggle(project, "contacts", "Kundenkontakte")}
+          ${selfEmploymentProjectListModuleToggle(project, "profit", "Gewinnschaetzung")}
+          ${selfEmploymentProjectListModuleToggle(project, "metrics", "Kennzahlen")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function selfEmploymentProjectListModuleToggle(
+  project: SelfEmploymentProject,
+  module: keyof SelfEmploymentProjectModules,
+  label: string
+): string {
+  return `
+    <label class="self-employment-check-field">
+      <input
+        type="checkbox"
+        ${project.enabledModules[module] ? "checked" : ""}
+        data-self-employment-project-id="${escapeHtml(project.id)}"
+        data-self-employment-field="${escapeHtml(`module.${module}`)}"
+      />
+      <span>${escapeHtml(label)}</span>
+    </label>
   `;
 }
 
@@ -269,6 +337,40 @@ function selfEmploymentInlineSelect(
       </select>
     </label>
   `;
+}
+
+export function refreshSelfEmploymentProjectListPopup(): void {
+  if (!selfEmploymentUiState.projectListPopupOpen || typeof document === "undefined") return;
+  const popup = document.querySelector<HTMLElement>(".self-employment-project-list-popup");
+  if (!popup) return;
+  const previousScrollTop = popup.scrollTop;
+  const focusSelector = selfEmploymentProjectListFocusSelector(popup);
+  popup.innerHTML = selfEmploymentProjectListPopupContent(selfEmploymentProjectEvaluations());
+  popup.scrollTop = previousScrollTop;
+  if (focusSelector) popup.querySelector<HTMLElement>(focusSelector)?.focus();
+}
+
+function selfEmploymentProjectListFocusSelector(popup: HTMLElement): string | null {
+  if (typeof document === "undefined") return null;
+  const active = document.activeElement as HTMLElement | null;
+  if (!active || !popup.contains(active) || !active.dataset) return null;
+  const projectId = active.dataset.selfEmploymentProjectId;
+  const action = active.dataset.action;
+  if (action) {
+    return `button[data-action="${selfEmploymentCssAttr(action)}"]${projectId ? `[data-self-employment-project-id="${selfEmploymentCssAttr(projectId)}"]` : ""}`;
+  }
+  const field = active.dataset.selfEmploymentField;
+  if (field) {
+    const tag = active.tagName?.toLowerCase() || "select";
+    return `${tag}[data-self-employment-field="${selfEmploymentCssAttr(field)}"]${
+      projectId ? `[data-self-employment-project-id="${selfEmploymentCssAttr(projectId)}"]` : ""
+    }`;
+  }
+  return null;
+}
+
+function selfEmploymentCssAttr(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 function selfEmploymentEvaluationContext(): { availableTimeHours: number; availableReserve: number } {
@@ -312,6 +414,7 @@ export function selectSelfEmploymentProject(projectId: string): void {
   if (!host.getState().selfEmployment.projects.some((project) => project.id === projectId)) return;
   selfEmploymentUiState.ganttEditor = null;
   selfEmploymentUiState.projectListPopupOpen = false;
+  selfEmploymentUiState.projectListExpandedProjectId = null;
   commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     selectedProjectId: projectId
@@ -384,17 +487,27 @@ export function selectSelfEmploymentRoadmapArea(rawAreaId: string): void {
 }
 
 export function toggleSelfEmploymentProjectListPopup(open?: boolean): void {
-  selfEmploymentUiState.projectListPopupOpen = open ?? !selfEmploymentUiState.projectListPopupOpen;
+  const nextOpen = open ?? !selfEmploymentUiState.projectListPopupOpen;
+  selfEmploymentUiState.projectListPopupOpen = nextOpen;
+  selfEmploymentUiState.projectListExpandedProjectId = null;
   host.renderAll();
 }
 
-export function toggleSelfEmploymentDashboardProject(projectId: string): void {
+export function toggleSelfEmploymentProjectListItem(projectId: string): void {
+  if (!host.getState().selfEmployment.projects.some((project) => project.id === projectId)) return;
+  selfEmploymentUiState.projectListExpandedProjectId =
+    selfEmploymentUiState.projectListExpandedProjectId === projectId ? null : projectId;
+  refreshSelfEmploymentProjectListPopup();
+}
+
+export function toggleSelfEmploymentDashboardProject(projectId: string, renderAfterUpdate = true): boolean {
   const projects = host.getState().selfEmployment.projects;
   const project = projects.find((item) => item.id === projectId);
-  if (!project) return;
+  if (!project) return false;
   const enabledCount = projects.filter((item) => item.dashboardEnabled).length;
-  if (!project.dashboardEnabled && enabledCount >= 3) return;
-  updateSelfEmploymentProject(projectId, (item) => ({ ...item, dashboardEnabled: !item.dashboardEnabled }), true);
+  if (!project.dashboardEnabled && enabledCount >= 3) return false;
+  updateSelfEmploymentProject(projectId, (item) => ({ ...item, dashboardEnabled: !item.dashboardEnabled }), renderAfterUpdate);
+  return true;
 }
 
 export function selectSelfEmploymentBillingTab(projectId: string, tab: "offers" | "invoices"): void {
@@ -511,6 +624,7 @@ export function deleteSelfEmploymentProject(projectId: string): void {
   if (selfEmploymentUiState.labelPickerProjectId === projectId) selfEmploymentUiState.labelPickerProjectId = null;
   if (selfEmploymentUiState.iconPicker?.projectId === projectId) selfEmploymentUiState.iconPicker = null;
   if (selfEmploymentUiState.ganttEditor?.projectId === projectId) selfEmploymentUiState.ganttEditor = null;
+  if (selfEmploymentUiState.projectListExpandedProjectId === projectId) selfEmploymentUiState.projectListExpandedProjectId = null;
   commitSelfEmploymentState({
     ...host.getState().selfEmployment,
     selectedProjectId,

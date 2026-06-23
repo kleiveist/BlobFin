@@ -227,6 +227,7 @@ export function normalizeSelfEmploymentProjectStatus(
   value: unknown,
   fallback: SelfEmploymentProjectStatus
 ): SelfEmploymentProjectStatus {
+  if (value === "done") return "completed";
   if (value === "open" || value === "in_progress" || value === "completed" || value === "cancelled") return value;
   if (value === "active") return "in_progress";
   if (value === "discarded") return "cancelled";

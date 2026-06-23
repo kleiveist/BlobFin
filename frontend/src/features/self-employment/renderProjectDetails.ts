@@ -138,10 +138,10 @@ function selfEmploymentProjectControlPanel(project: SelfEmploymentProject): stri
     <section class="self-employment-project-control-panel" aria-label="Projektsteuerung">
       <div class="self-employment-edit-grid compact">
         ${selfEmploymentSelectField(project, "status", "Projektstatus", project.status, [
-          ["open", "Offen"],
-          ["in_progress", "In Arbeit"],
-          ["completed", "Erledigt"],
-          ["cancelled", "Cancel"]
+          ["open", "⚪ Offen"],
+          ["in_progress", "🔵 In Arbeit"],
+          ["completed", "✔️ Erledigt"],
+          ["cancelled", "❌ Cancel"]
         ])}
         ${selfEmploymentSelectField(project, "projectType", "Projektart", project.projectType, [
           ["revenue", "Umsatzprojekt"],
@@ -156,13 +156,6 @@ function selfEmploymentProjectControlPanel(project: SelfEmploymentProject): stri
           ["low", "Niedrig"]
         ])}
         ${selfEmploymentReadOnlyField("Status-Zusammenfassung", `${selfEmploymentProjectTypeLabel(project.projectType)} · ${selfEmploymentPriorityLabel(project.priority)}`)}
-      </div>
-      <div class="self-employment-module-toggle-grid" aria-label="Aktive Projektmodule">
-        ${selfEmploymentModuleToggle(project, "invoices", "Angebote & Rechnungen")}
-        ${selfEmploymentModuleToggle(project, "budget", "Budget & Investitionen")}
-        ${selfEmploymentModuleToggle(project, "contacts", "Kundenkontakte")}
-        ${selfEmploymentModuleToggle(project, "profit", "Gewinnschaetzung")}
-        ${selfEmploymentModuleToggle(project, "metrics", "Kennzahlen")}
       </div>
     </section>
   `;
@@ -299,14 +292,6 @@ function selfEmploymentCheckboxField(
   `;
 }
 
-function selfEmploymentModuleToggle(
-  project: SelfEmploymentProject,
-  module: keyof SelfEmploymentProject["enabledModules"],
-  label: string
-): string {
-  return selfEmploymentCheckboxField(project, `module.${module}`, label, project.enabledModules[module]);
-}
-
 function selfEmploymentReadOnlyField(label: string, value: string): string {
   return `
     <div class="field self-employment-readonly-field">
@@ -405,7 +390,7 @@ function selfEmploymentOffersEditor(project: SelfEmploymentProject): string {
         ${selfEmploymentNumberField(project, "offerBufferPercent", "Puffer in %", project.offerSettings.bufferPercent, 0, 100, 1)}
         ${selfEmploymentNumberField(project, "offerTaxPercent", "Steuer in %", project.offerSettings.taxPercent, 0, 100, 1)}
       </div>
-      <div class="self-employment-module-toggle-grid">
+      <div class="self-employment-offer-option-grid">
         ${selfEmploymentCheckboxField(project, "offer.usePhaseFactors", "Phasenfaktoren verwenden", project.offerSettings.usePhaseFactors)}
         ${selfEmploymentCheckboxField(project, "offer.useLabelFactors", "Labelfaktoren verwenden", project.offerSettings.useLabelFactors)}
         ${selfEmploymentCheckboxField(project, "offer.useTodoTimes", "Todo-Zeiten verwenden", project.offerSettings.useTodoTimes)}

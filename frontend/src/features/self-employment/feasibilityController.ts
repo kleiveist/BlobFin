@@ -153,24 +153,12 @@ export function selfEmploymentProjectIsActive(project: SelfEmploymentProject): b
 }
 
 export function selfEmploymentStatusLabel(status: SelfEmploymentProjectStatus): string {
-  const labels: Record<SelfEmploymentProjectStatus, string> = {
-    open: "Offen",
-    in_progress: "In Arbeit",
-    cancelled: "Cancel",
-    idea: "Idee",
-    review: "In Pruefung",
-    preparation: "Vorbereitung",
-    active: "Aktiv",
-    paused: "Pausiert",
-    completed: "Abgeschlossen",
-    discarded: "Verworfen"
-  };
   const canonical = canonicalSelfEmploymentProjectStatus(status);
-  if (canonical === "open") return "Offen";
-  if (canonical === "in_progress") return "In Arbeit";
-  if (canonical === "completed") return "Erledigt";
-  if (canonical === "cancelled") return "Cancel";
-  return labels[status];
+  if (canonical === "open") return "⚪ Offen";
+  if (canonical === "in_progress") return "🔵 In Arbeit";
+  if (canonical === "completed") return "✔️ Erledigt";
+  if (canonical === "cancelled") return "❌ Cancel";
+  return "⚪ Offen";
 }
 
 export function selfEmploymentRiskLabel(risk: SelfEmploymentRiskLevel): string {
@@ -241,6 +229,7 @@ export function selfEmploymentTextToList(rawValue: string): string[] {
 }
 
 export function selfEmploymentStatusFromValue(value: string, fallback: SelfEmploymentProjectStatus): SelfEmploymentProjectStatus {
+  if (value === "done") return "completed";
   if (value === "open" || value === "in_progress" || value === "completed" || value === "cancelled") return value;
   if (value === "active") return "in_progress";
   if (value === "discarded") return "cancelled";

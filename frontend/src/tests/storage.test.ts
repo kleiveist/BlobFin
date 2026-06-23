@@ -179,6 +179,17 @@ describe("storage", () => {
     expect(loaded.selfEmployment.projects[0].icon).toBe("briefcase");
   });
 
+  it("normalizes done as completed for self employment project status", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState() as any;
+    state.selfEmployment.projects[0].status = "done";
+    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const loaded = loadState(storage);
+
+    expect(loaded.selfEmployment.projects[0].status).toBe("completed");
+  });
+
   it("keeps self employment projects when normalizing legacy app state", () => {
     const state = defaultAppState();
     const project = {
