@@ -169,7 +169,7 @@ describe("self employment project gantt", () => {
     expect(phaseTwoAndThreeRows[1].widthPercent).toBeCloseTo(62.5);
   });
 
-  it("renders dense gantt labels as clickable label surfaces", () => {
+  it("keeps five readable gantt cards expanded", () => {
     const project = projectWithCanvas({
       nodes: Array.from({ length: 5 }, (_, index) => ({
         id: `card-${index + 1}`,
@@ -191,9 +191,35 @@ describe("self employment project gantt", () => {
 
     const html = renderSelfEmploymentProjectGantt(project);
 
+    expect(html).not.toContain("self-employment-project-gantt-label condensed");
+    expect(html).toContain('data-self-employment-gantt-card-id="card-5"');
+    expect(html).toContain("Karte 5");
+  });
+
+  it("renders unreadably narrow gantt cards as clickable label surfaces", () => {
+    const project = projectWithCanvas({
+      nodes: [
+        { id: "large-card", type: "text", text: "Grosse Karte", x: 0, y: 0, width: 100, height: 80 },
+        { id: "small-card-a", type: "text", text: "Klein A", x: 120, y: 0, width: 100, height: 80 },
+        { id: "small-card-b", type: "text", text: "Klein B", x: 240, y: 0, width: 100, height: 80 }
+      ],
+      nodeMeta: {
+        "large-card": { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" },
+        "small-card-a": { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" },
+        "small-card-b": { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" }
+      },
+      cardPlans: [
+        { cardId: "large-card", timeBudgetHours: 92 },
+        { cardId: "small-card-a", timeBudgetHours: 4 },
+        { cardId: "small-card-b", timeBudgetHours: 4 }
+      ]
+    });
+
+    const html = renderSelfEmploymentProjectGantt(project);
+
     expect(html).toContain("self-employment-project-gantt-label condensed");
     expect(html).toContain('data-action="self-employment-gantt-open-label"');
-    expect(html).toContain("Idee · 5 h");
+    expect(html).toContain("Idee · 100 h");
   });
 
   it("renders a dense label detail popup with clickable card rows", () => {
@@ -220,6 +246,35 @@ describe("self employment project gantt", () => {
     expect(html).toContain("2 h");
     expect(html).toContain("0 h - 2 h");
     expect(html).toContain('data-action="self-employment-gantt-open-card"');
+    expect(html).toContain('data-self-employment-gantt-phase-id="phase-1"');
+    expect(html).toContain('data-self-employment-gantt-label-id="idea"');
+  });
+
+  it("renders card popovers with a stable switch back to the label popup", () => {
+    const project = projectWithCanvas({
+      nodes: [{ id: "card-a", type: "text", text: "Erste Karte", x: 0, y: 0, width: 100, height: 80 }],
+      nodeMeta: {
+        "card-a": { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" }
+      },
+      cardPlans: [{ cardId: "card-a", timeBudgetHours: 2 }]
+    });
+    selfEmploymentUiState.ganttEditor = {
+      projectId: project.id,
+      type: "card",
+      cardId: "card-a",
+      phaseId: "phase-1",
+      labelId: "idea",
+      top: 10,
+      left: 20
+    };
+
+    const html = renderSelfEmploymentProjectGantt(project);
+
+    expect(html).toContain("self-employment-gantt-card-popover");
+    expect(html).toContain('style="left:20px;top:10px;"');
+    expect(html).toContain('data-action="self-employment-gantt-open-label"');
+    expect(html).toContain('data-self-employment-gantt-phase-id="phase-1"');
+    expect(html).toContain('data-self-employment-gantt-label-id="idea"');
   });
 
   it("prunes stale card plans during normalization", () => {

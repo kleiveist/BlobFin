@@ -43,6 +43,8 @@ const SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX = 12;
 const SELF_EMPLOYMENT_GANTT_POPOVER_GAP_PX = 8;
 const SELF_EMPLOYMENT_GANTT_POPOVER_WIDTH_PX = 560;
 const SELF_EMPLOYMENT_GANTT_POPOVER_ESTIMATED_HEIGHT_PX = 420;
+const SELF_EMPLOYMENT_GANTT_MIN_LABEL_WIDTH_PERCENT = 8;
+const SELF_EMPLOYMENT_GANTT_MIN_CARD_WIDTH_PERCENT = 6;
 
 function selfEmploymentGanttPopoverPosition(trigger: HTMLElement): { top: number; left: number } {
   const rect = trigger.getBoundingClientRect();
@@ -71,12 +73,20 @@ function selfEmploymentGanttPopoverPosition(trigger: HTMLElement): { top: number
   };
 }
 
+function selfEmploymentGanttEditorPosition(trigger: HTMLElement): { top: number; left: number } {
+  const editor = selfEmploymentUiState.ganttEditor;
+  if (editor && trigger.closest("[data-self-employment-gantt-popover]")) {
+    return { top: editor.top, left: editor.left };
+  }
+  return selfEmploymentGanttPopoverPosition(trigger);
+}
+
 export function openSelfEmploymentGanttPhaseEditor(button: HTMLButtonElement): void {
   selfEmploymentUiState.ganttEditor = {
     projectId: button.dataset.selfEmploymentProjectId || context().selectedProjectId(),
     type: "phase",
     phaseId: button.dataset.selfEmploymentGanttPhaseId || "",
-    ...selfEmploymentGanttPopoverPosition(button)
+    ...selfEmploymentGanttEditorPosition(button)
   };
   context().renderAll();
 }
@@ -86,7 +96,9 @@ export function openSelfEmploymentGanttCardEditor(button: HTMLButtonElement): vo
     projectId: button.dataset.selfEmploymentProjectId || context().selectedProjectId(),
     type: "card",
     cardId: button.dataset.selfEmploymentGanttCardId || "",
-    ...selfEmploymentGanttPopoverPosition(button)
+    phaseId: button.dataset.selfEmploymentGanttPhaseId || undefined,
+    labelId: button.dataset.selfEmploymentGanttLabelId || undefined,
+    ...selfEmploymentGanttEditorPosition(button)
   };
   context().renderAll();
 }
@@ -97,7 +109,7 @@ export function openSelfEmploymentGanttLabelEditor(button: HTMLButtonElement): v
     type: "label",
     phaseId: button.dataset.selfEmploymentGanttPhaseId || "",
     labelId: button.dataset.selfEmploymentGanttLabelId || "",
-    ...selfEmploymentGanttPopoverPosition(button)
+    ...selfEmploymentGanttEditorPosition(button)
   };
   context().renderAll();
 }
@@ -214,6 +226,8 @@ function renderSelfEmploymentProjectGanttLabel(
           data-action="self-employment-gantt-open-card"
           data-self-employment-project-id="${escapeHtml(project.id)}"
           data-self-employment-gantt-card-id="${escapeHtml(card.cardId)}"
+          data-self-employment-gantt-phase-id="${escapeHtml(row.phaseId)}"
+          data-self-employment-gantt-label-id="${escapeHtml(label.labelId)}"
           title="${escapeHtml(`${card.title} · ${hoursLabel(card.timeBudgetHours)}`)}"
         >
           <span>${escapeHtml(card.title)}</span>
@@ -228,28 +242,27 @@ function renderSelfEmploymentProjectGanttLabel(
       style="left: ${left}%; width: ${width}%; --self-employment-gantt-color: ${escapeHtml(selfEmploymentGanttLabelColor(label.labelId))};"
       title="${escapeHtml(`${label.labelName}: ${hoursLabel(label.totalHours)}`)}"
     >
-      ${
-        condensed
-          ? `<button
-              class="self-employment-project-gantt-label-condensed"
-              type="button"
-              data-action="self-employment-gantt-open-label"
-              data-self-employment-project-id="${escapeHtml(project.id)}"
-              data-self-employment-gantt-phase-id="${escapeHtml(row.phaseId)}"
-              data-self-employment-gantt-label-id="${escapeHtml(label.labelId)}"
-              aria-label="${escapeHtml(`${label.labelName} Detailansicht oeffnen`)}"
-            >
-              <span>${escapeHtml(`${label.labelName} · ${hoursLabel(label.totalHours)}`)}</span>
-              <small>${escapeHtml(`${intNumber(label.cards.length)} Karten`)}</small>
-            </button>`
-          : `<div class="self-employment-project-gantt-label-head">
-              <span>${escapeHtml(label.labelName)}</span>
-              <strong>${escapeHtml(hoursLabel(label.totalHours))}</strong>
-            </div>
-            <div class="self-employment-project-gantt-cards">
-              ${cards}
-            </div>`
-      }
+      <button
+        class="self-employment-project-gantt-label-condensed"
+        type="button"
+        data-action="self-employment-gantt-open-label"
+        data-self-employment-project-id="${escapeHtml(project.id)}"
+        data-self-employment-gantt-phase-id="${escapeHtml(row.phaseId)}"
+        data-self-employment-gantt-label-id="${escapeHtml(label.labelId)}"
+        aria-label="${escapeHtml(`${label.labelName} Detailansicht oeffnen`)}"
+      >
+        <span>${escapeHtml(`${label.labelName} · ${hoursLabel(label.totalHours)}`)}</span>
+        <small>${escapeHtml(`${intNumber(label.cards.length)} Karten`)}</small>
+      </button>
+      <div class="self-employment-project-gantt-label-standard">
+        <div class="self-employment-project-gantt-label-head">
+          <span>${escapeHtml(label.labelName)}</span>
+          <strong>${escapeHtml(hoursLabel(label.totalHours))}</strong>
+        </div>
+        <div class="self-employment-project-gantt-cards">
+          ${cards}
+        </div>
+      </div>
     </div>
   `;
 }
@@ -257,7 +270,10 @@ function renderSelfEmploymentProjectGanttLabel(
 function selfEmploymentGanttLabelIsCondensed(label: SelfEmploymentGanttSummary["rows"][number]["labels"][number]): boolean {
   if (label.cards.length === 0) return false;
   const smallestAbsoluteCardWidth = Math.min(...label.cards.map((card) => (label.widthPercent * card.widthPercent) / 100));
-  return label.cards.length > 4 || label.widthPercent < 9 || smallestAbsoluteCardWidth < 4.5;
+  return (
+    label.widthPercent < SELF_EMPLOYMENT_GANTT_MIN_LABEL_WIDTH_PERCENT ||
+    smallestAbsoluteCardWidth < SELF_EMPLOYMENT_GANTT_MIN_CARD_WIDTH_PERCENT
+  );
 }
 
 function renderSelfEmploymentGanttEditor(project: SelfEmploymentProject, summary: SelfEmploymentGanttSummary): string {
@@ -277,7 +293,13 @@ function renderSelfEmploymentGanttEditor(project: SelfEmploymentProject, summary
       positionAttributes
     );
   }
-  return renderSelfEmploymentGanttCardPopover(project, selfEmploymentUiState.ganttEditor.cardId, positionAttributes);
+  return renderSelfEmploymentGanttCardPopover(
+    project,
+    selfEmploymentUiState.ganttEditor.cardId,
+    positionAttributes,
+    selfEmploymentUiState.ganttEditor.phaseId,
+    selfEmploymentUiState.ganttEditor.labelId
+  );
 }
 
 function renderSelfEmploymentGanttPhasePopover(
@@ -363,7 +385,15 @@ function renderSelfEmploymentGanttLabelPopover(
       <div class="self-employment-gantt-label-detail-list">
         ${cards
           .map((card) =>
-            renderSelfEmploymentGanttLabelDetailCard(project, row.phaseName, label.labelName, selfEmploymentGanttLabelColor(label.labelId), card)
+            renderSelfEmploymentGanttLabelDetailCard(
+              project,
+              row.phaseId,
+              row.phaseName,
+              label.labelId,
+              label.labelName,
+              selfEmploymentGanttLabelColor(label.labelId),
+              card
+            )
           )
           .join("")}
       </div>
@@ -373,7 +403,9 @@ function renderSelfEmploymentGanttLabelPopover(
 
 function renderSelfEmploymentGanttLabelDetailCard(
   project: SelfEmploymentProject,
+  phaseId: string,
   phaseName: string,
+  labelId: string,
   labelName: string,
   labelColor: string,
   card: SelfEmploymentGanttSummary["rows"][number]["labels"][number]["cards"][number] & { startHour: number; endHour: number }
@@ -390,6 +422,8 @@ function renderSelfEmploymentGanttLabelDetailCard(
       data-action="self-employment-gantt-open-card"
       data-self-employment-project-id="${escapeHtml(project.id)}"
       data-self-employment-gantt-card-id="${escapeHtml(card.cardId)}"
+      data-self-employment-gantt-phase-id="${escapeHtml(phaseId)}"
+      data-self-employment-gantt-label-id="${escapeHtml(labelId)}"
       style="--self-employment-gantt-color:${escapeHtml(labelColor)};"
     >
       <span class="self-employment-gantt-label-detail-title">${escapeHtml(card.title)}</span>
@@ -402,7 +436,13 @@ function renderSelfEmploymentGanttLabelDetailCard(
   `;
 }
 
-function renderSelfEmploymentGanttCardPopover(project: SelfEmploymentProject, cardId: string, positionAttributes: string): string {
+function renderSelfEmploymentGanttCardPopover(
+  project: SelfEmploymentProject,
+  cardId: string,
+  positionAttributes: string,
+  contextPhaseId?: string,
+  contextLabelId?: string
+): string {
   const node = project.businessIdeaCanvas.nodes.find((item) => item.id === cardId && item.type !== "group");
   if (!node) return "";
   const gantt = normalizeSelfEmploymentGanttPlan(project.gantt, project.businessIdeaCanvas, project.businessIdeaCanvasMeta);
@@ -413,14 +453,32 @@ function renderSelfEmploymentGanttCardPopover(project: SelfEmploymentProject, ca
     phaseId: project.businessIdeaCanvasMeta.activePhaseId,
     shape: "rounded-rectangle" as BusinessIdeaCanvasShape
   };
+  const activePhaseId = contextPhaseId || nodeMeta.phaseId;
+  const activeLabelId = normalizedGanttLabelId(contextLabelId || nodeMeta.labelId);
+  const activeLabelName = selfEmploymentGanttLabelName(project, activeLabelId);
+  const activePhaseName =
+    [...project.businessIdeaCanvasMeta.phases].find((phase) => phase.id === activePhaseId)?.name ?? "Phase";
   const labelOptions = orderedGanttLabels(project.businessIdeaCanvasMeta).map((label) => [label.id, label.name] as [string, string]);
   const phaseOptions = selfEmploymentGanttPhaseOptions(project);
   const completedTodos = plan.todos.filter((todo) => todo.completed).length;
   return `
     <div class="self-employment-gantt-popover self-employment-gantt-card-popover" ${positionAttributes} role="dialog" aria-label="${escapeHtml(`${selfEmploymentGanttNodeTitle(node)} planen`)}">
       <header>
-        <strong>${escapeHtml(selfEmploymentGanttNodeTitle(node))}</strong>
-        <button class="icon-button" type="button" data-action="self-employment-gantt-close-editor" aria-label="Gantt-Editor schliessen">x</button>
+        <div class="self-employment-gantt-popover-title">
+          <span>${escapeHtml(`${activePhaseName} · ${activeLabelName}`)}</span>
+          <strong>${escapeHtml(selfEmploymentGanttNodeTitle(node))}</strong>
+        </div>
+        <div class="self-employment-gantt-popover-actions">
+          <button
+            class="button mini secondary"
+            type="button"
+            data-action="self-employment-gantt-open-label"
+            data-self-employment-project-id="${escapeHtml(project.id)}"
+            data-self-employment-gantt-phase-id="${escapeHtml(activePhaseId)}"
+            data-self-employment-gantt-label-id="${escapeHtml(activeLabelId)}"
+          >Label</button>
+          <button class="icon-button" type="button" data-action="self-employment-gantt-close-editor" aria-label="Gantt-Editor schliessen">x</button>
+        </div>
       </header>
       <div class="self-employment-gantt-popover-summary">
         <span>${escapeHtml(`${completedTodos}/${plan.todos.length} Todos erledigt`)}</span>

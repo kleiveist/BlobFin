@@ -755,8 +755,8 @@
   position: absolute;
   top: 6px;
   bottom: 6px;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  container-type: inline-size;
+  display: block;
   min-width: 4px;
   overflow: hidden;
   border-radius: 7px;
@@ -764,12 +764,15 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--self-employment-gantt-color) 42%, var(--border));
 }
 
-.self-employment-project-gantt-label.condensed {
-  grid-template-rows: minmax(0, 1fr);
+.self-employment-project-gantt-label-standard {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-width: 0;
 }
 
 .self-employment-project-gantt-label-condensed {
-  display: grid;
+  display: none;
   align-content: center;
   gap: 2px;
   width: 100%;
@@ -809,6 +812,24 @@
   font-weight: 850;
 }
 
+.self-employment-project-gantt-label.condensed .self-employment-project-gantt-label-standard {
+  display: none;
+}
+
+.self-employment-project-gantt-label.condensed .self-employment-project-gantt-label-condensed {
+  display: grid;
+}
+
+@container (max-width: 170px) {
+  .self-employment-project-gantt-label-standard {
+    display: none;
+  }
+
+  .self-employment-project-gantt-label-condensed {
+    display: grid;
+  }
+}
+
 .self-employment-project-gantt-label-head {
   display: flex;
   justify-content: space-between;
@@ -838,7 +859,10 @@
 }
 
 .self-employment-project-gantt-card {
+  display: grid;
+  align-content: center;
   min-width: 30px;
+  min-height: 28px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, white 42%, transparent);
   border-radius: 5px;
@@ -920,6 +944,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.self-employment-gantt-popover-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.self-employment-gantt-popover-title span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.self-employment-gantt-popover-actions {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
 }
 
 .self-employment-gantt-popover-summary {
