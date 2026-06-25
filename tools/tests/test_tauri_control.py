@@ -4,12 +4,13 @@ import argparse
 import json
 import re
 import signal
+import stat
 import subprocess
 from pathlib import Path
 
 from tools import control
 from tools.tauri import common, doctor, paths, run
-from tools.tauri.build import appimage, installappimage
+from tools.tauri.build import appimage, installappimage, windows_portable
 from tools.tauri.linux import install as linux_install
 from tools.tauri.linux import install_arch
 
@@ -328,6 +329,21 @@ def test_tauri_build_artifacts_print_with_icons(monkeypatch, tmp_path) -> None:
     assert "📦 src-tauri/target/release/bundle/BlobFin_0.1.0_amd64.deb" in output
     assert "📦 src-tauri/target/release/bundle/BlobFin-0.1.0-1.x86_64.rpm" in output
     assert "🗜️ .dist/desktop/BlobFin-windows-portable.zip" in output
+
+
+def test_windows_portable_output_path_repairs_owner_directory_permissions(tmp_path) -> None:
+    dist_dir = tmp_path / "desktop"
+    dist_dir.mkdir()
+    dist_dir.chmod(stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+
+    try:
+        assert windows_portable._ensure_portable_output_path(dist_dir / "BlobFin-windows-portable.zip") is True
+        mode = dist_dir.stat().st_mode
+        assert mode & stat.S_IRUSR
+        assert mode & stat.S_IWUSR
+        assert mode & stat.S_IXUSR
+    finally:
+        dist_dir.chmod(stat.S_IRWXU)
 
 
 def test_tauri_linux_build_accepts_explicit_bundle_selection(monkeypatch) -> None:

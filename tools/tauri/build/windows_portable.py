@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import stat
 import subprocess
 import zipfile
 from pathlib import Path
@@ -192,7 +193,8 @@ def _zip_portable_binary(*, dry_run: bool) -> int:
         logger.fail(f"No Windows executable found in {release_dir}")
         return 1
 
-    paths.DIST_DIR.mkdir(parents=True, exist_ok=True)
+    if not _ensure_portable_output_path(zip_path):
+        return 1
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for candidate in candidates:
             archive.write(candidate, arcname=candidate.name)
@@ -205,6 +207,28 @@ def _zip_portable_binary(*, dry_run: bool) -> int:
         )
     logger.ok(f"Windows portable ZIP created at {zip_path.relative_to(paths.ROOT)}")
     return 0
+
+
+def _ensure_portable_output_path(zip_path: Path) -> bool:
+    try:
+        zip_path.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_user_permissions(zip_path.parent, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        if zip_path.exists():
+            _ensure_user_permissions(zip_path, stat.S_IRUSR | stat.S_IWUSR)
+    except OSError as exc:
+        logger.fail(f"Cannot prepare portable ZIP output path {zip_path}: {exc}")
+        return False
+    if not os.access(zip_path.parent, os.R_OK | os.W_OK | os.X_OK):
+        logger.fail(f"Portable ZIP output directory is not writable: {zip_path.parent}")
+        return False
+    return True
+
+
+def _ensure_user_permissions(path: Path, permission_bits: int) -> None:
+    current_mode = path.stat().st_mode
+    next_mode = current_mode | permission_bits
+    if next_mode != current_mode:
+        path.chmod(next_mode)
 
 
 def _portable_exe_candidates(release_dir: Path) -> list[Path]:
