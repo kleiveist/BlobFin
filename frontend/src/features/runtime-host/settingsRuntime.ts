@@ -34,8 +34,13 @@ function toggleSettingsVault(): void {
 
 async function handleVaultSelect(): Promise<void> {
   setVaultStatusDetail("Vault-Auswahl wird geoeffnet...");
-  await selectVault(runtimeHost.state);
-  syncVaultControls();
+  const loadedState = await selectVault();
+  if (!loadedState) {
+    syncVaultControls();
+    return;
+  }
+
+  applyLoadedVaultState(loadedState);
 }
 
 async function handleVaultCreate(): Promise<void> {
@@ -59,6 +64,10 @@ async function handleVaultReload(): Promise<void> {
     return;
   }
 
+  applyLoadedVaultState(loadedState);
+}
+
+function applyLoadedVaultState(loadedState: typeof runtimeHost.state): void {
   runtimeHost.state = runtimeApi.sanitizeAppState(loadedState);
   runtimeHost.investmentAccountContextId = runtimeHost.state.ui.selectedInvestmentAccountId;
   runtimeHost.selectedRealEstateYear = null;

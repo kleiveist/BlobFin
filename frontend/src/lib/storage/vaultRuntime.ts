@@ -10,9 +10,11 @@ import {
   isVaultRuntimeAvailable,
   pickVaultDirectory,
   profilePath as vaultProfilePath,
+  readVault,
   readVaultState,
   writeVaultState
 } from "../vault/vaultStorage";
+import { deserializeVaultState } from "../vault/vaultSerializer";
 import type { VaultRuntimeState, VaultSnapshotResult } from "../vault/vaultTypes";
 import { loadState } from "./loadState";
 import { normalizeState } from "./normalizeState";
@@ -76,8 +78,34 @@ export function getVaultStatus(): VaultRuntimeState {
   return { ...vaultRuntimeState };
 }
 
-export async function selectVault(state: AppState, storage: Storage = localStorage): Promise<VaultRuntimeState> {
-  return activatePickedVault("Vault auswaehlen", state, storage);
+export async function selectVault(storage: Storage = localStorage): Promise<AppState | null> {
+  if (!isVaultRuntimeAvailable()) {
+    vaultRuntimeState = {
+      status: "csvOnly",
+      vaultRootPath: null,
+      profilePath: null,
+      lastSavedAt: null,
+      lastError: null,
+      pendingWrites: 0
+    };
+    return null;
+  }
+
+  await drainVaultWriteQueue();
+  const selectedPath = await pickVaultDirectory("Vault auswaehlen");
+  if (!selectedPath) return null;
+
+  try {
+    const result = await readVault(selectedPath);
+    const vaultState = normalizeState(deserializeVaultState(result.dataFiles));
+    saveFallbackStateValue(vaultState, storage);
+    saveVaultFallbackMetadata(selectedPath, storage);
+    setVaultConnected(selectedPath, result.manifest.updatedAt);
+    return vaultState;
+  } catch (error) {
+    setVaultError(selectedPath, error);
+    return null;
+  }
 }
 
 export async function createVault(state: AppState, storage: Storage = localStorage): Promise<VaultRuntimeState> {
@@ -151,6 +179,7 @@ async function activatePickedVault(
   if (!selectedPath) return getVaultStatus();
 
   try {
+    await drainVaultWriteQueue();
     const result = await writeVaultState(selectedPath, state);
     saveFallbackStateValue(state, storage);
     saveVaultFallbackMetadata(selectedPath, storage);
@@ -169,6 +198,15 @@ function queueVaultSave(): void {
 
   vaultWriteScheduled = true;
   vaultWriteQueue = vaultWriteQueue.then(processQueuedVaultSave);
+}
+
+async function drainVaultWriteQueue(): Promise<void> {
+  while (vaultWriteScheduled) {
+    await vaultWriteQueue;
+  }
+  if (!vaultPendingState) return;
+  vaultPendingState = null;
+  vaultRuntimeState = { ...vaultRuntimeState, pendingWrites: 0 };
 }
 
 async function processQueuedVaultSave(): Promise<void> {

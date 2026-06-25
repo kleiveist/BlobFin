@@ -93,9 +93,13 @@ export function deserializeVaultState(files: VaultDataFiles): AppState {
   const timeHabitsFile = record(files.timeHabits);
   const timeWeekScenariosFile = record(files.timeWeekScenarios);
   const timeStampPlannerFile = record(files.timeStampPlanner);
-  const selfEmploymentStateFile = withSelfEmploymentProjectFiles(
-    withExternalSelfEmploymentCanvases(files.selfEmploymentState, files.selfEmploymentCanvasFiles),
+  const selfEmploymentStateWithProjects = withSelfEmploymentProjectFiles(
+    files.selfEmploymentState,
     files.selfEmploymentProjectFiles
+  );
+  const selfEmploymentStateFile = withExternalSelfEmploymentCanvases(
+    selfEmploymentStateWithProjects,
+    files.selfEmploymentCanvasFiles
   );
 
   const incomeTracker: IncomeTrackerState = {

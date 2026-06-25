@@ -1,16 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defaultAppState } from "../data/defaults";
-import { getVaultStatus, initializeStorage, loadState, normalizeStoredState, saveState } from "../lib/storage";
+import { getVaultStatus, initializeStorage, loadState, normalizeStoredState, saveState, selectVault } from "../lib/storage";
 import { readVaultFallbackMetadata, saveVaultFallbackMetadata } from "../lib/vault/vaultFallback";
 import { createVaultManifest, parseVaultManifest } from "../lib/vault/vaultManifest";
 import { deserializeVaultState, serializeVaultState } from "../lib/vault/vaultSerializer";
 import { createVaultSnapshot, joinVaultPath, manifestPath, profilePath, readVault, readVaultState, writeVaultState } from "../lib/vault/vaultStorage";
 
 const tauriInvokeMock = vi.hoisted(() => vi.fn());
+const dialogOpenMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: tauriInvokeMock
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: dialogOpenMock
 }));
 
 const STORAGE_KEY = "blobfin.reserveCalculator.v1";
@@ -69,6 +74,10 @@ class MemoryVaultFiles {
     return JSON.parse(contents);
   }
 
+  readText(path: string): string | null {
+    return this.values.get(path) ?? null;
+  }
+
   has(path: string): boolean {
     return this.values.has(path);
   }
@@ -113,6 +122,8 @@ function useMemoryVaultFiles(): MemoryVaultFiles {
 
 afterEach(() => {
   tauriInvokeMock.mockReset();
+  dialogOpenMock.mockReset();
+  vi.unstubAllGlobals();
 });
 
 describe("vault serializer", () => {
@@ -220,6 +231,36 @@ describe("vault serializer", () => {
     });
   });
 
+  it("prefers external .canvas files after project file rehydration", () => {
+    const state = stateWithPersistentSelfEmploymentProject();
+    const project = state.selfEmployment.projects[0];
+    const serialized = serializeVaultState(state);
+    const staleProjectCanvas = {
+      nodes: [{ id: "stale-project-file-card", type: "text", text: "Aus project files", x: 0, y: 0, width: 240, height: 120 }],
+      edges: []
+    };
+    const externalCanvas = {
+      nodes: [{ id: "external-sidecar-card", type: "text", text: "Aus Canvas-Datei", x: 0, y: 0, width: 240, height: 120 }],
+      edges: []
+    };
+
+    serialized.selfEmploymentProjectFiles = {
+      ...serialized.selfEmploymentProjectFiles,
+      [project.id]: {
+        ...serialized.selfEmploymentProjectFiles?.[project.id],
+        "canvas-geschaeftsidee.canvas": staleProjectCanvas
+      }
+    };
+    serialized.selfEmploymentCanvasFiles = {
+      [project.businessIdeaCanvasFile]: externalCanvas
+    };
+
+    const loaded = normalizeStoredState(deserializeVaultState(serialized));
+
+    expect(loaded.selfEmployment.projects[0].businessIdeaCanvas.nodes.map((node) => node.id)).toContain("external-sidecar-card");
+    expect(loaded.selfEmployment.projects[0].businessIdeaCanvas.nodes.map((node) => node.id)).not.toContain("stale-project-file-card");
+  });
+
   it("falls back to defaults for missing optional vault files", () => {
     const state = defaultAppState();
     const loaded = normalizeStoredState(
@@ -314,6 +355,39 @@ describe("vault storage", () => {
     ]) {
       expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/self-project-example", fileName))).toBe(true);
     }
+  });
+
+  it("loads an existing selected vault without overwriting project files", async () => {
+    const vault = useMemoryVaultFiles();
+    const storage = new MemoryStorage();
+    const rootPath = "/tmp/blobfin-selected-vault";
+    const localState = defaultAppState();
+    localState.selfEmployment.projects[0] = {
+      ...localState.selfEmployment.projects[0],
+      name: "Lokaler Entwurf"
+    };
+    const vaultState = stateWithPersistentSelfEmploymentProject();
+    const projectPath = joinVaultPath(profilePath(rootPath), "planning/projects/self-project-example/project.json");
+
+    saveState(localState, storage);
+    await writeVaultState(rootPath, vaultState);
+    const projectFileBeforeSelect = vault.readText(projectPath);
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    dialogOpenMock.mockResolvedValue(rootPath);
+
+    const loaded = await selectVault(storage);
+
+    expect(dialogOpenMock).toHaveBeenCalledWith({
+      title: "Vault auswaehlen",
+      directory: true,
+      multiple: false,
+      canCreateDirectories: true
+    });
+    expect(loaded?.selfEmployment.projects[0].name).toBe("Roundtrip-Projekt");
+    expect(loaded?.selfEmployment.projects[0].businessIdeaCanvas.nodes.some((node) => node.id === "vault-project-card")).toBe(true);
+    expect(vault.readText(projectPath)).toBe(projectFileBeforeSelect);
+    expect(loadState(storage).selfEmployment.projects[0].name).toBe("Roundtrip-Projekt");
+    expect(readVaultFallbackMetadata(storage)?.vaultRootPath).toBe(rootPath);
   });
 
   it("removes deleted self employment project folders from the vault", async () => {
