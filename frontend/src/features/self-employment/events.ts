@@ -37,6 +37,7 @@ import {
 import {
   closeSelfEmploymentGanttEditor,
   openSelfEmploymentGanttCardEditor,
+  openSelfEmploymentGanttLabelEditor,
   openSelfEmploymentGanttPhaseEditor,
   toggleSelfEmploymentGanttPhaseFilter
 } from "./ganttController";
@@ -323,6 +324,7 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
     );
   }
   if (action === "self-employment-gantt-open-phase") openSelfEmploymentGanttPhaseEditor(button);
+  if (action === "self-employment-gantt-open-label") openSelfEmploymentGanttLabelEditor(button);
   if (action === "self-employment-gantt-open-card") openSelfEmploymentGanttCardEditor(button);
   if (action === "self-employment-gantt-close-editor") closeSelfEmploymentGanttEditor();
   return true;
@@ -435,6 +437,7 @@ function isSelfEmploymentIconAction(action: string | undefined): boolean {
 function isSelfEmploymentGanttAction(action: string | undefined): boolean {
   return (
     action === "self-employment-gantt-open-phase" ||
+    action === "self-employment-gantt-open-label" ||
     action === "self-employment-gantt-open-card" ||
     action === "self-employment-gantt-close-editor"
   );

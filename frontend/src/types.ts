@@ -80,7 +80,7 @@ export type SelfEmploymentProjectStatus =
   | "discarded";
 export type SelfEmploymentProjectType = "revenue" | "human_capital" | "mandatory" | "strategic" | "private";
 export type SelfEmploymentRiskLevel = "low" | "medium" | "high";
-export type SelfEmploymentFeasibility = "realistic" | "borderline" | "unrealistic";
+export type SelfEmploymentFeasibility = "realistic" | "borderline" | "unrealistic" | "neutral";
 export type SelfEmploymentTaskPriority = "low" | "medium" | "high";
 export type SelfEmploymentTaskStatus = "open" | "in_progress" | "done";
 export type SelfEmploymentGanttTodoStatus = "planned" | "in_progress" | "done";

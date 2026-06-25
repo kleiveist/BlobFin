@@ -91,6 +91,17 @@ export function openSelfEmploymentGanttCardEditor(button: HTMLButtonElement): vo
   context().renderAll();
 }
 
+export function openSelfEmploymentGanttLabelEditor(button: HTMLButtonElement): void {
+  selfEmploymentUiState.ganttEditor = {
+    projectId: button.dataset.selfEmploymentProjectId || context().selectedProjectId(),
+    type: "label",
+    phaseId: button.dataset.selfEmploymentGanttPhaseId || "",
+    labelId: button.dataset.selfEmploymentGanttLabelId || "",
+    ...selfEmploymentGanttPopoverPosition(button)
+  };
+  context().renderAll();
+}
+
 export function closeSelfEmploymentGanttEditor(): void {
   if (!selfEmploymentUiState.ganttEditor) return;
   selfEmploymentUiState.ganttEditor = null;
@@ -152,7 +163,7 @@ function renderSelfEmploymentProjectGanttRow(project: SelfEmploymentProject, row
   const phaseNumber = selfEmploymentGanttPhaseNumber(row.phaseId);
   const labelSegments = row.labels
     .filter((label) => row.enabled && label.totalHours > 0)
-    .map((label) => renderSelfEmploymentProjectGanttLabel(project, label))
+    .map((label) => renderSelfEmploymentProjectGanttLabel(project, row, label))
     .join("");
   const emptyState = row.enabled ? "Keine Karten in dieser Phase" : "Phase inaktiv";
   const startLabel = row.startMode === "after_previous_label"
@@ -186,10 +197,12 @@ function renderSelfEmploymentProjectGanttRow(project: SelfEmploymentProject, row
 
 function renderSelfEmploymentProjectGanttLabel(
   project: SelfEmploymentProject,
+  row: SelfEmploymentGanttSummary["rows"][number],
   label: SelfEmploymentGanttSummary["rows"][number]["labels"][number]
 ): string {
   const left = selfEmploymentGanttPercent(label.startPercent);
   const width = selfEmploymentGanttPercent(label.widthPercent);
+  const condensed = selfEmploymentGanttLabelIsCondensed(label);
   const cards = label.cards
     .map((card) => {
       const cardWidth = selfEmploymentGanttPercent(card.widthPercent);
@@ -211,19 +224,40 @@ function renderSelfEmploymentProjectGanttLabel(
     .join("");
   return `
     <div
-      class="self-employment-project-gantt-label"
+      class="self-employment-project-gantt-label${condensed ? " condensed" : ""}"
       style="left: ${left}%; width: ${width}%; --self-employment-gantt-color: ${escapeHtml(selfEmploymentGanttLabelColor(label.labelId))};"
       title="${escapeHtml(`${label.labelName}: ${hoursLabel(label.totalHours)}`)}"
     >
-      <div class="self-employment-project-gantt-label-head">
-        <span>${escapeHtml(label.labelName)}</span>
-        <strong>${escapeHtml(hoursLabel(label.totalHours))}</strong>
-      </div>
-      <div class="self-employment-project-gantt-cards">
-        ${cards}
-      </div>
+      ${
+        condensed
+          ? `<button
+              class="self-employment-project-gantt-label-condensed"
+              type="button"
+              data-action="self-employment-gantt-open-label"
+              data-self-employment-project-id="${escapeHtml(project.id)}"
+              data-self-employment-gantt-phase-id="${escapeHtml(row.phaseId)}"
+              data-self-employment-gantt-label-id="${escapeHtml(label.labelId)}"
+              aria-label="${escapeHtml(`${label.labelName} Detailansicht oeffnen`)}"
+            >
+              <span>${escapeHtml(`${label.labelName} · ${hoursLabel(label.totalHours)}`)}</span>
+              <small>${escapeHtml(`${intNumber(label.cards.length)} Karten`)}</small>
+            </button>`
+          : `<div class="self-employment-project-gantt-label-head">
+              <span>${escapeHtml(label.labelName)}</span>
+              <strong>${escapeHtml(hoursLabel(label.totalHours))}</strong>
+            </div>
+            <div class="self-employment-project-gantt-cards">
+              ${cards}
+            </div>`
+      }
     </div>
   `;
+}
+
+function selfEmploymentGanttLabelIsCondensed(label: SelfEmploymentGanttSummary["rows"][number]["labels"][number]): boolean {
+  if (label.cards.length === 0) return false;
+  const smallestAbsoluteCardWidth = Math.min(...label.cards.map((card) => (label.widthPercent * card.widthPercent) / 100));
+  return label.cards.length > 4 || label.widthPercent < 9 || smallestAbsoluteCardWidth < 4.5;
 }
 
 function renderSelfEmploymentGanttEditor(project: SelfEmploymentProject, summary: SelfEmploymentGanttSummary): string {
@@ -233,6 +267,15 @@ function renderSelfEmploymentGanttEditor(project: SelfEmploymentProject, summary
   )}px;" data-self-employment-gantt-popover`;
   if (selfEmploymentUiState.ganttEditor.type === "phase") {
     return renderSelfEmploymentGanttPhasePopover(project, summary, selfEmploymentUiState.ganttEditor.phaseId, positionAttributes);
+  }
+  if (selfEmploymentUiState.ganttEditor.type === "label") {
+    return renderSelfEmploymentGanttLabelPopover(
+      project,
+      summary,
+      selfEmploymentUiState.ganttEditor.phaseId,
+      selfEmploymentUiState.ganttEditor.labelId,
+      positionAttributes
+    );
   }
   return renderSelfEmploymentGanttCardPopover(project, selfEmploymentUiState.ganttEditor.cardId, positionAttributes);
 }
@@ -283,6 +326,79 @@ function renderSelfEmploymentGanttPhasePopover(
       )}
       ${selfEmploymentGanttPhaseSelectField(project.id, phase, "triggerLabelId", "Start ab Label", phase.triggerLabelId ?? "goal", labelOptions)}
     </div>
+  `;
+}
+
+function renderSelfEmploymentGanttLabelPopover(
+  project: SelfEmploymentProject,
+  summary: SelfEmploymentGanttSummary,
+  phaseId: string,
+  labelId: string,
+  positionAttributes: string
+): string {
+  const row = summary.rows.find((item) => item.phaseId === phaseId);
+  const label = row?.labels.find((item) => item.labelId === labelId);
+  if (!row || !label) return "";
+  let cursor = label.startHour;
+  const cards = label.cards.map((card) => {
+    const startHour = cursor;
+    const endHour = startHour + card.timeBudgetHours;
+    cursor = endHour;
+    return { ...card, startHour, endHour };
+  });
+  return `
+    <div class="self-employment-gantt-popover self-employment-gantt-label-popover" ${positionAttributes} role="dialog" aria-label="${escapeHtml(`${label.labelName} Details`)}">
+      <header>
+        <div>
+          <span>${escapeHtml(row.phaseName)}</span>
+          <strong>${escapeHtml(label.labelName)}</strong>
+        </div>
+        <button class="icon-button" type="button" data-action="self-employment-gantt-close-editor" aria-label="Gantt-Details schliessen">x</button>
+      </header>
+      <div class="self-employment-gantt-popover-summary">
+        <span>${escapeHtml(`${intNumber(cards.length)} Karten`)}</span>
+        <span>${escapeHtml(hoursLabel(label.totalHours))}</span>
+        <span>${escapeHtml(`${hoursLabel(label.startHour)} bis ${hoursLabel(label.startHour + label.totalHours)}`)}</span>
+      </div>
+      <div class="self-employment-gantt-label-detail-list">
+        ${cards
+          .map((card) =>
+            renderSelfEmploymentGanttLabelDetailCard(project, row.phaseName, label.labelName, selfEmploymentGanttLabelColor(label.labelId), card)
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderSelfEmploymentGanttLabelDetailCard(
+  project: SelfEmploymentProject,
+  phaseName: string,
+  labelName: string,
+  labelColor: string,
+  card: SelfEmploymentGanttSummary["rows"][number]["labels"][number]["cards"][number] & { startHour: number; endHour: number }
+): string {
+  const status = card.completed
+    ? "Erledigt"
+    : card.todoCount > 0
+      ? `${intNumber(card.completedTodoCount)}/${intNumber(card.todoCount)} Todos`
+      : "Geplant";
+  return `
+    <button
+      class="self-employment-gantt-label-detail-card${card.completed ? " completed" : ""}"
+      type="button"
+      data-action="self-employment-gantt-open-card"
+      data-self-employment-project-id="${escapeHtml(project.id)}"
+      data-self-employment-gantt-card-id="${escapeHtml(card.cardId)}"
+      style="--self-employment-gantt-color:${escapeHtml(labelColor)};"
+    >
+      <span class="self-employment-gantt-label-detail-title">${escapeHtml(card.title)}</span>
+      <span>${escapeHtml(labelName)}</span>
+      <span>${escapeHtml(phaseName)}</span>
+      <span>${escapeHtml(hoursLabel(card.timeBudgetHours))}</span>
+      <span>${escapeHtml(status)}</span>
+      <span>${escapeHtml(`${hoursLabel(card.startHour)} - ${hoursLabel(card.endHour)}`)}</span>
+    </button>
   `;
 }
 

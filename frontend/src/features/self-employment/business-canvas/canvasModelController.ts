@@ -1,6 +1,7 @@
 import { createId } from "../../../data/defaults";
 import {
   businessIdeaCanvasEndsForDirection,
+  businessIdeaCanvasWithShortestEdgeSides,
   snapBusinessIdeaCanvasValue
 } from "../../../domain/businessIdeaCanvas";
 import { normalizeSelfEmploymentGanttPlan } from "../../../domain/selfEmploymentGantt";
@@ -93,9 +94,11 @@ export function updateBusinessIdeaCanvasProject(
     projectId,
     (project) => {
       const nextProject = updater(project);
+      const businessIdeaCanvas = businessIdeaCanvasWithShortestEdgeSides(nextProject.businessIdeaCanvas);
       return {
         ...nextProject,
-        gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, nextProject.businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
+        businessIdeaCanvas,
+        gantt: normalizeSelfEmploymentGanttPlan(nextProject.gantt, businessIdeaCanvas, nextProject.businessIdeaCanvasMeta)
       };
     },
     renderAfterUpdate

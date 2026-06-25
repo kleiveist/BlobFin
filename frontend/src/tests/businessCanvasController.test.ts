@@ -15,7 +15,7 @@ import {
 import { selectBusinessIdeaCanvasNodes } from "../features/self-employment/business-canvas/selectionController";
 import { businessCanvasUiState } from "../features/self-employment/business-canvas/uiState";
 import { renderBusinessIdeaCanvasEditor, type BusinessIdeaCanvasRenderState } from "../features/self-employment/business-canvas/view";
-import type { JsonCanvasNode, SelfEmploymentProject } from "../types";
+import type { JsonCanvasEdge, JsonCanvasNode, SelfEmploymentProject } from "../types";
 
 afterEach(() => {
   resetBusinessCanvasUiState();
@@ -222,6 +222,24 @@ describe("business canvas controller", () => {
     expect(businessCanvasUiState.selectedNodeIds).toEqual({ projectId: host.projectId, nodeIds: ["a"] });
   });
 
+  it("applies repeated arrow-key movement as relative deltas and updates edge anchors", () => {
+    const host = configureFakeBusinessCanvasHost(
+      [
+        { id: "a", type: "text", text: "A", x: 40, y: 0, width: 100, height: 80 },
+        { id: "b", type: "text", text: "B", x: 40, y: 200, width: 100, height: 80 }
+      ],
+      [{ id: "edge-a-b", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" }]
+    );
+    stubBusinessCanvasDocument(host.projectId);
+    selectBusinessIdeaCanvasNodes(host.projectId, ["a"]);
+
+    handleBusinessIdeaCanvasKeyDown(keyboardEvent("ArrowRight"));
+    handleBusinessIdeaCanvasKeyDown(keyboardEvent("ArrowRight"));
+
+    expect(host.project().businessIdeaCanvas.nodes.find((node) => node.id === "a")).toMatchObject({ x: 60, y: 0 });
+    expect(host.project().businessIdeaCanvas.edges[0]).toMatchObject({ fromSide: "bottom", toSide: "top" });
+  });
+
   it("uses Shift for one-pixel arrow-key movement", () => {
     const host = configureFakeBusinessCanvasHost([
       { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }
@@ -295,11 +313,11 @@ describe("business canvas controller", () => {
   });
 });
 
-function configureFakeBusinessCanvasHost(nodes: JsonCanvasNode[]): { projectId: string; project: () => SelfEmploymentProject } {
+function configureFakeBusinessCanvasHost(nodes: JsonCanvasNode[], edges: JsonCanvasEdge[] = []): { projectId: string; project: () => SelfEmploymentProject } {
   const projectId = "project-keyboard";
   const state = defaultAppState();
   const defaults = defaultBusinessIdeaCanvasForProject(projectId);
-  const canvas = { nodes, edges: [] };
+  const canvas = { nodes, edges };
   const project: SelfEmploymentProject = {
     ...state.selfEmployment.projects[0],
     id: projectId,

@@ -155,7 +155,7 @@ export function renderSelfEmploymentDashboard(): void {
     </section>
     ${selfEmploymentProjectListPopup(evaluations)}
     <section class="self-employment-metrics" aria-label="Projektuebergreifende Kennzahlen">
-      ${selfEmploymentMetric("Aktive Projekte", intNumber(totals.activeProjects), `${intNumber(totals.totalProjects)} insgesamt`)}
+      ${selfEmploymentMetric("Aktive Projekte", intNumber(totals.activeProjects), `${intNumber(totals.totalProjects)} insgesamt`)}${selfEmploymentMetric("Neutral", intNumber(totals.neutralProjects), "Humankapital separat")}
     </section>
     <section class="self-employment-cards" aria-label="Selbststaendigkeitsprojekte">
       ${projectCardsHtml}

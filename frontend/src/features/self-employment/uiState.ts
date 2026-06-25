@@ -3,6 +3,7 @@ import type { SelfEmploymentGanttTodoEisenhowerQuadrant } from "../../types";
 export type SelfEmploymentGanttEditor =
   | { projectId: string; type: "phase"; phaseId: string; top: number; left: number }
   | { projectId: string; type: "card"; cardId: string; top: number; left: number }
+  | { projectId: string; type: "label"; phaseId: string; labelId: string; top: number; left: number }
   | null;
 
 export interface SelfEmploymentUiState {

@@ -161,6 +161,26 @@ describe("self employment controller persistence", () => {
     expect(popupHtml).toContain('aria-current="true"');
   });
 
+  it("renders compact kanban phase filters and treats all phases as unfiltered", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const project = projectWithRelatedTodos(host.state);
+    selfEmploymentUiState.kanbanPhaseFilterIds = project.businessIdeaCanvasMeta.phases.map((phase) => phase.id);
+
+    const html = selfEmploymentProjectDetails(
+      evaluateSelfEmploymentProject(project, { availableTimeHours: 40, availableReserve: 5000 }),
+      "tasks",
+      fakeIncomePlanningModel()
+    );
+
+    expect(html).toContain('class="self-employment-kanban-filter-chip phase active"');
+    expect(html).toContain('data-self-employment-kanban-phase-id="phase-0"');
+    expect(html).toContain(">0</button>");
+    expect(html).not.toContain(">Phase 1 ·");
+    expect(html).toContain("Erstes Todo");
+    expect(html).toContain("Fremdes Todo");
+    expect(html).toContain("keine Filter");
+  });
+
   it("jumps from the popup to another kanban todo and clears blocking filters", () => {
     vi.useFakeTimers();
     const host = configureFakeSelfEmploymentHost();
@@ -189,7 +209,7 @@ describe("self employment controller persistence", () => {
     expect(classList.add).toHaveBeenCalledWith("jump-highlight");
   });
 
-  it("rates human-capital projects as realistic without direct profit when time and benefit fit", () => {
+  it("keeps human-capital projects neutral without direct profit scoring", () => {
     const project = {
       ...defaultAppState().selfEmployment.projects[0],
       projectType: "human_capital" as const,
@@ -207,8 +227,8 @@ describe("self employment controller persistence", () => {
 
     const evaluation = evaluateSelfEmploymentProject(project, { availableTimeHours: 19.4, availableReserve: 0, weeklyTimeDemand: 12 });
 
-    expect(evaluation.feasibility).toBe("realistic");
-    expect(evaluation.benefitLabel).toBe("Humankapital-Wert hoch");
+    expect(evaluation.feasibility).toBe("neutral");
+    expect(evaluation.benefitLabel).toBe("Humankapital · neutral");
     expect(evaluation.reasons.join(" ")).not.toContain("Umsatzprojekt hat noch keinen positiven Gewinn");
   });
 
@@ -370,7 +390,7 @@ describe("self employment controller persistence", () => {
     expect(host.calls).toEqual([]);
   });
 
-  it("keeps project module controls in the project list and filters the detail roadmap", () => {
+  it("keeps project module controls in the project list, renders the roadmap, and omits the detail control panel", () => {
     const host = configureFakeSelfEmploymentHost();
     const project = {
       ...host.state.selfEmployment.projects[0],
@@ -397,6 +417,8 @@ describe("self employment controller persistence", () => {
     expect(disabledHtml).not.toContain("Budget &amp; Investitionen");
     expect(enabledHtml).toContain('data-self-employment-roadmap-area="budget"');
     expect(enabledHtml).toContain("Budget &amp; Investitionen");
+    expect(enabledHtml).not.toContain("self-employment-project-control-panel");
+    expect(enabledHtml).not.toContain('aria-label="Projektsteuerung"');
   });
 
   it("normalizes done project status aliases and updates project modules through saved fields", () => {

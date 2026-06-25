@@ -70,7 +70,7 @@ function selfEmploymentProjectPotentialLabel(evaluation: SelfEmploymentProjectEv
     return `Gewinnpotenzial: ${money(evaluation.monthlyProfitAfterReserve)} / Monat`;
   }
   if (evaluation.project.projectType === "human_capital") {
-    return `Kein direkter Gewinn · ${selfEmploymentProjectTypeBenefitLabel(evaluation.project.projectType)}`;
+    return evaluation.benefitLabel;
   }
   return `${selfEmploymentProjectTypeBenefitLabel(evaluation.project.projectType)} · direkt ${money(evaluation.monthlyProfitAfterReserve)} / Monat`;
 }

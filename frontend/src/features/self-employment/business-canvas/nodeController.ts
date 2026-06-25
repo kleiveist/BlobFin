@@ -204,6 +204,7 @@ export function handleBusinessIdeaCanvasDoubleClick(event: MouseEvent): void {
   const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === textElement.dataset.businessCanvasNodeText);
   if (!projectId || !node || node.type !== "text") return;
   event.preventDefault();
+  event.stopPropagation?.();
   editBusinessIdeaCanvasNode(node.id, projectId);
 }
 

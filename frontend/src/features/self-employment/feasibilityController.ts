@@ -53,6 +53,7 @@ export function evaluateSelfEmploymentProject(
   );
   const blockingTaskCount = context.blockingTaskCount ?? openTasks.filter((task) => task.todo.eisenhowerQuadrant === "important_urgent").length;
   const projectType = selfEmploymentProjectTypeFromValue(project.projectType);
+  const isNeutralProject = projectType === "human_capital";
   const needsProfit = projectType === "revenue";
   const hasStrategicBenefit =
     projectType === "human_capital" ||
@@ -66,35 +67,41 @@ export function evaluateSelfEmploymentProject(
   const nearReserve = context.availableTimeHours > 0 && weeklyTimeDemand > context.availableTimeHours * 0.85;
   const reasons: string[] = [];
 
-  if (timeOverReserve) {
-    reasons.push(
-      `Zeitbedarf liegt ${hoursLabel(weeklyTimeDemand - context.availableTimeHours)} ueber der freien Reserve.`
-    );
+  if (isNeutralProject) {
+    reasons.push("Humankapital-Projekt wird separat und neutral gefuehrt.");
+  } else {
+    if (timeOverReserve) {
+      reasons.push(
+        `Zeitbedarf liegt ${hoursLabel(weeklyTimeDemand - context.availableTimeHours)} ueber der freien Reserve.`
+      );
+    }
+    if (fundingGap > 0) reasons.push(`Startkapital-Luecke von ${money(fundingGap)} offen.`);
+    if (needsProfit && monthlyProfitAfterReserve <= 0) reasons.push("Umsatzprojekt hat noch keinen positiven Gewinn nach Ruecklage/Steuer.");
+    if (!needsProfit && hasStrategicBenefit) {
+      reasons.push(`${selfEmploymentProjectTypeLabel(projectType)} wird ueber Nutzen statt direkten Gewinn bewertet.`);
+    }
+    if (!hasClearBenefit) reasons.push("Nutzen, Gewinn oder strategische Relevanz sind noch nicht klar.");
+    if (openTasks.length > 6 || openTaskHours > Math.max(weeklyTimeDemand, 1) * 2 || blockingTaskCount > 3) {
+      reasons.push("Aufgabenmenge ist fuer die aktuelle Wochenzeit hoch.");
+    }
+    if (project.risk === "high") reasons.push("Risiko ist hoch eingestuft.");
   }
-  if (fundingGap > 0) reasons.push(`Startkapital-Luecke von ${money(fundingGap)} offen.`);
-  if (needsProfit && monthlyProfitAfterReserve <= 0) reasons.push("Umsatzprojekt hat noch keinen positiven Gewinn nach Ruecklage/Steuer.");
-  if (!needsProfit && hasStrategicBenefit) {
-    reasons.push(`${selfEmploymentProjectTypeLabel(projectType)} wird ueber Nutzen statt direkten Gewinn bewertet.`);
-  }
-  if (!hasClearBenefit) reasons.push("Nutzen, Gewinn oder strategische Relevanz sind noch nicht klar.");
-  if (openTasks.length > 6 || openTaskHours > Math.max(weeklyTimeDemand, 1) * 2 || blockingTaskCount > 3) {
-    reasons.push("Aufgabenmenge ist fuer die aktuelle Wochenzeit hoch.");
-  }
-  if (project.risk === "high") reasons.push("Risiko ist hoch eingestuft.");
 
   const feasibility =
-    timeOverReserve ||
-    criticalFundingGap ||
-    (needsProfit && monthlyProfitAfterReserve <= 0) ||
-    (!hasClearBenefit && openTaskHours > 0)
-      ? "unrealistic"
-      : nearReserve ||
-          fundingGap > 0 ||
-          project.risk === "high" ||
-          openTaskHours > Math.max(weeklyTimeDemand, 1) ||
-          blockingTaskCount > 0
-        ? "borderline"
-        : "realistic";
+    isNeutralProject
+      ? "neutral"
+      : timeOverReserve ||
+          criticalFundingGap ||
+          (needsProfit && monthlyProfitAfterReserve <= 0) ||
+          (!hasClearBenefit && openTaskHours > 0)
+        ? "unrealistic"
+        : nearReserve ||
+            fundingGap > 0 ||
+            project.risk === "high" ||
+            openTaskHours > Math.max(weeklyTimeDemand, 1) ||
+            blockingTaskCount > 0
+          ? "borderline"
+          : "realistic";
 
   return {
     project,
@@ -109,11 +116,13 @@ export function evaluateSelfEmploymentProject(
     openInvoiceAmount,
     openTaskHours,
     weeklyTimeDemand,
-    benefitLabel: hasStrategicBenefit
-      ? selfEmploymentProjectTypeBenefitLabel(projectType)
-      : hasFinancialUpside
-        ? "finanzieller Nutzen"
-        : "Nutzen offen"
+    benefitLabel: isNeutralProject
+      ? "Humankapital · neutral"
+      : hasStrategicBenefit
+        ? selfEmploymentProjectTypeBenefitLabel(projectType)
+        : hasFinancialUpside
+          ? "finanzieller Nutzen"
+          : "Nutzen offen"
   };
 }
 
@@ -125,6 +134,7 @@ export function selfEmploymentTotals(
   activeProjects: number;
   realisticProjects: number;
   unrealisticProjects: number;
+  neutralProjects: number;
   monthlyRevenue: number;
   monthlyProfit: number;
   requiredHours: number;
@@ -138,6 +148,7 @@ export function selfEmploymentTotals(
     activeProjects: activeEvaluations.length,
     realisticProjects: activeEvaluations.filter((evaluation) => evaluation.feasibility === "realistic").length,
     unrealisticProjects: activeEvaluations.filter((evaluation) => evaluation.feasibility === "unrealistic").length,
+    neutralProjects: activeEvaluations.filter((evaluation) => evaluation.feasibility === "neutral").length,
     monthlyRevenue: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.project.monthlyRevenueExpected, 0),
     monthlyProfit: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.monthlyProfitAfterReserve, 0),
     requiredHours: activeEvaluations.reduce((sum, evaluation) => sum + evaluation.weeklyTimeDemand, 0),
@@ -168,6 +179,7 @@ export function selfEmploymentRiskLabel(risk: SelfEmploymentRiskLevel): string {
 }
 
 export function selfEmploymentFeasibilityLabel(feasibility: SelfEmploymentFeasibility): string {
+  if (feasibility === "neutral") return "Neutral";
   if (feasibility === "realistic") return "Realistisch";
   if (feasibility === "borderline") return "Grenzwertig";
   return "Unrealistisch";

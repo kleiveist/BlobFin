@@ -20,9 +20,7 @@ import type { SelfEmploymentProjectEvaluation } from "./feasibilityController";
 import {
   hoursLabel,
   selfEmploymentFeasibilityLabel,
-  selfEmploymentPriorityLabel,
   selfEmploymentProjectTypeBenefitLabel,
-  selfEmploymentProjectTypeLabel,
   selfEmploymentRoadmapAreaIdFromValue
 } from "./feasibilityController";
 import { SELF_EMPLOYMENT_ROADMAP_AREAS } from "./config";
@@ -53,7 +51,6 @@ export function selfEmploymentProjectDetails(
           selfEmploymentFeasibilityLabel(evaluation.feasibility)
         )}</span>
       </div>
-      ${selfEmploymentProjectControlPanel(project)}
       ${selfEmploymentRoadmap(activeArea.id, activeAreas)}
       <article class="self-employment-roadmap-panel">
         <header>
@@ -97,6 +94,17 @@ function renderSelfEmploymentGanttPhaseFilter(project: SelfEmploymentProject): s
   `;
 }
 
+function selfEmploymentActiveRoadmapAreas(project: SelfEmploymentProject): typeof SELF_EMPLOYMENT_ROADMAP_AREAS {
+  return SELF_EMPLOYMENT_ROADMAP_AREAS.filter((area) => {
+    if (area.id === "contacts") return project.enabledModules.contacts;
+    if (area.id === "invoices") return project.enabledModules.invoices;
+    if (area.id === "budget") return project.enabledModules.budget;
+    if (area.id === "profit") return project.enabledModules.profit;
+    if (area.id === "metrics") return project.enabledModules.metrics;
+    return true;
+  });
+}
+
 function selfEmploymentRoadmap(
   selectedArea: SelfEmploymentRoadmapAreaId,
   areas: typeof SELF_EMPLOYMENT_ROADMAP_AREAS
@@ -119,45 +127,6 @@ function selfEmploymentRoadmap(
         `;
       }).join("")}
     </div>
-  `;
-}
-
-function selfEmploymentActiveRoadmapAreas(project: SelfEmploymentProject): typeof SELF_EMPLOYMENT_ROADMAP_AREAS {
-  return SELF_EMPLOYMENT_ROADMAP_AREAS.filter((area) => {
-    if (area.id === "contacts") return project.enabledModules.contacts;
-    if (area.id === "invoices") return project.enabledModules.invoices;
-    if (area.id === "budget") return project.enabledModules.budget;
-    if (area.id === "profit") return project.enabledModules.profit;
-    if (area.id === "metrics") return project.enabledModules.metrics;
-    return true;
-  });
-}
-
-function selfEmploymentProjectControlPanel(project: SelfEmploymentProject): string {
-  return `
-    <section class="self-employment-project-control-panel" aria-label="Projektsteuerung">
-      <div class="self-employment-edit-grid compact">
-        ${selfEmploymentSelectField(project, "status", "Projektstatus", project.status, [
-          ["open", "⚪ Offen"],
-          ["in_progress", "🔵 In Arbeit"],
-          ["completed", "✔️ Erledigt"],
-          ["cancelled", "❌ Cancel"]
-        ])}
-        ${selfEmploymentSelectField(project, "projectType", "Projektart", project.projectType, [
-          ["revenue", "Umsatzprojekt"],
-          ["human_capital", "Humankapital-Projekt"],
-          ["mandatory", "Pflichtprojekt"],
-          ["strategic", "Strategisches Projekt"],
-          ["private", "Privates Projekt"]
-        ])}
-        ${selfEmploymentSelectField(project, "priority", "Prioritaet", project.priority, [
-          ["high", "Hoch"],
-          ["medium", "Mittel"],
-          ["low", "Niedrig"]
-        ])}
-        ${selfEmploymentReadOnlyField("Status-Zusammenfassung", `${selfEmploymentProjectTypeLabel(project.projectType)} · ${selfEmploymentPriorityLabel(project.priority)}`)}
-      </div>
-    </section>
   `;
 }
 
@@ -247,28 +216,6 @@ function selfEmploymentNumberField(
       <input type="number" min="${min}" max="${max}" step="${step}" value="${escapeHtml(value)}" data-self-employment-project-id="${escapeHtml(
         project.id
       )}" data-self-employment-field="${escapeHtml(field)}" />
-    </label>
-  `;
-}
-
-function selfEmploymentSelectField(
-  project: SelfEmploymentProject,
-  field: string,
-  label: string,
-  value: string,
-  options: Array<[string, string]>
-): string {
-  return `
-    <label class="field self-employment-edit-field">
-      <span>${escapeHtml(label)}</span>
-      <select data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-field="${escapeHtml(field)}">
-        ${options
-          .map(
-            ([optionValue, optionLabel]) =>
-              `<option value="${escapeHtml(optionValue)}" ${optionValue === value ? "selected" : ""}>${escapeHtml(optionLabel)}</option>`
-          )
-          .join("")}
-      </select>
     </label>
   `;
 }
@@ -630,7 +577,7 @@ function selfEmploymentTasksDashboard(project: SelfEmploymentProject, workPlan: 
   const openTasks = workPlan.tasks.filter((task) => !task.completed);
   const doneTasks = workPlan.tasks.filter((task) => task.completed);
   const overdueTasks = openTasks.filter((task) => task.overdue);
-  const visibleTasks = selfEmploymentFilteredKanbanTasks(workPlan.tasks);
+  const visibleTasks = selfEmploymentFilteredKanbanTasks(project, workPlan.tasks);
   return `
     <div class="self-employment-task-dashboard">
       <div class="self-employment-dashboard-metrics">
@@ -801,15 +748,14 @@ function selfEmploymentEisenhowerMatrix(workPlan: SelfEmploymentProjectWorkPlan)
 }
 
 function selfEmploymentKanbanFilters(project: SelfEmploymentProject, workPlan: SelfEmploymentProjectWorkPlan): string {
-  const phaseIds = new Set(workPlan.tasks.map((task) => task.phaseId));
   const labelIds = new Set(workPlan.tasks.map((task) => task.labelId));
-  const phases = [...project.businessIdeaCanvasMeta.phases].sort((first, second) => first.order - second.order).filter((phase) => phaseIds.has(phase.id));
+  const phases = [...project.businessIdeaCanvasMeta.phases].sort((first, second) => first.order - second.order);
   const labels = orderedGanttLabels(project.businessIdeaCanvasMeta).filter((label) => labelIds.has(label.id));
   return `
     <section class="self-employment-dashboard-section self-employment-kanban-filter-panel">
       <header>
         <strong>Kanban-Filter</strong>
-        <span>${escapeHtml(selfEmploymentKanbanFilterSummary(workPlan))}</span>
+        <span>${escapeHtml(selfEmploymentKanbanFilterSummary(project, workPlan))}</span>
       </header>
       <div class="self-employment-kanban-filter-groups">
         <div class="self-employment-kanban-filter-group">
@@ -832,14 +778,17 @@ function selfEmploymentKanbanFilters(project: SelfEmploymentProject, workPlan: S
 function selfEmploymentKanbanPhaseFilterButton(phaseId: string, phaseName: string, workPlan: SelfEmploymentProjectWorkPlan): string {
   const active = selfEmploymentUiState.kanbanPhaseFilterIds.includes(phaseId);
   const count = workPlan.tasks.filter((task) => task.phaseId === phaseId).length;
+  const phaseNumber = selfEmploymentGanttPhaseNumber(phaseId);
   return `
     <button
-      class="self-employment-kanban-filter-chip${active ? " active" : ""}"
+      class="self-employment-kanban-filter-chip phase${active ? " active" : ""}"
       type="button"
       data-action="self-employment-toggle-kanban-phase-filter"
       data-self-employment-kanban-phase-id="${escapeHtml(phaseId)}"
       aria-pressed="${active}"
-    >${escapeHtml(`${phaseName} · ${intNumber(count)}`)}</button>
+      aria-label="${escapeHtml(`${phaseName} ${active ? "deaktivieren" : "aktivieren"} · ${intNumber(count)} Todos`)}"
+      title="${escapeHtml(`${phaseName} · ${intNumber(count)} Todos`)}"
+    >${escapeHtml(phaseNumber)}</button>
   `;
 }
 
@@ -858,10 +807,9 @@ function selfEmploymentKanbanLabelFilterButton(labelId: string, labelName: strin
   `;
 }
 
-function selfEmploymentKanbanFilterSummary(workPlan: SelfEmploymentProjectWorkPlan): string {
-  const availablePhaseIds = new Set(workPlan.tasks.map((task) => task.phaseId));
+function selfEmploymentKanbanFilterSummary(project: SelfEmploymentProject, workPlan: SelfEmploymentProjectWorkPlan): string {
   const availableLabelIds = new Set(workPlan.tasks.map((task) => task.labelId));
-  const phaseCount = selfEmploymentUiState.kanbanPhaseFilterIds.filter((id) => availablePhaseIds.has(id)).length;
+  const phaseCount = selfEmploymentActiveKanbanPhaseFilterIds(project).size;
   const labelCount = selfEmploymentUiState.kanbanLabelFilterIds.filter((id) => availableLabelIds.has(id)).length;
   const parts = [
     selfEmploymentUiState.taskEisenhowerFilter === "all" ? "" : "Eisenhower",
@@ -871,10 +819,9 @@ function selfEmploymentKanbanFilterSummary(workPlan: SelfEmploymentProjectWorkPl
   return parts.length ? parts.join(" · ") : "keine Filter";
 }
 
-function selfEmploymentFilteredKanbanTasks(tasks: SelfEmploymentProjectWorkPlanTask[]): SelfEmploymentProjectWorkPlanTask[] {
-  const availablePhaseIds = new Set(tasks.map((task) => task.phaseId));
+function selfEmploymentFilteredKanbanTasks(project: SelfEmploymentProject, tasks: SelfEmploymentProjectWorkPlanTask[]): SelfEmploymentProjectWorkPlanTask[] {
   const availableLabelIds = new Set(tasks.map((task) => task.labelId));
-  const phaseIds = new Set(selfEmploymentUiState.kanbanPhaseFilterIds.filter((id) => availablePhaseIds.has(id)));
+  const phaseIds = selfEmploymentActiveKanbanPhaseFilterIds(project);
   const labelIds = new Set(selfEmploymentUiState.kanbanLabelFilterIds.filter((id) => availableLabelIds.has(id)));
   return tasks.filter((task) => {
     if (selfEmploymentUiState.taskEisenhowerFilter !== "all" && task.eisenhowerQuadrant !== selfEmploymentUiState.taskEisenhowerFilter) return false;
@@ -882,6 +829,14 @@ function selfEmploymentFilteredKanbanTasks(tasks: SelfEmploymentProjectWorkPlanT
     if (labelIds.size && !labelIds.has(task.labelId)) return false;
     return true;
   });
+}
+
+function selfEmploymentActiveKanbanPhaseFilterIds(project: SelfEmploymentProject): Set<string> {
+  const phaseIds = [...project.businessIdeaCanvasMeta.phases].sort((first, second) => first.order - second.order).map((phase) => phase.id);
+  const phaseIdSet = new Set(phaseIds);
+  const selectedIds = selfEmploymentUiState.kanbanPhaseFilterIds.filter((id) => phaseIdSet.has(id));
+  if (selectedIds.length === 0 || selectedIds.length === phaseIds.length) return new Set();
+  return new Set(selectedIds);
 }
 
 function selfEmploymentKanbanColumn(

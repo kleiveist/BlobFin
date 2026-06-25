@@ -266,6 +266,44 @@ export function nearestBusinessIdeaCanvasNodeSide(node: JsonCanvasNode, point: B
   }, "top" as JsonCanvasSide);
 }
 
+export function shortestBusinessIdeaCanvasConnectionSides(
+  fromNode: JsonCanvasNode,
+  toNode: JsonCanvasNode
+): { fromSide: JsonCanvasSide; toSide: JsonCanvasSide } {
+  let best = {
+    fromSide: "right" as JsonCanvasSide,
+    toSide: "left" as JsonCanvasSide,
+    distance: Number.POSITIVE_INFINITY
+  };
+  for (const fromSide of SIDES) {
+    const fromPoint = canvasAnchorPoint(fromNode, fromSide);
+    for (const toSide of SIDES) {
+      const toPoint = canvasAnchorPoint(toNode, toSide);
+      const distance = distanceSquared(fromPoint, toPoint);
+      if (distance < best.distance) best = { fromSide, toSide, distance };
+    }
+  }
+  return { fromSide: best.fromSide, toSide: best.toSide };
+}
+
+export function businessIdeaCanvasWithShortestEdgeSides(canvas: BusinessIdeaCanvas): BusinessIdeaCanvas {
+  const nodesById = new Map(canvas.nodes.map((node) => [node.id, node]));
+  return {
+    ...canvas,
+    edges: canvas.edges.map((edgeValue) => {
+      const fromNode = nodesById.get(edgeValue.fromNode);
+      const toNode = nodesById.get(edgeValue.toNode);
+      if (!fromNode || !toNode) return edgeValue;
+      const sides = shortestBusinessIdeaCanvasConnectionSides(fromNode, toNode);
+      return {
+        ...edgeValue,
+        fromSide: sides.fromSide,
+        toSide: sides.toSide
+      };
+    })
+  };
+}
+
 export function nearestBusinessIdeaCanvasEndpointForEdge(
   canvas: BusinessIdeaCanvas,
   edgeValue: JsonCanvasEdge,

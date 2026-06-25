@@ -20,20 +20,24 @@ export function selfEmploymentStatusChart(evaluations: SelfEmploymentProjectEval
   const total = Math.max(1, evaluations.length);
   const realistic = evaluations.filter((evaluation) => evaluation.feasibility === "realistic").length;
   const borderline = evaluations.filter((evaluation) => evaluation.feasibility === "borderline").length;
+  const unrealistic = evaluations.filter((evaluation) => evaluation.feasibility === "unrealistic").length;
+  const neutral = evaluations.filter((evaluation) => evaluation.feasibility === "neutral").length;
   const realisticEnd = (realistic / total) * 100;
   const borderlineEnd = realisticEnd + (borderline / total) * 100;
+  const unrealisticEnd = borderlineEnd + (unrealistic / total) * 100;
   return `
     <article class="self-employment-chart-card">
       <h3>Projektstatus</h3>
       <div
         class="self-employment-donut"
-        style="background: conic-gradient(var(--accent) 0 ${realisticEnd}%, var(--gold) ${realisticEnd}% ${borderlineEnd}%, var(--danger) ${borderlineEnd}% 100%)"
+        style="background: conic-gradient(var(--accent) 0 ${realisticEnd}%, var(--gold) ${realisticEnd}% ${borderlineEnd}%, var(--danger) ${borderlineEnd}% ${unrealisticEnd}%, var(--muted) ${unrealisticEnd}% 100%)"
         aria-hidden="true"
       ></div>
       <div class="self-employment-legend">
         <span><i class="realistic"></i>Realistisch ${intNumber(realistic)}</span>
         <span><i class="borderline"></i>Grenzwertig ${intNumber(borderline)}</span>
-        <span><i class="unrealistic"></i>Unrealistisch ${intNumber(total - realistic - borderline)}</span>
+        <span><i class="unrealistic"></i>Unrealistisch ${intNumber(unrealistic)}</span>
+        <span><i class="neutral"></i>Neutral ${intNumber(neutral)}</span>
       </div>
     </article>
   `;

@@ -16,7 +16,9 @@ import {
   nearestBusinessIdeaCanvasEndpointForEdge,
   normalizeBusinessIdeaCanvasMeta,
   parseBusinessIdeaCanvasFile,
-  serializeBusinessIdeaCanvas
+  serializeBusinessIdeaCanvas,
+  shortestBusinessIdeaCanvasConnectionSides,
+  businessIdeaCanvasWithShortestEdgeSides
 } from "../domain/businessIdeaCanvas";
 import type { BusinessIdeaCanvas } from "../types";
 
@@ -143,6 +145,36 @@ describe("business idea canvas", () => {
     expect(nearestBusinessIdeaCanvasEndpointForEdge(canvas, canvas.edges[0], { x: 305, y: 40 })).toEqual({
       nodeId: "b",
       side: "left"
+    });
+  });
+
+  it("chooses the shortest canvas connection sides across all anchors", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 },
+        { id: "b", type: "text", text: "B", x: 40, y: 160, width: 100, height: 80 }
+      ],
+      edges: [{ id: "e", fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" }]
+    });
+
+    expect(shortestBusinessIdeaCanvasConnectionSides(canvas.nodes[0], canvas.nodes[1])).toEqual({
+      fromSide: "bottom",
+      toSide: "top"
+    });
+  });
+
+  it("normalizes saved canvas edges to the current shortest anchor pair", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 },
+        { id: "b", type: "text", text: "B", x: 300, y: 0, width: 100, height: 80 }
+      ],
+      edges: [{ id: "e", fromNode: "a", fromSide: "top", toNode: "b", toSide: "bottom" }]
+    });
+
+    expect(businessIdeaCanvasWithShortestEdgeSides(canvas).edges[0]).toMatchObject({
+      fromSide: "right",
+      toSide: "left"
     });
   });
 

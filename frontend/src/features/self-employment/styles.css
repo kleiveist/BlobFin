@@ -101,6 +101,10 @@
   border-left-color: var(--danger);
 }
 
+.self-employment-project-list-item.neutral {
+  border-left-color: var(--muted);
+}
+
 .self-employment-project-list-summary {
   display: flex;
   align-items: center;
@@ -238,6 +242,15 @@
   background: var(--danger-soft);
 }
 
+.self-employment-project-card.neutral {
+  background: color-mix(in srgb, var(--surface-muted) 58%, var(--surface) 42%);
+}
+
+.self-employment-detail .status-pill.neutral {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
 .self-employment-project-head {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
@@ -363,15 +376,14 @@
 
 .self-employment-roadmap {
   display: grid;
-  grid-template-columns: repeat(9, minmax(118px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(118px, 100%), 1fr));
   gap: 8px;
-  overflow-x: auto;
   padding-bottom: 4px;
 }
 
 .self-employment-roadmap-step {
   display: grid;
-  min-width: 118px;
+  min-width: 0;
   min-height: 88px;
   align-content: center;
   justify-items: center;
@@ -481,18 +493,10 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-strong) 18%, transparent);
 }
 
-.self-employment-project-control-panel,
 .self-employment-billing-editor,
 .self-employment-offer-editor {
   display: grid;
   gap: 12px;
-}
-
-.self-employment-project-control-panel {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-soft);
-  padding: 12px;
 }
 
 .self-employment-project-module-grid,
@@ -760,6 +764,51 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--self-employment-gantt-color) 42%, var(--border));
 }
 
+.self-employment-project-gantt-label.condensed {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.self-employment-project-gantt-label-condensed {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  padding: 5px 7px;
+  text-align: left;
+  text-shadow: 0 1px 1px rgba(15, 23, 42, 0.24);
+}
+
+.self-employment-project-gantt-label-condensed:hover,
+.self-employment-project-gantt-label-condensed:focus-visible {
+  background: color-mix(in srgb, white 16%, transparent);
+  outline: 2px solid color-mix(in srgb, white 40%, transparent);
+  outline-offset: -2px;
+}
+
+.self-employment-project-gantt-label-condensed span,
+.self-employment-project-gantt-label-condensed small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.self-employment-project-gantt-label-condensed span {
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.self-employment-project-gantt-label-condensed small {
+  font-size: 0.64rem;
+  font-weight: 850;
+}
+
 .self-employment-project-gantt-label-head {
   display: flex;
   justify-content: space-between;
@@ -878,6 +927,70 @@
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 850;
+}
+
+.self-employment-gantt-label-popover {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.self-employment-gantt-label-popover > header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.self-employment-gantt-label-popover > header span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.self-employment-gantt-label-detail-list {
+  display: grid;
+  gap: 7px;
+}
+
+.self-employment-gantt-label-detail-card {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) repeat(5, minmax(72px, 1fr));
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--self-employment-gantt-color, var(--accent));
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px;
+  text-align: left;
+}
+
+.self-employment-gantt-label-detail-card:hover,
+.self-employment-gantt-label-detail-card:focus-visible {
+  border-color: var(--accent-strong);
+  background: var(--surface-soft);
+}
+
+.self-employment-gantt-label-detail-card.completed {
+  opacity: 0.72;
+}
+
+.self-employment-gantt-label-detail-card span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.self-employment-gantt-label-detail-card .self-employment-gantt-label-detail-title {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 950;
 }
 
 .self-employment-gantt-check {
@@ -1108,6 +1221,16 @@
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, var(--surface));
   color: var(--text);
+}
+
+.self-employment-kanban-filter-chip.phase {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0.82rem;
 }
 
 .self-employment-eisenhower-button.important_urgent,
@@ -1637,6 +1760,10 @@
   background: var(--danger);
 }
 
+.self-employment-legend i.neutral {
+  background: var(--muted);
+}
+
 .self-employment-feasibility-item {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1650,6 +1777,10 @@
 
 .self-employment-feasibility-item.unrealistic span {
   color: var(--danger);
+}
+
+.self-employment-feasibility-item.neutral span {
+  color: var(--muted);
 }
 
 .self-employment-bars {

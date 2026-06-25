@@ -379,6 +379,8 @@ describe("follow-up ui rendering", () => {
     expect(stylesSource).toContain(".self-employment-project-list-details");
     expect(stylesSource).toContain("position: absolute");
     expect(stylesSource).toContain("self-employment-project-list-slide-in");
+    expect(stylesSource).toContain("grid-template-columns: repeat(auto-fit, minmax(min(118px, 100%), 1fr))");
+    expect(stylesSource).not.toContain("grid-template-columns: repeat(9, minmax(118px, 1fr))");
     expect(stylesSource).toContain(".self-employment-project-module-grid");
     expect(stylesSource).toContain(".self-employment-offer-option-grid");
     expect(stylesSource).not.toContain(".self-employment-module-toggle-grid");
