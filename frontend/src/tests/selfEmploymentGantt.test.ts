@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { defaultAppState } from "../data/defaults";
 import {
@@ -10,9 +11,11 @@ import {
 } from "../domain/selfEmploymentGantt";
 import { buildIncomePlanningModel } from "../domain/incomePlanning";
 import { normalizeBusinessIdeaCanvasMeta, parseBusinessIdeaCanvasFile } from "../domain/businessIdeaCanvas";
-import { renderSelfEmploymentProjectGantt } from "../features/self-employment/ganttController";
+import { renderSelfEmploymentProjectGantt, selfEmploymentGanttLabelIsCondensed } from "../features/self-employment/ganttController";
 import { selfEmploymentUiState } from "../features/self-employment/uiState";
 import type { SelfEmploymentProject } from "../types";
+
+const selfEmploymentStylesSource = readFileSync(new URL("../features/self-employment/styles.css", import.meta.url), "utf8");
 
 afterEach(() => {
   selfEmploymentUiState.ganttEditor = null;
@@ -228,6 +231,27 @@ describe("self employment project gantt", () => {
     expect(html).toContain('data-action="self-employment-gantt-open-label"');
     expect(html).toContain("Idee · 100 h");
     expect(html).toContain("94 % erledigt");
+  });
+
+  it("uses muted light-theme completed colors and keeps dark-theme success contrast", () => {
+    expect(selfEmploymentStylesSource).toContain("--self-employment-gantt-progress-color: #8fa39a");
+    expect(selfEmploymentStylesSource).toContain("border-left-color: #6f877c");
+    expect(selfEmploymentStylesSource).toContain(':root[data-theme="dark"] .self-employment-project-gantt-card.completed');
+    expect(selfEmploymentStylesSource).toContain("border-left-color: #22c55e");
+  });
+
+  it("uses the same visible-width condensation rule for labels at the start and end", () => {
+    const startLabel = fakeGanttLabelSegment({ startPercent: 0, widthPercent: 6 });
+    const endLabel = fakeGanttLabelSegment({ startPercent: 94, widthPercent: 6 });
+
+    expect(selfEmploymentGanttLabelIsCondensed(startLabel)).toBe(false);
+    expect(selfEmploymentGanttLabelIsCondensed(endLabel)).toBe(false);
+  });
+
+  it("condenses end labels when only their clipped visible width is unreadable", () => {
+    const clippedEndLabel = fakeGanttLabelSegment({ startPercent: 98, widthPercent: 8 });
+
+    expect(selfEmploymentGanttLabelIsCondensed(clippedEndLabel)).toBe(true);
   });
 
   it("renders a dense label detail popup with clickable card rows", () => {
@@ -614,6 +638,30 @@ describe("self employment project gantt", () => {
     expect(plan.endDate).toBe("2026-03-16");
   });
 });
+
+function fakeGanttLabelSegment(input: { startPercent: number; widthPercent: number }): Parameters<typeof selfEmploymentGanttLabelIsCondensed>[0] {
+  return {
+    labelId: "idea",
+    labelName: "Idee",
+    color: "1",
+    totalHours: 6,
+    startHour: 0,
+    startPercent: input.startPercent,
+    widthPercent: input.widthPercent,
+    cards: [
+      {
+        cardId: "readable-card",
+        title: "Lesbare Karte",
+        timeBudgetHours: 6,
+        widthPercent: 100,
+        completed: false,
+        todoCount: 1,
+        completedTodoCount: 0,
+        progressPercent: 0
+      }
+    ]
+  };
+}
 
 function projectWithCanvas(input: {
   nodes: Array<{ id: string; type: "text"; text: string; x: number; y: number; width: number; height: number }>;

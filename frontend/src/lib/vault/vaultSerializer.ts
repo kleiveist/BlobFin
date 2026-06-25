@@ -9,6 +9,8 @@ import {
 import type { VaultDataFiles } from "./vaultTypes";
 
 export function serializeVaultState(state: AppState): VaultDataFiles {
+  const selfEmploymentProjectFiles = serializeSelfEmploymentProjectFilesById(state.selfEmployment);
+  const projectsById = new Map(state.selfEmployment.projects.map((project) => [project.id, project]));
   return {
     settingsBase: state.settings,
     settingsUi: state.ui,
@@ -69,12 +71,15 @@ export function serializeVaultState(state: AppState): VaultDataFiles {
       plannedStamps: state.incomePlanning.plannedStamps
     },
     selfEmploymentState: serializeSelfEmploymentStateShell(state.selfEmployment),
-    selfEmploymentProjectFiles: serializeSelfEmploymentProjectFilesById(state.selfEmployment),
+    selfEmploymentProjectFiles,
     selfEmploymentCanvasFiles: Object.fromEntries(
-      state.selfEmployment.projects.map((project) => [
-        project.businessIdeaCanvasFile,
-        serializeBusinessIdeaCanvas(project.businessIdeaCanvas)
-      ])
+      Object.values(selfEmploymentProjectFiles).flatMap((files) => {
+        const projectFile = record(files["project.json"]);
+        const project = typeof projectFile.id === "string" ? projectsById.get(projectFile.id) : null;
+        const businessIdeaCanvasFile = projectFile.businessIdeaCanvasFile;
+        if (!project || typeof businessIdeaCanvasFile !== "string") return [];
+        return [[businessIdeaCanvasFile, serializeBusinessIdeaCanvas(project.businessIdeaCanvas)]];
+      })
     )
   };
 }

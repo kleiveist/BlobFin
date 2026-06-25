@@ -59,6 +59,56 @@
   animation: self-employment-project-list-slide-in 160ms ease-out;
 }
 
+.self-employment-project-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.22);
+  padding: 16px;
+}
+
+:root[data-theme="dark"] .self-employment-project-dialog-backdrop {
+  background: rgba(0, 0, 0, 0.44);
+}
+
+.self-employment-project-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(440px, calc(100vw - 32px));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.self-employment-project-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.self-employment-project-dialog > header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.self-employment-project-dialog > header span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.self-employment-project-dialog > header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .self-employment-offer-overview-popup {
   position: relative;
 }
@@ -752,6 +802,7 @@
 }
 
 .self-employment-project-gantt-label {
+  --self-employment-gantt-progress-color: #8fa39a;
   position: absolute;
   top: 6px;
   bottom: 6px;
@@ -784,7 +835,7 @@
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, #22c55e 74%, transparent) 0 var(--self-employment-gantt-progress-percent, 0%),
+      color-mix(in srgb, var(--self-employment-gantt-progress-color) 72%, transparent) 0 var(--self-employment-gantt-progress-percent, 0%),
       transparent var(--self-employment-gantt-progress-percent, 0%) 100%
     );
   color: white;
@@ -867,6 +918,7 @@
 }
 
 .self-employment-project-gantt-card {
+  --self-employment-gantt-card-progress-color: #8fa39a;
   display: grid;
   align-content: center;
   position: relative;
@@ -878,7 +930,7 @@
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, #22c55e 76%, transparent) 0 var(--self-employment-gantt-card-progress-percent, 0%),
+      color-mix(in srgb, var(--self-employment-gantt-card-progress-color) 76%, transparent) 0 var(--self-employment-gantt-card-progress-percent, 0%),
       transparent var(--self-employment-gantt-card-progress-percent, 0%) 100%
     ) left bottom / 100% 3px no-repeat,
     color-mix(in srgb, var(--surface) 90%, transparent);
@@ -894,7 +946,7 @@
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, #22c55e 76%, transparent) 0 var(--self-employment-gantt-card-progress-percent, 0%),
+      color-mix(in srgb, var(--self-employment-gantt-card-progress-color) 76%, transparent) 0 var(--self-employment-gantt-card-progress-percent, 0%),
       transparent var(--self-employment-gantt-card-progress-percent, 0%) 100%
     ) left bottom / 100% 3px no-repeat,
     var(--surface);
@@ -922,15 +974,15 @@
 }
 
 .self-employment-project-gantt-card.completed {
-  border-color: color-mix(in srgb, #16a34a 72%, var(--border));
+  border-color: color-mix(in srgb, #6f877c 62%, var(--border));
   background:
-    linear-gradient(90deg, color-mix(in srgb, #16a34a 34%, transparent) 0 100%) left bottom / 100% 3px no-repeat,
-    color-mix(in srgb, #22c55e 18%, var(--surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #16a34a 18%, transparent);
+    linear-gradient(90deg, color-mix(in srgb, #6f877c 42%, transparent) 0 100%) left bottom / 100% 3px no-repeat,
+    color-mix(in srgb, #8fa39a 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #6f877c 18%, transparent);
 }
 
 .self-employment-project-gantt-card.completed small {
-  color: color-mix(in srgb, #166534 72%, var(--muted));
+  color: color-mix(in srgb, #4f6359 72%, var(--muted));
 }
 
 .self-employment-project-gantt-empty {
@@ -1053,9 +1105,9 @@
 }
 
 .self-employment-gantt-label-detail-card.completed {
-  border-color: color-mix(in srgb, #16a34a 48%, var(--border));
-  border-left-color: #16a34a;
-  background: color-mix(in srgb, #22c55e 12%, var(--surface));
+  border-color: color-mix(in srgb, #6f877c 48%, var(--border));
+  border-left-color: #6f877c;
+  background: color-mix(in srgb, #8fa39a 14%, var(--surface));
 }
 
 .self-employment-gantt-label-detail-card span {
@@ -1075,7 +1127,7 @@
 }
 
 .self-employment-gantt-label-detail-card.completed .self-employment-gantt-label-detail-title {
-  color: color-mix(in srgb, #166534 74%, var(--text));
+  color: color-mix(in srgb, #4f6359 74%, var(--text));
   text-decoration: line-through;
 }
 
@@ -1089,8 +1141,39 @@
 }
 
 .self-employment-project-gantt-card.completed span {
-  color: color-mix(in srgb, #166534 76%, var(--text));
+  color: color-mix(in srgb, #4f6359 76%, var(--text));
   text-decoration: line-through;
+}
+
+:root[data-theme="dark"] .self-employment-project-gantt-label {
+  --self-employment-gantt-progress-color: #22c55e;
+}
+
+:root[data-theme="dark"] .self-employment-project-gantt-card {
+  --self-employment-gantt-card-progress-color: #22c55e;
+}
+
+:root[data-theme="dark"] .self-employment-project-gantt-card.completed {
+  border-color: color-mix(in srgb, #22c55e 68%, var(--border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, #22c55e 36%, transparent) 0 100%) left bottom / 100% 3px no-repeat,
+    color-mix(in srgb, #16a34a 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #22c55e 18%, transparent);
+}
+
+:root[data-theme="dark"] .self-employment-project-gantt-card.completed span,
+:root[data-theme="dark"] .self-employment-gantt-label-detail-card.completed .self-employment-gantt-label-detail-title {
+  color: color-mix(in srgb, #bbf7d0 72%, var(--text));
+}
+
+:root[data-theme="dark"] .self-employment-project-gantt-card.completed small {
+  color: color-mix(in srgb, #86efac 68%, var(--muted));
+}
+
+:root[data-theme="dark"] .self-employment-gantt-label-detail-card.completed {
+  border-color: color-mix(in srgb, #22c55e 48%, var(--border));
+  border-left-color: #22c55e;
+  background: color-mix(in srgb, #16a34a 13%, var(--surface));
 }
 
 .self-employment-gantt-status-switch {

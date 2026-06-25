@@ -8,6 +8,7 @@ export type SelfEmploymentGanttEditor =
 
 export interface SelfEmploymentUiState {
   ganttEditor: SelfEmploymentGanttEditor;
+  projectRenameDialog: { projectId: string; name: string; error: string } | null;
   labelPickerProjectId: string | null;
   iconPicker: { projectId: string; top: number; left: number } | null;
   projectListPopupOpen: boolean;
@@ -24,6 +25,7 @@ export interface SelfEmploymentUiState {
 
 export const selfEmploymentUiState: SelfEmploymentUiState = {
   ganttEditor: null,
+  projectRenameDialog: null,
   labelPickerProjectId: null,
   iconPicker: null,
   projectListPopupOpen: false,

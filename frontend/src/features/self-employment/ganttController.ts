@@ -276,13 +276,20 @@ function selfEmploymentGanttLabelProgressPercent(label: SelfEmploymentGanttSumma
   return clamp(Math.round((completedHours / label.totalHours) * 100), 0, 100);
 }
 
-function selfEmploymentGanttLabelIsCondensed(label: SelfEmploymentGanttSummary["rows"][number]["labels"][number]): boolean {
+export function selfEmploymentGanttLabelIsCondensed(label: SelfEmploymentGanttSummary["rows"][number]["labels"][number]): boolean {
   if (label.cards.length === 0) return false;
-  const smallestAbsoluteCardWidth = Math.min(...label.cards.map((card) => (label.widthPercent * card.widthPercent) / 100));
+  const visibleLabelWidth = selfEmploymentGanttVisibleWidthPercent(label.startPercent, label.widthPercent);
+  const smallestAbsoluteCardWidth = Math.min(...label.cards.map((card) => (visibleLabelWidth * card.widthPercent) / 100));
   return (
-    label.widthPercent < SELF_EMPLOYMENT_GANTT_MIN_LABEL_WIDTH_PERCENT ||
+    visibleLabelWidth < SELF_EMPLOYMENT_GANTT_MIN_LABEL_WIDTH_PERCENT ||
     smallestAbsoluteCardWidth < SELF_EMPLOYMENT_GANTT_MIN_CARD_WIDTH_PERCENT
   );
+}
+
+function selfEmploymentGanttVisibleWidthPercent(startPercent: number, widthPercent: number): number {
+  const start = clamp(startPercent, 0, 100);
+  const end = clamp(startPercent + widthPercent, 0, 100);
+  return Math.max(0, end - start);
 }
 
 function renderSelfEmploymentGanttEditor(project: SelfEmploymentProject, summary: SelfEmploymentGanttSummary): string {

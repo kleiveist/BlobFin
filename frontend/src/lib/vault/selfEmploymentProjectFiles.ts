@@ -35,8 +35,9 @@ export type SelfEmploymentProjectFileName = (typeof SELF_EMPLOYMENT_PROJECT_FILE
 export type SelfEmploymentProjectFiles = Partial<Record<SelfEmploymentProjectFileName, unknown>>;
 export type SelfEmploymentProjectFilesById = Record<string, SelfEmploymentProjectFiles>;
 
-export function serializeSelfEmploymentProjectFiles(project: SelfEmploymentProject): SelfEmploymentProjectFiles {
+export function serializeSelfEmploymentProjectFiles(project: SelfEmploymentProject, projectFolderName = project.id): SelfEmploymentProjectFiles {
   const cardPlansById = new Map(project.gantt.cardPlans.map((plan) => [plan.cardId, plan]));
+  const businessIdeaCanvasFile = selfEmploymentProjectRelativeFilePath(projectFolderName, "canvas-geschaeftsidee.canvas");
   return {
     "project.json": {
       id: project.id,
@@ -66,7 +67,7 @@ export function serializeSelfEmploymentProjectFiles(project: SelfEmploymentProje
       oneTimeCosts: project.oneTimeCosts,
       taxReservePercent: project.taxReservePercent,
       monthlyWorkHours: project.monthlyWorkHours,
-      businessIdeaCanvasFile: businessIdeaCanvasFilePath(project.id),
+      businessIdeaCanvasFile,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt
     },
@@ -159,7 +160,13 @@ export function serializeSelfEmploymentProjectFiles(project: SelfEmploymentProje
 }
 
 export function serializeSelfEmploymentProjectFilesById(state: SelfEmploymentState): SelfEmploymentProjectFilesById {
-  return Object.fromEntries(state.projects.map((project) => [project.id, serializeSelfEmploymentProjectFiles(project)]));
+  const usedFolderNames = new Set<string>();
+  return Object.fromEntries(
+    state.projects.map((project) => {
+      const folderName = selfEmploymentProjectFolderName(project, usedFolderNames);
+      return [folderName, serializeSelfEmploymentProjectFiles(project, folderName)];
+    })
+  );
 }
 
 export function serializeSelfEmploymentStateShell(state: SelfEmploymentState): Pick<SelfEmploymentState, "selectedProjectId" | "selectedRoadmapAreaId"> {
@@ -193,6 +200,21 @@ export function selfEmploymentProjectFilePaths(projectFilesById: SelfEmploymentP
 
 export function selfEmploymentProjectRelativeFilePath(projectId: string, fileName: SelfEmploymentProjectFileName): string {
   return `planning/projects/${safeProjectId(projectId)}/${fileName}`;
+}
+
+export function selfEmploymentProjectFolderName(
+  project: Pick<SelfEmploymentProject, "id" | "name">,
+  usedFolderNames: Set<string>
+): string {
+  const baseName = safeProjectFolderSlug(project.name || project.id || "project");
+  let folderName = baseName;
+  let suffix = 2;
+  while (usedFolderNames.has(folderName)) {
+    folderName = `${baseName}-${suffix}`;
+    suffix += 1;
+  }
+  usedFolderNames.add(folderName);
+  return folderName;
 }
 
 export function safeSelfEmploymentProjectId(value: string): string {
@@ -329,6 +351,17 @@ function offerLabelFactor(labelId: string): number {
 
 function safeProjectId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "project";
+}
+
+function safeProjectFolderSlug(value: string): string {
+  return (
+    value
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "project"
+  );
 }
 
 function record(value: unknown): Record<string, unknown> {

@@ -87,7 +87,7 @@ export async function writeVaultState(rootPath: string, state: AppState): Promis
   await removeDeletedSelfEmploymentProjectFolders(
     rootPath,
     existingProjectIds,
-    state.selfEmployment.projects.map((project) => project.id)
+    Object.keys(dataFiles.selfEmploymentProjectFiles ?? {})
   );
   await writeJsonFile(manifestPath(rootPath), manifest);
 

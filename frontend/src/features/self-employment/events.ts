@@ -6,12 +6,14 @@ import {
   addSelfEmploymentInvoice,
   addSelfEmploymentProject,
   addSelfEmploymentGanttTodo,
+  closeSelfEmploymentProjectRenameDialog,
   deleteSelfEmploymentProject,
   hideSelfEmploymentIconPicker,
   removeSelfEmploymentGanttTodo,
   removeSelfEmploymentCollectionItem,
   renameSelfEmploymentProject,
   refreshSelfEmploymentProjectListPopup,
+  saveSelfEmploymentProjectRenameDialog,
   selectSelfEmploymentBillingTab,
   selectSelfEmploymentIcon,
   selectSelfEmploymentProject,
@@ -32,7 +34,8 @@ import {
   updateSelfEmploymentGanttTodoField,
   updateSelfEmploymentGanttTodoStatus,
   updateSelfEmploymentProjectField,
-  updateSelfEmploymentProjectListField
+  updateSelfEmploymentProjectListField,
+  updateSelfEmploymentProjectRenameDraft
 } from "./controller";
 import {
   closeSelfEmploymentGanttEditor,
@@ -46,6 +49,10 @@ export function onSelfEmploymentInput(event: Event, context: AppContext): boolea
   const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
   if (!target) return;
 
+  if (target.dataset.selfEmploymentProjectRenameField) {
+    updateSelfEmploymentProjectRenameDraft(target.dataset.selfEmploymentProjectRenameField, target.value);
+    return true;
+  }
   if (target.dataset.selfEmploymentGanttPhaseField && target.dataset.selfEmploymentProjectId && target.dataset.selfEmploymentGanttPhaseId) {
     updateSelfEmploymentGanttPhaseField(
       target.dataset.selfEmploymentProjectId,
@@ -220,6 +227,8 @@ export function onSelfEmploymentClick(event: MouseEvent, context: AppContext): b
 
   event.preventDefault();
   if (action === "self-employment-add-project") addSelfEmploymentProject();
+  if (action === "self-employment-cancel-project-rename") closeSelfEmploymentProjectRenameDialog();
+  if (action === "self-employment-save-project-rename") saveSelfEmploymentProjectRenameDialog();
   if (action === "self-employment-toggle-project-list") toggleSelfEmploymentProjectListPopup();
   if (action === "self-employment-close-project-list") toggleSelfEmploymentProjectListPopup(false);
   if (action === "self-employment-toggle-project-list-item") {
@@ -385,12 +394,14 @@ export function closeSelfEmploymentOverlays(): void {
   hideSelfEmploymentIconPicker();
   closeSelfEmploymentGanttEditor();
   closeSelfEmploymentTaskContextPopup();
+  selfEmploymentUiState.projectRenameDialog = null;
   selfEmploymentUiState.projectListPopupOpen = false;
   selfEmploymentUiState.projectListExpandedProjectId = null;
   selfEmploymentUiState.offerOverviewProjectId = null;
   if (typeof document !== "undefined") {
     document.querySelector<HTMLElement>(".self-employment-project-list-popup")?.remove();
     document.querySelector<HTMLElement>(".self-employment-offer-overview-popup")?.remove();
+    document.querySelector<HTMLElement>(".self-employment-project-dialog-backdrop")?.remove();
   }
 }
 
@@ -406,6 +417,11 @@ function closeSelfEmploymentOverlaysForTarget(target: HTMLElement | null): boole
   }
   if (selfEmploymentUiState.taskContextPopup && !target?.closest("[data-self-employment-task-context-popup]")) {
     closeSelfEmploymentTaskContextPopup();
+    closed = true;
+  }
+  if (selfEmploymentUiState.projectRenameDialog && !target?.closest(".self-employment-project-dialog")) {
+    selfEmploymentUiState.projectRenameDialog = null;
+    if (typeof document !== "undefined") document.querySelector<HTMLElement>(".self-employment-project-dialog-backdrop")?.remove();
     closed = true;
   }
   if (selfEmploymentUiState.projectListPopupOpen && !target?.closest(".self-employment-project-list-popup")) {

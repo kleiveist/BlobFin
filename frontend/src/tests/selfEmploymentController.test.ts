@@ -5,16 +5,19 @@ import type { IncomePlanningModel } from "../domain/incomePlanning";
 import { normalizeSelfEmploymentGanttPlan } from "../domain/selfEmploymentGantt";
 import {
   addSelfEmploymentProject,
+  closeSelfEmploymentProjectRenameDialog,
   configureSelfEmploymentHost,
   deleteSelfEmploymentProject,
   renderSelfEmploymentDashboard,
   renameSelfEmploymentProject,
+  saveSelfEmploymentProjectRenameDialog,
   toggleSelfEmploymentDashboardProject,
   toggleSelfEmploymentProjectLabel,
   updateSelfEmploymentProject,
-  updateSelfEmploymentProjectField
+  updateSelfEmploymentProjectField,
+  updateSelfEmploymentProjectRenameDraft
 } from "../features/self-employment/controller";
-import { onSelfEmploymentChange, onSelfEmploymentClick } from "../features/self-employment/events";
+import { onSelfEmploymentChange, onSelfEmploymentClick, onSelfEmploymentInput } from "../features/self-employment/events";
 import {
   evaluateSelfEmploymentProject,
   selfEmploymentProjectIsActive,
@@ -26,6 +29,7 @@ import { selfEmploymentUiState } from "../features/self-employment/uiState";
 afterEach(() => {
   selfEmploymentUiState.kanbanSelectedCard = null;
   selfEmploymentUiState.kanbanDrag = null;
+  selfEmploymentUiState.projectRenameDialog = null;
   selfEmploymentUiState.taskContextPopup = null;
   selfEmploymentUiState.projectListPopupOpen = false;
   selfEmploymentUiState.projectListExpandedProjectId = null;
@@ -49,10 +53,11 @@ describe("self employment controller persistence", () => {
     expect(host.state.selfEmployment.projects.some((project) => project.id === createdProjectId)).toBe(true);
 
     host.clearCalls();
-    vi.stubGlobal("window", { prompt: vi.fn(() => "Umbenannt"), confirm: vi.fn(() => true) });
     renameSelfEmploymentProject(createdProjectId);
+    updateSelfEmploymentProjectRenameDraft("name", "Umbenannt");
+    saveSelfEmploymentProjectRenameDialog();
 
-    expect(host.calls).toEqual(["sync", "render"]);
+    expect(host.calls).toEqual(["render", "sync", "render"]);
     expect(host.state.selfEmployment.projects.find((project) => project.id === createdProjectId)?.name).toBe("Umbenannt");
 
     host.clearCalls();
@@ -62,10 +67,59 @@ describe("self employment controller persistence", () => {
     expect(host.state.selfEmployment.projects.find((project) => project.id === createdProjectId)?.labels).toEqual(["Kunde"]);
 
     host.clearCalls();
+    vi.stubGlobal("window", { confirm: vi.fn(() => true) });
     deleteSelfEmploymentProject(createdProjectId);
 
     expect(host.calls).toEqual(["sync", "render"]);
     expect(host.state.selfEmployment.projects.some((project) => project.id === createdProjectId)).toBe(false);
+  });
+
+  it("opens project rename in a native app dialog without using window prompt", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const projectId = host.state.selfEmployment.projects[0].id;
+    const prompt = vi.fn(() => "Browser-Prompt");
+    vi.stubGlobal("window", { prompt, confirm: vi.fn(() => true) });
+
+    onSelfEmploymentClick(
+      fakeMouseEvent(fakeProjectListButton("self-employment-rename-project", projectId)),
+      fakeAppContext(host.state, { request: vi.fn() })
+    );
+
+    expect(prompt).not.toHaveBeenCalled();
+    expect(selfEmploymentUiState.projectRenameDialog).toMatchObject({
+      projectId,
+      name: host.state.selfEmployment.projects[0].name,
+      error: ""
+    });
+    expect(host.calls).toEqual(["render"]);
+  });
+
+  it("validates and saves the native project rename dialog", () => {
+    const host = configureFakeSelfEmploymentHost();
+    const projectId = host.state.selfEmployment.projects[0].id;
+    renameSelfEmploymentProject(projectId);
+    host.clearCalls();
+
+    onSelfEmploymentInput(
+      { target: fakeProjectRenameInput("   ") } as unknown as Event,
+      fakeAppContext(host.state, { request: vi.fn() })
+    );
+    saveSelfEmploymentProjectRenameDialog();
+
+    expect(selfEmploymentUiState.projectRenameDialog?.error).toBe("Bitte einen Projektnamen eingeben.");
+    expect(host.state.selfEmployment.projects[0].name).not.toBe("Native Umbenennung");
+    expect(host.calls).toEqual(["render"]);
+
+    host.clearCalls();
+    updateSelfEmploymentProjectRenameDraft("name", "Native Umbenennung");
+    saveSelfEmploymentProjectRenameDialog();
+
+    expect(selfEmploymentUiState.projectRenameDialog).toBeNull();
+    expect(host.state.selfEmployment.projects[0].name).toBe("Native Umbenennung");
+    expect(host.calls).toEqual(["sync", "render"]);
+
+    closeSelfEmploymentProjectRenameDialog();
+    expect(host.calls).toEqual(["sync", "render"]);
   });
 
   it("syncs project updates before direct persistence", () => {
@@ -633,6 +687,15 @@ function fakeProjectListSelect(projectId: string, field: string, value: string, 
     closest: (selector: string) => (selector === ".self-employment-project-list-popup" ? popup : null)
   } as unknown as HTMLSelectElement;
   return target;
+}
+
+function fakeProjectRenameInput(value: string): HTMLInputElement {
+  return {
+    dataset: {
+      selfEmploymentProjectRenameField: "name"
+    },
+    value
+  } as unknown as HTMLInputElement;
 }
 
 function fakeProjectListPopup(focus: ReturnType<typeof vi.fn> = vi.fn()): HTMLElement {

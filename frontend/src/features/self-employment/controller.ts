@@ -26,6 +26,7 @@ import type {
 } from "../../types";
 import { selfEmploymentUiState } from "./uiState";
 import { configureSelfEmploymentGantt } from "./ganttController";
+import { configureSelfEmploymentProjectRename } from "./projectRename";
 import {
   evaluateSelfEmploymentProject,
   selfEmploymentPriorityLabel,
@@ -45,6 +46,7 @@ import {
   selfEmploymentTotals
 } from "./feasibilityController";
 import { selfEmploymentProjectCard } from "./renderProjectCards";
+import { renderSelfEmploymentProjectRenameDialog } from "./renderProjectDialog";
 import {
   investmentTableRow,
   profitTableRow,
@@ -69,6 +71,8 @@ interface SelfEmploymentHost {
 
 let host: SelfEmploymentHost;
 
+export { closeSelfEmploymentProjectRenameDialog, renameSelfEmploymentProject, saveSelfEmploymentProjectRenameDialog, updateSelfEmploymentProjectRenameDraft } from "./projectRename";
+
 export function configureSelfEmploymentHost(nextHost: SelfEmploymentHost): void {
   host = nextHost;
   configureSelfEmploymentGantt({
@@ -77,6 +81,7 @@ export function configureSelfEmploymentHost(nextHost: SelfEmploymentHost): void 
     updateProject: updateSelfEmploymentProject,
     renderAll: () => host.renderAll()
   });
+  configureSelfEmploymentProjectRename({ getState: () => host.getState(), commitSelfEmploymentState, renderAll: () => host.renderAll() });
 }
 
 function requireSelfEmploymentHost(): void {
@@ -154,6 +159,7 @@ export function renderSelfEmploymentDashboard(): void {
       </div>
     </section>
     ${selfEmploymentProjectListPopup(evaluations)}
+    ${renderSelfEmploymentProjectRenameDialog(host.getState().selfEmployment.projects)}
     <section class="self-employment-metrics" aria-label="Projektuebergreifende Kennzahlen">
       ${selfEmploymentMetric("Aktive Projekte", intNumber(totals.activeProjects), `${intNumber(totals.totalProjects)} insgesamt`)}${selfEmploymentMetric("Neutral", intNumber(totals.neutralProjects), "Humankapital separat")}
     </section>
@@ -391,6 +397,7 @@ function normalizeSelfEmploymentSelection(): void {
 export function selectSelfEmploymentProject(projectId: string): void {
   if (!host.getState().selfEmployment.projects.some((project) => project.id === projectId)) return;
   selfEmploymentUiState.ganttEditor = null;
+  selfEmploymentUiState.projectRenameDialog = null;
   selfEmploymentUiState.projectListPopupOpen = false;
   selfEmploymentUiState.projectListExpandedProjectId = null;
   commitSelfEmploymentState({
@@ -539,6 +546,7 @@ export function selectSelfEmploymentIcon(projectId: string, icon: string): void 
 }
 
 export function renderSelfEmploymentIconPicker(): void {
+  if (typeof document === "undefined") return;
   const picker = document.querySelector<HTMLDivElement>("#selfEmploymentUiState.iconPicker");
   if (!picker) return;
   if (!selfEmploymentUiState.iconPicker) {
@@ -584,17 +592,6 @@ export function renderSelfEmploymentIconPicker(): void {
   picker.hidden = false;
 }
 
-export function renameSelfEmploymentProject(projectId: string): void {
-  const project = host.getState().selfEmployment.projects.find((item) => item.id === projectId);
-  if (!project) return;
-  const nextName = window.prompt("Projekt umbenennen", project.name)?.trim();
-  if (!nextName || nextName === project.name) return;
-  commitSelfEmploymentState({
-    ...host.getState().selfEmployment,
-    projects: host.getState().selfEmployment.projects.map((item) => (item.id === projectId ? { ...item, name: nextName } : item))
-  }, { render: true });
-}
-
 export function deleteSelfEmploymentProject(projectId: string): void {
   const project = host.getState().selfEmployment.projects.find((item) => item.id === projectId);
   if (!project) return;
@@ -605,6 +602,7 @@ export function deleteSelfEmploymentProject(projectId: string): void {
   if (selfEmploymentUiState.labelPickerProjectId === projectId) selfEmploymentUiState.labelPickerProjectId = null;
   if (selfEmploymentUiState.iconPicker?.projectId === projectId) selfEmploymentUiState.iconPicker = null;
   if (selfEmploymentUiState.ganttEditor?.projectId === projectId) selfEmploymentUiState.ganttEditor = null;
+  if (selfEmploymentUiState.projectRenameDialog?.projectId === projectId) selfEmploymentUiState.projectRenameDialog = null;
   if (selfEmploymentUiState.projectListExpandedProjectId === projectId) selfEmploymentUiState.projectListExpandedProjectId = null;
   commitSelfEmploymentState({
     ...host.getState().selfEmployment,

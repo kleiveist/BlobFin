@@ -162,8 +162,8 @@ describe("vault serializer", () => {
       completed: false
     };
     const serialized = serializeVaultState(state);
-    const serializedCanvas = serialized.selfEmploymentCanvasFiles?.[state.selfEmployment.projects[0].businessIdeaCanvasFile];
-    const projectFiles = serialized.selfEmploymentProjectFiles?.[state.selfEmployment.projects[0].id];
+    const serializedCanvas = serialized.selfEmploymentCanvasFiles?.["planning/projects/vault-projekt/canvas-geschaeftsidee.canvas"];
+    const projectFiles = serialized.selfEmploymentProjectFiles?.["vault-projekt"];
     const loaded = normalizeStoredState(deserializeVaultState(serialized));
 
     expect(loaded.ui.activeSection).toBe("combined_wealth");
@@ -233,7 +233,6 @@ describe("vault serializer", () => {
 
   it("prefers external .canvas files after project file rehydration", () => {
     const state = stateWithPersistentSelfEmploymentProject();
-    const project = state.selfEmployment.projects[0];
     const serialized = serializeVaultState(state);
     const staleProjectCanvas = {
       nodes: [{ id: "stale-project-file-card", type: "text", text: "Aus project files", x: 0, y: 0, width: 240, height: 120 }],
@@ -246,13 +245,13 @@ describe("vault serializer", () => {
 
     serialized.selfEmploymentProjectFiles = {
       ...serialized.selfEmploymentProjectFiles,
-      [project.id]: {
-        ...serialized.selfEmploymentProjectFiles?.[project.id],
+      "roundtrip-projekt": {
+        ...serialized.selfEmploymentProjectFiles?.["roundtrip-projekt"],
         "canvas-geschaeftsidee.canvas": staleProjectCanvas
       }
     };
     serialized.selfEmploymentCanvasFiles = {
-      [project.businessIdeaCanvasFile]: externalCanvas
+      "planning/projects/roundtrip-projekt/canvas-geschaeftsidee.canvas": externalCanvas
     };
 
     const loaded = normalizeStoredState(deserializeVaultState(serialized));
@@ -333,9 +332,10 @@ describe("vault storage", () => {
       selectedProjectId: state.selfEmployment.selectedProjectId,
       selectedRoadmapAreaId: "planning"
     });
-    expect(vault.readJson(joinVaultPath(profilePath(rootPath), "planning/projects/self-project-example/project.json"))).toMatchObject({
+    expect(vault.readJson(joinVaultPath(profilePath(rootPath), "planning/projects/roundtrip-projekt/project.json"))).toMatchObject({
       id: "self-project-example",
       name: "Roundtrip-Projekt",
+      businessIdeaCanvasFile: "planning/projects/roundtrip-projekt/canvas-geschaeftsidee.canvas",
       createdAt: expect.any(String),
       updatedAt: expect.any(String)
     });
@@ -353,7 +353,7 @@ describe("vault storage", () => {
       "invoices.json",
       "contacts.json"
     ]) {
-      expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/self-project-example", fileName))).toBe(true);
+      expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/roundtrip-projekt", fileName))).toBe(true);
     }
   });
 
@@ -367,7 +367,7 @@ describe("vault storage", () => {
       name: "Lokaler Entwurf"
     };
     const vaultState = stateWithPersistentSelfEmploymentProject();
-    const projectPath = joinVaultPath(profilePath(rootPath), "planning/projects/self-project-example/project.json");
+    const projectPath = joinVaultPath(profilePath(rootPath), "planning/projects/roundtrip-projekt/project.json");
 
     saveState(localState, storage);
     await writeVaultState(rootPath, vaultState);
@@ -390,6 +390,32 @@ describe("vault storage", () => {
     expect(readVaultFallbackMetadata(storage)?.vaultRootPath).toBe(rootPath);
   });
 
+  it("writes duplicate self employment project names into unique name folders", async () => {
+    const vault = useMemoryVaultFiles();
+    const rootPath = "/tmp/blobfin-duplicate-project-vault";
+    const state = stateWithPersistentSelfEmploymentProject();
+    const duplicateProject = {
+      ...state.selfEmployment.projects[0],
+      id: "second-project-id",
+      name: state.selfEmployment.projects[0].name,
+      businessIdeaCanvasFile: "planning/projects/second-project-id/canvas-geschaeftsidee.canvas"
+    };
+    state.selfEmployment.projects = [state.selfEmployment.projects[0], duplicateProject];
+
+    await writeVaultState(rootPath, state);
+
+    expect(vault.readJson(joinVaultPath(profilePath(rootPath), "planning/projects/roundtrip-projekt/project.json"))).toMatchObject({
+      id: "self-project-example",
+      name: "Roundtrip-Projekt"
+    });
+    expect(vault.readJson(joinVaultPath(profilePath(rootPath), "planning/projects/roundtrip-projekt-2/project.json"))).toMatchObject({
+      id: "second-project-id",
+      name: "Roundtrip-Projekt"
+    });
+    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/self-project-example/project.json"))).toBe(false);
+    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/second-project-id/project.json"))).toBe(false);
+  });
+
   it("removes deleted self employment project folders from the vault", async () => {
     const vault = useMemoryVaultFiles();
     const rootPath = "/tmp/blobfin-delete-vault";
@@ -409,11 +435,11 @@ describe("vault storage", () => {
     };
 
     await writeVaultState(rootPath, stateWithTwoProjects);
-    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/deleted-project/project.json"))).toBe(true);
+    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/wird-geloescht/project.json"))).toBe(true);
 
     await writeVaultState(rootPath, state);
-    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/deleted-project/project.json"))).toBe(false);
-    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/deleted-project/canvas-geschaeftsidee.canvas"))).toBe(false);
+    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/wird-geloescht/project.json"))).toBe(false);
+    expect(vault.has(joinVaultPath(profilePath(rootPath), "planning/projects/wird-geloescht/canvas-geschaeftsidee.canvas"))).toBe(false);
 
     const loaded = normalizeStoredState(await readVaultState(rootPath));
     expect(loaded.selfEmployment.projects.map((project) => project.id)).toEqual(["self-project-example"]);
@@ -459,10 +485,10 @@ describe("vault storage", () => {
     await writeVaultState(rootPath, state);
     const snapshot = await createVaultSnapshot(rootPath);
 
-    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/self-project-example/project.json"))).toBe(true);
-    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/self-project-example/cards.json"))).toBe(true);
-    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/self-project-example/gantt.json"))).toBe(true);
-    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/self-project-example/invoices.json"))).toBe(true);
+    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/roundtrip-projekt/project.json"))).toBe(true);
+    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/roundtrip-projekt/cards.json"))).toBe(true);
+    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/roundtrip-projekt/gantt.json"))).toBe(true);
+    expect(vault.has(joinVaultPath(snapshot.backupPath, "planning/projects/roundtrip-projekt/invoices.json"))).toBe(true);
   });
 
   it("merges self employment sidecar canvases into raw vault state before normalization", async () => {
