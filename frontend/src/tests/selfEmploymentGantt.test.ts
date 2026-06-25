@@ -186,12 +186,18 @@ describe("self employment project gantt", () => {
           { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" as const }
         ])
       ),
-      cardPlans: Array.from({ length: 5 }, (_, index) => ({ cardId: `card-${index + 1}`, timeBudgetHours: 1 }))
+      cardPlans: Array.from({ length: 5 }, (_, index) => ({
+        cardId: `card-${index + 1}`,
+        timeBudgetHours: 1,
+        completed: index === 0
+      }))
     });
 
     const html = renderSelfEmploymentProjectGantt(project);
 
     expect(html).not.toContain("self-employment-project-gantt-label condensed");
+    expect(html).toContain('class="self-employment-project-gantt-card completed"');
+    expect(html).toContain("--self-employment-gantt-card-progress-percent: 100%;");
     expect(html).toContain('data-self-employment-gantt-card-id="card-5"');
     expect(html).toContain("Karte 5");
   });
@@ -209,17 +215,19 @@ describe("self employment project gantt", () => {
         "small-card-b": { labelId: "idea", phaseId: "phase-1", shape: "rounded-rectangle" }
       },
       cardPlans: [
-        { cardId: "large-card", timeBudgetHours: 92 },
-        { cardId: "small-card-a", timeBudgetHours: 4 },
-        { cardId: "small-card-b", timeBudgetHours: 4 }
+        { cardId: "large-card", timeBudgetHours: 94, completed: true },
+        { cardId: "small-card-a", timeBudgetHours: 3 },
+        { cardId: "small-card-b", timeBudgetHours: 3 }
       ]
     });
 
     const html = renderSelfEmploymentProjectGantt(project);
 
     expect(html).toContain("self-employment-project-gantt-label condensed");
+    expect(html).toContain("--self-employment-gantt-progress-percent: 94%;");
     expect(html).toContain('data-action="self-employment-gantt-open-label"');
     expect(html).toContain("Idee · 100 h");
+    expect(html).toContain("94 % erledigt");
   });
 
   it("renders a dense label detail popup with clickable card rows", () => {

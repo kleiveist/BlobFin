@@ -43,8 +43,8 @@ const SELF_EMPLOYMENT_GANTT_POPOVER_MARGIN_PX = 12;
 const SELF_EMPLOYMENT_GANTT_POPOVER_GAP_PX = 8;
 const SELF_EMPLOYMENT_GANTT_POPOVER_WIDTH_PX = 560;
 const SELF_EMPLOYMENT_GANTT_POPOVER_ESTIMATED_HEIGHT_PX = 420;
-const SELF_EMPLOYMENT_GANTT_MIN_LABEL_WIDTH_PERCENT = 8;
-const SELF_EMPLOYMENT_GANTT_MIN_CARD_WIDTH_PERCENT = 6;
+const SELF_EMPLOYMENT_GANTT_MIN_LABEL_WIDTH_PERCENT = 5.5;
+const SELF_EMPLOYMENT_GANTT_MIN_CARD_WIDTH_PERCENT = 3.5;
 
 function selfEmploymentGanttPopoverPosition(trigger: HTMLElement): { top: number; left: number } {
   const rect = trigger.getBoundingClientRect();
@@ -215,14 +215,17 @@ function renderSelfEmploymentProjectGanttLabel(
   const left = selfEmploymentGanttPercent(label.startPercent);
   const width = selfEmploymentGanttPercent(label.widthPercent);
   const condensed = selfEmploymentGanttLabelIsCondensed(label);
+  const progressPercent = selfEmploymentGanttLabelProgressPercent(label);
+  const progressStyle = selfEmploymentGanttProgressPercent(progressPercent);
   const cards = label.cards
     .map((card) => {
       const cardWidth = selfEmploymentGanttPercent(card.widthPercent);
+      const cardProgress = selfEmploymentGanttProgressPercent(card.progressPercent);
       return `
         <button
           class="self-employment-project-gantt-card${card.completed ? " completed" : ""}"
           type="button"
-          style="flex-basis: ${cardWidth}%;"
+          style="flex-basis: ${cardWidth}%; --self-employment-gantt-card-progress-percent: ${cardProgress}%;"
           data-action="self-employment-gantt-open-card"
           data-self-employment-project-id="${escapeHtml(project.id)}"
           data-self-employment-gantt-card-id="${escapeHtml(card.cardId)}"
@@ -239,7 +242,7 @@ function renderSelfEmploymentProjectGanttLabel(
   return `
     <div
       class="self-employment-project-gantt-label${condensed ? " condensed" : ""}"
-      style="left: ${left}%; width: ${width}%; --self-employment-gantt-color: ${escapeHtml(selfEmploymentGanttLabelColor(label.labelId))};"
+      style="left: ${left}%; width: ${width}%; --self-employment-gantt-color: ${escapeHtml(selfEmploymentGanttLabelColor(label.labelId))}; --self-employment-gantt-progress-percent: ${progressStyle}%;"
       title="${escapeHtml(`${label.labelName}: ${hoursLabel(label.totalHours)}`)}"
     >
       <button
@@ -252,7 +255,7 @@ function renderSelfEmploymentProjectGanttLabel(
         aria-label="${escapeHtml(`${label.labelName} Detailansicht oeffnen`)}"
       >
         <span>${escapeHtml(`${label.labelName} · ${hoursLabel(label.totalHours)}`)}</span>
-        <small>${escapeHtml(`${intNumber(label.cards.length)} Karten`)}</small>
+        <small>${escapeHtml(`${intNumber(progressPercent)} % erledigt · ${intNumber(label.cards.length)} Karten`)}</small>
       </button>
       <div class="self-employment-project-gantt-label-standard">
         <div class="self-employment-project-gantt-label-head">
@@ -265,6 +268,12 @@ function renderSelfEmploymentProjectGanttLabel(
       </div>
     </div>
   `;
+}
+
+function selfEmploymentGanttLabelProgressPercent(label: SelfEmploymentGanttSummary["rows"][number]["labels"][number]): number {
+  if (label.totalHours <= 0) return 0;
+  const completedHours = label.cards.reduce((sum, card) => sum + card.timeBudgetHours * (clamp(card.progressPercent, 0, 100) / 100), 0);
+  return clamp(Math.round((completedHours / label.totalHours) * 100), 0, 100);
 }
 
 function selfEmploymentGanttLabelIsCondensed(label: SelfEmploymentGanttSummary["rows"][number]["labels"][number]): boolean {
@@ -704,6 +713,10 @@ export function selfEmploymentGanttPhaseNumber(phaseId: string): string {
 
 function selfEmploymentGanttPercent(value: number): string {
   return String(Math.round(clamp(value, 0, 100) * 1000) / 1000);
+}
+
+function selfEmploymentGanttProgressPercent(value: number): string {
+  return String(Math.round(clamp(value, 0, 100) * 10) / 10);
 }
 
 function selfEmploymentOption(value: string, label: string, selectedValue: string): string {
