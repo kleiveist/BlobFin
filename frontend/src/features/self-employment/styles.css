@@ -1,3 +1,10 @@
+:root {
+  --self-employment-completed-border: #15803d;
+  --self-employment-completed-fill: #16a34a;
+  --self-employment-completed-badge-bg: #dcfce7;
+  --self-employment-completed-badge-text: #166534;
+}
+
 .self-employment-dashboard {
   position: relative;
   display: grid;
@@ -802,7 +809,7 @@
 }
 
 .self-employment-project-gantt-label {
-  --self-employment-gantt-progress-color: #8fa39a;
+  --self-employment-gantt-progress-color: var(--self-employment-completed-fill);
   position: absolute;
   top: 6px;
   bottom: 6px;
@@ -918,7 +925,7 @@
 }
 
 .self-employment-project-gantt-card {
-  --self-employment-gantt-card-progress-color: #8fa39a;
+  --self-employment-gantt-card-progress-color: var(--self-employment-completed-fill);
   display: grid;
   align-content: center;
   position: relative;
@@ -974,15 +981,15 @@
 }
 
 .self-employment-project-gantt-card.completed {
-  border-color: color-mix(in srgb, #6f877c 62%, var(--border));
+  border-color: color-mix(in srgb, var(--self-employment-completed-border) 65%, var(--border));
   background:
-    linear-gradient(90deg, color-mix(in srgb, #6f877c 42%, transparent) 0 100%) left bottom / 100% 3px no-repeat,
-    color-mix(in srgb, #8fa39a 16%, var(--surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #6f877c 18%, transparent);
+    linear-gradient(90deg, color-mix(in srgb, var(--self-employment-completed-border) 42%, transparent) 0 100%) left bottom / 100% 3px no-repeat,
+    color-mix(in srgb, var(--self-employment-completed-fill) 13%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--self-employment-completed-border) 18%, transparent);
 }
 
 .self-employment-project-gantt-card.completed small {
-  color: color-mix(in srgb, #4f6359 72%, var(--muted));
+  color: color-mix(in srgb, var(--self-employment-completed-badge-text) 62%, var(--muted));
 }
 
 .self-employment-project-gantt-empty {
@@ -1105,9 +1112,9 @@
 }
 
 .self-employment-gantt-label-detail-card.completed {
-  border-color: color-mix(in srgb, #6f877c 48%, var(--border));
-  border-left-color: #6f877c;
-  background: color-mix(in srgb, #8fa39a 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--self-employment-completed-border) 48%, var(--border));
+  border-left-color: var(--self-employment-completed-border);
+  background: color-mix(in srgb, var(--self-employment-completed-fill) 13%, var(--surface));
 }
 
 .self-employment-gantt-label-detail-card span {
@@ -1127,7 +1134,7 @@
 }
 
 .self-employment-gantt-label-detail-card.completed .self-employment-gantt-label-detail-title {
-  color: color-mix(in srgb, #4f6359 74%, var(--text));
+  color: color-mix(in srgb, var(--self-employment-completed-badge-text) 72%, var(--text));
   text-decoration: line-through;
 }
 
@@ -1141,24 +1148,24 @@
 }
 
 .self-employment-project-gantt-card.completed span {
-  color: color-mix(in srgb, #4f6359 76%, var(--text));
+  color: color-mix(in srgb, var(--self-employment-completed-badge-text) 74%, var(--text));
   text-decoration: line-through;
 }
 
 :root[data-theme="dark"] .self-employment-project-gantt-label {
-  --self-employment-gantt-progress-color: #22c55e;
+  --self-employment-gantt-progress-color: var(--self-employment-completed-fill);
 }
 
 :root[data-theme="dark"] .self-employment-project-gantt-card {
-  --self-employment-gantt-card-progress-color: #22c55e;
+  --self-employment-gantt-card-progress-color: var(--self-employment-completed-fill);
 }
 
 :root[data-theme="dark"] .self-employment-project-gantt-card.completed {
-  border-color: color-mix(in srgb, #22c55e 68%, var(--border));
+  border-color: color-mix(in srgb, var(--self-employment-completed-border) 68%, var(--border));
   background:
-    linear-gradient(90deg, color-mix(in srgb, #22c55e 36%, transparent) 0 100%) left bottom / 100% 3px no-repeat,
-    color-mix(in srgb, #16a34a 16%, var(--surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #22c55e 18%, transparent);
+    linear-gradient(90deg, color-mix(in srgb, var(--self-employment-completed-border) 36%, transparent) 0 100%) left bottom / 100% 3px no-repeat,
+    color-mix(in srgb, var(--self-employment-completed-fill) 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--self-employment-completed-border) 18%, transparent);
 }
 
 :root[data-theme="dark"] .self-employment-project-gantt-card.completed span,
@@ -1171,9 +1178,9 @@
 }
 
 :root[data-theme="dark"] .self-employment-gantt-label-detail-card.completed {
-  border-color: color-mix(in srgb, #22c55e 48%, var(--border));
-  border-left-color: #22c55e;
-  background: color-mix(in srgb, #16a34a 13%, var(--surface));
+  border-color: color-mix(in srgb, var(--self-employment-completed-border) 48%, var(--border));
+  border-left-color: var(--self-employment-completed-border);
+  background: color-mix(in srgb, var(--self-employment-completed-fill) 13%, var(--surface));
 }
 
 .self-employment-gantt-status-switch {
@@ -1240,6 +1247,13 @@
   border-radius: 8px;
   background: var(--surface);
   padding: 9px;
+}
+
+.self-employment-gantt-todo-row.completed {
+  border-color: color-mix(in srgb, var(--self-employment-completed-border) 45%, var(--border));
+  border-left-color: var(--self-employment-completed-border);
+  background: color-mix(in srgb, var(--self-employment-completed-fill) 10%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--self-employment-completed-border) 10%, transparent);
 }
 
 .self-employment-gantt-todo-row.completed input[type="text"] {
@@ -1564,10 +1578,14 @@
 }
 
 .self-employment-task-dashboard-item.completed {
-  opacity: 0.72;
+  border-color: color-mix(in srgb, var(--self-employment-completed-border) 45%, var(--border));
+  border-left-color: var(--self-employment-completed-border);
+  background: color-mix(in srgb, var(--self-employment-completed-fill) 10%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--self-employment-completed-border) 10%, transparent);
 }
 
 .self-employment-task-dashboard-item.completed strong {
+  color: var(--muted);
   text-decoration: line-through;
 }
 
@@ -1654,6 +1672,12 @@
 .self-employment-task-context-item.active {
   border-color: color-mix(in srgb, var(--self-employment-gantt-color) 56%, var(--border));
   background: color-mix(in srgb, var(--self-employment-gantt-color) 10%, var(--surface));
+}
+
+.self-employment-task-context-item.completed {
+  border-color: color-mix(in srgb, var(--self-employment-completed-border) 45%, var(--border));
+  border-left-color: var(--self-employment-completed-border);
+  background: color-mix(in srgb, var(--self-employment-completed-fill) 10%, var(--surface));
 }
 
 .self-employment-task-context-item.completed strong {

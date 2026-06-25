@@ -233,11 +233,15 @@ describe("self employment project gantt", () => {
     expect(html).toContain("94 % erledigt");
   });
 
-  it("uses muted light-theme completed colors and keeps dark-theme success contrast", () => {
-    expect(selfEmploymentStylesSource).toContain("--self-employment-gantt-progress-color: #8fa39a");
-    expect(selfEmploymentStylesSource).toContain("border-left-color: #6f877c");
+  it("uses canvas completed green for Gantt and completed task states", () => {
+    expect(selfEmploymentStylesSource).toContain("--self-employment-completed-border: #15803d");
+    expect(selfEmploymentStylesSource).toContain("--self-employment-completed-fill: #16a34a");
+    expect(selfEmploymentStylesSource).toContain("--self-employment-gantt-progress-color: var(--self-employment-completed-fill)");
+    expect(selfEmploymentStylesSource).toContain("border-left-color: var(--self-employment-completed-border)");
+    expect(selfEmploymentStylesSource).toContain(".self-employment-gantt-todo-row.completed");
+    expect(selfEmploymentStylesSource).toContain(".self-employment-task-dashboard-item.completed");
+    expect(selfEmploymentStylesSource).toContain(".self-employment-task-context-item.completed");
     expect(selfEmploymentStylesSource).toContain(':root[data-theme="dark"] .self-employment-project-gantt-card.completed');
-    expect(selfEmploymentStylesSource).toContain("border-left-color: #22c55e");
   });
 
   it("uses the same visible-width condensation rule for labels at the start and end", () => {
