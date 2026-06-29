@@ -4,12 +4,18 @@ import { defaultAppState } from "../data/defaults";
 import { defaultBusinessIdeaCanvasForProject, normalizeBusinessIdeaCanvasMeta } from "../domain/businessIdeaCanvas";
 import { normalizeSelfEmploymentGanttPlan } from "../domain/selfEmploymentGantt";
 import {
+  businessIdeaCanvasDragNodeIdsForNode,
   handleBusinessIdeaCanvasKeyDown,
   toggleBusinessIdeaCanvasGanttSummary
 } from "../features/self-employment/business-canvas/controller";
 import { configureBusinessCanvasHost } from "../features/self-employment/business-canvas/host";
 import {
+  duplicateBusinessIdeaCanvasSelectedNode,
+  editBusinessIdeaCanvasNode,
+  finishBusinessIdeaCanvasNodeEdit,
   handleBusinessIdeaCanvasDoubleClick,
+  updateBusinessIdeaCanvasGroupName,
+  updateBusinessIdeaCanvasNodeText,
   updateBusinessIdeaCanvasSelectedNodeField
 } from "../features/self-employment/business-canvas/nodeController";
 import { selectBusinessIdeaCanvasNodes } from "../features/self-employment/business-canvas/selectionController";
@@ -207,6 +213,86 @@ describe("business canvas controller", () => {
     expect(host.project().businessIdeaCanvasMeta.nodeMeta.group).toEqual(originalGroupMeta);
   });
 
+  it("updates card text in canvas state and duplicates it with the card", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "a", type: "text", text: "Alter Text", x: 0, y: 0, width: 100, height: 80 }
+    ]);
+
+    updateBusinessIdeaCanvasNodeText("a", "Persistierter Text");
+    selectBusinessIdeaCanvasNodes(host.projectId, ["a"]);
+    duplicateBusinessIdeaCanvasSelectedNode();
+
+    const texts = host.project().businessIdeaCanvas.nodes.map((node) => (node.type === "text" ? node.text : ""));
+    expect(texts).toEqual(["Persistierter Text", "Persistierter Text"]);
+  });
+
+  it("finishes card text editing from the current editable content", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "a", type: "text", text: "Alter Text", x: 0, y: 0, width: 100, height: 80 }
+    ]);
+    businessCanvasUiState.editingNode = { projectId: host.projectId, nodeId: "a" };
+
+    finishBusinessIdeaCanvasNodeEdit("a", "Finaler Text");
+
+    expect(host.project().businessIdeaCanvas.nodes[0]).toMatchObject({ text: "Finaler Text" });
+    expect(businessCanvasUiState.editingNode).toBeNull();
+  });
+
+  it("starts group name editing from the node context action", () => {
+    vi.useFakeTimers();
+    const host = configureFakeBusinessCanvasHost([
+      { id: "group", type: "group", label: "Gruppe", x: -20, y: -20, width: 260, height: 180 }
+    ]);
+    const focus = vi.fn();
+    const select = vi.fn();
+    const input = groupNameInputStub(focus, select);
+    vi.stubGlobal("HTMLInputElement", FakeInputElement);
+    vi.stubGlobal("window", {
+      setTimeout: (handler: () => void, timeout?: number) => setTimeout(handler, timeout)
+    });
+    vi.stubGlobal("document", {
+      querySelector: (selector: string) => (selector.startsWith("[data-business-canvas-group-name-input=") ? input : null),
+      querySelectorAll: () => []
+    });
+
+    editBusinessIdeaCanvasNode("group", host.projectId);
+    vi.runAllTimers();
+
+    expect(businessCanvasUiState.editingNode).toEqual({ projectId: host.projectId, nodeId: "group" });
+    expect(focus).toHaveBeenCalled();
+    expect(select).toHaveBeenCalled();
+  });
+
+  it("persists group names in metadata and the JSON canvas label", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "group", type: "group", label: "Gruppe", x: -20, y: -20, width: 260, height: 180, color: "4" }
+    ]);
+
+    updateBusinessIdeaCanvasGroupName("group", "Eigene Gruppe");
+
+    expect(host.project().businessIdeaCanvas.nodes[0]).toMatchObject({ label: "Eigene Gruppe" });
+    expect(host.project().businessIdeaCanvasMeta.groupMeta.group).toMatchObject({
+      name: "Eigene Gruppe",
+      color: "4"
+    });
+  });
+
+  it("resolves group drag nodes without changing visible card selection rules", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "inside", type: "text", text: "Inside", x: 0, y: 0, width: 80, height: 60 },
+      { id: "outside", type: "text", text: "Outside", x: 260, y: 0, width: 80, height: 60 },
+      { id: "group", type: "group", label: "Gruppe", x: -20, y: -20, width: 140, height: 120 }
+    ]);
+
+    expect(businessIdeaCanvasDragNodeIdsForNode(host.project(), "group", [], false)).toEqual(["group", "inside"]);
+    expect(businessIdeaCanvasDragNodeIdsForNode(host.project(), "group", ["inside"], false)).toEqual(["group"]);
+    expect(businessIdeaCanvasDragNodeIdsForNode(host.project(), "group", ["group", "outside"], false)).toEqual([
+      "group",
+      "outside"
+    ]);
+    expect(businessIdeaCanvasDragNodeIdsForNode(host.project(), "inside", ["inside"], false)).toEqual(["inside"]);
+  });
+
   it("moves the selected card with arrow keys and preserves selection", () => {
     const host = configureFakeBusinessCanvasHost([
       { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 }
@@ -313,6 +399,13 @@ describe("business canvas controller", () => {
   });
 });
 
+class FakeInputElement {
+  constructor(
+    public focus: () => void,
+    public select: () => void
+  ) {}
+}
+
 function configureFakeBusinessCanvasHost(nodes: JsonCanvasNode[], edges: JsonCanvasEdge[] = []): { projectId: string; project: () => SelfEmploymentProject } {
   const projectId = "project-keyboard";
   const state = defaultAppState();
@@ -346,6 +439,10 @@ function configureFakeBusinessCanvasHost(nodes: JsonCanvasNode[], edges: JsonCan
     projectId,
     project: () => state.selfEmployment.projects[0]
   };
+}
+
+function groupNameInputStub(focus: () => void, select: () => void): HTMLInputElement {
+  return new FakeInputElement(focus, select) as unknown as HTMLInputElement;
 }
 
 function renderSelectedMultiToolbar(project: SelfEmploymentProject, selectedNodeIds: string[]): string {

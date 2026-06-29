@@ -30,6 +30,7 @@ import {
   saveBusinessIdeaCanvasPaletteColor,
   startBusinessIdeaCanvasPointer,
   toggleBusinessIdeaCanvasGanttSummary,
+  updateBusinessIdeaCanvasGroupName,
   updateBusinessIdeaCanvasEdgeLabelDraft,
   updateBusinessIdeaCanvasGridField,
   updateBusinessIdeaCanvasMetaField,
@@ -48,6 +49,12 @@ export function handleBusinessCanvasInput(event: Event): boolean {
   const canvasTextTarget = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-business-canvas-node-text]");
   if (canvasTextTarget?.dataset.businessCanvasNodeText) {
     updateBusinessIdeaCanvasNodeText(canvasTextTarget.dataset.businessCanvasNodeText, canvasTextTarget.textContent ?? "");
+    return true;
+  }
+
+  const groupNameTarget = (event.target as HTMLElement | null)?.closest<HTMLInputElement>("[data-business-canvas-group-name-input]");
+  if (groupNameTarget?.dataset.businessCanvasGroupNameInput) {
+    updateBusinessIdeaCanvasGroupName(groupNameTarget.dataset.businessCanvasGroupNameInput, groupNameTarget.value);
     return true;
   }
 

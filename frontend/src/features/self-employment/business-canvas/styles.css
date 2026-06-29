@@ -336,6 +336,13 @@
   white-space: nowrap;
 }
 
+.business-canvas-group-title-input {
+  min-width: 120px;
+  border: 1px solid var(--accent-strong);
+  outline: none;
+  font: inherit;
+}
+
 .business-canvas-node.armed {
   outline: 3px dashed var(--gold);
   outline-offset: 4px;

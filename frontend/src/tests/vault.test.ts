@@ -6,6 +6,7 @@ import { readVaultFallbackMetadata, saveVaultFallbackMetadata } from "../lib/vau
 import { createVaultManifest, parseVaultManifest } from "../lib/vault/vaultManifest";
 import { deserializeVaultState, serializeVaultState } from "../lib/vault/vaultSerializer";
 import { createVaultSnapshot, joinVaultPath, manifestPath, profilePath, readVault, readVaultState, writeVaultState } from "../lib/vault/vaultStorage";
+import type { BusinessIdeaCanvas } from "../types";
 
 const tauriInvokeMock = vi.hoisted(() => vi.fn());
 const dialogOpenMock = vi.hoisted(() => vi.fn());
@@ -134,10 +135,13 @@ describe("vault serializer", () => {
     state.settings.interestRatePercent = 3.25;
     state.incomePlanning.habits[0] = { ...state.incomePlanning.habits[0], name: "Training" };
     state.selfEmployment.projects[0] = { ...state.selfEmployment.projects[0], name: "Vault-Projekt" };
+    const firstCanvasCard = state.selfEmployment.projects[0].businessIdeaCanvas.nodes[0];
     state.selfEmployment.projects[0].businessIdeaCanvas = {
       ...state.selfEmployment.projects[0].businessIdeaCanvas,
       nodes: [
-        ...state.selfEmployment.projects[0].businessIdeaCanvas.nodes,
+        ...state.selfEmployment.projects[0].businessIdeaCanvas.nodes.map((node) =>
+          node.id === firstCanvasCard.id && node.type === "text" ? { ...node, text: "Persistierter Kartentext" } : node
+        ),
         { id: "group-1", type: "group", label: "Planung", x: -40, y: -40, width: 500, height: 260, color: "5" }
       ]
     };
@@ -162,7 +166,9 @@ describe("vault serializer", () => {
       completed: false
     };
     const serialized = serializeVaultState(state);
-    const serializedCanvas = serialized.selfEmploymentCanvasFiles?.["planning/projects/vault-projekt/canvas-geschaeftsidee.canvas"];
+    const serializedCanvas = serialized.selfEmploymentCanvasFiles?.[
+      "planning/projects/vault-projekt/canvas-geschaeftsidee.canvas"
+    ] as BusinessIdeaCanvas | undefined;
     const projectFiles = serialized.selfEmploymentProjectFiles?.["vault-projekt"];
     const loaded = normalizeStoredState(deserializeVaultState(serialized));
 
@@ -171,6 +177,9 @@ describe("vault serializer", () => {
     expect(loaded.settings.interestRatePercent).toBe(3.25);
     expect(loaded.incomePlanning.habits[0].name).toBe("Training");
     expect(loaded.selfEmployment.projects[0].name).toBe("Vault-Projekt");
+    expect(loaded.selfEmployment.projects[0].businessIdeaCanvas.nodes.find((node) => node.id === firstCanvasCard.id)).toMatchObject({
+      text: "Persistierter Kartentext"
+    });
     expect(loaded.selfEmployment.projects[0].businessIdeaCanvasMeta.palette).toContainEqual({
       id: "custom",
       name: "Custom",
@@ -187,6 +196,9 @@ describe("vault serializer", () => {
       todos: [{ id: "vault-todo", title: "Nur Sidecar", eisenhowerQuadrant: "important_not_urgent", status: "planned", completed: false }]
     });
     expect(serializedCanvas).toBeDefined();
+    expect(serializedCanvas?.nodes.find((node) => node.id === firstCanvasCard.id)).toMatchObject({
+      text: "Persistierter Kartentext"
+    });
     expect(serialized.selfEmploymentState).toEqual({
       selectedProjectId: state.selfEmployment.selectedProjectId,
       selectedRoadmapAreaId: state.selfEmployment.selectedRoadmapAreaId

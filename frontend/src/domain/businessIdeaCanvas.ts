@@ -233,6 +233,30 @@ export function businessIdeaCanvasNodeText(node: JsonCanvasNode): string {
   return node.label || "Gruppe";
 }
 
+export function businessIdeaCanvasGroupDisplayName(
+  canvas: BusinessIdeaCanvas,
+  meta: BusinessIdeaCanvasMeta,
+  groupNode: JsonCanvasNode
+): string {
+  if (groupNode.type !== "group") return businessIdeaCanvasNodeText(groupNode);
+  const metaName = meta.groupMeta[groupNode.id]?.name.trim();
+  if (metaName) return metaName;
+  const nodeLabel = groupNode.label?.trim();
+  if (nodeLabel) return nodeLabel;
+  return businessIdeaCanvasGroupFallbackName(canvas, groupNode.id);
+}
+
+export function businessIdeaCanvasGroupEditValue(meta: BusinessIdeaCanvasMeta, groupNode: JsonCanvasNode): string {
+  if (groupNode.type !== "group") return "";
+  const metaItem = meta.groupMeta[groupNode.id];
+  return typeof metaItem?.name === "string" ? metaItem.name : groupNode.label ?? "";
+}
+
+export function businessIdeaCanvasGroupFallbackName(canvas: BusinessIdeaCanvas, groupId: string): string {
+  const index = canvas.nodes.filter((node) => node.type === "group").findIndex((node) => node.id === groupId);
+  return `Gruppe ${index >= 0 ? index + 1 : 1}`;
+}
+
 export function businessIdeaCanvasEndsForDirection(
   direction: BusinessIdeaCanvasEdgeDirection
 ): { fromEnd: JsonCanvasEnd; toEnd: JsonCanvasEnd } {
@@ -522,7 +546,7 @@ function parseNode(value: unknown, label: string): JsonCanvasNode {
     height: positiveIntegerValue(value.height, `${label}.height`),
     color: typeof value.color === "string" ? value.color : undefined
   };
-  if (type === "text") return { ...base, type, text: String(value.text ?? "") };
+  if (type === "text") return { ...base, type, text: String(value.text ?? value.labelText ?? value.fieldLabel ?? value.title ?? "") };
   if (type === "file") return { ...base, type, file: nonEmptyString(value.file, `${label}.file`), subpath: optionalString(value.subpath) };
   if (type === "link") return { ...base, type, url: nonEmptyString(value.url, `${label}.url`) };
   return {
@@ -736,7 +760,8 @@ function normalizeGroupMeta(
         : {};
     const rawNodeIds = Array.isArray(item.nodeIds) ? item.nodeIds : [];
     const nodeIds = Array.from(new Set(rawNodeIds.map(String).filter((nodeId) => cardIds.has(nodeId))));
-    const name = typeof item.name === "string" && item.name.trim() ? item.name.trim() : groupNode.label || "Gruppe";
+    const rawName = typeof item.name === "string" ? item.name : groupNode.label;
+    const name = typeof rawName === "string" ? rawName.trim() : "";
     const color = typeof item.color === "string" && item.color.trim() ? item.color.trim() : groupNode.color || "4";
     groupMeta[groupNode.id] = {
       nodeIds,

@@ -240,6 +240,46 @@ describe("storage", () => {
     expect(project.gantt.cardPlans.length).toBeGreaterThan(0);
   });
 
+  it("roundtrips business canvas card text and group names", () => {
+    const storage = new MemoryStorage();
+    const state = defaultAppState();
+    const project = state.selfEmployment.projects[0];
+    const firstCard = project.businessIdeaCanvas.nodes.find((node) => node.type === "text");
+    if (!firstCard || firstCard.type !== "text") throw new Error("Expected default canvas text card.");
+    project.businessIdeaCanvas = {
+      ...project.businessIdeaCanvas,
+      nodes: [
+        ...project.businessIdeaCanvas.nodes.map((node) =>
+          node.id === firstCard.id && node.type === "text" ? { ...node, text: "Persistierter Kartentext" } : node
+        ),
+        { id: "group-storage", type: "group", label: "Persistierte Gruppe", x: -40, y: -40, width: 420, height: 240, color: "5" }
+      ]
+    };
+    project.businessIdeaCanvasMeta = {
+      ...project.businessIdeaCanvasMeta,
+      groupMeta: {
+        ...project.businessIdeaCanvasMeta.groupMeta,
+        "group-storage": { nodeIds: [firstCard.id], name: "Persistierte Gruppe", color: "5" }
+      }
+    };
+
+    saveState(state, storage);
+    const loaded = loadState(storage);
+    const loadedProject = loaded.selfEmployment.projects[0];
+
+    expect(loadedProject.businessIdeaCanvas.nodes.find((node) => node.id === firstCard.id)).toMatchObject({
+      text: "Persistierter Kartentext"
+    });
+    expect(loadedProject.businessIdeaCanvas.nodes.find((node) => node.id === "group-storage")).toMatchObject({
+      label: "Persistierte Gruppe"
+    });
+    expect(loadedProject.businessIdeaCanvasMeta.groupMeta["group-storage"]).toMatchObject({
+      nodeIds: [firstCard.id],
+      name: "Persistierte Gruppe",
+      color: "5"
+    });
+  });
+
   it("roundtrips self employment project gantt state", () => {
     const storage = new MemoryStorage();
     const state = defaultAppState();

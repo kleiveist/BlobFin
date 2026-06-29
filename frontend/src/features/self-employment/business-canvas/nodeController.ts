@@ -54,6 +54,60 @@ export function updateBusinessIdeaCanvasNodeText(nodeId: string, text: string): 
   }));
 }
 
+export function updateBusinessIdeaCanvasGroupName(nodeId: string, name: string): void {
+  const projectId = businessCanvasUiState.editingNode?.projectId ?? businessCanvasHost().getState().selfEmployment.selectedProjectId;
+  updateBusinessIdeaCanvasProject(projectId, (project) => {
+    const groupNode = project.businessIdeaCanvas.nodes.find((node) => node.id === nodeId);
+    if (!groupNode || groupNode.type !== "group") return project;
+    const currentGroupMeta = project.businessIdeaCanvasMeta.groupMeta[nodeId] ?? {
+      nodeIds: [],
+      name: groupNode.label ?? "",
+      color: groupNode.color || "4"
+    };
+    return {
+      ...project,
+      businessIdeaCanvas: {
+        ...project.businessIdeaCanvas,
+        nodes: project.businessIdeaCanvas.nodes.map((node) =>
+          node.id === nodeId && node.type === "group" ? { ...node, label: name } : node
+        )
+      },
+      businessIdeaCanvasMeta: {
+        ...project.businessIdeaCanvasMeta,
+        groupMeta: {
+          ...project.businessIdeaCanvasMeta.groupMeta,
+          [nodeId]: {
+            ...currentGroupMeta,
+            name,
+            color: currentGroupMeta.color || groupNode.color || "4"
+          }
+        }
+      }
+    };
+  });
+}
+
+export function finishBusinessIdeaCanvasNodeEdit(nodeId: string, value: string): void {
+  const projectId = businessCanvasUiState.editingNode?.projectId ?? businessCanvasHost().getState().selfEmployment.selectedProjectId;
+  const project = businessCanvasProjectById(projectId);
+  const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === nodeId);
+  if (node?.type === "text") {
+    updateBusinessIdeaCanvasNodeText(nodeId, value);
+  } else if (node?.type === "group") {
+    updateBusinessIdeaCanvasGroupName(nodeId, value);
+  }
+  if (businessCanvasUiState.editingNode?.projectId === projectId && businessCanvasUiState.editingNode.nodeId === nodeId) {
+    businessCanvasUiState.editingNode = null;
+  }
+  renderAll();
+}
+
+export function cancelBusinessIdeaCanvasNodeEdit(): void {
+  if (!businessCanvasUiState.editingNode) return;
+  businessCanvasUiState.editingNode = null;
+  renderAll();
+}
+
 export function updateBusinessIdeaCanvasSelectedNodeField(field: string, value: string): void {
   const selection = businessCanvasUiState.selectedNodeIds;
   if (!selection?.nodeIds.length) return;
@@ -213,19 +267,24 @@ export function editBusinessIdeaCanvasNode(nodeId: string, projectIdOverride?: s
     projectIdOverride ?? businessCanvasUiState.selectedNodeIds?.projectId ?? businessCanvasHost().getState().selfEmployment.selectedProjectId;
   const project = businessCanvasProjectById(projectId);
   const node = project?.businessIdeaCanvas.nodes.find((item) => item.id === nodeId);
-  if (!project || !node || node.type !== "text") return;
+  if (!project || !node || (node.type !== "text" && node.type !== "group")) return;
   businessCanvasUiState.selectedNodeIds = { projectId, nodeIds: [nodeId] };
   businessCanvasUiState.selectedEdge = null;
   businessCanvasUiState.editingNode = { projectId, nodeId };
   closeBusinessIdeaCanvasOverlays();
   renderAll();
   window.setTimeout(() => {
-    const editor = document.querySelector<HTMLElement>(
-      `[data-business-canvas-node-text="${cssEscape(nodeId)}"]`
-    );
+    const editor =
+      node.type === "group"
+        ? document.querySelector<HTMLInputElement>(`[data-business-canvas-group-name-input="${cssEscape(nodeId)}"]`)
+        : document.querySelector<HTMLElement>(`[data-business-canvas-node-text="${cssEscape(nodeId)}"]`);
     if (!editor) return;
     editor.focus();
-    selectBusinessIdeaCanvasNodeText(editor);
+    if (typeof HTMLInputElement !== "undefined" && editor instanceof HTMLInputElement) {
+      editor.select();
+    } else {
+      selectBusinessIdeaCanvasNodeText(editor);
+    }
   }, 0);
 }
 

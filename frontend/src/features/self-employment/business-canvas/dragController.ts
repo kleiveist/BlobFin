@@ -7,7 +7,7 @@ import {
   snapBusinessIdeaCanvasValue
 } from "../../../domain/businessIdeaCanvas";
 import { numberValue } from "../../../lib/format";
-import type { JsonCanvasSide } from "../../../types";
+import type { JsonCanvasSide, SelfEmploymentProject } from "../../../types";
 import {
   businessCanvasProjectById,
   cssEscape,
@@ -138,9 +138,10 @@ export function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
       renderAll();
       return;
     }
-    const dragNodeIds =
+    const selectedNodeIds =
       resizeHandle || !currentSelection.includes(nodeId) ? [nodeId] : currentSelection.filter((item) => Boolean(item));
-    selectBusinessIdeaCanvasNodes(projectId, dragNodeIds);
+    const dragNodeIds = businessIdeaCanvasDragNodeIdsForNode(project, nodeId, currentSelection, Boolean(resizeHandle));
+    selectBusinessIdeaCanvasNodes(projectId, selectedNodeIds);
     businessCanvasUiState.selectedEdge = null;
     businessCanvasUiState.lineMenu = null;
     businessCanvasUiState.palettePopover = null;
@@ -217,6 +218,30 @@ export function startBusinessIdeaCanvasPointer(event: PointerEvent): void {
     viewportElement.setPointerCapture?.(event.pointerId);
     renderAll();
   }
+}
+
+export function businessIdeaCanvasDragNodeIdsForNode(
+  project: SelfEmploymentProject,
+  nodeId: string,
+  currentSelection: string[],
+  resizing: boolean
+): string[] {
+  if (resizing) return [nodeId];
+  const selectedIds = currentSelection.filter(Boolean);
+  const baseNodeIds = selectedIds.includes(nodeId) ? selectedIds : [nodeId];
+  const nodesById = new Map(project.businessIdeaCanvas.nodes.map((node) => [node.id, node]));
+  const clickedNode = nodesById.get(nodeId);
+  if (clickedNode?.type !== "group") return baseNodeIds;
+  const hasSelectedCards = selectedIds.some((id) => {
+    const selectedNode = nodesById.get(id);
+    return Boolean(selectedNode && selectedNode.type !== "group");
+  });
+  if (hasSelectedCards) return baseNodeIds;
+  const containedCardIds = baseNodeIds.flatMap((id) => {
+    const groupNode = nodesById.get(id);
+    return groupNode?.type === "group" ? businessIdeaCanvasNodesInsideRect(project.businessIdeaCanvas, groupNode) : [];
+  });
+  return Array.from(new Set([...baseNodeIds, ...containedCardIds]));
 }
 
 export function moveBusinessIdeaCanvasPointer(event: PointerEvent): void {

@@ -7,6 +7,8 @@ import {
   businessIdeaCanvasCardNodes,
   businessIdeaCanvasDirectionFromEdge,
   businessIdeaCanvasGanttRows,
+  businessIdeaCanvasGroupDisplayName,
+  businessIdeaCanvasGroupEditValue,
   businessIdeaCanvasNodeText,
   businessIdeaCanvasPaletteRows,
   canvasAnchorPoint
@@ -297,7 +299,10 @@ function renderBusinessIdeaCanvasNode(
   const phase = project.businessIdeaCanvasMeta.phases.find((item) => item.id === meta?.phaseId);
   const shape = node.type === "group" ? "rectangle" : meta?.shape ?? "rounded-rectangle";
   const colorClass = businessIdeaColorClass(node.color);
-  const text = businessIdeaCanvasNodeText(node);
+  const text =
+    node.type === "group"
+      ? businessIdeaCanvasGroupDisplayName(project.businessIdeaCanvas, project.businessIdeaCanvasMeta, node)
+      : businessIdeaCanvasNodeText(node);
   return `
     <article
       class="business-canvas-node ${node.type === "group" ? "business-canvas-group-node" : ""} business-canvas-shape-${shape} ${colorClass}${selected ? " selected" : ""}${editing ? " editing" : ""}${armed ? " armed" : ""}${completed ? " completed" : ""}"
@@ -310,7 +315,7 @@ function renderBusinessIdeaCanvasNode(
     >
       ${
         node.type === "group"
-          ? `<div class="business-canvas-group-title">${escapeHtml(text)}</div>`
+          ? renderBusinessIdeaCanvasGroupTitle(project, node, text, editing)
           : `<div class="business-canvas-node-badges">
               <span>${escapeHtml(label?.name ?? "Idee")}</span>
               <span class="business-canvas-phase-badge" title="${escapeHtml(phase?.name ?? "Phase 1")}">${escapeHtml(
@@ -327,6 +332,25 @@ function renderBusinessIdeaCanvasNode(
       ${node.type !== "group" ? renderBusinessIdeaCanvasAnchors(node.id) : ""}
       ${selected ? `<span class="business-canvas-resize-handle" data-business-canvas-resize="${escapeHtml(node.id)}"></span>` : ""}
     </article>
+  `;
+}
+
+function renderBusinessIdeaCanvasGroupTitle(
+  project: SelfEmploymentProject,
+  node: JsonCanvasNode,
+  displayName: string,
+  editing: boolean
+): string {
+  if (node.type !== "group") return "";
+  if (!editing) return `<div class="business-canvas-group-title">${escapeHtml(displayName)}</div>`;
+  return `
+    <input
+      class="business-canvas-group-title business-canvas-group-title-input"
+      type="text"
+      value="${escapeHtml(businessIdeaCanvasGroupEditValue(project.businessIdeaCanvasMeta, node))}"
+      data-business-canvas-group-name-input="${escapeHtml(node.id)}"
+      aria-label="Gruppenname bearbeiten"
+    />
   `;
 }
 

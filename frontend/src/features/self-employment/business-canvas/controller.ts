@@ -15,7 +15,11 @@ import {
   deleteBusinessIdeaCanvasSelectedEdge
 } from "./edgeController";
 import { businessCanvasHost } from "./host";
-import { deleteBusinessIdeaCanvasSelectedNode } from "./nodeController";
+import {
+  cancelBusinessIdeaCanvasNodeEdit,
+  deleteBusinessIdeaCanvasSelectedNode,
+  finishBusinessIdeaCanvasNodeEdit
+} from "./nodeController";
 import {
   businessIdeaCanvasSelectedIds,
   copyBusinessIdeaCanvasSelection,
@@ -39,6 +43,7 @@ export {
   updateBusinessIdeaCanvasProject
 } from "./canvasModelController";
 export {
+  businessIdeaCanvasDragNodeIdsForNode,
   finishBusinessIdeaCanvasConnectionDrag,
   finishBusinessIdeaCanvasPointer,
   hasBusinessIdeaCanvasPointerState,
@@ -67,8 +72,11 @@ export {
   deleteBusinessIdeaCanvasSelectedNode,
   duplicateBusinessIdeaCanvasSelectedNode,
   editBusinessIdeaCanvasNode,
+  cancelBusinessIdeaCanvasNodeEdit,
+  finishBusinessIdeaCanvasNodeEdit,
   handleBusinessIdeaCanvasDoubleClick,
   insertBusinessIdeaCanvasNode,
+  updateBusinessIdeaCanvasGroupName,
   updateBusinessIdeaCanvasNodeText,
   updateBusinessIdeaCanvasSelectedNodeField
 } from "./nodeController";
@@ -208,9 +216,20 @@ export function handleBusinessIdeaCanvasWheel(event: WheelEvent): void {
 }
 
 export function handleBusinessIdeaCanvasFocusOut(event: FocusEvent): void {
-  const input = (event.target as HTMLElement | null)?.closest<HTMLInputElement>("[data-business-canvas-edge-label-input]");
+  const target = event.target as HTMLElement | null;
+  const input = target?.closest<HTMLInputElement>("[data-business-canvas-edge-label-input]");
   if (input?.dataset.businessCanvasEdgeLabelInput) {
     commitBusinessIdeaCanvasEdgeLabelEdit();
+    return;
+  }
+  const groupNameInput = target?.closest<HTMLInputElement>("[data-business-canvas-group-name-input]");
+  if (groupNameInput?.dataset.businessCanvasGroupNameInput) {
+    finishBusinessIdeaCanvasNodeEdit(groupNameInput.dataset.businessCanvasGroupNameInput, groupNameInput.value);
+    return;
+  }
+  const nodeText = target?.closest<HTMLElement>("[data-business-canvas-node-text]");
+  if (nodeText?.dataset.businessCanvasNodeText) {
+    finishBusinessIdeaCanvasNodeEdit(nodeText.dataset.businessCanvasNodeText, nodeText.textContent ?? "");
   }
 }
 
@@ -225,6 +244,19 @@ export function handleBusinessIdeaCanvasKeyDown(event: KeyboardEvent): void {
     if (event.key === "Escape") {
       event.preventDefault();
       cancelBusinessIdeaCanvasEdgeLabelEdit();
+      return;
+    }
+  }
+  const groupNameInput = (event.target as HTMLElement | null)?.closest<HTMLInputElement>("[data-business-canvas-group-name-input]");
+  if (groupNameInput && businessCanvasUiState.editingNode) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finishBusinessIdeaCanvasNodeEdit(groupNameInput.dataset.businessCanvasGroupNameInput || "", groupNameInput.value);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelBusinessIdeaCanvasNodeEdit();
       return;
     }
   }

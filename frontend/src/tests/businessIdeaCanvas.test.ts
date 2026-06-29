@@ -5,6 +5,7 @@ import {
   businessIdeaCanvasDirectionFromEdge,
   businessIdeaCanvasEndsForDirection,
   businessIdeaCanvasGanttRows,
+  businessIdeaCanvasGroupDisplayName,
   businessIdeaCanvasMoveDeltaForNodes,
   businessIdeaCanvasNodesInsideRect,
   businessIdeaCanvasPaletteRows,
@@ -127,6 +128,25 @@ describe("business idea canvas", () => {
     expect(businessIdeaCanvasEndsForDirection("backward")).toEqual({ fromEnd: "arrow", toEnd: "none" });
     expect(businessIdeaCanvasEndsForDirection("both")).toEqual({ fromEnd: "arrow", toEnd: "arrow" });
     expect(businessIdeaCanvasDirectionFromEdge({ fromEnd: "arrow", toEnd: "none" })).toBe("backward");
+  });
+
+  it("normalizes legacy text aliases into canonical canvas text", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [
+        { id: "label-text", type: "text", labelText: "Label Text", x: 0, y: 0, width: 100, height: 80 },
+        { id: "field-label", type: "text", fieldLabel: "Field Label", x: 120, y: 0, width: 100, height: 80 },
+        { id: "title", type: "text", title: "Title Text", x: 240, y: 0, width: 100, height: 80 },
+        { id: "canonical", type: "text", text: "Canonical Text", title: "Ignored", x: 360, y: 0, width: 100, height: 80 }
+      ],
+      edges: []
+    });
+
+    expect(canvas.nodes.map((node) => (node.type === "text" ? node.text : ""))).toEqual([
+      "Label Text",
+      "Field Label",
+      "Title Text",
+      "Canonical Text"
+    ]);
   });
 
   it("maps a line branch point to the nearest real node endpoint", () => {
@@ -405,6 +425,33 @@ describe("business idea canvas", () => {
 
     expect(meta.palette.length).toBeGreaterThan(0);
     expect(meta.groupMeta.group).toMatchObject({ nodeIds: ["a"], name: "Validiert", color: "6", status: "open" });
+  });
+
+  it("derives group display names from meta, node labels, and order fallback", () => {
+    const canvas = parseBusinessIdeaCanvasFile({
+      nodes: [
+        { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 },
+        { id: "group-a", type: "group", x: -20, y: -20, width: 180, height: 140, color: "4" },
+        { id: "group-b", type: "group", label: "Legacy Label", x: 200, y: -20, width: 180, height: 140, color: "5" },
+        { id: "group-c", type: "group", label: "Node Label", x: 420, y: -20, width: 180, height: 140, color: "6" }
+      ],
+      edges: []
+    });
+    const meta = normalizeBusinessIdeaCanvasMeta(
+      {
+        groupMeta: {
+          "group-a": { nodeIds: [], name: "", color: "4" },
+          "group-b": { nodeIds: [], name: "Meta Name", color: "5" },
+          "group-c": { nodeIds: [], color: "6" }
+        }
+      },
+      canvas
+    );
+
+    expect(meta.groupMeta["group-a"].name).toBe("");
+    expect(businessIdeaCanvasGroupDisplayName(canvas, meta, canvas.nodes[1])).toBe("Gruppe 1");
+    expect(businessIdeaCanvasGroupDisplayName(canvas, meta, canvas.nodes[2])).toBe("Meta Name");
+    expect(businessIdeaCanvasGroupDisplayName(canvas, meta, canvas.nodes[3])).toBe("Node Label");
   });
 
   it("rejects invalid external canvas files with clear errors", () => {
