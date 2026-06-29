@@ -105,14 +105,34 @@ export function renderHomeTemplate(): string {
               badge: "Persoenlich"
             },
             {
-              sectionId: "self_employment_dashboard",
-              title: "Selbststaendigkeits-Dashboard",
-              subtitle: "Projekte, Zeit, Budget und Gewinnpotenzial",
+              sectionId: "project_dashboard",
+              title: "Projekt-Dashboard",
+              subtitle: "Projektidee, Planung, Aufgaben und Umsetzung",
               description:
-                "Selbststaendigkeitsprojekte planen, pruefen und mit Zeit, Budget, Aufgaben und Gewinnpotenzial verbinden.",
+                "Projektideen strukturieren, Planung schaerfen, Aufgaben verfolgen und Zeitbudget verbinden.",
               actionLabel: "Dashboard oeffnen",
               icon: "self_employment",
               badge: "Projekt"
+            },
+            {
+              sectionId: "self_employment_overview",
+              title: "Selbststaendigkeits-Dashboard",
+              subtitle: "Einnahmen, Kunden und Auslastung",
+              description:
+                "Vorbereiteter Bereich fuer laufende Selbststaendigkeit, Angebote, Kapazitaet und wiederkehrende Aufgaben.",
+              actionLabel: "Dashboard oeffnen",
+              icon: "account",
+              badge: "Selbststaendig"
+            },
+            {
+              sectionId: "business_foundation_dashboard",
+              title: "Unternehmensgründungs-Dashboard",
+              subtitle: "Gruendungsfahrplan und erste Kunden",
+              description:
+                "Vorbereiteter Bereich fuer Validierung, Rechtsform, Budget, Behoerden-Schritte und Markteintritt.",
+              actionLabel: "Dashboard oeffnen",
+              icon: "investment",
+              badge: "Gruendung"
             }
           ],
           "section",

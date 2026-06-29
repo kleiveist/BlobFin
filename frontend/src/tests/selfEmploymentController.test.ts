@@ -354,8 +354,8 @@ describe("self employment controller persistence", () => {
     expect(collapsedItem).not.toContain("self-employment-project-module-grid");
     expect(expandedItem).toContain('aria-expanded="true"');
     expect(expandedItem).toContain("self-employment-project-list-details");
-    expect(expandedItem).toContain("self-employment-project-module-grid");
-    expect(expandedItem).toContain('data-self-employment-field="module.metrics"');
+    expect(expandedItem).not.toContain("self-employment-project-module-grid");
+    expect(expandedItem).not.toContain('data-self-employment-field="module.metrics"');
   });
 
   it("toggles exactly one project list item open at a time", () => {
@@ -444,35 +444,34 @@ describe("self employment controller persistence", () => {
     expect(host.calls).toEqual([]);
   });
 
-  it("keeps project module controls in the project list, renders the roadmap, and omits the detail control panel", () => {
+  it("renders only project roadmap areas and falls back from old module areas", () => {
     const host = configureFakeSelfEmploymentHost();
     const project = {
       ...host.state.selfEmployment.projects[0],
       enabledModules: { invoices: false, budget: false, contacts: false, profit: false, metrics: true }
     };
 
-    const disabledHtml = selfEmploymentProjectDetails(
+    const html = selfEmploymentProjectDetails(
       evaluateSelfEmploymentProject(project, { availableTimeHours: 40, availableReserve: 5000 }),
       "budget",
       fakeIncomePlanningModel()
     );
-    const enabledHtml = selfEmploymentProjectDetails(
-      evaluateSelfEmploymentProject({ ...project, enabledModules: { ...project.enabledModules, budget: true } }, {
-        availableTimeHours: 40,
-        availableReserve: 5000
-      }),
-      "budget",
-      fakeIncomePlanningModel()
-    );
 
-    expect(disabledHtml).not.toContain("self-employment-module-toggle-grid");
-    expect(disabledHtml).not.toContain('data-self-employment-field="module.budget"');
-    expect(disabledHtml).not.toContain('data-self-employment-roadmap-area="budget"');
-    expect(disabledHtml).not.toContain("Budget &amp; Investitionen");
-    expect(enabledHtml).toContain('data-self-employment-roadmap-area="budget"');
-    expect(enabledHtml).toContain("Budget &amp; Investitionen");
-    expect(enabledHtml).not.toContain("self-employment-project-control-panel");
-    expect(enabledHtml).not.toContain('aria-label="Projektsteuerung"');
+    expect(html).toContain('data-self-employment-roadmap-area="idea"');
+    expect(html).toContain('data-self-employment-roadmap-area="planning"');
+    expect(html).toContain('data-self-employment-roadmap-area="tasks"');
+    expect(html).toContain('data-self-employment-roadmap-area="time"');
+    expect(html).toContain("Projektidee");
+    expect(html).not.toContain("self-employment-module-toggle-grid");
+    expect(html).not.toContain('data-self-employment-field="module.budget"');
+    expect(html).not.toContain('data-self-employment-roadmap-area="budget"');
+    expect(html).not.toContain('data-self-employment-roadmap-area="contacts"');
+    expect(html).not.toContain('data-self-employment-roadmap-area="profit"');
+    expect(html).not.toContain('data-self-employment-roadmap-area="metrics"');
+    expect(html).not.toContain("Budget &amp; Investitionen");
+    expect(html).not.toContain("Kundenkontakte");
+    expect(html).not.toContain("Gewinnschaetzung");
+    expect(html).not.toContain("Kennzahlen");
   });
 
   it("normalizes done project status aliases and updates project modules through saved fields", () => {
@@ -499,7 +498,7 @@ describe("self employment controller persistence", () => {
     expect(selfEmploymentProjectIsActive({ ...project, status: "cancelled" })).toBe(false);
   });
 
-  it("renders separated offer and invoice tabs with card-based offer calculation", () => {
+  it("does not expose old billing areas through the project roadmap", () => {
     const host = configureFakeSelfEmploymentHost();
     const project = {
       ...projectWithRelatedTodos(host.state),
@@ -515,28 +514,20 @@ describe("self employment controller persistence", () => {
       }
     };
 
-    const offerHtml = selfEmploymentProjectDetails(
+    const html = selfEmploymentProjectDetails(
       evaluateSelfEmploymentProject(project, { availableTimeHours: 40, availableReserve: 5000, weeklyTimeDemand: 4 }),
       "invoices",
       fakeIncomePlanningModel()
     );
 
-    expect(offerHtml).toContain("Phasenfaktoren verwenden");
-    expect(offerHtml).toContain("Labelfaktoren verwenden");
-    expect(offerHtml).toContain("Angebotsuebersicht anzeigen");
-    expect(offerHtml).toContain("Karte A");
-    expect(offerHtml).toContain("33,60");
-
-    selfEmploymentUiState.billingTabByProjectId = { [project.id]: "invoices" };
-    const invoiceHtml = selfEmploymentProjectDetails(
-      evaluateSelfEmploymentProject(project, { availableTimeHours: 40, availableReserve: 5000, weeklyTimeDemand: 4 }),
-      "invoices",
-      fakeIncomePlanningModel()
-    );
-
-    expect(invoiceHtml).toContain("Angebot uebernehmen");
-    expect(invoiceHtml).toContain("Rechnung hinzufuegen");
-    expect(invoiceHtml).toContain("Ueberfaellig");
+    expect(html).toContain("Projektidee");
+    expect(html).not.toContain('data-self-employment-roadmap-area="invoices"');
+    expect(html).not.toContain("Phasenfaktoren verwenden");
+    expect(html).not.toContain("Labelfaktoren verwenden");
+    expect(html).not.toContain("Angebotsuebersicht anzeigen");
+    expect(html).not.toContain("Angebot uebernehmen");
+    expect(html).not.toContain("Rechnung hinzufuegen");
+    expect(html).not.toContain("Ueberfaellig");
   });
 });
 

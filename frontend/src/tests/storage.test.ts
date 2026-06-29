@@ -113,7 +113,9 @@ describe("storage", () => {
     for (const section of [
       "income",
       "income_planning",
-      "self_employment_dashboard",
+      "project_dashboard",
+      "self_employment_overview",
+      "business_foundation_dashboard",
       "planning_scenarios",
       "real_estate_financing",
       "combined_wealth",
@@ -137,6 +139,19 @@ describe("storage", () => {
     const loaded = loadState(storage);
 
     expect(loaded.ui.activeSection).toBe("income_planning");
+  });
+
+  it("normalizes legacy self employment dashboard section ids to the project dashboard", () => {
+    const storage = new MemoryStorage();
+
+    for (const section of ["self_employment", "self_employment_dashboard"]) {
+      const state = defaultAppState();
+      storage.setItem(STORAGE_KEY, JSON.stringify({ ...state, ui: { ...state.ui, activeSection: section } }));
+
+      const loaded = loadState(storage);
+
+      expect(loaded.ui.activeSection).toBe("project_dashboard");
+    }
   });
 
   it("starts with a self employment example project", () => {

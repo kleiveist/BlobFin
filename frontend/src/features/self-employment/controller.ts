@@ -42,21 +42,10 @@ import {
   selfEmploymentStatusLabel,
   selfEmploymentTaskPriorityFromValue,
   selfEmploymentTaskStatusFromValue,
-  selfEmploymentTextToList,
-  selfEmploymentTotals
+  selfEmploymentTextToList
 } from "./feasibilityController";
 import { selfEmploymentProjectCard } from "./renderProjectCards";
 import { renderSelfEmploymentProjectRenameDialog } from "./renderProjectDialog";
-import {
-  investmentTableRow,
-  profitTableRow,
-  riskTableRow,
-  selfEmploymentBarChart,
-  selfEmploymentFeasibilityPanel,
-  selfEmploymentMetric,
-  selfEmploymentStatusChart,
-  selfEmploymentTable
-} from "./renderFeasibility";
 import { selfEmploymentProjectDetails } from "./renderProjectDetails";
 
 interface SelfEmploymentHost {
@@ -112,44 +101,23 @@ export function renderSelfEmploymentDashboard(): void {
   if (!container) return;
   normalizeSelfEmploymentSelection();
   const evaluations = selfEmploymentProjectEvaluations();
-  const context = selfEmploymentEvaluationContext();
   const incomePlanningState = host.getState().incomePlanning;
   const incomePlanningModel = host.incomePlanningModelForActiveWeek();
   const selected = evaluations.find((item) => item.project.id === host.getState().selfEmployment.selectedProjectId) ?? evaluations[0];
-  const totals = selfEmploymentTotals(evaluations, context.availableTimeHours);
   const activeEvaluations = evaluations.filter((evaluation) => selfEmploymentProjectIsActive(evaluation.project));
   const dashboardEvaluations = selfEmploymentDashboardEvaluations(activeEvaluations);
   const projectCardsHtml = dashboardEvaluations.length
     ? dashboardEvaluations.map((evaluation) => selfEmploymentProjectCard(evaluation, selected?.project.id)).join("")
     : `
       <article class="self-employment-empty-card">
-        <h3>Keine Dashboard-Projekte</h3>
-        <p>Markiere bis zu drei offene oder laufende Projekte in der Projektliste fuer das Dashboard.</p>
+        <h3>Keine Projekte im Dashboard</h3>
+        <p>Markiere bis zu drei offene oder laufende Projekte in der Projektliste fuer das Projekt-Dashboard.</p>
       </article>
     `;
-  const analysisHtml = activeEvaluations.length
-    ? `
-      <section class="self-employment-analysis" aria-label="Projekt-Auswertung">
-        ${selfEmploymentStatusChart(activeEvaluations)}
-        ${selfEmploymentBarChart("Zeitbedarf je Projekt", activeEvaluations, "time")}
-        ${selfEmploymentBarChart("Gewinnpotenzial je Projekt", activeEvaluations, "profit")}
-        ${selfEmploymentFeasibilityPanel(activeEvaluations)}
-      </section>
-    `
-    : "";
-  const tablesHtml = activeEvaluations.length
-    ? `
-      <section class="self-employment-tables" aria-label="Projekt-Tabellen">
-        ${selfEmploymentTable("Projekte nach Risiko", ["Projekt", "Risiko", "Machbarkeit"], activeEvaluations, riskTableRow)}
-        ${selfEmploymentTable("Investitionsbedarf", ["Projekt", "Startkapital", "Luecke"], activeEvaluations, investmentTableRow)}
-        ${selfEmploymentTable("Erwarteter Gewinn", ["Projekt", "Umsatz", "Gewinn"], activeEvaluations, profitTableRow)}
-      </section>
-    `
-    : "";
 
   container.innerHTML = `
     <section class="self-employment-hero">
-      <h2>Selbststaendigkeits-Dashboard</h2>
+      <h2>Projekt-Dashboard</h2>
     </section>
     <section class="self-employment-project-management" aria-label="Projektverwaltung">
       <span class="self-employment-project-management-label">Projektverwaltung</span>
@@ -160,14 +128,9 @@ export function renderSelfEmploymentDashboard(): void {
     </section>
     ${selfEmploymentProjectListPopup(evaluations)}
     ${renderSelfEmploymentProjectRenameDialog(host.getState().selfEmployment.projects)}
-    <section class="self-employment-metrics" aria-label="Projektuebergreifende Kennzahlen">
-      ${selfEmploymentMetric("Aktive Projekte", intNumber(totals.activeProjects), `${intNumber(totals.totalProjects)} insgesamt`)}${selfEmploymentMetric("Neutral", intNumber(totals.neutralProjects), "Humankapital separat")}
-    </section>
-    <section class="self-employment-cards" aria-label="Selbststaendigkeitsprojekte">
+    <section class="self-employment-cards" aria-label="Projektuebersicht">
       ${projectCardsHtml}
     </section>
-    ${analysisHtml}
-    ${tablesHtml}
     ${selected
       ? selfEmploymentProjectDetails(
           selected,
@@ -283,29 +246,8 @@ function selfEmploymentProjectListItemDetails(project: SelfEmploymentProject, da
         <button class="button mini secondary" type="button" data-action="self-employment-select-project" data-self-employment-project-id="${escapeHtml(project.id)}">Oeffnen</button>
         <button class="button mini secondary" type="button" data-action="self-employment-rename-project" data-self-employment-project-id="${escapeHtml(project.id)}">Umbenennen</button>
       </div>
-      <div class="self-employment-project-list-modules">
-        <span>Module:</span>
-        <div class="self-employment-project-module-grid">
-          ${(["invoices", "budget", "contacts", "profit", "metrics"] as const)
-            .map((module) => selfEmploymentProjectListModuleToggle(project, module, selfEmploymentModuleLabel(module)))
-            .join("")}
-        </div>
-      </div>
     </div>
   `;
-}
-
-function selfEmploymentProjectListModuleToggle(project: SelfEmploymentProject, module: keyof SelfEmploymentProjectModules, label: string): string {
-  return `
-    <label class="self-employment-check-field">
-      <input type="checkbox" ${project.enabledModules[module] ? "checked" : ""} data-self-employment-project-id="${escapeHtml(project.id)}" data-self-employment-field="${escapeHtml(`module.${module}`)}" />
-      <span>${escapeHtml(label)}</span>
-    </label>
-  `;
-}
-
-function selfEmploymentModuleLabel(module: keyof SelfEmploymentProjectModules): string {
-  return { invoices: "Angebote & Rechnungen", budget: "Budget & Investitionen", contacts: "Kundenkontakte", profit: "Gewinnschaetzung", metrics: "Kennzahlen" }[module];
 }
 
 function selfEmploymentInlineSelect(
@@ -410,7 +352,7 @@ export function addSelfEmploymentProject(): void {
   const index = host.getState().selfEmployment.projects.length + 1;
   const id = createId();
   const now = new Date().toISOString();
-  const canvasDefaults = defaultBusinessIdeaCanvasForProject(id, { idea: "Neue Geschaeftsidee" });
+  const canvasDefaults = defaultBusinessIdeaCanvasForProject(id, { idea: "Neue Projektidee" });
   const project: SelfEmploymentProject = {
     ...defaultSelfEmploymentState().projects[0],
     ...canvasDefaults,
@@ -434,7 +376,7 @@ export function addSelfEmploymentProject(): void {
       bufferPercent: 10,
       taxPercent: 19
     },
-    idea: "Neue Geschaeftsidee",
+    idea: "Neue Projektidee",
     problem: "",
     targetGroup: "",
     revenueModel: "",

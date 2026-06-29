@@ -1,13 +1,10 @@
-import { escapeHtml, money } from "../../lib/format";
+import { escapeHtml } from "../../lib/format";
 import { normalizePositionIcon, positionIconSvg } from "../../lib/positionIcons";
 import type { SelfEmploymentProject } from "../../types";
 import type { SelfEmploymentProjectEvaluation } from "./feasibilityController";
 import {
   hoursLabel,
-  selfEmploymentFeasibilityLabel,
   selfEmploymentPriorityLabel,
-  selfEmploymentProjectTypeBenefitLabel,
-  selfEmploymentProjectTypeLabel,
   selfEmploymentStatusLabel
 } from "./feasibilityController";
 import { SELF_EMPLOYMENT_LABEL_OPTIONS } from "./config";
@@ -48,10 +45,10 @@ export function selfEmploymentProjectCard(evaluation: SelfEmploymentProjectEvalu
           <span class="self-employment-project-title">
             <strong>${escapeHtml(project.name)}</strong>
           </span>
-          <span>${escapeHtml(`${selfEmploymentStatusLabel(project.status)} · ${selfEmploymentProjectTypeLabel(project.projectType)} · ${selfEmploymentPriorityLabel(project.priority)}`)}</span>
+          <span>${escapeHtml(`${selfEmploymentStatusLabel(project.status)} · Prioritaet ${selfEmploymentPriorityLabel(project.priority)}`)}</span>
           <span>Zeitbedarf: ${hoursLabel(evaluation.weeklyTimeDemand)} / Woche</span>
-          <span>${escapeHtml(selfEmploymentProjectPotentialLabel(evaluation))}</span>
-          <span>Machbarkeit: ${escapeHtml(selfEmploymentFeasibilityLabel(evaluation.feasibility))}</span>
+          <span>Offene Aufgabenzeit: ${hoursLabel(evaluation.openTaskHours)}</span>
+          <span>${escapeHtml(project.nextSteps[0] ? `Naechster Schritt: ${project.nextSteps[0]}` : "Naechster Schritt offen")}</span>
         </button>
       </div>
       <div class="self-employment-project-labels" aria-label="Projektlabels">${labelChips}</div>
@@ -63,16 +60,6 @@ export function selfEmploymentProjectCard(evaluation: SelfEmploymentProjectEvalu
       ${selfEmploymentUiState.labelPickerProjectId === project.id ? selfEmploymentLabelPicker(project) : ""}
     </article>
   `;
-}
-
-function selfEmploymentProjectPotentialLabel(evaluation: SelfEmploymentProjectEvaluation): string {
-  if (evaluation.project.projectType === "revenue") {
-    return `Gewinnpotenzial: ${money(evaluation.monthlyProfitAfterReserve)} / Monat`;
-  }
-  if (evaluation.project.projectType === "human_capital") {
-    return evaluation.benefitLabel;
-  }
-  return `${selfEmploymentProjectTypeBenefitLabel(evaluation.project.projectType)} · direkt ${money(evaluation.monthlyProfitAfterReserve)} / Monat`;
 }
 
 function selfEmploymentLabelPicker(project: SelfEmploymentProject): string {

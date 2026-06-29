@@ -111,7 +111,7 @@ export function defaultBusinessIdeaCanvasForProject(
 ): BusinessIdeaCanvasDefaults {
   const safeProjectId = safeIdPart(projectId || "project");
   const nodes = [
-    textNode(`${safeProjectId}-idea`, fields.idea || "Neue Geschaeftsidee", -160, -70, 320, 110, "1"),
+    textNode(`${safeProjectId}-idea`, fields.idea || "Neue Projektidee", -160, -70, 320, 110, "1"),
     textNode(`${safeProjectId}-problem`, fields.problem || "Problem / Bedarf", -500, 130, 280, 120, "3"),
     textNode(`${safeProjectId}-target-group`, fields.targetGroup || "Zielgruppe", -140, 150, 280, 110, "3"),
     textNode(`${safeProjectId}-revenue`, fields.revenueModel || "Einnahmemodell", 230, 130, 280, 120, "2")

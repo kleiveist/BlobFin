@@ -214,13 +214,8 @@ export function normalizeSelfEmploymentRoadmapAreaId(
 ): SelfEmploymentRoadmapAreaId {
   return value === "idea" ||
     value === "planning" ||
-    value === "contacts" ||
-    value === "invoices" ||
     value === "tasks" ||
-    value === "time" ||
-    value === "budget" ||
-    value === "profit" ||
-    value === "metrics"
+    value === "time"
     ? value
     : fallback;
 }

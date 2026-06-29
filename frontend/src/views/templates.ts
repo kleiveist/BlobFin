@@ -122,10 +122,38 @@ export function renderAppShell(): string {
     <main class="app-main">
       ${renderHomeTemplate()}
 
-      <section class="panel self-employment-panel" data-module-section="self_employment_dashboard">
-        ${moduleTopBar("Selbststaendigkeits-Dashboard", "Projekte, Zeit, Budget und Gewinnpotenzial")}
+      <section class="panel self-employment-panel" data-module-section="project_dashboard">
+        ${moduleTopBar("Projekt-Dashboard", "Projektidee, Planung, Aufgaben und Umsetzung")}
         <div id="selfEmploymentDashboard" class="self-employment-dashboard"></div>
         <div id="selfEmploymentIconPicker" class="position-icon-picker self-employment-icon-picker" role="dialog" aria-label="Projekt-Icon auswaehlen" hidden></div>
+      </section>
+
+      <section class="panel dashboard-placeholder-panel" data-module-section="self_employment_overview">
+        ${moduleTopBar("Selbststaendigkeits-Dashboard", "Einnahmen, Kunden, Angebote und Auslastung")}
+        <article class="dashboard-placeholder">
+          <h2>Selbststaendigkeits-Dashboard</h2>
+          <p>
+            Hier entsteht dein Cockpit fuer laufende Selbststaendigkeit: Einnahmen, Kunden, Angebote, Auslastung,
+            wiederkehrende Aufgaben und persoenliche Kapazitaet.
+          </p>
+          <p>
+            Aktuell ist dieser Bereich vorbereitet und wird schrittweise mit Projekt-, Zeit- und Finanzdaten verbunden.
+          </p>
+        </article>
+      </section>
+
+      <section class="panel dashboard-placeholder-panel" data-module-section="business_foundation_dashboard">
+        ${moduleTopBar("Unternehmensgründungs-Dashboard", "Idee validieren, Budget planen und Markteintritt vorbereiten")}
+        <article class="dashboard-placeholder">
+          <h2>Unternehmensgründungs-Dashboard</h2>
+          <p>
+            Hier entsteht dein Gruendungsfahrplan: Idee validieren, Rechtsform klaeren, Budget planen,
+            Behoerden-Schritte, Markteintritt und erste Kunden.
+          </p>
+          <p>
+            Dieser Bereich wird spaeter mit Projektideen, Aufgaben, Budgetplanung und Meilensteinen verknuepft.
+          </p>
+        </article>
       </section>
 
       <section class="panel income-planning-panel" data-module-section="income_planning">

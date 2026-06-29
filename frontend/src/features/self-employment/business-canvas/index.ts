@@ -20,7 +20,7 @@ export { renderBusinessCanvas } from "./controller";
 
 export const businessCanvasFeature: FeatureModule = {
   id: "business-canvas",
-  sections: ["self_employment_dashboard"],
+  sections: ["project_dashboard"],
   onInput: handleBusinessCanvasInput,
   onChange: handleBusinessCanvasChange,
   onClick: handleBusinessCanvasClick,

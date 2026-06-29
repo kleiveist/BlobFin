@@ -43,11 +43,17 @@ describe("app shell", () => {
     expect(appSectionIdFromValue("income")).toBe("income");
     expect(appSectionIdFromValue("income_tracking")).toBe("income");
     expect(appSectionIdFromValue("income_stamp_planner")).toBe("income_planning");
+    expect(appSectionIdFromValue("project_dashboard")).toBe("project_dashboard");
+    expect(appSectionIdFromValue("self_employment")).toBe("project_dashboard");
+    expect(appSectionIdFromValue("self_employment_dashboard")).toBe("project_dashboard");
+    expect(appSectionIdFromValue("self_employment_overview")).toBe("self_employment_overview");
+    expect(appSectionIdFromValue("business_foundation_dashboard")).toBe("business_foundation_dashboard");
     expect(appSectionIdFromValue("year_table")).toBe("planning_scenarios");
     expect(appSectionIdFromValue("investment_overview")).toBe("planning_scenarios");
     expect(appSectionIdFromValue("unknown")).toBeNull();
     expect(sectionFromLocationHash("#income_charts")).toBe("income");
     expect(sectionFromLocationHash("#income_stamp_planner")).toBe("income_planning");
+    expect(sectionFromLocationHash("#self_employment_dashboard")).toBe("project_dashboard");
     expect(sectionFromLocationHash("#real_estate_financing")).toBe("real_estate_financing");
     expect(sectionFromLocationHash("")).toBeNull();
   });
@@ -67,6 +73,7 @@ describe("app shell", () => {
       "combined-wealth"
     ]);
     expect(featureModules.flatMap((feature) => feature.sections ?? [])).toContain("combined_wealth");
+    expect(featureModules.flatMap((feature) => feature.sections ?? [])).toContain("project_dashboard");
   });
 
   it("dispatches feature events before host handlers and keeps wheel non-passive", () => {

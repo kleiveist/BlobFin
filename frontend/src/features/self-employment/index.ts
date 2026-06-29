@@ -14,7 +14,7 @@ import {
 
 export const selfEmploymentFeature: FeatureModule = {
   id: "self-employment",
-  sections: ["self_employment_dashboard"],
+  sections: ["project_dashboard"],
   onInput: onSelfEmploymentInput,
   onChange: onSelfEmploymentChange,
   onClick: onSelfEmploymentClick,

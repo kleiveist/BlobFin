@@ -251,10 +251,15 @@ export function normalizeAppSectionId(value: unknown, fallback: AppSectionId): A
   ) {
     return "planning_scenarios";
   }
+  if (value === "self_employment" || value === "self_employment_dashboard") {
+    return "project_dashboard";
+  }
   if (
     value === "home" ||
     value === "income_planning" ||
-    value === "self_employment_dashboard" ||
+    value === "project_dashboard" ||
+    value === "self_employment_overview" ||
+    value === "business_foundation_dashboard" ||
     value === "real_estate_financing" ||
     value === "statutory_pension" ||
     value === "combined_wealth"
