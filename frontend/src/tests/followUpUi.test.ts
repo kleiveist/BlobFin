@@ -213,6 +213,17 @@ describe("follow-up ui rendering", () => {
     expect(count(html, 'class="overview-card section-overview-card')).toBe(4);
     expect(html).not.toContain('class="overview-subcard"');
     expect(html).toContain('class="module-overview-grid landing-personal-grid"');
+    const personalGridStyles = stylesSource.slice(
+      stylesSource.indexOf(".landing-personal-grid {"),
+      stylesSource.indexOf(".landing-personal-grid .section-overview-card")
+    );
+    expect(personalGridStyles).toContain("gap: 16px;");
+    expect(personalGridStyles).toContain("grid-template-columns: repeat(4, minmax(220px, 1fr));");
+    expect(personalGridStyles).toContain("max-width: none;");
+    expect(personalGridStyles).toContain("width: 100%;");
+    expect(stylesSource).toContain("@media (max-width: 980px)");
+    expect(stylesSource).toContain("grid-template-columns: repeat(2, minmax(220px, 1fr));");
+    expect(personalGridStyles).not.toContain("max-width: 1120px;");
     const landingMainGridStart = html.indexOf('class="module-overview-grid landing-main-grid"');
     const landingPersonalGridStart = html.indexOf('class="module-overview-grid landing-personal-grid"');
     expect(landingMainGridStart).toBeGreaterThanOrEqual(0);

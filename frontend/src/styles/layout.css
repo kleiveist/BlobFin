@@ -328,8 +328,10 @@ h3 {
 }
 
 .landing-personal-grid {
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
-  max-width: 1120px;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  max-width: none;
+  width: 100%;
 }
 
 .landing-personal-grid .section-overview-card {
