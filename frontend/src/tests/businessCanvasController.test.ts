@@ -90,6 +90,20 @@ describe("business canvas controller", () => {
     expect(toolbar).not.toContain("business-canvas-phase-dropdown");
   });
 
+  it("right-aligns the single group toolbar inside the group area", () => {
+    const host = configureFakeBusinessCanvasHost([
+      { id: "group", type: "group", label: "Gruppe", x: 0, y: 0, width: 180, height: 140 }
+    ]);
+    const html = renderBusinessIdeaCanvasEditor(host.project(), {
+      ...blankBusinessIdeaCanvasRenderState(),
+      selectedNodeIds: ["group"]
+    });
+    const toolbar = renderBusinessCanvasToolbar(html);
+
+    expect(toolbar).toContain("transform:translateX(-100%)");
+    expect(toolbar).toContain("left:472px;top:188px");
+  });
+
   it("renders completed gantt cards as completed business canvas cards", () => {
     const host = configureFakeBusinessCanvasHost([
       { id: "done-card", type: "text", text: "Fertige Karte", x: 0, y: 0, width: 100, height: 80 },
@@ -491,6 +505,15 @@ function renderBusinessCanvasNodeArticle(html: string, nodeId: string): string {
   const articleEnd = html.indexOf("</article>", markerIndex);
   if (articleStart === -1 || articleEnd === -1) return "";
   return html.slice(articleStart, articleEnd + "</article>".length);
+}
+
+function renderBusinessCanvasToolbar(html: string): string {
+  const markerIndex = html.indexOf("data-business-canvas-node-toolbar");
+  if (markerIndex === -1) return "";
+  const toolbarStart = html.lastIndexOf("<div", markerIndex);
+  const toolbarEnd = html.indexOf("</div>", markerIndex);
+  if (toolbarStart === -1 || toolbarEnd === -1) return "";
+  return html.slice(toolbarStart, toolbarEnd + "</div>".length);
 }
 
 function keyboardEvent(

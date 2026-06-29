@@ -400,15 +400,16 @@ function renderBusinessIdeaCanvasNodeToolbar(
   if (!selectedNode) return "";
   const meta = project.businessIdeaCanvasMeta;
   const nodeMeta = meta.nodeMeta[selectedNode.id];
-  const position = toolbarPosition(meta, selectedNode.x, selectedNode.y);
   if (selectedNode.type === "group") {
+    const position = groupToolbarPosition(meta, selectedNode);
     return `
-      <div class="business-canvas-node-toolbar" style="left:${position.left}px;top:${position.top}px;" data-business-canvas-node-toolbar>
+      <div class="business-canvas-node-toolbar" style="left:${position.left}px;top:${position.top}px;transform:translateX(-100%);" data-business-canvas-node-toolbar>
         ${renderPaletteButton([selectedNode.id], selectedNode.color)}
         <button class="icon-button danger" type="button" data-action="business-canvas-delete-node" title="Loeschen" aria-label="Loeschen">x</button>
       </div>
     `;
   }
+  const position = toolbarPosition(meta, selectedNode.x, selectedNode.y);
   return `
     <div class="business-canvas-node-toolbar" style="left:${position.left}px;top:${position.top}px;" data-business-canvas-node-toolbar>
       ${renderPaletteButton([selectedNode.id], selectedNode.color)}
@@ -858,6 +859,14 @@ function toolbarPosition(meta: BusinessIdeaCanvasMeta, x: number, y: number): { 
   return {
     left: Math.max(8, Math.round(viewport.x + (x + BUSINESS_IDEA_CANVAS_ORIGIN) * viewport.zoom)),
     top: Math.max(8, Math.round(viewport.y + (y + BUSINESS_IDEA_CANVAS_ORIGIN) * viewport.zoom - 48))
+  };
+}
+
+function groupToolbarPosition(meta: BusinessIdeaCanvasMeta, node: JsonCanvasNode): { left: number; top: number } {
+  const viewport = meta.viewport;
+  return {
+    left: Math.max(8, Math.round(viewport.x + (node.x + node.width + BUSINESS_IDEA_CANVAS_ORIGIN) * viewport.zoom - 8)),
+    top: Math.max(8, Math.round(viewport.y + (node.y + BUSINESS_IDEA_CANVAS_ORIGIN) * viewport.zoom + 8))
   };
 }
 

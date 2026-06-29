@@ -9,6 +9,10 @@
   grid-template-columns: minmax(50px, 0.35fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(100px, 0.7fr) minmax(150px, 1fr);
 }
 
+.income-stamp-planner-dialog .income-planning-dialog-grid.basis {
+  grid-template-columns: minmax(260px, 1fr) minmax(130px, max-content) minmax(120px, max-content);
+}
+
 .income-planning-dialog-grid.single {
   grid-template-columns: minmax(160px, 260px);
 }

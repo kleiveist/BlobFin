@@ -175,13 +175,9 @@ function renderIncomeStampPlannerDialog(): void {
           <button class="chart-popup-close" type="button" data-action="income-stamp-planner-close-dialog" aria-label="Stempel-Planer Dialog schliessen">x</button>
         </div>
         <div class="income-planning-dialog-grid basis">
-          <label class="field">
+          <label class="field income-stamp-planner-label-field">
             <span>Label</span>
             <input type="text" value="${escapeHtml(draft.label)}" data-income-stamp-planner-field="label" />
-          </label>
-          <label class="field">
-            <span>Projekt / Notiz</span>
-            <input type="text" value="${escapeHtml(draft.description)}" data-income-stamp-planner-field="description" />
           </label>
           <label class="field compact">
             <span>Datum</span>
