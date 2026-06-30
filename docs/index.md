@@ -17,6 +17,10 @@
 - 📝 [Testing](def/testing.md)
 - 📝 [Tooling](def/tooling.md)
 
+## 📁 Developer Documentation
+- 🗂️ [Overview](dev/dev.md)
+- 📝 [Business Canvas Editor Requirements](dev/business-canvas-editor-requirements.md)
+
 ## 📁 Tools Documentation (Current Implemented State)
 - 🗂️ [Overview](tools/tools.md)
 - 📝 [build Command](tools/build.md)
